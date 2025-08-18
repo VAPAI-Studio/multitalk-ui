@@ -1170,9 +1170,9 @@ export default function MultiTalkMultiplePeople() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
-      <div className="flex gap-6 p-6 md:p-10">
+      <div className="max-w-7xl mx-auto p-6 md:p-10 grid gap-6 lg:grid-cols-3">
         {/* Main Content */}
-        <div className="flex-1 max-w-4xl space-y-8">
+        <div className="lg:col-span-2 w-full space-y-8">
           <div className="text-center space-y-4 py-8">
             <h1 className="text-4xl md:text-6xl font-black bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent">
               MultiTalk
@@ -1453,7 +1453,7 @@ export default function MultiTalkMultiplePeople() {
         </div>
 
         {/* Right Sidebar */}
-        <div className="w-96 space-y-6">
+        <div className="lg:col-span-1 w-full space-y-6">
           <div className="sticky top-6">
             <div className="rounded-3xl border border-gray-200/80 p-6 shadow-lg bg-gradient-to-br from-white to-gray-50/50 backdrop-blur-sm">
               <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-3">
