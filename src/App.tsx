@@ -7,9 +7,9 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState<"multitalk-one" | "multitalk-multiple" | "audiotest">("multitalk-one");
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen flex flex-col">
       {/* Navigation */}
-      <nav className="bg-white/90 backdrop-blur-md border-b border-gray-200/50 sticky top-0 z-10 shadow-sm">
+      <nav className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-lg border-b border-gray-200/50 dark:border-gray-700/50 sticky top-0 z-10 shadow-sm">
         <div className="max-w-6xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -55,9 +55,11 @@ export default function App() {
       </nav>
 
       {/* Page Content */}
-      {currentPage === "multitalk-one" && <MultiTalkOnePerson />}
-      {currentPage === "multitalk-multiple" && <MultiTalkMultiplePeople />}
-      {currentPage === "audiotest" && <AudioTest />}
+      <main className="flex-1 w-full max-w-6xl mx-auto p-6">
+        {currentPage === "multitalk-one" && <MultiTalkOnePerson />}
+        {currentPage === "multitalk-multiple" && <MultiTalkMultiplePeople />}
+        {currentPage === "audiotest" && <AudioTest />}
+      </main>
     </div>
   );
 }
