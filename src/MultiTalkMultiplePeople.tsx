@@ -610,10 +610,10 @@ export default function MultiTalkMultiplePeople({ comfyUrl }: Props) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
-      <div className="max-w-7xl mx-auto p-6 md:p-10 grid gap-6 lg:grid-cols-3">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      <div className="flex gap-6 p-6 md:p-10">
         {/* Main Content */}
-        <div className="lg:col-span-2 w-full space-y-8">
+        <div className="flex-1 max-w-4xl space-y-8">
           <div className="text-center space-y-4 py-8">
             <h1 className="text-4xl md:text-6xl font-black bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
               MultiTalk
@@ -867,24 +867,10 @@ export default function MultiTalkMultiplePeople({ comfyUrl }: Props) {
             </Section>
         </div>
 
-        {/* Right Sidebar */}
-        <div className="lg:col-span-1 w-full space-y-6">
-          <div className="sticky top-6">
-            <div className="rounded-3xl border border-gray-200/80 p-6 shadow-lg bg-gradient-to-br from-white to-gray-50/50 backdrop-blur-sm">
-              <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-3">
-                <div className="w-2 h-8 bg-gradient-to-b from-emerald-500 to-teal-600 rounded-full"></div>
-                Tips Rápidos
-              </h2>
-              <ul className="list-disc ml-5 text-sm text-gray-700 space-y-1">
-                <li>Usá una imagen con cara clara y bien iluminada para mejores resultados.</li>
-                <li>Posicioná los audios en el timeline para crear conversaciones dinámicas.</li>
-                <li>Ajustá el tiempo de inicio para diálogos o voces superpuestas.</li>
-                <li>El modelo sincroniza automáticamente los movimientos con cada audio.</li>
-                <li>Para máxima compatibilidad, usá anchos y altos múltiplos de 32.</li>
-              </ul>
-            </div>
-            
-            <div className="rounded-3xl border border-gray-200/80 p-6 shadow-lg bg-gradient-to-br from-white to-gray-50/50 backdrop-blur-sm">
+        {/* Right Sidebar - Video Feed */}
+        <div className="w-96 space-y-6">
+          <div className="sticky top-6 h-[calc(100vh-3rem)]">
+            <div className="rounded-3xl border border-gray-200/80 p-6 shadow-lg bg-gradient-to-br from-white to-gray-50/50 backdrop-blur-sm h-full flex flex-col">
               <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-3">
                 <div className="w-2 h-8 bg-gradient-to-b from-purple-500 to-pink-600 rounded-full"></div>
                 Feed de Generaciones
