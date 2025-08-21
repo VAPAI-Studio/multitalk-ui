@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createJob, updateJobToProcessing, completeJob, getCompletedJobsWithVideos } from "./lib/jobTracking";
 import type { MultiTalkJob } from "./lib/supabase";
+import { downloadVideoFromComfy, uploadVideoToStorage } from "./lib/supabase";
+import { startJobMonitoring, checkComfyUIHealth } from "./components/utils";
 
 // MultiTalk One-Person Frontend for ComfyUI
 // - Enter ComfyUI URL
@@ -40,23 +42,26 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 // ---------- Component ----------
-export default function MultiTalkOnePerson() {
-  const [comfyUrl, setComfyUrl] = useState<string>("https://59414078555f.ngrok.app");
+interface Props {
+  comfyUrl: string;
+}
+
+export default function MultiTalkOnePerson({ comfyUrl }: Props) {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
   const [imageAR, setImageAR] = useState<number | null>(null);
 
-  const [lock16x9, setLock16x9] = useState<boolean>(false);
   const [width, setWidth] = useState<number>(640); // defaults from workflow
   const [height, setHeight] = useState<number>(360);
 
-  const [trimToAudio, setTrimToAudio] = useState<boolean>(true);
+  const trimToAudio = true;
   const [status, setStatus] = useState<string>("");
   const [videoUrl, setVideoUrl] = useState<string>("");
   const [jobId, setJobId] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [videoFeed, setVideoFeed] = useState<MultiTalkJob[]>([]);
+  const [jobMonitorCleanup, setJobMonitorCleanup] = useState<(() => void) | null>(null);
 
   const imgRef = useRef<HTMLImageElement | null>(null);
 
@@ -66,6 +71,15 @@ export default function MultiTalkOnePerson() {
     const interval = setInterval(loadVideoFeedFromDB, 30000); // Refresh every 30 seconds
     return () => clearInterval(interval);
   }, [comfyUrl]);
+
+  // cleanup job monitor on unmount
+  useEffect(() => {
+    return () => {
+      if (jobMonitorCleanup) {
+        jobMonitorCleanup();
+      }
+    };
+  }, [jobMonitorCleanup]);
 
   async function loadVideoFeedFromDB() {
     try {
@@ -92,13 +106,11 @@ export default function MultiTalkOnePerson() {
     img.onload = () => {
       const ar = img.width / img.height;
       setImageAR(ar);
-      // If not forcing 16:9, initialize W/H to the nearest multiples of 32 preserving aspect, max width ~ 640
-      if (!lock16x9) {
-        const targetW = Math.max(32, Math.round(Math.min(640, img.width) / 32) * 32);
-        const targetH = Math.max(32, Math.round((targetW / ar) / 32) * 32);
-        setWidth(targetW);
-        setHeight(targetH);
-      }
+      // Initialize W/H to the nearest multiples of 32 preserving aspect, max width ~ 640
+      const targetW = Math.max(32, Math.round(Math.min(640, img.width) / 32) * 32);
+      const targetH = Math.max(32, Math.round((targetW / ar) / 32) * 32);
+      setWidth(targetW);
+      setHeight(targetH);
     };
     img.src = url;
     return () => URL.revokeObjectURL(url);
@@ -106,18 +118,11 @@ export default function MultiTalkOnePerson() {
 
   useEffect(() => {
     if (!imageAR) return;
-    if (lock16x9) {
-      // Lock to 16:9 while keeping width multiple of 32
-      const targetW = Math.max(32, Math.round(width / 32) * 32);
-      const targetH = Math.max(32, Math.round((targetW * 9 / 16) / 32) * 32);
-      if (targetH !== height) setHeight(targetH);
-    } else {
-      // Preserve image aspect ratio: H = W / AR, both multiples of 32
-      const targetH = Math.max(32, Math.round((width / imageAR) / 32) * 32);
-      if (targetH !== height) setHeight(targetH);
-    }
+    // Preserve image aspect ratio: H = W / AR, both multiples of 32
+    const targetH = Math.max(32, Math.round((width / imageAR) / 32) * 32);
+    if (targetH !== height) setHeight(targetH);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [width, lock16x9, imageAR]);
+  }, [width, imageAR]);
 
   async function fileToBase64(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
@@ -174,34 +179,26 @@ export default function MultiTalkOnePerson() {
     }
   }
 
-  function buildPromptJSON(base64Image: string, audioFilename: string) {
-    // Clone of provided workflow JSON with mutations: image (201), audio (195), sizes (171 & 192), trim_to_audio (131)
-    const prompt: any = {
-      "120": { inputs: { model: "WAN\\2.1\\multitalk.safetensors", base_precision: "fp16" }, class_type: "MultiTalkModelLoader", _meta: { title: "MultiTalk Model Loader" } },
-      "122": { inputs: { model: "WAN\\2.1\\Wan2_1-I2V-14B-480P_fp8_e4m3fn.safetensors", base_precision: "fp16_fast", quantization: "fp8_e4m3fn", load_device: "offload_device", attention_mode: "sageattn", compile_args: ["177", 0], block_swap_args: ["134", 0], lora: ["138", 0], multitalk_model: ["120", 0] }, class_type: "WanVideoModelLoader", _meta: { title: "WanVideo Model Loader" } },
-      "128": { inputs: { steps: 4, cfg: 1.03, shift: 11.94, seed: 1, force_offload: true, scheduler: "flowmatch_distill", riflex_freq_index: 0, denoise_strength: 1, batched_cfg: false, rope_function: "comfy", start_step: 0, end_step: -1, add_noise_to_samples: false, model: ["122", 0], image_embeds: ["192", 0], text_embeds: ["135", 0], multitalk_embeds: ["194", 0] }, class_type: "WanVideoSampler", _meta: { title: "WanVideo Sampler" } },
-      "129": { inputs: { model_name: "wan\\wan_2.1_vae.safetensors", precision: "bf16" }, class_type: "WanVideoVAELoader", _meta: { title: "WanVideo VAE Loader" } },
-      "130": { inputs: { enable_vae_tiling: false, tile_x: 272, tile_y: 272, tile_stride_x: 144, tile_stride_y: 128, normalization: "default", vae: ["129", 0], samples: ["128", 0] }, class_type: "WanVideoDecode", _meta: { title: "WanVideo Decode" } },
-      "131": { inputs: { frame_rate: 25, loop_count: 0, filename_prefix: "MultiTalkApi/WanVideo2_1_multitalk", format: "video/h264-mp4", pix_fmt: "yuv420p", crf: 19, save_metadata: true, trim_to_audio: trimToAudio, pingpong: false, save_output: true, images: ["130", 0], audio: ["194", 1] }, class_type: "VHS_VideoCombine", _meta: { title: "Video Combine 🎥🅥🅗🅢" } },
-      "134": { inputs: { blocks_to_swap: 15, offload_img_emb: false, offload_txt_emb: false, use_non_blocking: true, vace_blocks_to_swap: 0, prefetch_blocks: 0, block_swap_debug: false }, class_type: "WanVideoBlockSwap", _meta: { title: "WanVideo Block Swap" } },
-      "135": { inputs: { positive_prompt: "A 2D digital illustration of a teenage girl on her room looking directly into the camera, warm soft tones, inspired by the style and color palette of the reference image. She has a calm but focused expression, as if speaking to the audience like a documentarian, not posing like an influencer. The framing is close-up from the shoulders up, with natural lighting and subtle shadows, minimal background detail to keep focus on her face, animated style with clean lines and soft shading.", negative_prompt: "bright tones, overexposed, static, blurred details, subtitles, style, works, paintings, images, static, overall gray, worst quality, low quality, JPEG compression residue, ugly, incomplete, extra fingers, poorly drawn hands, poorly drawn faces, deformed, disfigured, misshapen limbs, fused fingers, still picture, messy background, three legs, many people in the background, walking backwards", force_offload: true, use_disk_cache: false, device: "gpu", t5: ["136", 0] }, class_type: "WanVideoTextEncode", _meta: { title: "WanVideo TextEncode" } },
-      "136": { inputs: { model_name: "umt5-xxl-enc-bf16.pth", precision: "bf16", load_device: "offload_device", quantization: "disabled" }, class_type: "LoadWanVideoT5TextEncoder", _meta: { title: "WanVideo T5 Text Encoder Loader" } },
-      "137": { inputs: { model: "TencentGameMate/chinese-wav2vec2-base", base_precision: "fp16", load_device: "main_device" }, class_type: "DownloadAndLoadWav2VecModel", _meta: { title: "(Down)load Wav2Vec Model" } },
-      "138": { inputs: { lora: "WAN\\lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors", strength: 0.8, low_mem_load: false, merge_loras: true }, class_type: "WanVideoLoraSelect", _meta: { title: "WanVideo Lora Select" } },
-      "171": { inputs: { width, height, upscale_method: "lanczos", keep_proportion: "crop", pad_color: "0, 0, 0", crop_position: "center", divisible_by: 2, device: "cpu", image: ["201", 0] }, class_type: "ImageResizeKJv2", _meta: { title: "Resize Image v2" } },
-      "173": { inputs: { clip_name: "clip_vision_h.safetensors" }, class_type: "CLIPVisionLoader", _meta: { title: "Load CLIP Vision" } },
-      "177": { inputs: { backend: "inductor", fullgraph: false, mode: "default", dynamic: false, dynamo_cache_size_limit: 64, compile_transformer_blocks_only: true, dynamo_recompile_limit: 128 }, class_type: "WanVideoTorchCompileSettings", _meta: { title: "WanVideo Torch Compile Settings" } },
-      "192": { inputs: { width, height, frame_window_size: 81, motion_frame: 25, force_offload: false, colormatch: "mkl", tiled_vae: false, vae: ["129", 0], start_image: ["171", 0], clip_embeds: ["193", 0] }, class_type: "WanVideoImageToVideoMultiTalk", _meta: { title: "WanVideo Image To Video MultiTalk" } },
-      "193": { inputs: { strength_1: 1, strength_2: 1, crop: "center", combine_embeds: "average", force_offload: true, tiles: 0, ratio: 0.5, clip_vision: ["173", 0], image_1: ["171", 0] }, class_type: "WanVideoClipVisionEncode", _meta: { title: "WanVideo ClipVision Encode" } },
-      "194": { inputs: { normalize_loudness: true, num_frames: 250, fps: 25, audio_scale: 1, audio_cfg_scale: 1, multi_audio_type: "para", wav2vec_model: ["137", 0], audio_1: ["196", 0] }, class_type: "MultiTalkWav2VecEmbeds", _meta: { title: "MultiTalk Wav2Vec Embeds" } },
-      "195": { inputs: { audio: audioFilename, audioUI: "" }, class_type: "LoadAudio", _meta: { title: "LoadAudio" } },
-      "196": { inputs: { start_time: "0:00", end_time: "4:00", audio: ["195", 0] }, class_type: "AudioCrop", _meta: { title: "AudioCrop" } },
-      "199": { inputs: { images: ["171", 0] }, class_type: "PreviewImage", _meta: { title: "Preview Image" } },
-      "200": { inputs: { anything: ["131", 0] }, class_type: "easy cleanGpuUsed", _meta: { title: "Clean VRAM Used" } },
-      "201": { inputs: { base64_string: base64Image }, class_type: "Base64DecodeNode", _meta: { title: "Base64 Decode to Image" } }
-    };
-
-    return prompt;
+  async function buildPromptJSON(base64Image: string, audioFilename: string) {
+    try {
+      const response = await fetch('/workflows/MultiTalkOnePerson.json');
+      if (!response.ok) {
+        throw new Error('Failed to load workflow template');
+      }
+      const template = await response.json();
+      
+      const promptString = JSON.stringify(template)
+        .replace(/"\{\{BASE64_IMAGE\}\}"/g, `"${base64Image}"`)
+        .replace(/"\{\{AUDIO_FILENAME\}\}"/g, `"${audioFilename}"`)
+        .replace(/"\{\{WIDTH\}\}"/g, width.toString())
+        .replace(/"\{\{HEIGHT\}\}"/g, height.toString())
+        .replace(/"\{\{TRIM_TO_AUDIO\}\}"/g, trimToAudio.toString());
+      
+      return JSON.parse(promptString);
+    } catch (error) {
+      console.error('Error loading workflow template:', error);
+      throw new Error('Failed to build prompt JSON');
+    }
   }
 
   async function submit() {
@@ -224,6 +221,13 @@ export default function MultiTalkOnePerson() {
 
     setIsSubmitting(true);
     try {
+      // First check ComfyUI health
+      setStatus("Verificando ComfyUI...");
+      const healthCheck = await checkComfyUIHealth(comfyUrl);
+      if (!healthCheck.available) {
+        throw new Error(`${healthCheck.error}${healthCheck.details ? `. ${healthCheck.details}` : ''}`);
+      }
+
       setStatus("Convirtiendo imagen a Base64…");
       const base64Image = await fileToBase64(imageFile);
 
@@ -232,19 +236,44 @@ export default function MultiTalkOnePerson() {
 
       setStatus("Enviando prompt a ComfyUI…");
       const payload = {
-        prompt: buildPromptJSON(base64Image, audioFilename),
+        prompt: await buildPromptJSON(base64Image, audioFilename),
         client_id: `multitalk-ui-${Math.random().toString(36).slice(2)}`,
       };
 
-      const r = await fetch(`${comfyUrl}/prompt`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (!r.ok) throw new Error(`Error ${r.status} al enviar el prompt.`);
+      let r: Response;
+      try {
+        r = await fetch(`${comfyUrl}/prompt`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(30000) // 30 second timeout
+        });
+      } catch (error: any) {
+        if (error.name === 'TimeoutError') {
+          throw new Error('Timeout al conectar con ComfyUI. Verificá que esté ejecutándose y la URL sea correcta.');
+        }
+        if (error.name === 'TypeError') {
+          throw new Error('No se pudo conectar a ComfyUI. Verificá la URL y que CORS esté habilitado.');
+        }
+        throw new Error(`Error de red: ${error.message}`);
+      }
+      
+      if (!r.ok) {
+        let errorDetail = '';
+        try {
+          const errorData = await r.json();
+          errorDetail = errorData.error || errorData.message || '';
+        } catch {
+          errorDetail = await r.text().catch(() => '');
+        }
+        throw new Error(`ComfyUI rechazó el prompt (${r.status}): ${errorDetail || 'Error desconocido'}`);
+      }
+      
       const resp = await r.json();
       const id = resp?.prompt_id || resp?.promptId || resp?.node_id || "";
-      if (!id) throw new Error("No se obtuvo prompt_id.");
+      if (!id) {
+        throw new Error('ComfyUI no devolvió un ID de prompt válido. Respuesta: ' + JSON.stringify(resp));
+      }
       setJobId(id);
 
       // Create job record in Supabase
@@ -261,106 +290,119 @@ export default function MultiTalkOnePerson() {
       // Update job to processing status
       await updateJobToProcessing(id);
 
-      // Poll history
+      // Start monitoring job status
       setStatus("Procesando en ComfyUI…");
-      const result = await pollForResult(id, comfyUrl, 1000, 60 * 30); // up to 30 min
-      if (!result) throw new Error("No se pudo recuperar el resultado.");
+      const cleanup = startJobMonitoring(
+        id,
+        comfyUrl,
+        async (jobStatus, message, videoInfo) => {
+          if (jobStatus === 'processing') {
+            setStatus(message || 'Procesando en ComfyUI…');
+          } else if (jobStatus === 'completed' && videoInfo) {
+            // Handle successful completion
+            setStatus('Subiendo video a Supabase Storage…');
+            let videoStorageUrl: string | null = null;
+            try {
+              const videoBlob = await downloadVideoFromComfy(comfyUrl, videoInfo.filename, videoInfo.subfolder);
+              if (videoBlob) {
+                videoStorageUrl = await uploadVideoToStorage(videoBlob, videoInfo.filename);
+                if (videoStorageUrl) {
+                  console.log('Video uploaded to Supabase Storage:', videoStorageUrl);
+                  // Set video URL from Supabase
+                  setVideoUrl(videoStorageUrl);
+                } else {
+                  console.warn('Upload to Supabase succeeded but no URL returned');
+                  // Fallback to ComfyUI URL if no Supabase URL
+                  const fallbackUrl = videoInfo.subfolder
+                    ? `${comfyUrl}/view?filename=${encodeURIComponent(videoInfo.filename)}&subfolder=${encodeURIComponent(videoInfo.subfolder)}&type=output`
+                    : `${comfyUrl}/view?filename=${encodeURIComponent(videoInfo.filename)}&type=output`;
+                  setVideoUrl(fallbackUrl);
+                }
+              } else {
+                console.warn('Failed to download video from ComfyUI');
+                // Still try to show ComfyUI URL even if download failed
+                const fallbackUrl = videoInfo.subfolder
+                  ? `${comfyUrl}/view?filename=${encodeURIComponent(videoInfo.filename)}&subfolder=${encodeURIComponent(videoInfo.subfolder)}&type=output`
+                  : `${comfyUrl}/view?filename=${encodeURIComponent(videoInfo.filename)}&type=output`;
+                setVideoUrl(fallbackUrl);
+              }
+            } catch (storageError) {
+              console.warn('Failed to upload to Supabase Storage:', storageError);
+              // Fallback to ComfyUI URL if Supabase upload fails
+              const fallbackUrl = videoInfo.subfolder
+                ? `${comfyUrl}/view?filename=${encodeURIComponent(videoInfo.filename)}&subfolder=${encodeURIComponent(videoInfo.subfolder)}&type=output`
+                : `${comfyUrl}/view?filename=${encodeURIComponent(videoInfo.filename)}&type=output`;
+              setVideoUrl(fallbackUrl);
+            }
+            
+            // Complete job in Supabase
+            await completeJob({
+              job_id: id,
+              status: 'completed',
+              filename: videoInfo.filename,
+              subfolder: videoInfo.subfolder,
+              video_url: videoStorageUrl || undefined
+            });
 
-      const fileInfo = findVideoFileFromHistory(result);
-      if (!fileInfo) throw new Error("No encontré el MP4 en el historial.");
-
-      const url = `${comfyUrl}/view?filename=${encodeURIComponent(fileInfo.filename)}&subfolder=${encodeURIComponent(fileInfo.subfolder || "MultiTalkApi")}&type=output`;
-      setVideoUrl(url);
+            // Refresh feed to show new job
+            await loadVideoFeedFromDB();
+            
+            setStatus("Listo ✅");
+            setIsSubmitting(false);
+            
+          } else if (jobStatus === 'error') {
+            // Handle error
+            setStatus(`❌ ${message}`);
+            setIsSubmitting(false);
+            
+            try {
+              await completeJob({
+                job_id: id,
+                status: 'error',
+                error_message: message || 'Unknown error'
+              });
+            } catch (dbError) {
+              console.error('Error updating job status:', dbError);
+            }
+          }
+        }
+      );
       
-      // Complete job in Supabase
-      await completeJob({
-        job_id: id,
-        status: 'completed',
-        filename: fileInfo.filename,
-        subfolder: fileInfo.subfolder || "MultiTalkApi"
-      });
-
-      // Refresh feed to show new job
-      await loadVideoFeedFromDB();
-      
-      setStatus("Listo ✅");
+      setJobMonitorCleanup(() => cleanup);
     } catch (e: any) {
-      const errorMessage = e?.message || String(e);
-      setStatus(errorMessage);
+      let errorMessage = e?.message || String(e);
+      
+      // Provide more user-friendly error messages
+      if (errorMessage.includes('Failed to fetch')) {
+        errorMessage = 'No se pudo conectar a ComfyUI. Verificá la URL y que esté ejecutándose.';
+      } else if (errorMessage.includes('NetworkError')) {
+        errorMessage = 'Error de red al conectar con ComfyUI. Verificá tu conexión.';
+      } else if (errorMessage.includes('JSON.parse')) {
+        errorMessage = 'ComfyUI devolvió una respuesta inválida. Puede estar sobrecargado.';
+      } else if (errorMessage.includes('workflow template')) {
+        errorMessage = 'Error cargando plantilla de workflow. Verificá que el archivo exista.';
+      }
+      
+      console.error('MultiTalk OnePerson error:', e);
+      setStatus(`❌ ${errorMessage}`);
       
       // Complete job with error status if we have a job ID
       if (jobId) {
-        await completeJob({
-          job_id: jobId,
-          status: 'error',
-          error_message: errorMessage
-        });
+        try {
+          await completeJob({
+            job_id: jobId,
+            status: 'error',
+            error_message: errorMessage
+          });
+        } catch (dbError) {
+          console.error('Error updating job status:', dbError);
+        }
       }
     } finally {
       setIsSubmitting(false);
     }
   }
 
-  async function pollForResult(promptId: string, baseUrl: string, intervalMs: number, maxSeconds: number) {
-    const started = Date.now();
-    while (Date.now() - started < maxSeconds * 1000) {
-      await new Promise((res) => setTimeout(res, intervalMs));
-      const r = await fetch(`${baseUrl}/history/${promptId}`);
-      if (!r.ok) continue;
-      const data = await r.json();
-      const h = data?.[promptId];
-      if (h?.status?.status_str === "success" || h?.status?.completed) return h;
-      if (h?.status?.status_str === "error" || h?.status?.error) throw new Error("Error en ComfyUI durante el proceso.");
-    }
-    return null;
-  }
-
-  function findVideoFileFromHistory(historyEntry: any): { filename: string; subfolder?: string } | null {
-    const outputs = historyEntry?.outputs || {};
-    const nodes = Object.values(outputs) as any[];
-    
-    console.log("Looking for video in outputs:", outputs);
-    
-    for (const node of nodes) {
-      console.log("Checking node:", node);
-      
-      // Check for videos array (VHS format)
-      const vids = node?.videos || node?.video;
-      if (Array.isArray(vids) && vids.length) {
-        const v = vids[0];
-        console.log("Found video:", v);
-        if (v?.filename) return { filename: v.filename, subfolder: v.subfolder };
-      }
-      
-      // Check for gifs array (sometimes VHS uses this)
-      const gifs = node?.gifs;
-      if (Array.isArray(gifs) && gifs.length) {
-        const g = gifs[0];
-        console.log("Found gif:", g);
-        if (g?.filename) return { filename: g.filename, subfolder: g.subfolder };
-      }
-      
-      // VHS sometimes attaches files under 'files'
-      const files = node?.files;
-      if (Array.isArray(files)) {
-        for (const f of files) {
-          console.log("Found file:", f);
-          if (typeof f?.filename === "string" && (f.filename.endsWith(".mp4") || f.filename.endsWith(".gif"))) {
-            return { filename: f.filename, subfolder: f.subfolder };
-          }
-        }
-      }
-      
-      // Check if the node has direct filename references
-      if (node?.filename && typeof node.filename === "string") {
-        console.log("Found direct filename:", node.filename);
-        return { filename: node.filename, subfolder: node.subfolder };
-      }
-    }
-    
-    console.log("No video found in outputs");
-    return null;
-  }
 
   function handleDownload() {
     if (!videoUrl) return;
@@ -391,19 +433,6 @@ export default function MultiTalkOnePerson() {
           </p>
         </div>
 
-      <Section title="Conexión">
-        <Field>
-          <Label>URL de ComfyUI</Label>
-          <input
-            type="text"
-            className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 placeholder-gray-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all duration-200 bg-white/80 backdrop-blur-sm"
-            placeholder="https://59414078555f.ngrok.app"
-            value={comfyUrl}
-            onChange={(e) => setComfyUrl(e.target.value)}
-          />
-          <p className="text-xs text-gray-500 mt-1">Asegurate de habilitar CORS o usar un proxy si servís este frontend desde otro origen.</p>
-        </Field>
-      </Section>
 
       <Section title="Entrada">
         <div className="grid md:grid-cols-2 gap-6">
@@ -439,7 +468,7 @@ export default function MultiTalkOnePerson() {
       </Section>
 
       <Section title="Resolución de salida">
-        <div className="grid md:grid-cols-3 gap-4 items-end">
+        <div className="grid md:grid-cols-2 gap-4 items-end">
           <Field>
             <Label>Ancho (px)</Label>
             <input
@@ -457,22 +486,9 @@ export default function MultiTalkOnePerson() {
               value={height}
               onChange={(e) => setHeight(Math.max(32, Math.round(Number(e.target.value) / 32) * 32))}
             />
-            <p className="text-xs text-gray-500 mt-1">Se ajusta a múltiplos de 32 por compatibilidad con el modelo.</p>
-          </Field>
-          <Field>
-            <Label className="flex items-center gap-2">
-              <input type="checkbox" checked={lock16x9} onChange={(e) => setLock16x9(e.target.checked)} />
-              Bloquear a 16:9
-            </Label>
-            <div className="text-xs text-gray-500">Si está desactivado, se mantiene el aspecto de la imagen.</div>
           </Field>
         </div>
-        <div className="mt-3 flex items-center gap-4">
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={trimToAudio} onChange={(e) => setTrimToAudio(e.target.checked)} />
-            Recortar video a la duración del audio
-          </label>
-        </div>
+        <p className="text-xs text-gray-500 mt-3">Se ajusta a múltiplos de 32 por compatibilidad con el modelo.</p>
       </Section>
 
       <Section title="Ejecución">
@@ -511,20 +527,12 @@ export default function MultiTalkOnePerson() {
         )}
       </Section>
 
-        <Section title="Tips Rápidos">
-          <ul className="list-disc ml-5 text-sm text-gray-700 space-y-1">
-            <li>Para máxima compatibilidad, usá anchos y altos múltiplos de 32.</li>
-            <li>Si querés que todo sea 16:9 (p. ej., 1280×720, 1920×1080), activá el switch y seteá el ancho.</li>
-            <li>Si tu ComfyUI no tiene <code>/upload/audio</code>, probá actualizar extensiones VHS/Audio o ajustá el endpoint en el código.</li>
-            <li>El prompt de texto (nodo 135) está hardcodeado como en tu workflow; lo podemos exponer en UI si querés.</li>
-          </ul>
-        </Section>
         </div>
 
         {/* Right Sidebar - Video Feed */}
         <div className="w-96 space-y-6">
-          <div className="sticky top-6">
-            <div className="rounded-3xl border border-gray-200/80 p-6 shadow-lg bg-gradient-to-br from-white to-gray-50/50 backdrop-blur-sm">
+          <div className="sticky top-6 h-[calc(100vh-3rem)]">
+            <div className="rounded-3xl border border-gray-200/80 p-6 shadow-lg bg-gradient-to-br from-white to-gray-50/50 backdrop-blur-sm h-full flex flex-col">
               <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-3">
                 <div className="w-2 h-8 bg-gradient-to-b from-purple-500 to-pink-600 rounded-full"></div>
                 Feed de Generaciones
@@ -536,11 +544,15 @@ export default function MultiTalkOnePerson() {
                   <p className="text-xs text-gray-400">Los videos aparecerán aquí cuando generes contenido</p>
                 </div>
               ) : (
-                <div className="space-y-4 max-h-96 overflow-y-auto">
+                <div className="space-y-4 flex-1 overflow-y-auto">
                   {videoFeed.map((job) => {
-                    const videoUrl = job.filename ? 
-                      `${job.comfy_url}/view?filename=${encodeURIComponent(job.filename)}&subfolder=${encodeURIComponent(job.subfolder || 'MultiTalkApi')}&type=output` 
-                      : null;
+                    // Prefer Supabase video_url, fallback to ComfyUI if not available
+                    const videoUrl = job.video_url || 
+                      (job.filename ? 
+                        (job.subfolder 
+                          ? `${job.comfy_url}/view?filename=${encodeURIComponent(job.filename)}&subfolder=${encodeURIComponent(job.subfolder)}&type=output`
+                          : `${job.comfy_url}/view?filename=${encodeURIComponent(job.filename)}&type=output`)
+                        : null);
                       
                     return (
                       <div key={job.job_id} className="border border-gray-200 rounded-2xl p-3 bg-white">

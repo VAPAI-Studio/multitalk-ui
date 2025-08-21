@@ -71,6 +71,7 @@ export async function completeJob(payload: CompleteJobPayload): Promise<{ succes
       ...(payload.filename && { filename: payload.filename }),
       ...(payload.subfolder && { subfolder: payload.subfolder }),
       ...(payload.error_message && { error_message: payload.error_message }),
+      ...(payload.video_url && { video_url: payload.video_url }),
     }
 
     const { error } = await supabase

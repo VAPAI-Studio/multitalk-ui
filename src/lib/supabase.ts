@@ -1,9 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 
-// These would normally come from environment variables
-// For now, using placeholder values - you'll need to replace these with your actual Supabase credentials
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://your-project.supabase.co'
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'your-anon-key'
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://rwbhfxltyxaegtalgxdx.supabase.co'
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3YmhmeGx0eXhhZWd0YWxneGR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU0Njc3OTMsImV4cCI6MjA3MTA0Mzc5M30.2euUdw7ubhbyQ_orFYJxJByPuRxl21QFO3cmZtnVRos'
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
@@ -25,6 +23,7 @@ export interface MultiTalkJob {
   trim_to_audio: boolean
   comfy_url: string
   error_message?: string
+  video_url?: string // Supabase Storage URL
   // Additional metadata
   created_at?: string
   updated_at?: string
@@ -48,4 +47,53 @@ export interface CompleteJobPayload {
   filename?: string
   subfolder?: string
   error_message?: string
+  video_url?: string // Added for Supabase Storage URL
+}
+
+// Video storage functions
+export async function uploadVideoToStorage(file: File | Blob, fileName: string): Promise<string | null> {
+  try {
+    const filePath = `videos/${Date.now()}_${fileName}`
+    
+    const { data, error } = await supabase.storage
+      .from('multitalk-videos')
+      .upload(filePath, file, {
+        contentType: 'video/mp4',
+        upsert: false
+      })
+
+    if (error) {
+      console.error('Error uploading video:', error)
+      return null
+    }
+
+    // Get public URL
+    const { data: publicData } = supabase.storage
+      .from('multitalk-videos')
+      .getPublicUrl(data.path)
+
+    return publicData.publicUrl
+  } catch (error) {
+    console.error('Error uploading video:', error)
+    return null
+  }
+}
+
+export async function downloadVideoFromComfy(comfyUrl: string, filename: string, subfolder?: string): Promise<Blob | null> {
+  try {
+    const url = subfolder 
+      ? `${comfyUrl}/view?filename=${encodeURIComponent(filename)}&subfolder=${encodeURIComponent(subfolder)}&type=output`
+      : `${comfyUrl}/view?filename=${encodeURIComponent(filename)}&type=output`
+    
+    console.log('Downloading video from ComfyUI:', url)
+    const response = await fetch(url)
+    if (!response.ok) {
+      throw new Error(`Failed to download video: ${response.status} ${response.statusText}`)
+    }
+    
+    return await response.blob()
+  } catch (error) {
+    console.error('Error downloading video from ComfyUI:', error)
+    return null
+  }
 }
