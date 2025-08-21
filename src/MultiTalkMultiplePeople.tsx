@@ -599,9 +599,17 @@ export default function MultiTalkMultiplePeople({ comfyUrl }: Props) {
   const preventDefault: React.DragEventHandler = (e) => e.preventDefault();
 
 
+  const handleDownload = () => {
+    if (!videoUrl) return;
+    const a = document.createElement("a");
+    a.href = videoUrl;
+    a.download = "multitalk.mp4";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      <div className="flex gap-6 p-6 md:p-10">
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
       <div className="max-w-7xl mx-auto p-6 md:p-10 grid gap-6 lg:grid-cols-3">
         {/* Main Content */}
@@ -856,7 +864,6 @@ export default function MultiTalkMultiplePeople({ comfyUrl }: Props) {
                     </div>
                   </div>
                 )}
-              </div>
             </Section>
         </div>
 
