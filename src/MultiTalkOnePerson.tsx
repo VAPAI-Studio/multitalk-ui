@@ -51,9 +51,12 @@ export default function MultiTalkOnePerson({ comfyUrl }: Props) {
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
   const [imageAR, setImageAR] = useState<number | null>(null);
+  const [audioDuration, setAudioDuration] = useState<number>(0);
 
   const [width, setWidth] = useState<number>(640); // defaults from workflow
   const [height, setHeight] = useState<number>(360);
+  const [mode, setMode] = useState<'multitalk' | 'infinitetalk'>('multitalk');
+  const [audioScale, setAudioScale] = useState<number>(1);
 
   const trimToAudio = true;
   const [status, setStatus] = useState<string>("");
@@ -181,18 +184,27 @@ export default function MultiTalkOnePerson({ comfyUrl }: Props) {
 
   async function buildPromptJSON(base64Image: string, audioFilename: string) {
     try {
-      const response = await fetch('/workflows/MultiTalkOnePerson.json');
+      const workflowFile = mode === 'infinitetalk' ? '/workflows/InfiniteTalkOnePerson.json' : '/workflows/MultiTalkOnePerson.json';
+      const response = await fetch(workflowFile);
       if (!response.ok) {
         throw new Error('Failed to load workflow template');
       }
       const template = await response.json();
       
-      const promptString = JSON.stringify(template)
+      let promptString = JSON.stringify(template)
         .replace(/"\{\{BASE64_IMAGE\}\}"/g, `"${base64Image}"`)
         .replace(/"\{\{AUDIO_FILENAME\}\}"/g, `"${audioFilename}"`)
         .replace(/"\{\{WIDTH\}\}"/g, width.toString())
         .replace(/"\{\{HEIGHT\}\}"/g, height.toString())
         .replace(/"\{\{TRIM_TO_AUDIO\}\}"/g, trimToAudio.toString());
+      
+      // Add audio_scale and audio_end_time replacement for InfiniteTalk mode
+      if (mode === 'infinitetalk') {
+        promptString = promptString.replace(/"\{\{AUDIO_SCALE\}\}"/g, audioScale.toString());
+        // Format audio duration for AudioCrop (add 1 second buffer)
+        const audioEndTime = Math.ceil(audioDuration + 1).toString();
+        promptString = promptString.replace(/"\{\{AUDIO_END_TIME\}\}"/g, audioEndTime);
+      }
       
       return JSON.parse(promptString);
     } catch (error) {
@@ -424,15 +436,59 @@ export default function MultiTalkOnePerson({ comfyUrl }: Props) {
             MultiTalk
           </h1>
           <div className="text-lg md:text-xl font-medium text-gray-700">
-            <span className="bg-gradient-to-r from-blue-100 to-purple-100 px-4 py-2 rounded-full border border-blue-200/50">
-              1 Persona
+            <span className={`px-4 py-2 rounded-full border ${mode === 'multitalk' ? 'bg-gradient-to-r from-blue-100 to-purple-100 border-blue-200/50' : 'bg-gradient-to-r from-purple-100 to-pink-100 border-purple-200/50'}`}>
+              {mode === 'multitalk' ? 'MultiTalk' : 'InfiniteTalk'} - 1 Persona
             </span>
           </div>
           <p className="text-gray-600 max-w-2xl mx-auto leading-relaxed">
-            Frontend elegante para disparar tu workflow de MultiTalk en ComfyUI con estilo.
+            Frontend elegante para disparar tu workflow de {mode === 'multitalk' ? 'MultiTalk' : 'InfiniteTalk'} en ComfyUI con estilo.
           </p>
         </div>
 
+
+      <Section title="Modo">
+        <div className="flex gap-4">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="radio"
+              name="mode"
+              value="multitalk"
+              checked={mode === 'multitalk'}
+              onChange={(e) => setMode(e.target.value as 'multitalk' | 'infinitetalk')}
+              className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+            />
+            <span className="text-sm font-medium text-gray-700">MultiTalk</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="radio"
+              name="mode"
+              value="infinitetalk"
+              checked={mode === 'infinitetalk'}
+              onChange={(e) => setMode(e.target.value as 'multitalk' | 'infinitetalk')}
+              className="w-4 h-4 text-purple-600 border-gray-300 focus:ring-purple-500"
+            />
+            <span className="text-sm font-medium text-gray-700">InfiniteTalk</span>
+          </label>
+        </div>
+        {mode === 'infinitetalk' && (
+          <div className="mt-4">
+            <Field>
+              <Label>Audio Scale</Label>
+              <input
+                type="number"
+                step="0.1"
+                min="0.1"
+                max="2.0"
+                className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all duration-200 bg-white/80"
+                value={audioScale}
+                onChange={(e) => setAudioScale(Number(e.target.value))}
+              />
+              <p className="text-xs text-gray-500 mt-1">Escala del audio para InfiniteTalk (0.1 - 2.0)</p>
+            </Field>
+          </div>
+        )}
+      </Section>
 
       <Section title="Entrada">
         <div className="grid md:grid-cols-2 gap-6">
@@ -458,10 +514,27 @@ export default function MultiTalkOnePerson({ comfyUrl }: Props) {
               <input
                 type="file"
                 accept="audio/*"
-                onChange={(e) => setAudioFile(e.target.files?.[0] || null)}
+                onChange={(e) => {
+                  const file = e.target.files?.[0] || null;
+                  setAudioFile(file);
+                  if (file) {
+                    const audio = new Audio();
+                    const url = URL.createObjectURL(file);
+                    audio.addEventListener('loadedmetadata', () => {
+                      setAudioDuration(audio.duration);
+                      URL.revokeObjectURL(url);
+                    });
+                    audio.src = url;
+                  } else {
+                    setAudioDuration(0);
+                  }
+                }}
                 className="w-full rounded-2xl border-2 border-dashed border-gray-300 px-4 py-6 text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-gradient-to-r file:from-green-500 file:to-teal-600 file:text-white file:font-semibold hover:file:from-green-600 hover:file:to-teal-700 transition-all duration-200 bg-gray-50/50"
               />
             </div>
+            {audioDuration > 0 && (
+              <p className="text-xs text-green-600 mt-1">Duración: {audioDuration.toFixed(1)}s</p>
+            )}
             <p className="text-xs text-gray-500 mt-1">Se sube al servidor de ComfyUI y se referencia en el nodo LoadAudio.</p>
           </Field>
         </div>
