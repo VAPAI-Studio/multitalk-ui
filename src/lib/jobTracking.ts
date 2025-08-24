@@ -17,20 +17,35 @@ export async function createJob(payload: CreateJobPayload): Promise<{ success: b
       trim_to_audio: payload.trim_to_audio,
     }
 
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout for writes
+
     const { error } = await supabase
       .from('multitalk_jobs')
       .insert([jobData])
+      .abortSignal(controller.signal)
+
+    clearTimeout(timeoutId)
 
     if (error) {
       console.error('Error creating job:', error)
-      return { success: false, error: error.message }
+      // Continue processing even if DB insert fails
+      console.warn('Job tracking failed but continuing with ComfyUI processing')
+      return { success: true, error: `DB error (non-blocking): ${error.message}` }
     }
 
     console.log('Job created successfully:', payload.job_id)
     return { success: true }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating job:', error)
-    return { success: false, error: String(error) }
+    
+    // Don't block the main workflow if DB operations fail
+    if (error.name === 'AbortError') {
+      console.warn('DB timeout but continuing with processing')
+      return { success: true, error: 'DB timeout (non-blocking)' }
+    }
+    
+    return { success: true, error: `DB error (non-blocking): ${String(error)}` }
   }
 }
 
@@ -143,6 +158,9 @@ export async function getJob(jobId: string): Promise<{ job: MultiTalkJob | null;
  */
 export async function getCompletedJobsWithVideos(limit: number = 20): Promise<{ jobs: MultiTalkJob[]; error?: string }> {
   try {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
+
     const { data, error } = await supabase
       .from('multitalk_jobs')
       .select('*')
@@ -150,15 +168,30 @@ export async function getCompletedJobsWithVideos(limit: number = 20): Promise<{ 
       .not('filename', 'is', null)
       .order('timestamp_completed', { ascending: false })
       .limit(limit)
+      .abortSignal(controller.signal)
+
+    clearTimeout(timeoutId)
 
     if (error) {
       console.error('Error fetching completed jobs:', error)
+      // Return empty array instead of failing completely
       return { jobs: [], error: error.message }
     }
 
     return { jobs: data || [] }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching completed jobs:', error)
+    
+    // Handle specific error types more gracefully
+    if (error.name === 'AbortError') {
+      return { jobs: [], error: 'Request timeout - using offline mode' }
+    }
+    
+    if (error.message?.includes('fetch')) {
+      return { jobs: [], error: 'Network error - check connection' }
+    }
+    
+    // Return empty array for any other errors to keep UI functional
     return { jobs: [], error: String(error) }
   }
 }

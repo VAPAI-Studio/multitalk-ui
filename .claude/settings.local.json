@@ -14,7 +14,9 @@
       "mcp__supabase__get_project_url",
       "mcp__supabase__get_anon_key",
       "mcp__supabase__search_docs",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(mv:*)",
+      "Bash(cp:*)"
     ],
     "deny": [],
     "ask": []
