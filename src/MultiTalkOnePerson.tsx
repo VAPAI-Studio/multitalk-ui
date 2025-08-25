@@ -57,6 +57,7 @@ export default function MultiTalkOnePerson({ comfyUrl }: Props) {
   const [height, setHeight] = useState<number>(360);
   const [mode, setMode] = useState<'multitalk' | 'infinitetalk'>('multitalk');
   const [audioScale, setAudioScale] = useState<number>(1);
+  const [customPrompt, setCustomPrompt] = useState<string>('a woman is talking');
 
   const trimToAudio = true;
   const [status, setStatus] = useState<string>("");
