@@ -198,6 +198,9 @@ export default function MultiTalkOnePerson({ comfyUrl }: Props) {
         .replace(/"\{\{HEIGHT\}\}"/g, height.toString())
         .replace(/"\{\{TRIM_TO_AUDIO\}\}"/g, trimToAudio.toString());
       
+      // Replace custom prompt
+      promptString = promptString.replace(/"\{\{CUSTOM_PROMPT\}\}"/g, `"${customPrompt.replace(/"/g, '\\"')}"`);
+      
       // Add audio_scale and audio_end_time replacement for InfiniteTalk mode
       if (mode === 'infinitetalk') {
         promptString = promptString.replace(/"\{\{AUDIO_SCALE\}\}"/g, audioScale.toString());
@@ -488,6 +491,20 @@ export default function MultiTalkOnePerson({ comfyUrl }: Props) {
             </Field>
           </div>
         )}
+        
+        <div className="mt-4">
+          <Field>
+            <Label>Prompt personalizado</Label>
+            <input
+              type="text"
+              className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all duration-200 bg-white/80"
+              value={customPrompt}
+              onChange={(e) => setCustomPrompt(e.target.value)}
+              placeholder="Describe la acción que quieres generar..."
+            />
+            <p className="text-xs text-gray-500 mt-1">Descripción de lo que quieres que haga la persona en el video</p>
+          </Field>
+        </div>
       </Section>
 
       <Section title="Entrada">

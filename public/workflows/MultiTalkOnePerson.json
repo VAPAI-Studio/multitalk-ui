@@ -114,7 +114,7 @@
   },
   "135": {
     "inputs": {
-      "positive_prompt": "A 2D digital illustration of a teenage girl on her room looking directly into the camera, warm soft tones, inspired by the style and color palette of the reference image. She has a calm but focused expression, as if speaking to the audience like a documentarian, not posing like an influencer. The framing is close-up from the shoulders up, with natural lighting and subtle shadows, minimal background detail to keep focus on her face, animated style with clean lines and soft shading.",
+      "positive_prompt": "{{CUSTOM_PROMPT}}",
       "negative_prompt": "bright tones, overexposed, static, blurred details, subtitles, style, works, paintings, images, static, overall gray, worst quality, low quality, JPEG compression residue, ugly, incomplete, extra fingers, poorly drawn hands, poorly drawn faces, deformed, disfigured, misshapen limbs, fused fingers, still picture, messy background, three legs, many people in the background, walking backwards",
       "force_offload": true,
       "use_disk_cache": false,

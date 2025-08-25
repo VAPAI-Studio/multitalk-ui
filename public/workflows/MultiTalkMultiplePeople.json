@@ -159,7 +159,7 @@
   },
   "135": {
     "inputs": {
-      "positive_prompt": "A man and a woman standing side by side in a brightly lit television news studio, speaking directly to the camera with relaxed and casual expressions. The man has short dark hair and wears a suit and tie; the woman has long blonde hair and wears a smart blouse. They speak with natural gestures and occasional smiles, creating a friendly and informal tone. At the end of the video, the man makes a light-hearted joke, and the woman bursts into a spontaneous laugh. The background features large LED screens and studio lights, with soft bokeh from out-of-focus monitors. Fixed camera angle, professional lighting, and smooth, realistic motion.",
+      "positive_prompt": "{{CUSTOM_PROMPT}}",
       "negative_prompt": "bright tones, overexposed, static, blurred details, subtitles, style, works, paintings, images, static, overall gray, worst quality, low quality, JPEG compression residue, ugly, incomplete, extra fingers, poorly drawn hands, poorly drawn faces, deformed, disfigured, misshapen limbs, fused fingers, still picture, messy background, three legs, many people in the background, walking backwards",
       "force_offload": true,
       "use_disk_cache": false,

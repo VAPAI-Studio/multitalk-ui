@@ -31,6 +31,7 @@ export default function MultiTalkMultiplePeople({ comfyUrl }: Props) {
   const [isEditingMask, setIsEditingMask] = useState<string | null>(null)
   const [showMaskModal, setShowMaskModal] = useState<boolean>(false)
   const [jobMonitorCleanup, setJobMonitorCleanup] = useState<(() => void) | null>(null)
+  const [customPrompt, setCustomPrompt] = useState<string>('people talking together')
 
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
@@ -374,6 +375,11 @@ export default function MultiTalkMultiplePeople({ comfyUrl }: Props) {
         };
       }
       
+      // Update custom prompt in the text encoder node (135)
+      if (prompt["135"] && prompt["135"].inputs) {
+        prompt["135"].inputs.positive_prompt = customPrompt;
+      }
+      
       return prompt;
     } catch (error) {
       console.error('Error loading workflow template:', error);
@@ -627,6 +633,20 @@ export default function MultiTalkMultiplePeople({ comfyUrl }: Props) {
               Frontend elegante para disparar tu workflow de MultiTalk en ComfyUI con múltiples personas.
             </p>
           </div>
+
+          <Section title="Configuración">
+            <Field>
+              <Label>Prompt personalizado</Label>
+              <input
+                type="text"
+                className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all duration-200 bg-white/80"
+                value={customPrompt}
+                onChange={(e) => setCustomPrompt(e.target.value)}
+                placeholder="Describe la escena que quieres generar..."
+              />
+              <p className="text-xs text-gray-500 mt-1">Descripción de lo que quieres que hagan las personas en el video</p>
+            </Field>
+          </Section>
 
           <Section title="Entrada">
             <div className="grid md:grid-cols-2 gap-6">
