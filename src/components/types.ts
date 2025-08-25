@@ -18,3 +18,19 @@ export interface VideoResult {
   subfolder?: string | null
   type?: string | null
 }
+
+export interface VideoTrack {
+  id: string
+  file: File
+  startTime: number // seconds
+  duration: number // seconds
+  name: string
+}
+
+export interface AudioTrackSimple {
+  id: string
+  file: File
+  startTime: number // seconds
+  duration: number // seconds
+  name: string
+}

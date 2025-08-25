@@ -1,9 +1,10 @@
 import { useState } from "react";
 import MultiTalkOnePerson from "./MultiTalkOnePerson";
 import MultiTalkMultiplePeople from "./MultiTalkMultiplePeople";
+import VideoLipsync from "./VideoLipsync";
 
 export default function App() {
-  const [currentPage, setCurrentPage] = useState<"multitalk-one" | "multitalk-multiple">("multitalk-one");
+  const [currentPage, setCurrentPage] = useState<"multitalk-one" | "multitalk-multiple" | "video-lipsync">("multitalk-one");
   const [comfyUrl, setComfyUrl] = useState<string>("https://59414078555f.ngrok.app");
 
   return (
@@ -53,6 +54,16 @@ export default function App() {
               >
                 🎵 MultiAudio
               </button>
+              <button
+                onClick={() => setCurrentPage("video-lipsync")}
+                className={`px-5 py-3 rounded-2xl font-bold transition-all duration-300 text-sm ${
+                  currentPage === "video-lipsync"
+                    ? "bg-gradient-to-r from-green-500 to-blue-600 text-white shadow-lg transform scale-105"
+                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-100/80 hover:scale-105"
+                }`}
+              >
+                🎬 Video Lipsync
+              </button>
             </div>
           </div>
         </div>
@@ -62,6 +73,7 @@ export default function App() {
       <main className="flex-1 w-full max-w-6xl mx-auto p-6">
         {currentPage === "multitalk-one" && <MultiTalkOnePerson comfyUrl={comfyUrl} />}
         {currentPage === "multitalk-multiple" && <MultiTalkMultiplePeople comfyUrl={comfyUrl} />}
+        {currentPage === "video-lipsync" && <VideoLipsync comfyUrl={comfyUrl} />}
       </main>
     </div>
   );

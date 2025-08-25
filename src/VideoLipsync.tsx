@@ -1,0 +1,852 @@
+import React, { useEffect, useRef, useState } from "react";
+import { createJob, updateJobToProcessing, completeJob, getCompletedJobsWithVideos } from "./lib/jobTracking";
+import type { MultiTalkJob } from "./lib/supabase";
+import { downloadVideoFromComfy, uploadVideoToStorage } from "./lib/supabase";
+import { Label, Field, Section } from "./components/UI";
+import { Button } from "./components/DesignSystem";
+import { Timeline } from "./components/Timeline";
+import type { VideoTrack, AudioTrackSimple } from "./components/types";
+import { fileToBase64, uploadMediaToComfy, generateId, startJobMonitoring, checkComfyUIHealth } from "./components/utils";
+
+interface Props {
+  comfyUrl: string;
+}
+
+export default function VideoLipsync({ comfyUrl }: Props) {
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [videoPreview, setVideoPreview] = useState<string>("");
+  const [videoDuration, setVideoDuration] = useState<number>(0);
+  const [audioDuration, setAudioDuration] = useState<number>(0);
+
+  const [width, setWidth] = useState<number>(640);
+  const [height, setHeight] = useState<number>(640);
+  const [audioScale, setAudioScale] = useState<number>(1.5);
+  const [customPrompt, setCustomPrompt] = useState<string>('a person is speaking');
+
+  // Timeline states
+  const [videoTrack, setVideoTrack] = useState<VideoTrack | null>(null);
+  const [audioTrack, setAudioTrack] = useState<AudioTrackSimple | null>(null);
+  const [totalDuration, setTotalDuration] = useState<number>(10);
+
+  const trimToAudio = true;
+  const [status, setStatus] = useState<string>("");
+  const [videoUrl, setVideoUrl] = useState<string>("");
+  const [jobId, setJobId] = useState<string>("");
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [videoFeed, setVideoFeed] = useState<MultiTalkJob[]>([]);
+  const [jobMonitorCleanup, setJobMonitorCleanup] = useState<(() => void) | null>(null);
+
+  const videoInputRef = useRef<HTMLInputElement | null>(null);
+  const audioInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Load video feed from Supabase
+  useEffect(() => {
+    loadVideoFeedFromDB();
+    const interval = setInterval(loadVideoFeedFromDB, 30000);
+    return () => clearInterval(interval);
+  }, [comfyUrl]);
+
+  // Cleanup job monitor on unmount
+  useEffect(() => {
+    return () => {
+      if (jobMonitorCleanup) {
+        jobMonitorCleanup();
+      }
+    };
+  }, [jobMonitorCleanup]);
+
+  async function loadVideoFeedFromDB() {
+    try {
+      const { jobs, error } = await getCompletedJobsWithVideos(20);
+      if (error) {
+        console.error("Error loading video feed:", error);
+        return;
+      }
+      
+      const filteredJobs = jobs.filter(job => job.comfy_url === comfyUrl || !comfyUrl);
+      setVideoFeed(filteredJobs);
+    } catch (e) {
+      console.error("Error loading video feed from DB:", e);
+    }
+  }
+
+  // Calculate the final duration based on actual content coverage
+  const calculateFinalDuration = () => {
+    let maxEndTime = 0;
+    
+    // Check video track end time
+    if (videoTrack) {
+      const videoEndTime = videoTrack.startTime + videoTrack.duration;
+      maxEndTime = Math.max(maxEndTime, videoEndTime);
+    }
+    
+    // Check audio track end time
+    if (audioTrack) {
+      const audioEndTime = audioTrack.startTime + audioTrack.duration;
+      maxEndTime = Math.max(maxEndTime, audioEndTime);
+    }
+    
+    return Math.max(10, Math.ceil(maxEndTime)); // Minimum 10 seconds
+  };
+
+  // Update total duration when tracks change
+  const updateTotalDuration = () => {
+    const newDuration = calculateFinalDuration();
+    setTotalDuration(newDuration);
+  };
+
+  // Video file selection
+  const onVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    setVideoFile(file);
+    
+    if (file) {
+      const url = URL.createObjectURL(file);
+      setVideoPreview(url);
+      
+      const video = document.createElement('video');
+      video.addEventListener('loadedmetadata', () => {
+        setVideoDuration(video.duration);
+        const track: VideoTrack = {
+          id: generateId(),
+          file,
+          startTime: 0,
+          duration: video.duration,
+          name: file.name
+        };
+        setVideoTrack(track);
+        // Update total duration after setting video track
+        setTimeout(updateTotalDuration, 0);
+        URL.revokeObjectURL(url);
+      });
+      video.src = url;
+    } else {
+      setVideoPreview("");
+      setVideoDuration(0);
+      setVideoTrack(null);
+    }
+  };
+
+  // Audio file selection
+  const onAudioSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    setAudioFile(file);
+    
+    if (file) {
+      const audio = new Audio();
+      const url = URL.createObjectURL(file);
+      audio.addEventListener('loadedmetadata', () => {
+        setAudioDuration(audio.duration);
+        const track: AudioTrackSimple = {
+          id: generateId(),
+          file,
+          startTime: 0,
+          duration: audio.duration,
+          name: file.name
+        };
+        setAudioTrack(track);
+        // Update total duration after setting audio track
+        setTimeout(updateTotalDuration, 0);
+        URL.revokeObjectURL(url);
+      });
+      audio.src = url;
+    } else {
+      setAudioDuration(0);
+      setAudioTrack(null);
+    }
+  };
+
+  // Upload video to ComfyUI
+  async function uploadVideoToComfy(baseUrl: string, file: File): Promise<string> {
+    const form = new FormData();
+    form.append("image", file, file.name); // ComfyUI uses "image" field for all media
+
+    try {
+      const r = await fetch(`${baseUrl}/upload/image`, {
+        method: "POST",
+        body: form,
+        credentials: "omit",
+      });
+      
+      if (!r.ok) {
+        throw new Error(`Upload failed: HTTP ${r.status}`);
+      }
+
+      let data: any = null;
+      try { 
+        data = await r.json(); 
+      } catch { 
+        // May be plain text
+      }
+      
+      if (data?.name) return data.name as string;
+      if (Array.isArray(data?.files) && data.files[0]) return data.files[0] as string;
+      
+      const text = typeof data === "string" ? data : await r.text().catch(() => "");
+      if (text.trim()) return text.trim();
+      
+      throw new Error("Unexpected server response");
+      
+    } catch (e: any) {
+      if (e.name === 'TypeError' && e.message.includes('fetch')) {
+        throw new Error('Could not connect to server. Check the ngrok URL.');
+      }
+      throw new Error(`Could not upload video: ${e.message}`);
+    }
+  }
+
+  // Build workflow JSON
+  async function buildPromptJSON(videoFilename: string, audioFilename: string) {
+    try {
+      const response = await fetch('/workflows/VideoLipsync.json');
+      if (!response.ok) {
+        throw new Error('Failed to load workflow template');
+      }
+      const template = await response.json();
+      
+      // Calculate timing parameters
+      const audioStartTime = audioTrack ? `${Math.floor(audioTrack.startTime / 60)}:${String(Math.floor(audioTrack.startTime % 60)).padStart(2, '0')}` : "0:00";
+      const audioEndTime = audioTrack ? `${Math.floor((audioTrack.startTime + audioTrack.duration) / 60)}:${String(Math.floor((audioTrack.startTime + audioTrack.duration) % 60)).padStart(2, '0')}` : "2:00";
+      const videoStartFrame = videoTrack ? Math.floor(videoTrack.startTime * 25) : 0; // Assuming 25 FPS
+      
+      // Calculate black frame padding
+      const fps = 25;
+      const videoStartTime = videoTrack ? videoTrack.startTime : 0;
+      const audioStartTime_seconds = audioTrack ? audioTrack.startTime : 0;
+      const videoEndTime = videoTrack ? videoTrack.startTime + videoTrack.duration : 0;
+      const audioEndTime_seconds = audioTrack ? audioTrack.startTime + audioTrack.duration : 0;
+      
+      // Calculate how many black frames we need at the start and end
+      const blackFramesStart = Math.max(0, Math.floor((videoStartTime - audioStartTime_seconds) * fps));
+      const blackFramesEnd = Math.max(0, Math.floor((audioEndTime_seconds - videoEndTime) * fps));
+      
+      // Determine concatenation inputs based on black frame needs
+      let concatInputCount = 1; // At minimum, we have the video
+      let concatInput1Node = "301"; // Generated video frames
+      let concatInput1Index = "0";
+      let concatInput2Node = "230"; // Original video frames  
+      let concatInput2Index = "0";
+      let concatInput3Node = "313"; // End black frames
+      let concatInput3Index = "0";
+      
+      if (blackFramesStart > 0 && blackFramesEnd > 0) {
+        // Need black frames at both start and end: [black_start, video, black_end]
+        concatInputCount = 3;
+        concatInput1Node = "311"; // Start black frames
+        concatInput1Index = "0";
+        concatInput2Node = "230"; // Video frames
+        concatInput2Index = "0"; 
+        concatInput3Node = "313"; // End black frames
+        concatInput3Index = "0";
+      } else if (blackFramesStart > 0) {
+        // Need black frames only at start: [black_start, video]
+        concatInputCount = 2;
+        concatInput1Node = "311"; // Start black frames
+        concatInput1Index = "0";
+        concatInput2Node = "230"; // Video frames
+        concatInput2Index = "0";
+      } else if (blackFramesEnd > 0) {
+        // Need black frames only at end: [video, black_end]
+        concatInputCount = 2;
+        concatInput1Node = "230"; // Video frames
+        concatInput1Index = "0";
+        concatInput2Node = "313"; // End black frames
+        concatInput2Index = "0";
+      } else {
+        // No black frames needed: [video]
+        concatInputCount = 1;
+        concatInput1Node = "230"; // Video frames only
+        concatInput1Index = "0";
+      }
+
+      let promptString = JSON.stringify(template)
+        .replace(/"\{\{VIDEO_FILENAME\}\}"/g, `"${videoFilename}"`)
+        .replace(/"\{\{AUDIO_FILENAME\}\}"/g, `"${audioFilename}"`)
+        .replace(/"\{\{WIDTH\}\}"/g, width.toString())
+        .replace(/"\{\{HEIGHT\}\}"/g, height.toString())
+        .replace(/"\{\{AUDIO_SCALE\}\}"/g, audioScale.toString())
+        .replace(/"\{\{AUDIO_START_TIME\}\}"/g, `"${audioStartTime}"`)
+        .replace(/"\{\{AUDIO_END_TIME\}\}"/g, `"${audioEndTime}"`)
+        .replace(/"\{\{VIDEO_START_FRAME\}\}"/g, videoStartFrame.toString())
+        .replace(/"\{\{CUSTOM_PROMPT\}\}"/g, `"${customPrompt.replace(/"/g, '\\"')}"`)
+        .replace(/"\{\{TRIM_TO_AUDIO\}\}"/g, trimToAudio.toString())
+        // Black frame parameters
+        .replace(/"\{\{BLACK_FRAME_COUNT_START\}\}"/g, blackFramesStart.toString())
+        .replace(/"\{\{BLACK_FRAME_COUNT_END\}\}"/g, blackFramesEnd.toString())
+        // Concatenation parameters
+        .replace(/"\{\{CONCAT_INPUT_COUNT\}\}"/g, concatInputCount.toString())
+        .replace(/"\{\{CONCAT_INPUT_1_NODE\}\}"/g, `"${concatInput1Node}"`)
+        .replace(/"\{\{CONCAT_INPUT_1_INDEX\}\}"/g, concatInput1Index)
+        .replace(/"\{\{CONCAT_INPUT_2_NODE\}\}"/g, `"${concatInput2Node}"`)
+        .replace(/"\{\{CONCAT_INPUT_2_INDEX\}\}"/g, concatInput2Index)
+        .replace(/"\{\{CONCAT_INPUT_3_NODE\}\}"/g, `"${concatInput3Node}"`)
+        .replace(/"\{\{CONCAT_INPUT_3_INDEX\}\}"/g, concatInput3Index);
+      
+      console.log('Black frames calculation:', {
+        audioStart: audioStartTime_seconds,
+        videoStart: videoStartTime,
+        audioEnd: audioEndTime_seconds,
+        videoEnd: videoEndTime,
+        blackFramesStart,
+        blackFramesEnd,
+        concatInputCount
+      });
+      
+      return JSON.parse(promptString);
+    } catch (error) {
+      console.error('Error loading workflow template:', error);
+      throw new Error('Failed to build prompt JSON');
+    }
+  }
+
+  // Submit job
+  async function submit() {
+    setStatus('');
+    setVideoUrl('');
+    setJobId('');
+
+    if (!comfyUrl) {
+      setStatus('Enter ComfyUI URL.');
+      return;
+    }
+    if (!videoFile) {
+      setStatus('Upload a video.');
+      return;
+    }
+    if (!audioFile) {
+      setStatus('Upload an audio file.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // Check ComfyUI health
+      setStatus('Checking ComfyUI...');
+      const healthCheck = await checkComfyUIHealth(comfyUrl);
+      if (!healthCheck.available) {
+        throw new Error(`${healthCheck.error}${healthCheck.details ? `. ${healthCheck.details}` : ''}`);
+      }
+
+      setStatus('Uploading video to ComfyUI…');
+      const videoFilename = await uploadVideoToComfy(comfyUrl, videoFile);
+
+      setStatus('Uploading audio to ComfyUI…');
+      const audioFilename = await uploadMediaToComfy(comfyUrl, audioFile);
+
+      setStatus('Sending prompt to ComfyUI…');
+      const payload = {
+        prompt: await buildPromptJSON(videoFilename, audioFilename),
+        client_id: `video-lipsync-${generateId()}`,
+      };
+
+      let r: Response;
+      try {
+        r = await fetch(`${comfyUrl}/prompt`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(30000)
+        });
+      } catch (error: any) {
+        if (error.name === 'TimeoutError') {
+          throw new Error('Timeout connecting to ComfyUI. Check that it\'s running and the URL is correct.');
+        }
+        if (error.name === 'TypeError') {
+          throw new Error('Could not connect to ComfyUI. Check URL and that CORS is enabled.');
+        }
+        throw new Error(`Network error: ${error.message}`);
+      }
+      
+      if (!r.ok) {
+        let errorDetail = '';
+        try {
+          const errorData = await r.json();
+          errorDetail = errorData.error || errorData.message || '';
+        } catch {
+          errorDetail = await r.text().catch(() => '');
+        }
+        throw new Error(`ComfyUI rejected the prompt (${r.status}): ${errorDetail || 'Unknown error'}`);
+      }
+      
+      const resp = await r.json();
+      const id = resp?.prompt_id || resp?.promptId || resp?.node_id || "";
+      if (!id) {
+        throw new Error('ComfyUI did not return a valid prompt ID. Response: ' + JSON.stringify(resp));
+      }
+      setJobId(id);
+
+      await createJob({
+        job_id: id,
+        comfy_url: comfyUrl,
+        image_filename: videoFile.name,
+        audio_filename: audioFilename,
+        width,
+        height,
+        trim_to_audio: trimToAudio
+      });
+
+      await updateJobToProcessing(id);
+
+      // Start monitoring job status
+      setStatus('Processing in ComfyUI…');
+      const cleanup = startJobMonitoring(
+        id,
+        comfyUrl,
+        async (jobStatus, message, videoInfo) => {
+          if (jobStatus === 'processing') {
+            setStatus(message || 'Processing in ComfyUI…');
+          } else if (jobStatus === 'completed' && videoInfo) {
+            setStatus('Uploading video to Supabase Storage…');
+            let videoStorageUrl: string | null = null;
+            try {
+              const videoBlob = await downloadVideoFromComfy(comfyUrl, videoInfo.filename, videoInfo.subfolder);
+              if (videoBlob) {
+                videoStorageUrl = await uploadVideoToStorage(videoBlob, videoInfo.filename);
+                if (videoStorageUrl) {
+                  setVideoUrl(videoStorageUrl);
+                } else {
+                  const fallbackUrl = videoInfo.subfolder
+                    ? `${comfyUrl}/view?filename=${encodeURIComponent(videoInfo.filename)}&subfolder=${encodeURIComponent(videoInfo.subfolder)}&type=output`
+                    : `${comfyUrl}/view?filename=${encodeURIComponent(videoInfo.filename)}&type=output`;
+                  setVideoUrl(fallbackUrl);
+                }
+              } else {
+                const fallbackUrl = videoInfo.subfolder
+                  ? `${comfyUrl}/view?filename=${encodeURIComponent(videoInfo.filename)}&subfolder=${encodeURIComponent(videoInfo.subfolder)}&type=output`
+                  : `${comfyUrl}/view?filename=${encodeURIComponent(videoInfo.filename)}&type=output`;
+                setVideoUrl(fallbackUrl);
+              }
+            } catch (storageError) {
+              console.warn('Failed to upload to Supabase Storage:', storageError);
+              const fallbackUrl = videoInfo.subfolder
+                ? `${comfyUrl}/view?filename=${encodeURIComponent(videoInfo.filename)}&subfolder=${encodeURIComponent(videoInfo.subfolder)}&type=output`
+                : `${comfyUrl}/view?filename=${encodeURIComponent(videoInfo.filename)}&type=output`;
+              setVideoUrl(fallbackUrl);
+            }
+
+            await completeJob({
+              job_id: id,
+              status: 'completed',
+              filename: videoInfo.filename,
+              subfolder: videoInfo.subfolder,
+              video_url: videoStorageUrl || undefined
+            });
+
+            await loadVideoFeedFromDB();
+            setStatus('Ready ✅');
+            setIsSubmitting(false);
+            
+          } else if (jobStatus === 'error') {
+            setStatus(`❌ ${message}`);
+            setIsSubmitting(false);
+            
+            try {
+              await completeJob({
+                job_id: id,
+                status: 'error',
+                error_message: message || 'Unknown error'
+              });
+            } catch (dbError) {
+              console.error('Error updating job status:', dbError);
+            }
+          }
+        }
+      );
+      
+      setJobMonitorCleanup(() => cleanup);
+    } catch (e: any) {
+      let errorMessage = e?.message || String(e);
+      
+      if (errorMessage.includes('Failed to fetch')) {
+        errorMessage = 'Could not connect to ComfyUI. Check URL and that it\'s running.';
+      } else if (errorMessage.includes('NetworkError')) {
+        errorMessage = 'Network error connecting to ComfyUI. Check your connection.';
+      } else if (errorMessage.includes('JSON.parse')) {
+        errorMessage = 'ComfyUI returned an invalid response. It may be overloaded.';
+      } else if (errorMessage.includes('workflow template')) {
+        errorMessage = 'Error loading workflow template. Check that the file exists.';
+      }
+      
+      console.error('VideoLipsync error:', e);
+      setStatus(`❌ ${errorMessage}`);
+      
+      if (jobId) {
+        try {
+          await completeJob({
+            job_id: jobId,
+            status: 'error',
+            error_message: errorMessage
+          });
+        } catch (dbError) {
+          console.error('Error updating job status:', dbError);
+        }
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  // Timeline helpers
+  const updateVideoTrackTime = (id: string, startTime: number) => {
+    if (videoTrack && videoTrack.id === id) {
+      const updatedTrack = { ...videoTrack, startTime: Math.max(0, startTime) };
+      setVideoTrack(updatedTrack);
+      // Update total duration automatically based on content coverage
+      setTimeout(updateTotalDuration, 0);
+    }
+  };
+
+  const updateAudioTrackTime = (id: string, startTime: number) => {
+    if (audioTrack && audioTrack.id === id) {
+      const updatedTrack = { ...audioTrack, startTime: Math.max(0, startTime) };
+      setAudioTrack(updatedTrack);
+      // Update total duration automatically based on content coverage
+      setTimeout(updateTotalDuration, 0);
+    }
+  };
+
+  const removeVideoTrack = () => {
+    setVideoTrack(null);
+    setVideoFile(null);
+    setVideoPreview("");
+    setVideoDuration(0);
+    if (videoInputRef.current) videoInputRef.current.value = '';
+    // Update total duration after removing video track
+    setTimeout(updateTotalDuration, 0);
+  };
+
+  const removeAudioTrack = () => {
+    setAudioTrack(null);
+    setAudioFile(null);
+    setAudioDuration(0);
+    if (audioInputRef.current) audioInputRef.current.value = '';
+    // Update total duration after removing audio track
+    setTimeout(updateTotalDuration, 0);
+  };
+
+  const handleDownload = () => {
+    if (!videoUrl) return;
+    const a = document.createElement("a");
+    a.href = videoUrl;
+    a.download = "video-lipsync.mp4";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50">
+      <div className="flex gap-6 p-6 md:p-10">
+        {/* Main Content */}
+        <div className="flex-1 max-w-4xl space-y-8">
+          <div className="text-center space-y-4 py-8">
+            <h1 className="text-4xl md:text-6xl font-black bg-gradient-to-r from-green-600 via-blue-600 to-purple-600 bg-clip-text text-transparent">
+              Video Lipsync
+            </h1>
+            <div className="text-lg md:text-xl font-medium text-gray-700">
+              <span className="bg-gradient-to-r from-green-100 to-blue-100 px-4 py-2 rounded-full border border-green-200/50">
+                Audio & Video Sync
+              </span>
+            </div>
+            <p className="text-gray-600 max-w-2xl mx-auto leading-relaxed">
+              Sync audio with existing video using advanced lipsync technology.
+            </p>
+          </div>
+
+          <Section title="Configuración">
+            <Field>
+              <Label>Prompt personalizado</Label>
+              <input
+                type="text"
+                className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-green-500 focus:ring-4 focus:ring-green-100 transition-all duration-200 bg-white/80"
+                value={customPrompt}
+                onChange={(e) => setCustomPrompt(e.target.value)}
+                placeholder="Describe what the person is doing..."
+              />
+              <p className="text-xs text-gray-500 mt-1">Description of what the person should be doing in the video</p>
+            </Field>
+            
+            <div className="mt-4 grid md:grid-cols-2 gap-4">
+              <Field>
+                <Label>Audio Scale</Label>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0.1"
+                  max="3.0"
+                  className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-green-500 focus:ring-4 focus:ring-green-100 transition-all duration-200 bg-white/80"
+                  value={audioScale}
+                  onChange={(e) => setAudioScale(Number(e.target.value))}
+                />
+                <p className="text-xs text-gray-500 mt-1">Audio intensity scale (0.1 - 3.0)</p>
+              </Field>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Width (px)</Label>
+                  <input
+                    type="number"
+                    className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-green-500 focus:ring-4 focus:ring-green-100 transition-all duration-200 bg-white/80"
+                    value={width}
+                    onChange={(e) => setWidth(Math.max(32, Math.round(Number(e.target.value) / 32) * 32))}
+                  />
+                </div>
+                <div>
+                  <Label>Height (px)</Label>
+                  <input
+                    type="number"
+                    className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-green-500 focus:ring-4 focus:ring-green-100 transition-all duration-200 bg-white/80"
+                    value={height}
+                    onChange={(e) => setHeight(Math.max(32, Math.round(Number(e.target.value) / 32) * 32))}
+                  />
+                </div>
+              </div>
+            </div>
+          </Section>
+
+          <Section title="Media Upload">
+            <div className="grid md:grid-cols-2 gap-6">
+              <Field>
+                <Label>Video Source</Label>
+                <div className="relative">
+                  <input
+                    ref={videoInputRef}
+                    type="file"
+                    accept="video/*"
+                    onChange={onVideoSelect}
+                    className="w-full rounded-2xl border-2 border-dashed border-gray-300 px-4 py-6 text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-gradient-to-r file:from-green-500 file:to-blue-600 file:text-white file:font-semibold hover:file:from-green-600 hover:file:to-blue-700 transition-all duration-200 bg-gray-50/50"
+                  />
+                </div>
+                {videoPreview && (
+                  <div className="mt-3">
+                    <video src={videoPreview} controls className="w-full rounded-2xl shadow-lg border border-gray-200" />
+                  </div>
+                )}
+                {videoDuration > 0 && (
+                  <p className="text-xs text-green-600 mt-1">Duration: {videoDuration.toFixed(1)}s</p>
+                )}
+              </Field>
+              
+              <Field>
+                <Label>Audio Source</Label>
+                <div className="relative">
+                  <input
+                    ref={audioInputRef}
+                    type="file"
+                    accept="audio/*"
+                    onChange={onAudioSelect}
+                    className="w-full rounded-2xl border-2 border-dashed border-gray-300 px-4 py-6 text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-gradient-to-r file:from-blue-500 file:to-purple-600 file:text-white file:font-semibold hover:file:from-blue-600 hover:file:to-purple-700 transition-all duration-200 bg-gray-50/50"
+                  />
+                </div>
+                {audioDuration > 0 && (
+                  <p className="text-xs text-blue-600 mt-1">Duration: {audioDuration.toFixed(1)}s</p>
+                )}
+              </Field>
+            </div>
+          </Section>
+
+          <Section title="Timeline Sync">
+            <div className="space-y-4">
+              <Timeline
+                tracks={[
+                  ...(videoTrack ? [{ ...videoTrack, assignedMaskId: null }] : []),
+                  ...(audioTrack ? [{ ...audioTrack, assignedMaskId: null }] : [])
+                ]}
+                totalDuration={totalDuration}
+                onUpdateTrackTime={(id, startTime) => {
+                  if (videoTrack && videoTrack.id === id) {
+                    updateVideoTrackTime(id, startTime);
+                  } else if (audioTrack && audioTrack.id === id) {
+                    updateAudioTrackTime(id, startTime);
+                  }
+                }}
+                onRemoveTrack={(id) => {
+                  if (videoTrack && videoTrack.id === id) {
+                    removeVideoTrack();
+                  } else if (audioTrack && audioTrack.id === id) {
+                    removeAudioTrack();
+                  }
+                }}
+                onUpdateTotalDuration={updateTotalDuration}
+              />
+              
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="p-3 rounded-lg bg-green-50 border border-green-200">
+                    <div className="font-medium text-green-800 mb-1">🎬 Video Track</div>
+                    <div className="text-green-600">
+                      {videoTrack ? `${videoTrack.name} (${videoTrack.duration.toFixed(1)}s)` : 'No video uploaded'}
+                      {videoTrack && (
+                        <div className="text-xs mt-1">
+                          Start: {videoTrack.startTime.toFixed(1)}s
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
+                    <div className="font-medium text-blue-800 mb-1">🎵 Audio Track</div>
+                    <div className="text-blue-600">
+                      {audioTrack ? `${audioTrack.name} (${audioTrack.duration.toFixed(1)}s)` : 'No audio uploaded'}
+                      {audioTrack && (
+                        <div className="text-xs mt-1">
+                          Start: {audioTrack.startTime.toFixed(1)}s
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Auto-padding info */}
+                {videoTrack && audioTrack && (
+                  <div className="p-3 rounded-lg bg-yellow-50 border border-yellow-200">
+                    <div className="font-medium text-yellow-800 mb-1">⚡ Auto Padding</div>
+                    <div className="text-yellow-600 text-xs">
+                      {(() => {
+                        const fps = 25;
+                        const videoStartTime = videoTrack.startTime;
+                        const audioStartTime = audioTrack.startTime;
+                        const videoEndTime = videoTrack.startTime + videoTrack.duration;
+                        const audioEndTime = audioTrack.startTime + audioTrack.duration;
+                        const blackFramesStart = Math.max(0, Math.floor((videoStartTime - audioStartTime) * fps));
+                        const blackFramesEnd = Math.max(0, Math.floor((audioEndTime - videoEndTime) * fps));
+                        
+                        if (blackFramesStart > 0 && blackFramesEnd > 0) {
+                          return `Adding ${blackFramesStart} black frames at start, ${blackFramesEnd} at end`;
+                        } else if (blackFramesStart > 0) {
+                          return `Adding ${blackFramesStart} black frames at start`;
+                        } else if (blackFramesEnd > 0) {
+                          return `Adding ${blackFramesEnd} black frames at end`;
+                        } else {
+                          return 'No padding needed - perfect sync';
+                        }
+                      })()}
+                    </div>
+                  </div>
+                )}
+                
+                <div className="p-2 rounded bg-gray-100 text-xs text-gray-600">
+                  <strong>Final Duration:</strong> {totalDuration}s (auto-calculated based on content coverage)
+                </div>
+              </div>
+            </div>
+          </Section>
+
+          <Section title="Generation">
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                className="px-8 py-4 rounded-2xl bg-gradient-to-r from-green-600 to-blue-600 text-white font-bold text-lg shadow-lg hover:from-green-700 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02] transition-all duration-200 flex items-center gap-3"
+                onClick={submit}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    Processing…
+                  </>
+                ) : (
+                  <>
+                    <span>🎬</span>
+                    Generate Lipsync
+                  </>
+                )}
+              </button>
+              {jobId && <span className="text-xs text-gray-500">Job ID: {jobId}</span>}
+              {status && <span className="text-sm">{status}</span>}
+            </div>
+
+            {videoUrl && (
+              <div className="mt-6 space-y-3">
+                <video src={videoUrl} controls className="w-full rounded-3xl shadow-2xl border border-gray-200/50" />
+                <div>
+                  <button className="px-6 py-3 rounded-2xl border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-semibold shadow-md hover:shadow-lg transition-all duration-200 flex items-center gap-2" onClick={handleDownload}>
+                    <span>⬇️</span>
+                    Download MP4
+                  </button>
+                </div>
+              </div>
+            )}
+          </Section>
+        </div>
+
+        {/* Right Sidebar - Video Feed */}
+        <div className="w-96 space-y-6">
+          <div className="sticky top-6 h-[calc(100vh-3rem)]">
+            <div className="rounded-3xl border border-gray-200/80 p-6 shadow-lg bg-gradient-to-br from-white to-gray-50/50 backdrop-blur-sm h-full flex flex-col">
+              <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+                <div className="w-2 h-8 bg-gradient-to-b from-green-500 to-blue-600 rounded-full"></div>
+                Generated Videos
+              </h2>
+              
+              {videoFeed.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500 mb-3">No videos generated yet</p>
+                  <p className="text-xs text-gray-400">Videos will appear here when you generate content</p>
+                </div>
+              ) : (
+                <div className="space-y-4 flex-1 overflow-y-auto">
+                  {videoFeed.map((job) => {
+                    const videoUrl = job.video_url || 
+                      (job.filename ? 
+                        (job.subfolder 
+                          ? `${job.comfy_url}/view?filename=${encodeURIComponent(job.filename)}&subfolder=${encodeURIComponent(job.subfolder)}&type=output`
+                          : `${job.comfy_url}/view?filename=${encodeURIComponent(job.filename)}&type=output`)
+                        : null);
+                      
+                    return (
+                      <div key={job.job_id} className="border border-gray-200 rounded-2xl p-3 bg-white">
+                        {videoUrl && (
+                          <video 
+                            src={videoUrl} 
+                            controls 
+                            className="w-full rounded-xl mb-2"
+                            style={{ maxHeight: '150px' }}
+                          />
+                        )}
+                        <div className="space-y-1">
+                          <div className="text-xs text-gray-500 truncate" title={job.filename || job.job_id}>
+                            {job.filename || `Job: ${job.job_id.slice(0, 8)}...`}
+                          </div>
+                          <div className="text-xs text-gray-400">
+                            {job.timestamp_completed ? new Date(job.timestamp_completed).toLocaleString() : 'Processing...'}
+                          </div>
+                          <div className="text-xs">
+                            <span className={`px-2 py-1 rounded-full ${
+                              job.status === 'completed' ? 'bg-green-100 text-green-700' :
+                              job.status === 'error' ? 'bg-red-100 text-red-700' :
+                              'bg-blue-100 text-blue-700'
+                            }`}>
+                              {job.status}
+                            </span>
+                          </div>
+                          <div className="text-xs text-gray-400">
+                            {job.width}×{job.height} • {job.trim_to_audio ? 'Trim to audio' : 'Fixed length'}
+                          </div>
+                        </div>
+                        {videoUrl && (
+                          <button 
+                            className="mt-2 w-full text-xs px-2 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors"
+                            onClick={() => {
+                              const a = document.createElement("a");
+                              a.href = videoUrl;
+                              a.download = job.filename || 'video.mp4';
+                              document.body.appendChild(a);
+                              a.click();
+                              a.remove();
+                            }}
+                          >
+                            Download
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
