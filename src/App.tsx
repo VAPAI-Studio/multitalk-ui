@@ -2,10 +2,11 @@ import { useState } from "react";
 import MultiTalkOnePerson from "./MultiTalkOnePerson";
 import MultiTalkMultiplePeople from "./MultiTalkMultiplePeople";
 import VideoLipsync from "./VideoLipsync";
+import ComfyUIStatus from "./components/ComfyUIStatus";
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<"multitalk-one" | "multitalk-multiple" | "video-lipsync">("multitalk-one");
-  const [comfyUrl, setComfyUrl] = useState<string>("https://59414078555f.ngrok.app");
+  const [comfyUrl, setComfyUrl] = useState<string>("https://comfy.vapai.studio");
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -26,11 +27,12 @@ export default function App() {
                 <input
                   type="text"
                   className="rounded-xl border-2 border-gray-200 px-3 py-2 text-gray-800 placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all duration-200 bg-white/90 w-80"
-                  placeholder="https://59414078555f.ngrok.app"
+                  placeholder="https://comfy.vapai.studio"
                   value={comfyUrl}
                   onChange={(e) => setComfyUrl(e.target.value)}
                 />
               </div>
+              <ComfyUIStatus baseUrl={comfyUrl} />
             </div>
             
             <div className="flex gap-3">

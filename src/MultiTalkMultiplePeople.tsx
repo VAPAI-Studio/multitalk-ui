@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { createJob, updateJobToProcessing, completeJob, getCompletedJobsWithVideos } from "./lib/jobTracking";
-import type { MultiTalkJob } from "./lib/supabase";
+import { createJob, updateJobToProcessing, completeJob } from "./lib/jobTracking";
 import { downloadVideoFromComfy, uploadVideoToStorage } from "./lib/supabase";
 import { Label, Field, Section, Modal } from "./components/UI";
 import { Button, Badge } from "./components/DesignSystem";
@@ -8,6 +7,7 @@ import { MaskEditor } from "./components/MaskEditor";
 import { Timeline } from "./components/Timeline";
 import type { Mask, AudioTrack } from "./components/types";
 import { fileToBase64, uploadMediaToComfy, joinAudiosForMask, groupAudiosByMask, generateId, startJobMonitoring, checkComfyUIHealth } from "./components/utils";
+import JobFeed from "./components/JobFeed";
 
 interface Props {
   comfyUrl: string;
@@ -27,7 +27,6 @@ export default function MultiTalkMultiplePeople({ comfyUrl }: Props) {
   const [videoUrl, setVideoUrl] = useState<string>("")
   const [jobId, setJobId] = useState<string>("")
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
-  const [videoFeed, setVideoFeed] = useState<MultiTalkJob[]>([])
   const [isEditingMask, setIsEditingMask] = useState<string | null>(null)
   const [showMaskModal, setShowMaskModal] = useState<boolean>(false)
   const [jobMonitorCleanup, setJobMonitorCleanup] = useState<(() => void) | null>(null)
@@ -35,20 +34,6 @@ export default function MultiTalkMultiplePeople({ comfyUrl }: Props) {
 
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
-  // load feed (poll every 30s)
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const { jobs, error } = await getCompletedJobsWithVideos(20)
-        if (error) return console.error('DB feed error:', error)
-        const filtered = jobs.filter(j => j.comfy_url === comfyUrl || !comfyUrl)
-        setVideoFeed(filtered)
-      } catch (e) { console.error('load feed', e) }
-    }
-    load()
-    const id = setInterval(load, 30_000)
-    return () => clearInterval(id)
-  }, [comfyUrl])
 
   // cleanup job monitor on unmount
   useEffect(() => {
@@ -543,11 +528,7 @@ export default function MultiTalkMultiplePeople({ comfyUrl }: Props) {
             setStatus('Listo ✅')
             setIsSubmitting(false)
             
-            // Refresh feed
-            try { 
-              const { jobs } = await getCompletedJobsWithVideos(20)
-              setVideoFeed(jobs.filter(j => j.comfy_url === comfyUrl || !comfyUrl))
-            } catch {}
+            // Feed will refresh automatically via JobFeed component
             
           } else if (jobStatus === 'error') {
             // Handle error
@@ -637,9 +618,9 @@ export default function MultiTalkMultiplePeople({ comfyUrl }: Props) {
           <Section title="Configuración">
             <Field>
               <Label>Prompt personalizado</Label>
-              <input
-                type="text"
-                className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all duration-200 bg-white/80"
+              <textarea
+                rows={3}
+                className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all duration-200 bg-white/80 resize-vertical"
                 value={customPrompt}
                 onChange={(e) => setCustomPrompt(e.target.value)}
                 placeholder="Describe la escena que quieres generar..."
@@ -890,101 +871,10 @@ export default function MultiTalkMultiplePeople({ comfyUrl }: Props) {
         {/* Right Sidebar - Video Feed */}
         <div className="w-96 space-y-6">
           <div className="sticky top-6 h-[calc(100vh-3rem)]">
-            <div className="rounded-3xl border border-gray-200/80 p-6 shadow-lg bg-gradient-to-br from-white to-gray-50/50 backdrop-blur-sm h-full flex flex-col">
-              <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-3">
-                <div className="w-2 h-8 bg-gradient-to-b from-purple-500 to-pink-600 rounded-full"></div>
-                Feed de Generaciones
-              </h2>
-              
-              {videoFeed.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-gray-500 mb-3">No hay videos generados aún</p>
-                  <p className="text-xs text-gray-400">Los videos aparecerán aquí cuando generes contenido</p>
-                </div>
-              ) : (
-                <div className="space-y-4 flex-1 overflow-y-auto">
-                  {videoFeed.map((job) => {
-                    // Prefer Supabase video_url, fallback to ComfyUI if not available
-                    const videoUrl = job.video_url || 
-                      (job.filename ? 
-                        (job.subfolder 
-                          ? `${job.comfy_url}/view?filename=${encodeURIComponent(job.filename)}&subfolder=${encodeURIComponent(job.subfolder)}&type=output`
-                          : `${job.comfy_url}/view?filename=${encodeURIComponent(job.filename)}&type=output`)
-                        : null);
-                      
-                    return (
-                      <div key={job.job_id} className="border border-gray-200 rounded-2xl p-3 bg-white">
-                        {videoUrl && (
-                          <video 
-                            src={videoUrl} 
-                            controls 
-                            className="w-full rounded-xl mb-2"
-                            style={{ maxHeight: '150px' }}
-                          />
-                        )}
-                        <div className="space-y-1">
-                          <div className="text-xs text-gray-500 truncate" title={job.filename || job.job_id}>
-                            {job.filename || `Job: ${job.job_id.slice(0, 8)}...`}
-                          </div>
-                          <div className="text-xs text-gray-400">
-                            {job.timestamp_completed ? new Date(job.timestamp_completed).toLocaleString() : 'Processing...'}
-                          </div>
-                          <div className="text-xs">
-                            <span className={`px-2 py-1 rounded-full ${
-                              job.status === 'completed' ? 'bg-green-100 text-green-700' :
-                              job.status === 'error' ? 'bg-red-100 text-red-700' :
-                              'bg-blue-100 text-blue-700'
-                            }`}>
-                              {job.status}
-                            </span>
-                          </div>
-                          <div className="text-xs text-gray-400">
-                            {job.width}×{job.height} • {job.trim_to_audio ? 'Trim to audio' : 'Fixed length'}
-                          </div>
-                        </div>
-                        {videoUrl && (
-                          <button 
-                            className="mt-2 w-full text-xs px-2 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors"
-                            onClick={() => {
-                              const a = document.createElement("a");
-                              a.href = videoUrl;
-                              a.download = job.filename || 'video.mp4';
-                              document.body.appendChild(a);
-                              a.click();
-                              a.remove();
-                            }}
-                          >
-                            Descargar
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+            <JobFeed comfyUrl={comfyUrl} />
           </div>
         </div>
       </div>
-
-      {/* Mask modal */}
-      <Modal
-        isOpen={showMaskModal && !!isEditingMask && !!imagePreview}
-        onClose={() => setShowMaskModal(false)}
-      >
-        {(() => {
-          const m = masks.find((x) => x.id === isEditingMask);
-          if (!m || !imagePreview) return null;
-          return (
-            <MaskEditor
-              imageUrl={imagePreview}
-              maskName={m.name}
-              existingMask={m.maskData}
-              onMaskUpdate={(data) => updateMask(m.id, data)}
-            />
-          );
-        })()}
-      </Modal>
     </div>
-  );
+  )
 }

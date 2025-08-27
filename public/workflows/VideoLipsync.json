@@ -511,18 +511,24 @@
   },
   "311": {
     "inputs": {
-      "samples": [
-        "310",
-        0
-      ],
+      "enable_vae_tiling": false,
+      "tile_x": 272,
+      "tile_y": 272,
+      "tile_stride_x": 144,
+      "tile_stride_y": 128,
+      "normalization": "default",
       "vae": [
         "129",
         0
+      ],
+      "samples": [
+        "310",
+        0
       ]
     },
-    "class_type": "VAEDecode",
+    "class_type": "WanVideoDecode",
     "_meta": {
-      "title": "VAE Decode - Start Black Frames"
+      "title": "WanVideo Decode - Start Black Frames"
     }
   },
   "312": {
@@ -545,18 +551,24 @@
   },
   "313": {
     "inputs": {
-      "samples": [
-        "312",
-        0
-      ],
+      "enable_vae_tiling": false,
+      "tile_x": 272,
+      "tile_y": 272,
+      "tile_stride_x": 144,
+      "tile_stride_y": 128,
+      "normalization": "default",
       "vae": [
         "129",
         0
+      ],
+      "samples": [
+        "312",
+        0
       ]
     },
-    "class_type": "VAEDecode",
+    "class_type": "WanVideoDecode",
     "_meta": {
-      "title": "VAE Decode - End Black Frames"
+      "title": "WanVideo Decode - End Black Frames"
     }
   },
   "300": {

@@ -1,4 +1,6 @@
 import type { AudioTrack, VideoResult } from './types'
+import { uploadVideoToSupabaseStorage } from '../lib/storageUtils'
+import { completeJob } from '../lib/jobTracking'
 
 export async function fileToBase64(file: File): Promise<string> {
   const buf = await file.arrayBuffer()
@@ -137,7 +139,7 @@ function interleave(channels: Float32Array[]): Float32Array {
   return result
 }
 
-export async function pollForResult(promptId: string, baseUrl: string, intervalMs: number, maxSeconds: number) {
+export async function pollForResult(promptId: string, baseUrl: string, intervalMs: number, maxSeconds: number, jobId?: string) {
   const start = Date.now();
   while (Date.now() - start < maxSeconds * 1000) {
     try {
@@ -163,7 +165,54 @@ export async function pollForResult(promptId: string, baseUrl: string, intervalM
       }
 
       const found = findVideoFromHistory(data);
-      if (found) return data;
+      if (found) {
+        // Upload video to Supabase Storage if we have a jobId
+        if (jobId && found.filename) {
+          console.log('Video found, uploading to Supabase Storage...');
+          try {
+            const uploadResult = await uploadVideoToSupabaseStorage(
+              baseUrl,
+              found.filename,
+              found.subfolder || '',
+              jobId
+            );
+            
+            if (uploadResult.success && uploadResult.publicUrl) {
+              // Update job with Supabase Storage URL
+              console.log('✅ Video upload successful! Saving Supabase URL to database:', uploadResult.publicUrl);
+              await completeJob({
+                job_id: jobId,
+                status: 'completed',
+                filename: found.filename,
+                subfolder: found.subfolder,
+                video_url: uploadResult.publicUrl
+              });
+              console.log('✅ Job completed with Supabase URL:', uploadResult.publicUrl);
+            } else {
+              console.error('❌ Failed to upload video to Supabase Storage:', uploadResult.error);
+              console.warn('⚠️ Completing job without Supabase URL - video will fallback to ComfyUI');
+              // Still complete the job with ComfyUI info
+              await completeJob({
+                job_id: jobId,
+                status: 'completed',
+                filename: found.filename,
+                subfolder: found.subfolder
+              });
+            }
+          } catch (uploadError) {
+            console.error('❌ Error during video upload:', uploadError);
+            console.warn('⚠️ Completing job without Supabase URL due to upload error - video will fallback to ComfyUI');
+            // Still complete the job with ComfyUI info
+            await completeJob({
+              job_id: jobId,
+              status: 'completed',
+              filename: found.filename,
+              subfolder: found.subfolder
+            });
+          }
+        }
+        return data;
+      }
       
       // Check if processing is complete but no video found
       if (historyEntry?.status?.status_str === "success" || historyEntry?.status?.completed) {
@@ -265,7 +314,52 @@ export function startJobMonitoring(
       if (historyEntry?.status?.status_str === "success" || historyEntry?.status?.completed) {
         const videoInfo = findVideoFromHistory(data);
         if (videoInfo) {
-          onStatusUpdate('completed', 'Procesamiento completado', videoInfo);
+          // Upload video to Supabase Storage
+          console.log('Video completed, uploading to Supabase Storage...');
+          try {
+            const uploadResult = await uploadVideoToSupabaseStorage(
+              baseUrl,
+              videoInfo.filename,
+              videoInfo.subfolder || '',
+              jobId
+            );
+            
+            if (uploadResult.success && uploadResult.publicUrl) {
+              // Update job with Supabase Storage URL
+              console.log('✅ Video upload successful! Saving Supabase URL to database:', uploadResult.publicUrl);
+              await completeJob({
+                job_id: jobId,
+                status: 'completed',
+                filename: videoInfo.filename,
+                subfolder: videoInfo.subfolder,
+                video_url: uploadResult.publicUrl
+              });
+              console.log('✅ Job completed with Supabase URL:', uploadResult.publicUrl);
+              onStatusUpdate('completed', 'Video guardado y completado', { ...videoInfo, video_url: uploadResult.publicUrl });
+            } else {
+              console.error('❌ Failed to upload video to Supabase Storage:', uploadResult.error);
+              console.warn('⚠️ Completing job without Supabase URL - video will fallback to ComfyUI');
+              // Still complete the job with ComfyUI info
+              await completeJob({
+                job_id: jobId,
+                status: 'completed',
+                filename: videoInfo.filename,
+                subfolder: videoInfo.subfolder
+              });
+              onStatusUpdate('completed', 'Procesamiento completado (sin subir a storage)', videoInfo);
+            }
+          } catch (uploadError) {
+            console.error('❌ Error during video upload:', uploadError);
+            console.warn('⚠️ Completing job without Supabase URL due to upload error - video will fallback to ComfyUI');
+            // Still complete the job with ComfyUI info
+            await completeJob({
+              job_id: jobId,
+              status: 'completed',
+              filename: videoInfo.filename,
+              subfolder: videoInfo.subfolder
+            });
+            onStatusUpdate('completed', 'Procesamiento completado (error subiendo)', videoInfo);
+          }
         } else {
           onStatusUpdate('error', 'ComfyUI completó pero no se encontró video de salida');
         }

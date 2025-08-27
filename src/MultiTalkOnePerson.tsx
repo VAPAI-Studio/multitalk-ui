@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
-import { createJob, updateJobToProcessing, completeJob, getCompletedJobsWithVideos } from "./lib/jobTracking";
-import type { MultiTalkJob } from "./lib/supabase";
+import { createJob, updateJobToProcessing, completeJob } from "./lib/jobTracking";
 import { downloadVideoFromComfy, uploadVideoToStorage } from "./lib/supabase";
 import { startJobMonitoring, checkComfyUIHealth } from "./components/utils";
+import JobFeed from "./components/JobFeed";
 
 // MultiTalk One-Person Frontend for ComfyUI
 // - Enter ComfyUI URL
@@ -64,17 +64,9 @@ export default function MultiTalkOnePerson({ comfyUrl }: Props) {
   const [videoUrl, setVideoUrl] = useState<string>("");
   const [jobId, setJobId] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [videoFeed, setVideoFeed] = useState<MultiTalkJob[]>([]);
   const [jobMonitorCleanup, setJobMonitorCleanup] = useState<(() => void) | null>(null);
 
   const imgRef = useRef<HTMLImageElement | null>(null);
-
-  // Load video feed from Supabase
-  useEffect(() => {
-    loadVideoFeedFromDB();
-    const interval = setInterval(loadVideoFeedFromDB, 30000); // Refresh every 30 seconds
-    return () => clearInterval(interval);
-  }, [comfyUrl]);
 
   // cleanup job monitor on unmount
   useEffect(() => {
@@ -84,22 +76,6 @@ export default function MultiTalkOnePerson({ comfyUrl }: Props) {
       }
     };
   }, [jobMonitorCleanup]);
-
-  async function loadVideoFeedFromDB() {
-    try {
-      const { jobs, error } = await getCompletedJobsWithVideos(20);
-      if (error) {
-        console.error("Error loading video feed:", error);
-        return;
-      }
-      
-      // Filter jobs that match current comfy URL or show all if no specific URL
-      const filteredJobs = jobs.filter(job => job.comfy_url === comfyUrl || !comfyUrl);
-      setVideoFeed(filteredJobs);
-    } catch (e) {
-      console.error("Error loading video feed from DB:", e);
-    }
-  }
 
 
   useEffect(() => {
@@ -360,8 +336,7 @@ export default function MultiTalkOnePerson({ comfyUrl }: Props) {
               video_url: videoStorageUrl || undefined
             });
 
-            // Refresh feed to show new job
-            await loadVideoFeedFromDB();
+            // Feed will refresh automatically via JobFeed component
             
             setStatus("Listo ✅");
             setIsSubmitting(false);
@@ -496,9 +471,9 @@ export default function MultiTalkOnePerson({ comfyUrl }: Props) {
         <div className="mt-4">
           <Field>
             <Label>Prompt personalizado</Label>
-            <input
-              type="text"
-              className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all duration-200 bg-white/80"
+            <textarea
+              rows={3}
+              className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all duration-200 bg-white/80 resize-vertical"
               value={customPrompt}
               onChange={(e) => setCustomPrompt(e.target.value)}
               placeholder="Describe la acción que quieres generar..."
@@ -623,79 +598,7 @@ export default function MultiTalkOnePerson({ comfyUrl }: Props) {
         {/* Right Sidebar - Video Feed */}
         <div className="w-96 space-y-6">
           <div className="sticky top-6 h-[calc(100vh-3rem)]">
-            <div className="rounded-3xl border border-gray-200/80 p-6 shadow-lg bg-gradient-to-br from-white to-gray-50/50 backdrop-blur-sm h-full flex flex-col">
-              <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-3">
-                <div className="w-2 h-8 bg-gradient-to-b from-purple-500 to-pink-600 rounded-full"></div>
-                Feed de Generaciones
-              </h2>
-              
-              {videoFeed.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-gray-500 mb-3">No hay videos generados aún</p>
-                  <p className="text-xs text-gray-400">Los videos aparecerán aquí cuando generes contenido</p>
-                </div>
-              ) : (
-                <div className="space-y-4 flex-1 overflow-y-auto">
-                  {videoFeed.map((job) => {
-                    // Prefer Supabase video_url, fallback to ComfyUI if not available
-                    const videoUrl = job.video_url || 
-                      (job.filename ? 
-                        (job.subfolder 
-                          ? `${job.comfy_url}/view?filename=${encodeURIComponent(job.filename)}&subfolder=${encodeURIComponent(job.subfolder)}&type=output`
-                          : `${job.comfy_url}/view?filename=${encodeURIComponent(job.filename)}&type=output`)
-                        : null);
-                      
-                    return (
-                      <div key={job.job_id} className="border border-gray-200 rounded-2xl p-3 bg-white">
-                        {videoUrl && (
-                          <video 
-                            src={videoUrl} 
-                            controls 
-                            className="w-full rounded-xl mb-2"
-                            style={{ maxHeight: '150px' }}
-                          />
-                        )}
-                        <div className="space-y-1">
-                          <div className="text-xs text-gray-500 truncate" title={job.filename || job.job_id}>
-                            {job.filename || `Job: ${job.job_id.slice(0, 8)}...`}
-                          </div>
-                          <div className="text-xs text-gray-400">
-                            {job.timestamp_completed ? new Date(job.timestamp_completed).toLocaleString() : 'Processing...'}
-                          </div>
-                          <div className="text-xs">
-                            <span className={`px-2 py-1 rounded-full ${
-                              job.status === 'completed' ? 'bg-green-100 text-green-700' :
-                              job.status === 'error' ? 'bg-red-100 text-red-700' :
-                              'bg-blue-100 text-blue-700'
-                            }`}>
-                              {job.status}
-                            </span>
-                          </div>
-                          <div className="text-xs text-gray-400">
-                            {job.width}×{job.height} • {job.trim_to_audio ? 'Trim to audio' : 'Fixed length'}
-                          </div>
-                        </div>
-                        {videoUrl && (
-                          <button 
-                            className="mt-2 w-full text-xs px-2 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors"
-                            onClick={() => {
-                              const a = document.createElement("a");
-                              a.href = videoUrl;
-                              a.download = job.filename || 'video.mp4';
-                              document.body.appendChild(a);
-                              a.click();
-                              a.remove();
-                            }}
-                          >
-                            Descargar
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+            <JobFeed comfyUrl={comfyUrl} />
           </div>
         </div>
       </div>

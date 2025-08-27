@@ -3,10 +3,9 @@ import { createJob, updateJobToProcessing, completeJob, getCompletedJobsWithVide
 import type { MultiTalkJob } from "./lib/supabase";
 import { downloadVideoFromComfy, uploadVideoToStorage } from "./lib/supabase";
 import { Label, Field, Section } from "./components/UI";
-import { Button } from "./components/DesignSystem";
 import { Timeline } from "./components/Timeline";
 import type { VideoTrack, AudioTrackSimple } from "./components/types";
-import { fileToBase64, uploadMediaToComfy, generateId, startJobMonitoring, checkComfyUIHealth } from "./components/utils";
+import { uploadMediaToComfy, generateId, startJobMonitoring, checkComfyUIHealth } from "./components/utils";
 
 interface Props {
   comfyUrl: string;
@@ -71,23 +70,38 @@ export default function VideoLipsync({ comfyUrl }: Props) {
     }
   }
 
-  // Calculate the final duration based on actual content coverage
+  // Calculate the final duration based on union of video and audio coverage
   const calculateFinalDuration = () => {
-    let maxEndTime = 0;
+    if (!videoTrack && !audioTrack) {
+      return 10; // Default minimum when nothing is loaded
+    }
     
-    // Check video track end time
+    // Calculate the union: from earliest start to latest end
+    let earliestStart = Infinity;
+    let latestEnd = 0;
+    
     if (videoTrack) {
-      const videoEndTime = videoTrack.startTime + videoTrack.duration;
-      maxEndTime = Math.max(maxEndTime, videoEndTime);
+      earliestStart = Math.min(earliestStart, videoTrack.startTime);
+      latestEnd = Math.max(latestEnd, videoTrack.startTime + videoTrack.duration);
     }
     
-    // Check audio track end time
     if (audioTrack) {
-      const audioEndTime = audioTrack.startTime + audioTrack.duration;
-      maxEndTime = Math.max(maxEndTime, audioEndTime);
+      earliestStart = Math.min(earliestStart, audioTrack.startTime);
+      latestEnd = Math.max(latestEnd, audioTrack.startTime + audioTrack.duration);
     }
     
-    return Math.max(10, Math.ceil(maxEndTime)); // Minimum 10 seconds
+    // If we only have video, minimum duration is video duration
+    if (videoTrack && !audioTrack) {
+      return Math.ceil(videoTrack.duration);
+    }
+    
+    // Total duration is the union (from earliest start to latest end)
+    const unionDuration = latestEnd - Math.min(earliestStart, 0);
+    
+    // But minimum duration should be at least the video duration if video exists
+    const minimumDuration = videoTrack ? videoTrack.duration : 0;
+    
+    return Math.ceil(Math.max(unionDuration, minimumDuration));
   };
 
   // Update total duration when tracks change
@@ -210,16 +224,23 @@ export default function VideoLipsync({ comfyUrl }: Props) {
       const audioEndTime = audioTrack ? `${Math.floor((audioTrack.startTime + audioTrack.duration) / 60)}:${String(Math.floor((audioTrack.startTime + audioTrack.duration) % 60)).padStart(2, '0')}` : "2:00";
       const videoStartFrame = videoTrack ? Math.floor(videoTrack.startTime * 25) : 0; // Assuming 25 FPS
       
-      // Calculate black frame padding
+      // Calculate black frame padding based on timeline union
       const fps = 25;
       const videoStartTime = videoTrack ? videoTrack.startTime : 0;
       const audioStartTime_seconds = audioTrack ? audioTrack.startTime : 0;
       const videoEndTime = videoTrack ? videoTrack.startTime + videoTrack.duration : 0;
       const audioEndTime_seconds = audioTrack ? audioTrack.startTime + audioTrack.duration : 0;
       
-      // Calculate how many black frames we need at the start and end
-      const blackFramesStart = Math.max(0, Math.floor((videoStartTime - audioStartTime_seconds) * fps));
-      const blackFramesEnd = Math.max(0, Math.floor((audioEndTime_seconds - videoEndTime) * fps));
+      // Calculate black frames needed to cover gaps
+      // Black frames at start: if audio starts before video
+      const blackFramesStart = videoTrack && audioTrack && audioStartTime_seconds < videoStartTime 
+        ? Math.floor((videoStartTime - audioStartTime_seconds) * fps) 
+        : 0;
+      
+      // Black frames at end: if audio continues after video ends
+      const blackFramesEnd = videoTrack && audioTrack && audioEndTime_seconds > videoEndTime 
+        ? Math.floor((audioEndTime_seconds - videoEndTime) * fps) 
+        : 0;
       
       // Determine concatenation inputs based on black frame needs
       let concatInputCount = 1; // At minimum, we have the video
@@ -557,9 +578,9 @@ export default function VideoLipsync({ comfyUrl }: Props) {
           <Section title="Configuración">
             <Field>
               <Label>Prompt personalizado</Label>
-              <input
-                type="text"
-                className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-green-500 focus:ring-4 focus:ring-green-100 transition-all duration-200 bg-white/80"
+              <textarea
+                rows={3}
+                className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-green-500 focus:ring-4 focus:ring-green-100 transition-all duration-200 bg-white/80 resize-vertical"
                 value={customPrompt}
                 onChange={(e) => setCustomPrompt(e.target.value)}
                 placeholder="Describe what the person is doing..."
@@ -726,7 +747,11 @@ export default function VideoLipsync({ comfyUrl }: Props) {
                 )}
                 
                 <div className="p-2 rounded bg-gray-100 text-xs text-gray-600">
-                  <strong>Final Duration:</strong> {totalDuration}s (auto-calculated based on content coverage)
+                  <strong>Final Duration:</strong> {totalDuration}s 
+                  {videoTrack && audioTrack ? ' (union of video + audio timeline)' : 
+                   videoTrack && !audioTrack ? ' (video duration minimum)' : 
+                   !videoTrack && audioTrack ? ' (audio coverage only)' : 
+                   ' (default minimum)'}
                 </div>
               </div>
             </div>
