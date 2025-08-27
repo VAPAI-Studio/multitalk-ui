@@ -55,7 +55,6 @@ export async function uploadVideoToSupabaseStorage(
     
     // Generate storage path
     const timestamp = new Date().toISOString().split('T')[0] // YYYY-MM-DD
-    const fileExtension = filename.split('.').pop() || 'mp4'
     const storagePath = `videos/${timestamp}/${jobId}_${filename}`
     
     console.log('📤 Step 2: Uploading to Supabase Storage:', { 

@@ -1,9 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createJob, updateJobToProcessing, completeJob } from "./lib/jobTracking";
 import { downloadVideoFromComfy, uploadVideoToStorage } from "./lib/supabase";
-import { Label, Field, Section, Modal } from "./components/UI";
+import { Label, Field, Section } from "./components/UI";
 import { Button, Badge } from "./components/DesignSystem";
-import { MaskEditor } from "./components/MaskEditor";
 import { Timeline } from "./components/Timeline";
 import type { Mask, AudioTrack } from "./components/types";
 import { fileToBase64, uploadMediaToComfy, joinAudiosForMask, groupAudiosByMask, generateId, startJobMonitoring, checkComfyUIHealth } from "./components/utils";
@@ -27,8 +26,8 @@ export default function MultiTalkMultiplePeople({ comfyUrl }: Props) {
   const [videoUrl, setVideoUrl] = useState<string>("")
   const [jobId, setJobId] = useState<string>("")
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
-  const [isEditingMask, setIsEditingMask] = useState<string | null>(null)
-  const [showMaskModal, setShowMaskModal] = useState<boolean>(false)
+  // const [isEditingMask, setIsEditingMask] = useState<string | null>(null)
+  // const [showMaskModal, setShowMaskModal] = useState<boolean>(false)
   const [jobMonitorCleanup, setJobMonitorCleanup] = useState<(() => void) | null>(null)
   const [customPrompt, setCustomPrompt] = useState<string>('people talking together')
 
@@ -74,13 +73,13 @@ export default function MultiTalkMultiplePeople({ comfyUrl }: Props) {
   // masks CRUD
   const createMask = () => {
     const m: Mask = { id: generateId(), name: `Mask ${masks.length + 1}`, maskData: null }
-    setMasks(v => [...v, m]); setIsEditingMask(m.id); setShowMaskModal(true)
+    setMasks(v => [...v, m]); // setIsEditingMask(m.id); setShowMaskModal(true)
   }
   const deleteMask = (id: string) => {
     setMasks(v => v.filter(m => m.id !== id))
     setAudioTracks(v => v.map(t => (t.assignedMaskId === id ? { ...t, assignedMaskId: null } : t)))
   }
-  const updateMask = (id: string, data: string | null) => setMasks(v => v.map(m => (m.id === id ? { ...m, maskData: data } : m)))
+  // const updateMask = (id: string, data: string | null) => setMasks(v => v.map(m => (m.id === id ? { ...m, maskData: data } : m)))
   const assignMask = (trackId: string, maskId: string | null) => setAudioTracks(v => v.map(t => (t.id === trackId ? { ...t, assignedMaskId: maskId } : t)))
 
   // audio tracks
@@ -729,8 +728,8 @@ export default function MultiTalkMultiplePeople({ comfyUrl }: Props) {
                             variant="secondary"
                             size="sm"
                             onClick={() => {
-                              setIsEditingMask(m.id);
-                              setShowMaskModal(true);
+                              // setIsEditingMask(m.id);
+                              // setShowMaskModal(true);
                             }}
                             disabled={!imagePreview}
                           >

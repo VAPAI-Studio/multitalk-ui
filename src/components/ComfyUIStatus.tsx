@@ -139,13 +139,13 @@ export default function ComfyUIStatus({ baseUrl }: ComfyUIStatusProps) {
 
   const getStatusColor = () => {
     if (!status.connected) return 'bg-red-500'
-    if (status.queue?.queue_running.length > 0) return 'bg-yellow-500'
+    if (status.queue?.queue_running?.length && status.queue.queue_running.length > 0) return 'bg-yellow-500'
     return 'bg-green-500'
   }
 
   const getStatusText = () => {
     if (!status.connected) return 'Offline'
-    if (status.queue?.queue_running.length > 0) return 'Processing'
+    if (status.queue?.queue_running?.length && status.queue.queue_running.length > 0) return 'Processing'
     return 'Ready'
   }
 

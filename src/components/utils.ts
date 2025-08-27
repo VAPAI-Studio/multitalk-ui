@@ -184,7 +184,7 @@ export async function pollForResult(promptId: string, baseUrl: string, intervalM
                 job_id: jobId,
                 status: 'completed',
                 filename: found.filename,
-                subfolder: found.subfolder,
+                subfolder: found.subfolder || undefined,
                 video_url: uploadResult.publicUrl
               });
               console.log('✅ Job completed with Supabase URL:', uploadResult.publicUrl);
@@ -196,7 +196,7 @@ export async function pollForResult(promptId: string, baseUrl: string, intervalM
                 job_id: jobId,
                 status: 'completed',
                 filename: found.filename,
-                subfolder: found.subfolder
+                subfolder: found.subfolder || undefined
               });
             }
           } catch (uploadError) {
@@ -207,7 +207,7 @@ export async function pollForResult(promptId: string, baseUrl: string, intervalM
               job_id: jobId,
               status: 'completed',
               filename: found.filename,
-              subfolder: found.subfolder
+              subfolder: found.subfolder || undefined
             });
           }
         }
@@ -331,7 +331,7 @@ export function startJobMonitoring(
                 job_id: jobId,
                 status: 'completed',
                 filename: videoInfo.filename,
-                subfolder: videoInfo.subfolder,
+                subfolder: videoInfo.subfolder || undefined,
                 video_url: uploadResult.publicUrl
               });
               console.log('✅ Job completed with Supabase URL:', uploadResult.publicUrl);
@@ -344,7 +344,7 @@ export function startJobMonitoring(
                 job_id: jobId,
                 status: 'completed',
                 filename: videoInfo.filename,
-                subfolder: videoInfo.subfolder
+                subfolder: videoInfo.subfolder || undefined
               });
               onStatusUpdate('completed', 'Procesamiento completado (sin subir a storage)', videoInfo);
             }
@@ -356,7 +356,7 @@ export function startJobMonitoring(
               job_id: jobId,
               status: 'completed',
               filename: videoInfo.filename,
-              subfolder: videoInfo.subfolder
+              subfolder: videoInfo.subfolder || undefined
             });
             onStatusUpdate('completed', 'Procesamiento completado (error subiendo)', videoInfo);
           }

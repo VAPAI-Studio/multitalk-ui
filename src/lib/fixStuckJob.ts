@@ -41,7 +41,7 @@ export async function fixStuckJob(jobId: string, comfyUrl: string) {
           job_id: jobId,
           status: 'completed',
           filename: videoInfo.filename,
-          subfolder: videoInfo.subfolder,
+          subfolder: videoInfo.subfolder || undefined,
           video_url: uploadResult.publicUrl
         })
         
@@ -57,7 +57,7 @@ export async function fixStuckJob(jobId: string, comfyUrl: string) {
           job_id: jobId,
           status: 'completed',
           filename: videoInfo.filename,
-          subfolder: videoInfo.subfolder
+          subfolder: videoInfo.subfolder || undefined
         })
         
         return { 
