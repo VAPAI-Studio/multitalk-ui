@@ -7,6 +7,7 @@ import { Timeline } from "./components/Timeline";
 import type { Mask, AudioTrack } from "./components/types";
 import { fileToBase64, uploadMediaToComfy, joinAudiosForMask, groupAudiosByMask, generateId, startJobMonitoring, checkComfyUIHealth } from "./components/utils";
 import JobFeed from "./components/JobFeed";
+import { useSmartResolution } from "./hooks/useSmartResolution";
 
 interface Props {
   comfyUrl: string;
@@ -19,8 +20,18 @@ export default function MultiTalkMultiplePeople({ comfyUrl }: Props) {
   const [imagePreview, setImagePreview] = useState<string>("")
   const [imageAR, setImageAR] = useState<number | null>(null)
   const [totalDuration, setTotalDuration] = useState<number>(10)
-  const [width, setWidth] = useState<number>(1280)
-  const [height, setHeight] = useState<number>(720)
+  
+  // Smart resolution handling with auto-correction to multiples of 32
+  const { 
+    width, 
+    height, 
+    widthInput, 
+    heightInput, 
+    handleWidthChange, 
+    handleHeightChange, 
+    setWidth, 
+    setHeight 
+  } = useSmartResolution(1280, 720)
   const trimToAudio = true
   const [status, setStatus] = useState<string>("")
   const [videoUrl, setVideoUrl] = useState<string>("")
@@ -339,7 +350,7 @@ export default function MultiTalkMultiplePeople({ comfyUrl }: Props) {
         const fps = 25;
         const numFrames = fps * (audioDuration + 1);
         
-        console.log('MultiTalk duration calculation:', {
+        console.log('VAPAI duration calculation:', {
           audioDuration,
           fps,
           numFrames,
@@ -558,7 +569,7 @@ export default function MultiTalkMultiplePeople({ comfyUrl }: Props) {
         errorMessage = 'Error cargando plantilla de workflow. Verificá que el archivo exista.';
       }
       
-      console.error('MultiTalk error:', e);
+      console.error('VAPAI error:', e);
       setStatus(`❌ ${errorMessage}`);
       
       if (jobId) {
@@ -602,7 +613,7 @@ export default function MultiTalkMultiplePeople({ comfyUrl }: Props) {
         <div className="flex-1 max-w-4xl space-y-8">
           <div className="text-center space-y-4 py-8">
             <h1 className="text-4xl md:text-6xl font-black bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
-              MultiTalk
+              Lipsync Multi Person
             </h1>
             <div className="text-lg md:text-xl font-medium text-gray-700">
               <span className="bg-gradient-to-r from-blue-100 to-purple-100 px-4 py-2 rounded-full border border-blue-200/50">
@@ -610,7 +621,7 @@ export default function MultiTalkMultiplePeople({ comfyUrl }: Props) {
               </span>
             </div>
             <p className="text-gray-600 max-w-2xl mx-auto leading-relaxed">
-              Frontend elegante para disparar tu workflow de MultiTalk en ComfyUI con múltiples personas.
+              Frontend elegante para disparar tu workflow de Lipsync Multi Person en ComfyUI con múltiples personas.
             </p>
           </div>
 
@@ -654,8 +665,8 @@ export default function MultiTalkMultiplePeople({ comfyUrl }: Props) {
                     <input
                       type="number"
                       className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all duration-200 bg-white/80"
-                      value={width}
-                      onChange={(e) => setWidth(Number(e.target.value) || 32)}
+                      value={widthInput}
+                      onChange={(e) => handleWidthChange(e.target.value)}
                     />
                   </div>
                   <div>
@@ -663,12 +674,12 @@ export default function MultiTalkMultiplePeople({ comfyUrl }: Props) {
                     <input
                       type="number"
                       className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all duration-200 bg-white/80"
-                      value={height}
-                      onChange={(e) => setHeight(Number(e.target.value) || 32)}
+                      value={heightInput}
+                      onChange={(e) => handleHeightChange(e.target.value)}
                     />
                   </div>
                 </div>
-                <p className="text-xs text-gray-500 mt-3">Se ajusta a múltiplos de 32 por compatibilidad con el modelo.</p>
+                <p className="text-xs text-gray-500 mt-3">Se corrige automáticamente a múltiplos de 32 después de 2 segundos sin cambios.</p>
               </Field>
             </div>
           </Section>

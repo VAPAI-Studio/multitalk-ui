@@ -3,8 +3,9 @@ import { createJob, updateJobToProcessing, completeJob } from "./lib/jobTracking
 import { downloadVideoFromComfy, uploadVideoToStorage } from "./lib/supabase";
 import { startJobMonitoring, checkComfyUIHealth } from "./components/utils";
 import JobFeed from "./components/JobFeed";
+import { useSmartResolution } from "./hooks/useSmartResolution";
 
-// MultiTalk One-Person Frontend for ComfyUI
+// VAPAI One-Person Frontend for ComfyUI
 // - Enter ComfyUI URL
 // - Upload Image (used as start frame, sent as Base64 to Base64DecodeNode)
 // - Upload Audio (uploaded to ComfyUI, referenced by LoadAudio node)
@@ -53,8 +54,17 @@ export default function MultiTalkOnePerson({ comfyUrl }: Props) {
   const [imageAR, setImageAR] = useState<number | null>(null);
   const [audioDuration, setAudioDuration] = useState<number>(0);
 
-  const [width, setWidth] = useState<number>(640); // defaults from workflow
-  const [height, setHeight] = useState<number>(360);
+  // Smart resolution handling with auto-correction to multiples of 32
+  const { 
+    width, 
+    height, 
+    widthInput, 
+    heightInput, 
+    handleWidthChange, 
+    handleHeightChange, 
+    setWidth, 
+    setHeight 
+  } = useSmartResolution(640, 360) // defaults from workflow
   const [mode, setMode] = useState<'multitalk' | 'infinitetalk'>('multitalk');
   const [audioScale, setAudioScale] = useState<number>(1);
   const [customPrompt, setCustomPrompt] = useState<string>('a woman is talking');
@@ -374,7 +384,7 @@ export default function MultiTalkOnePerson({ comfyUrl }: Props) {
         errorMessage = 'Error cargando plantilla de workflow. Verificá que el archivo exista.';
       }
       
-      console.error('MultiTalk OnePerson error:', e);
+      console.error('VAPAI OnePerson error:', e);
       setStatus(`❌ ${errorMessage}`);
       
       // Complete job with error status if we have a job ID
@@ -412,15 +422,15 @@ export default function MultiTalkOnePerson({ comfyUrl }: Props) {
         <div className="flex-1 max-w-4xl space-y-8">
         <div className="text-center space-y-4 py-8">
           <h1 className="text-4xl md:text-6xl font-black bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
-            MultiTalk
+            Lipsync 1 Person
           </h1>
           <div className="text-lg md:text-xl font-medium text-gray-700">
             <span className={`px-4 py-2 rounded-full border ${mode === 'multitalk' ? 'bg-gradient-to-r from-blue-100 to-purple-100 border-blue-200/50' : 'bg-gradient-to-r from-purple-100 to-pink-100 border-purple-200/50'}`}>
-              {mode === 'multitalk' ? 'MultiTalk' : 'InfiniteTalk'} - 1 Persona
+              {mode === 'multitalk' ? 'Lipsync 1 Person' : 'InfiniteTalk'}
             </span>
           </div>
           <p className="text-gray-600 max-w-2xl mx-auto leading-relaxed">
-            Frontend elegante para disparar tu workflow de {mode === 'multitalk' ? 'MultiTalk' : 'InfiniteTalk'} en ComfyUI con estilo.
+            Frontend elegante para disparar tu workflow de {mode === 'multitalk' ? 'Lipsync 1 Person' : 'InfiniteTalk'} en ComfyUI con estilo.
           </p>
         </div>
 
@@ -436,7 +446,7 @@ export default function MultiTalkOnePerson({ comfyUrl }: Props) {
               onChange={(e) => setMode(e.target.value as 'multitalk' | 'infinitetalk')}
               className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
             />
-            <span className="text-sm font-medium text-gray-700">MultiTalk</span>
+            <span className="text-sm font-medium text-gray-700">Lipsync 1 Person</span>
           </label>
           <label className="flex items-center gap-2 cursor-pointer">
             <input
@@ -540,8 +550,8 @@ export default function MultiTalkOnePerson({ comfyUrl }: Props) {
             <input
               type="number"
               className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all duration-200 bg-white/80"
-              value={width}
-              onChange={(e) => setWidth(Math.max(32, Math.round(Number(e.target.value) / 32) * 32))}
+              value={widthInput}
+              onChange={(e) => handleWidthChange(e.target.value)}
             />
           </Field>
           <Field>
@@ -549,12 +559,12 @@ export default function MultiTalkOnePerson({ comfyUrl }: Props) {
             <input
               type="number"
               className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all duration-200 bg-white/80"
-              value={height}
-              onChange={(e) => setHeight(Math.max(32, Math.round(Number(e.target.value) / 32) * 32))}
+              value={heightInput}
+              onChange={(e) => handleHeightChange(e.target.value)}
             />
           </Field>
         </div>
-        <p className="text-xs text-gray-500 mt-3">Se ajusta a múltiplos de 32 por compatibilidad con el modelo.</p>
+        <p className="text-xs text-gray-500 mt-3">Se corrige automáticamente a múltiplos de 32 después de 2 segundos sin cambios.</p>
       </Section>
 
       <Section title="Ejecución">

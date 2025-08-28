@@ -6,6 +6,8 @@ import { Label, Field, Section } from "./components/UI";
 import { Timeline } from "./components/Timeline";
 import type { VideoTrack, AudioTrackSimple } from "./components/types";
 import { uploadMediaToComfy, generateId, startJobMonitoring, checkComfyUIHealth } from "./components/utils";
+import { useSmartResolution } from "./hooks/useSmartResolution";
+import { AVPlayerWithPadding } from "./components/AVPlayerWithPadding";
 
 interface Props {
   comfyUrl: string;
@@ -18,8 +20,15 @@ export default function VideoLipsync({ comfyUrl }: Props) {
   const [videoDuration, setVideoDuration] = useState<number>(0);
   const [audioDuration, setAudioDuration] = useState<number>(0);
 
-  const [width, setWidth] = useState<number>(640);
-  const [height, setHeight] = useState<number>(640);
+  // Smart resolution handling with auto-correction to multiples of 32
+  const { 
+    width, 
+    height, 
+    widthInput, 
+    heightInput, 
+    handleWidthChange, 
+    handleHeightChange 
+  } = useSmartResolution(640, 640)
   const [audioScale, setAudioScale] = useState<number>(1.5);
   const [customPrompt, setCustomPrompt] = useState<string>('a person is speaking');
 
@@ -35,6 +44,9 @@ export default function VideoLipsync({ comfyUrl }: Props) {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [videoFeed, setVideoFeed] = useState<MultiTalkJob[]>([]);
   const [jobMonitorCleanup, setJobMonitorCleanup] = useState<(() => void) | null>(null);
+  const [audioPreviewUrl, setAudioPreviewUrl] = useState<string>("");
+  const [originalVideoStart, setOriginalVideoStart] = useState<number>(0);
+  const [originalAudioStart, setOriginalAudioStart] = useState<number>(0);
 
   const videoInputRef = useRef<HTMLInputElement | null>(null);
   const audioInputRef = useRef<HTMLInputElement | null>(null);
@@ -46,27 +58,32 @@ export default function VideoLipsync({ comfyUrl }: Props) {
     return () => clearInterval(interval);
   }, [comfyUrl]);
 
-  // Cleanup job monitor on unmount
+  // Cleanup job monitor and URLs on unmount
   useEffect(() => {
     return () => {
       if (jobMonitorCleanup) {
         jobMonitorCleanup();
       }
+      if (audioPreviewUrl) {
+        URL.revokeObjectURL(audioPreviewUrl);
+      }
+      if (videoPreview) {
+        URL.revokeObjectURL(videoPreview);
+      }
     };
-  }, [jobMonitorCleanup]);
+  }, [jobMonitorCleanup, audioPreviewUrl, videoPreview]);
 
   async function loadVideoFeedFromDB() {
     try {
       const { jobs, error } = await getCompletedJobsWithVideos(20);
       if (error) {
-        console.error("Error loading video feed:", error);
         return;
       }
       
       const filteredJobs = jobs.filter(job => job.comfy_url === comfyUrl || !comfyUrl);
       setVideoFeed(filteredJobs);
     } catch (e) {
-      console.error("Error loading video feed from DB:", e);
+      // Silent error - video feed loading failed
     }
   }
 
@@ -115,10 +132,18 @@ export default function VideoLipsync({ comfyUrl }: Props) {
     const file = e.target.files?.[0] || null;
     setVideoFile(file);
     
+    // Clean up previous video preview URL
+    if (videoPreview) {
+      URL.revokeObjectURL(videoPreview);
+      setVideoPreview("");
+    }
+    
     if (file) {
-      const url = URL.createObjectURL(file);
-      setVideoPreview(url);
+      const previewUrl = URL.createObjectURL(file);
+      setVideoPreview(previewUrl); // Store for preview player
       
+      // Create a separate temporary URL for metadata loading
+      const tempUrl = URL.createObjectURL(file);
       const video = document.createElement('video');
       video.addEventListener('loadedmetadata', () => {
         setVideoDuration(video.duration);
@@ -130,13 +155,14 @@ export default function VideoLipsync({ comfyUrl }: Props) {
           name: file.name
         };
         setVideoTrack(track);
+        setOriginalVideoStart(0); // Store original position
         // Update total duration after setting video track
         setTimeout(updateTotalDuration, 0);
-        URL.revokeObjectURL(url);
+        // Revoke the temporary URL used for metadata loading
+        URL.revokeObjectURL(tempUrl);
       });
-      video.src = url;
+      video.src = tempUrl;
     } else {
-      setVideoPreview("");
       setVideoDuration(0);
       setVideoTrack(null);
     }
@@ -147,9 +173,19 @@ export default function VideoLipsync({ comfyUrl }: Props) {
     const file = e.target.files?.[0] || null;
     setAudioFile(file);
     
+    // Clean up previous audio preview URL
+    if (audioPreviewUrl) {
+      URL.revokeObjectURL(audioPreviewUrl);
+      setAudioPreviewUrl("");
+    }
+    
     if (file) {
+      const previewUrl = URL.createObjectURL(file);
+      setAudioPreviewUrl(previewUrl); // Store for preview player
+      
+      // Create a separate temporary URL for metadata loading
+      const tempUrl = URL.createObjectURL(file);
       const audio = new Audio();
-      const url = URL.createObjectURL(file);
       audio.addEventListener('loadedmetadata', () => {
         setAudioDuration(audio.duration);
         const track: AudioTrackSimple = {
@@ -160,11 +196,13 @@ export default function VideoLipsync({ comfyUrl }: Props) {
           name: file.name
         };
         setAudioTrack(track);
+        setOriginalAudioStart(0); // Store original position
         // Update total duration after setting audio track
         setTimeout(updateTotalDuration, 0);
-        URL.revokeObjectURL(url);
+        // Revoke the temporary URL used for metadata loading
+        URL.revokeObjectURL(tempUrl);
       });
-      audio.src = url;
+      audio.src = tempUrl;
     } else {
       setAudioDuration(0);
       setAudioTrack(null);
@@ -243,42 +281,45 @@ export default function VideoLipsync({ comfyUrl }: Props) {
         : 0;
       
       // Determine concatenation inputs based on black frame needs
-      let concatInputCount = 1; // At minimum, we have the video
-      let concatInput1Node = "301"; // Generated video frames
+      // ImageConcatMulti requires minimum 2 inputs, so we need to handle the single input case differently
+      let concatInputCount = 2; // Minimum for ImageConcatMulti
+      let concatInput1Node = "301"; // Generated video frames (main output from lipsync)
       let concatInput1Index = "0";
-      let concatInput2Node = "230"; // Original video frames  
+      let concatInput2Node = "301"; // Fallback to main output
       let concatInput2Index = "0";
-      let concatInput3Node = "313"; // End black frames
+      let concatInput3Node = "301"; // Fallback to main output
       let concatInput3Index = "0";
       
       if (blackFramesStart > 0 && blackFramesEnd > 0) {
-        // Need black frames at both start and end: [black_start, video, black_end]
+        // Need black frames at both start and end: [black_start, generated_video, black_end]
         concatInputCount = 3;
         concatInput1Node = "311"; // Start black frames
         concatInput1Index = "0";
-        concatInput2Node = "230"; // Video frames
+        concatInput2Node = "301"; // Generated lipsync video frames
         concatInput2Index = "0"; 
         concatInput3Node = "313"; // End black frames
         concatInput3Index = "0";
       } else if (blackFramesStart > 0) {
-        // Need black frames only at start: [black_start, video]
+        // Need black frames only at start: [black_start, generated_video]
         concatInputCount = 2;
         concatInput1Node = "311"; // Start black frames
         concatInput1Index = "0";
-        concatInput2Node = "230"; // Video frames
+        concatInput2Node = "301"; // Generated lipsync video frames
         concatInput2Index = "0";
       } else if (blackFramesEnd > 0) {
-        // Need black frames only at end: [video, black_end]
+        // Need black frames only at end: [generated_video, black_end]
         concatInputCount = 2;
-        concatInput1Node = "230"; // Video frames
+        concatInput1Node = "301"; // Generated lipsync video frames
         concatInput1Index = "0";
         concatInput2Node = "313"; // End black frames
         concatInput2Index = "0";
       } else {
-        // No black frames needed: [video]
-        concatInputCount = 1;
-        concatInput1Node = "230"; // Video frames only
+        // No black frames needed: duplicate main output to satisfy ImageConcatMulti minimum requirement
+        concatInputCount = 2;
+        concatInput1Node = "301"; // Generated lipsync video frames
         concatInput1Index = "0";
+        concatInput2Node = "301"; // Same frames duplicated
+        concatInput2Index = "0";
       }
 
       let promptString = JSON.stringify(template)
@@ -304,19 +345,9 @@ export default function VideoLipsync({ comfyUrl }: Props) {
         .replace(/"\{\{CONCAT_INPUT_3_NODE\}\}"/g, `"${concatInput3Node}"`)
         .replace(/"\{\{CONCAT_INPUT_3_INDEX\}\}"/g, concatInput3Index);
       
-      console.log('Black frames calculation:', {
-        audioStart: audioStartTime_seconds,
-        videoStart: videoStartTime,
-        audioEnd: audioEndTime_seconds,
-        videoEnd: videoEndTime,
-        blackFramesStart,
-        blackFramesEnd,
-        concatInputCount
-      });
       
       return JSON.parse(promptString);
     } catch (error) {
-      console.error('Error loading workflow template:', error);
       throw new Error('Failed to build prompt JSON');
     }
   }
@@ -439,7 +470,7 @@ export default function VideoLipsync({ comfyUrl }: Props) {
                 setVideoUrl(fallbackUrl);
               }
             } catch (storageError) {
-              console.warn('Failed to upload to Supabase Storage:', storageError);
+              // Failed to upload to Supabase Storage, falling back to ComfyUI URL
               const fallbackUrl = videoInfo.subfolder
                 ? `${comfyUrl}/view?filename=${encodeURIComponent(videoInfo.filename)}&subfolder=${encodeURIComponent(videoInfo.subfolder)}&type=output`
                 : `${comfyUrl}/view?filename=${encodeURIComponent(videoInfo.filename)}&type=output`;
@@ -469,7 +500,7 @@ export default function VideoLipsync({ comfyUrl }: Props) {
                 error_message: message || 'Unknown error'
               });
             } catch (dbError) {
-              console.error('Error updating job status:', dbError);
+              // Silent error - job status update failed
             }
           }
         }
@@ -489,7 +520,6 @@ export default function VideoLipsync({ comfyUrl }: Props) {
         errorMessage = 'Error loading workflow template. Check that the file exists.';
       }
       
-      console.error('VideoLipsync error:', e);
       setStatus(`❌ ${errorMessage}`);
       
       if (jobId) {
@@ -500,7 +530,7 @@ export default function VideoLipsync({ comfyUrl }: Props) {
             error_message: errorMessage
           });
         } catch (dbError) {
-          console.error('Error updating job status:', dbError);
+          // Silent error - job status update failed but main error is more important
         }
       }
     } finally {
@@ -609,18 +639,20 @@ export default function VideoLipsync({ comfyUrl }: Props) {
                   <input
                     type="number"
                     className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-green-500 focus:ring-4 focus:ring-green-100 transition-all duration-200 bg-white/80"
-                    value={width}
-                    onChange={(e) => setWidth(Math.max(32, Math.round(Number(e.target.value) / 32) * 32))}
+                    value={widthInput}
+                    onChange={(e) => handleWidthChange(e.target.value)}
                   />
+                  <p className="text-xs text-gray-500 mt-1">Auto-corrects to multiple of 32 after 2s</p>
                 </div>
                 <div>
                   <Label>Height (px)</Label>
                   <input
                     type="number"
                     className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-green-500 focus:ring-4 focus:ring-green-100 transition-all duration-200 bg-white/80"
-                    value={height}
-                    onChange={(e) => setHeight(Math.max(32, Math.round(Number(e.target.value) / 32) * 32))}
+                    value={heightInput}
+                    onChange={(e) => handleHeightChange(e.target.value)}
                   />
+                  <p className="text-xs text-gray-500 mt-1">Auto-corrects to multiple of 32 after 2s</p>
                 </div>
               </div>
             </div>
@@ -669,6 +701,9 @@ export default function VideoLipsync({ comfyUrl }: Props) {
 
           <Section title="Timeline Sync">
             <div className="space-y-4">
+              <p className="text-sm text-gray-600">
+                Drag the colored blocks on the timeline to adjust when your video and audio start playing. Black frames will be added automatically where video isn't active.
+              </p>
               <Timeline
                 tracks={[
                   ...(videoTrack ? [{ ...videoTrack, assignedMaskId: null }] : []),
@@ -692,7 +727,52 @@ export default function VideoLipsync({ comfyUrl }: Props) {
                 onUpdateTotalDuration={updateTotalDuration}
               />
               
-              <div className="space-y-3">
+              <div className="space-y-4">
+                {/* Quick Timeline Presets */}
+                {videoTrack && audioTrack && (
+                  <div className="p-3 rounded-lg bg-gray-50 border border-gray-200">
+                    <div className="font-medium text-gray-800 mb-2">⚡ Quick Timing Presets</div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => {
+                          updateVideoTrackTime(videoTrack.id, 0);
+                          updateAudioTrackTime(audioTrack.id, 0);
+                        }}
+                        className="px-3 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
+                      >
+                        Both at Start
+                      </button>
+                      <button
+                        onClick={() => {
+                          updateAudioTrackTime(audioTrack.id, 0);
+                          updateVideoTrackTime(videoTrack.id, 2);
+                        }}
+                        className="px-3 py-1 text-xs bg-blue-200 hover:bg-blue-300 rounded-lg transition-colors"
+                      >
+                        Audio First (+2s video)
+                      </button>
+                      <button
+                        onClick={() => {
+                          updateVideoTrackTime(videoTrack.id, 0);
+                          updateAudioTrackTime(audioTrack.id, 1);
+                        }}
+                        className="px-3 py-1 text-xs bg-green-200 hover:bg-green-300 rounded-lg transition-colors"
+                      >
+                        Video First (+1s audio)
+                      </button>
+                      <button
+                        onClick={() => {
+                          updateVideoTrackTime(videoTrack.id, originalVideoStart);
+                          updateAudioTrackTime(audioTrack.id, originalAudioStart);
+                        }}
+                        className="px-3 py-1 text-xs bg-gray-300 hover:bg-gray-400 rounded-lg transition-colors"
+                      >
+                        Reset Original
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div className="p-3 rounded-lg bg-green-50 border border-green-200">
                     <div className="font-medium text-green-800 mb-1">🎬 Video Track</div>
@@ -756,6 +836,69 @@ export default function VideoLipsync({ comfyUrl }: Props) {
               </div>
             </div>
           </Section>
+
+          {/* Timeline Preview with Black Frame Padding */}
+          {videoFile && audioFile && videoPreview && audioPreviewUrl && (
+            <Section title="Timeline Preview">
+              <div className="space-y-6">
+                <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
+                  <div className="font-medium text-blue-800 mb-1">📺 Live Preview</div>
+                  <p className="text-blue-600 text-sm">
+                    This preview shows exactly how your final video will look with automatic black frame padding. 
+                    Use the timeline above to drag tracks and adjust timing - changes appear instantly here.
+                  </p>
+                </div>
+
+                {/* Live Preview Player */}
+                <AVPlayerWithPadding
+                  videoSrc={videoPreview}
+                  audioSrc={audioPreviewUrl}
+                  videoStart={videoTrack?.startTime || 0}
+                  videoDuration={videoTrack?.duration}
+                  audioStart={audioTrack?.startTime || 0}
+                  audioDuration={audioTrack?.duration}
+                  viewportSize={{ width: width, height: height }}
+                  className="max-w-2xl mx-auto"
+                  onTimeUpdate={(_time) => {
+                    // Optional: could sync with timeline visualization
+                  }}
+                />
+                
+                {/* Enhanced Info Panel */}
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
+                    <div className="font-medium text-blue-800 mb-1">📖 How it works</div>
+                    <div className="text-blue-600 text-sm space-y-1">
+                      <p>• <strong>Green bar:</strong> Video is active and visible</p>
+                      <p>• <strong>Blue bar:</strong> Audio is playing</p>
+                      <p>• <strong>Black areas:</strong> Auto padding where video isn't active</p>
+                      <p>• <strong>Drag tracks:</strong> Use timeline above to adjust timing</p>
+                    </div>
+                  </div>
+                  
+                  <div className="p-3 rounded-lg bg-yellow-50 border border-yellow-200">
+                    <div className="font-medium text-yellow-800 mb-1">⏱️ Current Timeline</div>
+                    <div className="text-yellow-700 text-sm space-y-1">
+                      <p>• <strong>Video:</strong> {(videoTrack?.startTime || 0).toFixed(1)}s → {((videoTrack?.startTime || 0) + (videoTrack?.duration || 0)).toFixed(1)}s</p>
+                      <p>• <strong>Audio:</strong> {(audioTrack?.startTime || 0).toFixed(1)}s → {((audioTrack?.startTime || 0) + (audioTrack?.duration || 0)).toFixed(1)}s</p>
+                      <p>• <strong>Total:</strong> {calculateFinalDuration().toFixed(1)}s</p>
+                      {(() => {
+                        const vStart = videoTrack?.startTime || 0;
+                        const aStart = audioTrack?.startTime || 0;
+                        const vEnd = vStart + (videoTrack?.duration || 0);
+                        const aEnd = aStart + (audioTrack?.duration || 0);
+                        const blackStart = aStart < vStart ? (vStart - aStart).toFixed(1) : '0';
+                        const blackEnd = aEnd > vEnd ? (aEnd - vEnd).toFixed(1) : '0';
+                        return (
+                          <p>• <strong>Black padding:</strong> {blackStart}s start, {blackEnd}s end</p>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Section>
+          )}
 
           <Section title="Generation">
             <div className="flex flex-wrap items-center gap-3">
