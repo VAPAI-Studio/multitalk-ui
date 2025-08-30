@@ -1,10 +1,10 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
+import { config } from '../config/environment'
 
 class ApiClient {
   private baseURL: string
 
   constructor() {
-    this.baseURL = API_BASE_URL
+    this.baseURL = config.apiBaseUrl
   }
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {

@@ -1,9 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
+import { config } from '../config/environment'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://rwbhfxltyxaegtalgxdx.supabase.co'
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3YmhmeGx0eXhhZWd0YWxneGR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU0Njc3OTMsImV4cCI6MjA3MTA0Mzc5M30.2euUdw7ubhbyQ_orFYJxJByPuRxl21QFO3cmZtnVRos'
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export const supabase = createClient(config.supabaseUrl, config.supabaseAnonKey)
 
 // Job status types
 export type JobStatus = 'submitted' | 'processing' | 'completed' | 'error'
