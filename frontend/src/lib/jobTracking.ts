@@ -1,12 +1,30 @@
 import { type CreateJobPayload, type CompleteJobPayload, type MultiTalkJob } from './supabase'
 import { apiClient } from './apiClient'
 
+// API Response interfaces
+interface JobApiResponse {
+  success: boolean;
+  error?: string;
+}
+
+interface JobsListResponse {
+  success: boolean;
+  jobs?: MultiTalkJob[];
+  error?: string;
+}
+
+interface SingleJobResponse {
+  success: boolean;
+  job?: MultiTalkJob;
+  error?: string;
+}
+
 /**
  * Creates a new job record via API when submission starts
  */
 export async function createJob(payload: CreateJobPayload): Promise<{ success: boolean; error?: string }> {
   try {
-    const response = await apiClient.createJob(payload)
+    const response = await apiClient.createJob(payload) as JobApiResponse
     
     if (response.success) {
       console.log('Job created successfully:', payload.job_id)
@@ -34,7 +52,7 @@ export async function createJob(payload: CreateJobPayload): Promise<{ success: b
  */
 export async function updateJobToProcessing(jobId: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const response = await apiClient.updateJobToProcessing(jobId)
+    const response = await apiClient.updateJobToProcessing(jobId) as JobApiResponse
     
     if (response.success) {
       return { success: true, error: response.error }
@@ -53,7 +71,7 @@ export async function updateJobToProcessing(jobId: string): Promise<{ success: b
  */
 export async function completeJob(payload: CompleteJobPayload): Promise<{ success: boolean; error?: string }> {
   try {
-    const response = await apiClient.completeJob(payload.job_id, payload)
+    const response = await apiClient.completeJob(payload.job_id, payload) as JobApiResponse
     
     if (response.success) {
       console.log('Job completed successfully:', payload.job_id)
@@ -73,7 +91,7 @@ export async function completeJob(payload: CompleteJobPayload): Promise<{ succes
  */
 export async function getRecentJobs(limit: number = 50): Promise<{ jobs: MultiTalkJob[]; error?: string }> {
   try {
-    const response = await apiClient.getRecentJobs(limit)
+    const response = await apiClient.getRecentJobs(limit) as JobsListResponse
     
     if (response.success) {
       return { jobs: response.jobs || [], error: response.error }
@@ -92,7 +110,7 @@ export async function getRecentJobs(limit: number = 50): Promise<{ jobs: MultiTa
  */
 export async function getJob(jobId: string): Promise<{ job: MultiTalkJob | null; error?: string }> {
   try {
-    const response = await apiClient.getJob(jobId)
+    const response = await apiClient.getJob(jobId) as SingleJobResponse
     
     if (response.success) {
       return { job: response.job || null, error: response.error }
@@ -111,7 +129,7 @@ export async function getJob(jobId: string): Promise<{ job: MultiTalkJob | null;
  */
 export async function getCompletedJobsWithVideos(limit: number = 20): Promise<{ jobs: MultiTalkJob[]; error?: string }> {
   try {
-    const response = await apiClient.getCompletedJobsWithVideos(limit)
+    const response = await apiClient.getCompletedJobsWithVideos(limit) as JobsListResponse
     
     if (response.success) {
       return { jobs: response.jobs || [], error: response.error }

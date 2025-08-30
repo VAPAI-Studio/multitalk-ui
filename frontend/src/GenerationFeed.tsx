@@ -39,7 +39,7 @@ export default function GenerationFeed() {
       setError(null)
       
       const offset = (page - 1) * itemsPerPage
-      const response: EditedImagesResponse = await apiClient.getRecentEditedImages(itemsPerPage, offset, completedOnly)
+      const response = await apiClient.getRecentEditedImages(itemsPerPage, offset, completedOnly) as EditedImagesResponse
       
       if (response.success) {
         setEditedImages(response.edited_images)

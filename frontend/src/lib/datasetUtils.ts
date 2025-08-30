@@ -63,6 +63,26 @@ export interface ImageWithCaption {
 
 export type WorkflowSettings = Dataset['settings'];
 
+// API Response interfaces for datasets
+interface CreateDatasetResponse {
+  success: boolean;
+  dataset?: Dataset;
+  error?: string;
+}
+
+interface LoadDatasetResponse {
+  success: boolean;
+  dataset?: Dataset;
+  data?: DataEntry[];
+  error?: string;
+}
+
+interface GetAllDatasetsResponse {
+  success: boolean;
+  datasets?: Dataset[];
+  error?: string;
+}
+
 // Create a new dataset with images and captions via API
 export async function saveDataset(
   name: string,
@@ -102,7 +122,7 @@ export async function saveDataset(
       formData.append('captions', JSON.stringify(captions));
     }
 
-    const response = await apiClient.createDataset(formData);
+    const response = await apiClient.createDataset(formData) as CreateDatasetResponse;
     
     if (response.success && response.dataset) {
       return response.dataset.id;
@@ -122,7 +142,7 @@ export async function loadDataset(datasetId: string): Promise<{
   data: DataEntry[];
 }> {
   try {
-    const response = await apiClient.loadDataset(datasetId);
+    const response = await apiClient.loadDataset(datasetId) as LoadDatasetResponse;
     
     if (response.success && response.dataset) {
       return {
@@ -142,7 +162,7 @@ export async function loadDataset(datasetId: string): Promise<{
 // Get all datasets (for selection) via API
 export async function getAllDatasets(): Promise<Dataset[]> {
   try {
-    const response = await apiClient.getAllDatasets();
+    const response = await apiClient.getAllDatasets() as GetAllDatasetsResponse;
     
     if (response.success) {
       return response.datasets || [];

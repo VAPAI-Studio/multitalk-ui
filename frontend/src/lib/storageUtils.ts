@@ -1,5 +1,28 @@
 import { apiClient } from './apiClient'
 
+// API Response interfaces for storage operations
+interface UploadVideoResponse {
+  success: boolean;
+  public_url?: string;
+  error?: string;
+}
+
+interface DeleteVideoResponse {
+  success: boolean;
+  error?: string;
+}
+
+interface VideoFile {
+  name: string;
+  public_url: string;
+}
+
+interface ListVideosResponse {
+  success: boolean;
+  files: VideoFile[];
+  error?: string;
+}
+
 /**
  * Downloads a video from ComfyUI and uploads it to Supabase Storage via API
  */
@@ -17,7 +40,7 @@ export async function uploadVideoToSupabaseStorage(
       job_id: jobId
     }
     
-    const response = await apiClient.uploadVideoToStorage(payload)
+    const response = await apiClient.uploadVideoToStorage(payload) as UploadVideoResponse
     
     return {
       success: response.success,
@@ -47,7 +70,7 @@ export async function uploadVideoToSupabaseStorage(
  */
 export async function deleteVideoFromStorage(publicUrl: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const response = await apiClient.deleteVideoFromStorage(publicUrl)
+    const response = await apiClient.deleteVideoFromStorage(publicUrl) as DeleteVideoResponse
     
     return {
       success: response.success,
@@ -67,11 +90,11 @@ export async function deleteVideoFromStorage(publicUrl: string): Promise<{ succe
  */
 export async function listStorageVideos(): Promise<{ files: Array<{ name: string; publicUrl: string }>; error?: string }> {
   try {
-    const response = await apiClient.listStorageVideos()
+    const response = await apiClient.listStorageVideos() as ListVideosResponse
     
     if (response.success) {
       return { 
-        files: response.files.map(file => ({
+        files: response.files.map((file: VideoFile) => ({
           name: file.name,
           publicUrl: file.public_url
         })), 

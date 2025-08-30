@@ -27,8 +27,19 @@ interface StatusState {
   connected: boolean
   queue: QueueStatus | null
   systemStats: SystemStats | null
-  error: string | null
+  error: string | null | undefined
   lastUpdate: Date | null
+}
+
+interface ComfyUIStatusResponse {
+  success: boolean
+  status?: {
+    connected: boolean
+    queue: QueueStatus
+    system_stats: SystemStats
+    error?: string
+  }
+  error?: string
 }
 
 
@@ -49,7 +60,7 @@ export default function ComfyUIStatus({ baseUrl }: ComfyUIStatusProps) {
     if (!baseUrl) return { connected: false, queue: null, systemStats: null, error: 'No URL provided' }
 
     try {
-      const response = await apiClient.getComfyUIStatus(baseUrl)
+      const response = await apiClient.getComfyUIStatus(baseUrl) as ComfyUIStatusResponse
       
       if (response.success && response.status) {
         return {
