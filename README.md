@@ -1,69 +1,72 @@
-# React + TypeScript + Vite
+# MultiTalk
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A full-stack application for AI-powered video and audio processing with multi-character conversations.
 
-Currently, two official plugins are available:
+## Project Structure
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```
+multitalk-ui/
+├── frontend/          # React + TypeScript frontend
+│   ├── src/
+│   ├── public/
+│   └── package.json
+├── backend/           # FastAPI backend
+│   ├── main.py
+│   ├── requirements.txt
+│   └── api/
+└── README.md
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Development
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### Frontend Development
 
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cd frontend
+npm install
+npm run dev
 ```
+
+### Backend Development
+
+```bash
+cd backend
+pip install -r requirements.txt
+cp .env.example .env
+# Edit .env with your configuration
+python main.py
+```
+
+## Deployment
+
+### Backend (Heroku)
+
+The backend automatically detects Heroku environment and uses appropriate configuration:
+
+1. **Create Heroku app and set environment variables**:
+```bash
+heroku create your-app-name
+heroku config:set SUPABASE_URL=your_supabase_url
+heroku config:set SUPABASE_ANON_KEY=your_supabase_anon_key
+heroku config:set OPENROUTER_API_KEY=your_openrouter_api_key
+heroku config:set COMFYUI_SERVER_URL=your_comfyui_url
+```
+
+2. **Deploy using Git**:
+```bash
+git add .
+git commit -m "Deploy to Heroku"
+git push heroku main
+```
+
+**Environment Detection**:
+- **Local**: Uses `.env` file via python-dotenv
+- **Heroku**: Uses Heroku config vars (detected via `DYNO` environment variable)
+
+### Frontend
+
+The frontend can be deployed to Vercel, Netlify, or any static hosting service.
+
+## Environment Variables
+
+See `.env.example` files in both frontend and backend directories for required configuration.

@@ -1,0 +1,25 @@
+{
+  "name": "MultiTalk API",
+  "description": "FastAPI backend for MultiTalk application",
+  "repository": "https://github.com/your-username/multitalk-ui",
+  "keywords": ["fastapi", "python", "api"],
+  "env": {
+    "SUPABASE_URL": {
+      "description": "Your Supabase project URL",
+      "required": true
+    },
+    "SUPABASE_ANON_KEY": {
+      "description": "Your Supabase anonymous key",
+      "required": true
+    },
+    "COMFYUI_SERVER_URL": {
+      "description": "URL of your ComfyUI server",
+      "required": false
+    }
+  },
+  "buildpacks": [
+    {
+      "url": "heroku/python"
+    }
+  ]
+}

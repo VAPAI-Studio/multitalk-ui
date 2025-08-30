@@ -8,10 +8,10 @@ export default function Homepage({ onNavigate }: Props) {
     {
       id: "multitalk-one" as const,
       title: "Lipsync 1 Person",
-      description: "Generate realistic talking videos from a single person image with custom audio and voice.",
+      description: "Generate realistic talking videos from a single person image with custom audio.",
       icon: "👤",
       gradient: "from-blue-500 to-purple-600",
-      features: ["Single person avatar", "Custom voice synthesis", "Lip-sync generation"]
+      features: ["Single person avatar", "Model: Multitalk and Infinite Talk with WAN 2.1"]
     },
     {
       id: "multitalk-multiple" as const,
@@ -19,7 +19,7 @@ export default function Homepage({ onNavigate }: Props) {
       description: "Create conversations between multiple people with synchronized audio and video.",
       icon: "🎵",
       gradient: "from-emerald-500 to-teal-600",
-      features: ["Multiple avatars", "Multi-audio sync", "Conversation flow"]
+      features: ["Multiple avatars", "Masked characters", "Model: Multitalk and Infinite Talk with WAN 2.1"]
     },
     {
       id: "video-lipsync" as const,
@@ -27,7 +27,7 @@ export default function Homepage({ onNavigate }: Props) {
       description: "Add perfect lip-synchronization to existing videos with new audio tracks.",
       icon: "🎬",
       gradient: "from-green-500 to-blue-600",
-      features: ["Video upload", "Audio replacement", "Precision lip-sync"]
+      features: ["Multiple masked avatars", "Video and audio timeline", "Model: Infinite Talk with WAN 2.1"]
     },
     {
       id: "image-edit" as const,
@@ -35,7 +35,7 @@ export default function Homepage({ onNavigate }: Props) {
       description: "Edit and enhance images using AI-powered editing with natural language instructions.",
       icon: "✨",
       gradient: "from-purple-500 to-pink-600",
-      features: ["AI image editing", "Natural language prompts", "16:9 output format"]
+      features: ["AI image editing", "Models: Nano Banana"]
     },
     {
       id: "character-caption" as const,
@@ -43,7 +43,7 @@ export default function Homepage({ onNavigate }: Props) {
       description: "Generate detailed captions for character images to create training datasets for LoRA models.",
       icon: "📝",
       gradient: "from-indigo-500 to-purple-600",
-      features: ["AI caption generation", "Batch processing", "LoRA training datasets"]
+      features: ["AI caption generation", "Batch processing", "Model: JoyCaption Beta 2"]
     }
   ];
 
@@ -61,22 +61,8 @@ export default function Homepage({ onNavigate }: Props) {
             VAPAI Studio
           </h1>
           <p className="text-xl md:text-2xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-            Your complete AI-powered media creation suite. Generate talking videos, sync audio, and edit images with cutting-edge technology.
+            Your complete AI-powered media creation suite.
           </p>
-          <div className="flex items-center justify-center gap-6 text-sm text-gray-500">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-              <span>AI-Powered</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
-              <span>Real-time Processing</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
-              <span>Professional Quality</span>
-            </div>
-          </div>
         </div>
 
         {/* Apps Grid */}
@@ -133,19 +119,8 @@ export default function Homepage({ onNavigate }: Props) {
 
         {/* Footer Info */}
         <div className="text-center space-y-4">
-          <div className="inline-flex items-center gap-4 px-6 py-3 rounded-2xl bg-white/60 backdrop-blur-sm border border-gray-200/50">
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <span className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></span>
-              <span>Powered by ComfyUI & OpenRouter</span>
-            </div>
-            <div className="w-px h-4 bg-gray-300"></div>
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <span>🚀</span>
-              <span>Next-gen AI Media Suite</span>
-            </div>
-          </div>
           <p className="text-xs text-gray-500 max-w-2xl mx-auto">
-            Configure your API keys in the navigation bar to get started. All processing happens in real-time with professional-grade AI models.
+            Configure your ComfyUI URL in the navigation bar to get started. All processing happens in real-time with professional-grade AI models.
           </p>
         </div>
       </div>

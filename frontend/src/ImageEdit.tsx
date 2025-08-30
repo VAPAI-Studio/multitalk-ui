@@ -1,5 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Label, Field, Section } from "./components/UI";
+import { apiClient } from "./lib/apiClient";
+import RecentImagesFeed from "./components/RecentImagesFeed";
+
+
 
 interface Props {}
 
@@ -10,9 +14,23 @@ export default function ImageEdit({}: Props) {
   const [editedImageUrl, setEditedImageUrl] = useState<string>("");
   const [originalImageUrl, setOriginalImageUrl] = useState<string>("");
   const [error, setError] = useState<string>("");
+  const [isConfigured, setIsConfigured] = useState<boolean>(false);
+  const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
 
-  // Use environment variable for API key
-  const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
+  // Check OpenRouter configuration on component mount
+  useEffect(() => {
+    const checkConfig = async () => {
+      try {
+        const response = await apiClient.checkOpenRouterConfig() as any;
+        setIsConfigured(response.configured);
+      } catch (error) {
+        console.error('Failed to check OpenRouter config:', error);
+        setIsConfigured(false);
+      }
+    };
+    checkConfig();
+  }, []);
+
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -43,8 +61,8 @@ export default function ImageEdit({}: Props) {
       return;
     }
 
-    if (!apiKey) {
-      setError("OpenRouter API key is required");
+    if (!isConfigured) {
+      setError("OpenRouter API key is not configured on the backend");
       return;
     }
 
@@ -54,48 +72,15 @@ export default function ImageEdit({}: Props) {
     setEditedImageUrl("");
 
     try {
-      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "HTTP-Referer": window.location.origin,
-          "X-Title": "VAPAI Studio",
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          "model": "google/gemini-2.5-flash-image-preview:free",
-          "modalities": ["image", "text"],
-          "messages": [{
-            "role": "user",
-            "content": [
-              {
-                "type": "text",
-                "text": `${userPrompt}. Output should be 16:9 widescreen composition.`
-              },
-              {
-                "type": "image_url",
-                "image_url": {
-                  "url": originalImageUrl
-                }
-              }
-            ]
-          }]
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error?.message || `API request failed: ${response.status}`);
-      }
-
-      const data = await response.json();
-      const imageDataUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+      const response = await apiClient.editImage(originalImageUrl, userPrompt) as any;
       
-      if (imageDataUrl) {
-        setEditedImageUrl(imageDataUrl);
+      if (response.success && response.image_url) {
+        setEditedImageUrl(response.image_url);
         setResult("Image edited successfully!");
+        // Trigger refresh of recent images feed
+        setRefreshTrigger(prev => prev + 1);
       } else {
-        throw new Error("No edited image received");
+        throw new Error(response.error || "No edited image received");
       }
 
     } catch (err: any) {
@@ -104,6 +89,7 @@ export default function ImageEdit({}: Props) {
       setIsGenerating(false);
     }
   };
+
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -116,7 +102,7 @@ export default function ImageEdit({}: Props) {
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50">
       <div className="flex gap-6 p-6 md:p-10">
         {/* Main Content */}
-        <div className="flex-1 max-w-4xl mx-auto space-y-8">
+        <div className="flex-1 max-w-4xl space-y-8">
           <div className="text-center space-y-4 py-8">
             <h1 className="text-4xl md:text-6xl font-black bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 bg-clip-text text-transparent">
               Image Edit
@@ -160,7 +146,7 @@ export default function ImageEdit({}: Props) {
                   className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all duration-200 bg-white/80 resize-vertical"
                   value={userPrompt}
                   onChange={(e) => setUserPrompt(e.target.value)}
-                  onKeyPress={handleKeyPress}
+                  onKeyDown={handleKeyPress}
                   placeholder="Describe how to edit the image... (e.g., 'Remove the background and add a sunset sky')"
                 />
                 <p className="text-xs text-gray-500 mt-1">
@@ -171,7 +157,7 @@ export default function ImageEdit({}: Props) {
               <div className="flex items-center gap-3">
                 <button
                   onClick={editImage}
-                  disabled={isGenerating || !userPrompt.trim() || !originalImageUrl}
+                  disabled={isGenerating || !userPrompt.trim() || !originalImageUrl || !isConfigured}
                   className="px-8 py-4 rounded-2xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-lg shadow-lg hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02] transition-all duration-200 flex items-center gap-3"
                 >
                   {isGenerating ? (
@@ -248,7 +234,7 @@ export default function ImageEdit({}: Props) {
             </div>
           </Section>
 
-          {!apiKey && (
+          {!isConfigured && (
             <Section title="API Configuration">
               <div className="p-4 rounded-2xl bg-yellow-50 border border-yellow-200">
                 <div className="flex items-center gap-2 text-yellow-800 mb-2">
@@ -256,14 +242,21 @@ export default function ImageEdit({}: Props) {
                   <span className="font-medium">OpenRouter API Key Required</span>
                 </div>
                 <p className="text-yellow-700 text-sm">
-                  To use image editing, you need to configure your OpenRouter API key. 
+                  To use image editing, you need to configure your OpenRouter API key on the backend. 
                   Get one at <a href="https://openrouter.ai" target="_blank" rel="noopener noreferrer" className="underline">openrouter.ai</a>
                   <br /><br />
-                  Set <code className="bg-yellow-200 px-1 rounded">VITE_OPENROUTER_API_KEY</code> environment variable in your .env file
+                  Set <code className="bg-yellow-200 px-1 rounded">OPENROUTER_API_KEY</code> environment variable in your backend .env file
                 </p>
               </div>
             </Section>
           )}
+        </div>
+
+        {/* Right Sidebar - Recent Images Feed */}
+        <div className="w-96 space-y-6">
+          <div className="sticky top-6 h-[calc(100vh-3rem)]">
+            <RecentImagesFeed refreshTrigger={refreshTrigger} />
+          </div>
         </div>
       </div>
     </div>

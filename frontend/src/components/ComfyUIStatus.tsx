@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { apiClient } from '../lib/apiClient'
 
 interface ComfyUIStatusProps {
   baseUrl: string
@@ -48,38 +49,22 @@ export default function ComfyUIStatus({ baseUrl }: ComfyUIStatusProps) {
     if (!baseUrl) return { connected: false, queue: null, systemStats: null, error: 'No URL provided' }
 
     try {
-      const cleanUrl = baseUrl.replace(/\/$/, '')
+      const response = await apiClient.getComfyUIStatus(baseUrl)
       
-      // Fetch queue status
-      const queueRes = await fetch(`${cleanUrl}/queue`, {
-        method: 'GET',
-        cache: 'no-store',
-        signal: AbortSignal.timeout(5000)
-      })
-      
-      if (!queueRes.ok) {
-        throw new Error(`Queue endpoint failed: ${queueRes.status}`)
-      }
-      
-      const queueData = await queueRes.json()
-      
-      // Fetch system stats
-      const statsRes = await fetch(`${cleanUrl}/system_stats`, {
-        method: 'GET', 
-        cache: 'no-store',
-        signal: AbortSignal.timeout(5000)
-      })
-      
-      let systemStats = null
-      if (statsRes.ok) {
-        systemStats = await statsRes.json()
-      }
-
-      return {
-        connected: true,
-        queue: queueData,
-        systemStats,
-        error: null
+      if (response.success && response.status) {
+        return {
+          connected: response.status.connected,
+          queue: response.status.queue,
+          systemStats: response.status.system_stats,
+          error: response.status.error
+        }
+      } else {
+        return {
+          connected: false,
+          queue: null,
+          systemStats: null,
+          error: response.error || 'Failed to get ComfyUI status'
+        }
       }
 
     } catch (error: any) {
@@ -87,8 +72,8 @@ export default function ComfyUIStatus({ baseUrl }: ComfyUIStatusProps) {
         connected: false,
         queue: null,
         systemStats: null,
-        error: error.name === 'TimeoutError' 
-          ? 'Connection timeout' 
+        error: error.message?.includes('fetch') 
+          ? 'Cannot connect to backend API' 
           : error.message || 'Connection failed'
       }
     }
