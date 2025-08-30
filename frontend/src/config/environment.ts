@@ -21,12 +21,25 @@ const isProduction = (): boolean => {
   return isDeploy || viteMode || customEnv;
 };
 
+// Normalize API URL to ensure it has the /api suffix and no double slashes
+const normalizeApiUrl = (url: string): string => {
+  // Remove trailing slashes
+  let cleanUrl = url.replace(/\/+$/, '');
+  
+  // Add /api if it doesn't end with it
+  if (!cleanUrl.endsWith('/api')) {
+    cleanUrl += '/api';
+  }
+  
+  return cleanUrl;
+};
+
 // Get environment configuration
 const getEnvironmentConfig = (): EnvironmentConfig => {
   // ALWAYS prioritize explicit environment variable first
   if (import.meta.env.VITE_API_BASE_URL) {
     return {
-      apiBaseUrl: import.meta.env.VITE_API_BASE_URL,
+      apiBaseUrl: normalizeApiUrl(import.meta.env.VITE_API_BASE_URL),
       environment: isProduction() ? 'production' : 'development'
     };
   }
@@ -53,5 +66,6 @@ console.log('🔧 Environment Configuration:', {
   apiBaseUrl: config.apiBaseUrl,
   environment: config.environment,
   explicitUrl: !!import.meta.env.VITE_API_BASE_URL,
+  originalUrl: import.meta.env.VITE_API_BASE_URL || 'auto-detected',
   hostname: window.location.hostname
 });

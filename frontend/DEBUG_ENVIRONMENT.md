@@ -50,9 +50,11 @@ VITE_API_BASE_URL=https://your-backend.herokuapp.com/api npm run dev
 1. Go to Vercel Dashboard → Your Project → Settings → Environment Variables
 2. Add:
    - **Key**: `VITE_API_BASE_URL`
-   - **Value**: `https://vapai-plataforma-backend-4daa799bd90b.herokuapp.com/api`
+   - **Value**: `https://vapai-plataforma-backend-4daa799bd90b.herokuapp.com` (without /api - it will be added automatically)
    - **Environments**: Production (and Preview if needed)
 3. Redeploy your application
 4. Check console output to verify
+
+**Note**: You can set the URL with or without `/api` at the end - the system will automatically normalize it to ensure the correct format.
 
 The console will now always show the configuration being used, making debugging much easier!
