@@ -1,5 +1,6 @@
 // Note: Direct Supabase access removed from frontend
 // All database operations now go through the backend API via apiClient
+import { apiClient } from './apiClient'
 
 // Job status types
 export type JobStatus = 'submitted' | 'processing' | 'completed' | 'error'
@@ -54,12 +55,11 @@ export async function uploadVideoToStorage(file: File | Blob, fileName: string):
     const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)))
     
     // Use the API client to upload through backend
-    const { apiClient } = await import('./apiClient')
     const response = await apiClient.uploadVideoToStorage({
       file_data: base64,
       file_name: fileName,
       content_type: 'video/mp4'
-    })
+    }) as { success?: boolean; public_url?: string; error?: string }
     
     return response.public_url || null
   } catch (error) {
