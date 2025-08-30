@@ -1,10 +1,6 @@
 {
   "buildCommand": "npm run build",
   "installCommand": "npm ci --no-audit --no-fund",
-  "framework": null,
-  "env": {
-    "VITE_API_BASE_URL": "https://vapai-plataforma-backend-4daa799bd90b.herokuapp.com/api",
-    "VITE_ENVIRONMENT": "production"
-  }
+  "framework": null
 }
   

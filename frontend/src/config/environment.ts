@@ -2,8 +2,6 @@
 
 interface EnvironmentConfig {
   apiBaseUrl: string;
-  supabaseUrl: string;
-  supabaseAnonKey: string;
   environment: 'development' | 'production';
 }
 
@@ -25,17 +23,21 @@ const isProduction = (): boolean => {
 
 // Get environment configuration
 const getEnvironmentConfig = (): EnvironmentConfig => {
+  // ALWAYS prioritize explicit environment variable first
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return {
+      apiBaseUrl: import.meta.env.VITE_API_BASE_URL,
+      environment: isProduction() ? 'production' : 'development'
+    };
+  }
+  
+  // Fallback to automatic detection only if no explicit URL is set
   const isProd = isProduction();
   
   return {
     apiBaseUrl: isProd 
-      ? (import.meta.env.VITE_API_BASE_URL || 'https://vapai-plataforma-backend-4daa799bd90b.herokuapp.com/api')
-      : (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'),
-    
-    supabaseUrl: import.meta.env.VITE_SUPABASE_URL || 'https://rwbhfxltyxaegtalgxdx.supabase.co',
-    
-    supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3YmhmeGx0eXhhZWd0YWxneGR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU0Njc3OTMsImV4cCI6MjA3MTA0Mzc5M30.2euUdw7ubhbyQ_orFYJxJByPuRxl21QFO3cmZtnVRos',
-    
+      ? 'https://vapai-plataforma-backend-4daa799bd90b.herokuapp.com/api'
+      : 'http://localhost:8000/api',
     environment: isProd ? 'production' : 'development'
   };
 };
@@ -47,9 +49,9 @@ export const config = getEnvironmentConfig();
 export { isProduction, getEnvironmentConfig };
 
 // Log configuration in development
-if (!isProduction()) {
-  console.log('🔧 Environment Configuration:', {
-    ...config,
-    supabaseAnonKey: config.supabaseAnonKey.substring(0, 20) + '...' // Hide sensitive key
-  });
-}
+console.log('🔧 Environment Configuration:', {
+  apiBaseUrl: config.apiBaseUrl,
+  environment: config.environment,
+  explicitUrl: !!import.meta.env.VITE_API_BASE_URL,
+  hostname: window.location.hostname
+});

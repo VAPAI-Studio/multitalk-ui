@@ -13,7 +13,6 @@
     "preview:prod": "VITE_ENVIRONMENT=production vite preview"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.55.0",
     "jszip": "^3.10.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"

@@ -9,35 +9,30 @@ The application automatically detects whether it's running in development or pro
 - **Development (localhost)**: Uses `http://localhost:8000/api` by default
 - **Production (deployed)**: Uses `https://vapai-plataforma-backend-4daa799bd90b.herokuapp.com/api` by default
 
+**Important**: The `VITE_API_BASE_URL` environment variable **always takes priority** over automatic detection.
+
 ## Configuration Methods
 
 ### 1. Environment Variables (Recommended)
 
-Create environment files or set variables in your deployment platform:
+Set the `VITE_API_BASE_URL` environment variable in your deployment platform:
 
 #### For Local Development
-Create a `.env.local` file in the `frontend/` directory:
+Create a `.env.local` file in the `frontend/` directory (optional):
 
 ```env
-# Backend API Configuration
+# Backend API Configuration - only set if you want to override defaults
 VITE_API_BASE_URL=http://localhost:8000/api
 
-# Supabase Configuration
-VITE_SUPABASE_URL=https://rwbhfxltyxaegtalgxdx.supabase.co
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-
-# Environment identifier
+# Environment identifier - optional for debugging
 VITE_ENVIRONMENT=development
 ```
 
 #### For Production Deployment
-Set these environment variables in your deployment platform (Vercel, Netlify, etc.):
+Set this environment variable in your deployment platform (Vercel, Netlify, etc.):
 
 ```env
-VITE_API_BASE_URL=https://vapai-plataforma-backend-4daa799bd90b.herokuapp.com/api
-VITE_SUPABASE_URL=https://rwbhfxltyxaegtalgxdx.supabase.co
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-VITE_ENVIRONMENT=production
+VITE_API_BASE_URL=https://your-backend-url.herokuapp.com/api
 ```
 
 ### 2. Automatic Detection (Default Behavior)

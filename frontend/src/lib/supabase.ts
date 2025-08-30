@@ -1,7 +1,5 @@
-import { createClient } from '@supabase/supabase-js'
-import { config } from '../config/environment'
-
-export const supabase = createClient(config.supabaseUrl, config.supabaseAnonKey)
+// Note: Direct Supabase access removed from frontend
+// All database operations now go through the backend API via apiClient
 
 // Job status types
 export type JobStatus = 'submitted' | 'processing' | 'completed' | 'error'
@@ -48,31 +46,24 @@ export interface CompleteJobPayload {
   video_url?: string // Added for Supabase Storage URL
 }
 
-// Video storage functions
+// Video storage functions - now handled by backend API
 export async function uploadVideoToStorage(file: File | Blob, fileName: string): Promise<string | null> {
   try {
-    const filePath = `videos/${Date.now()}_${fileName}`
+    // Convert blob to base64 for API transmission
+    const arrayBuffer = await file.arrayBuffer()
+    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)))
     
-    const { data, error } = await supabase.storage
-      .from('multitalk-videos')
-      .upload(filePath, file, {
-        contentType: 'video/mp4',
-        upsert: false
-      })
-
-    if (error) {
-      console.error('Error uploading video:', error)
-      return null
-    }
-
-    // Get public URL
-    const { data: publicData } = supabase.storage
-      .from('multitalk-videos')
-      .getPublicUrl(data.path)
-
-    return publicData.publicUrl
+    // Use the API client to upload through backend
+    const { apiClient } = await import('./apiClient')
+    const response = await apiClient.uploadVideoToStorage({
+      file_data: base64,
+      file_name: fileName,
+      content_type: 'video/mp4'
+    })
+    
+    return response.public_url || null
   } catch (error) {
-    console.error('Error uploading video:', error)
+    console.error('Error uploading video via API:', error)
     return null
   }
 }
