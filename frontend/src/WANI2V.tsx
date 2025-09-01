@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createJob, updateJobToProcessing, completeJob } from "./lib/jobTracking";
-import { downloadVideoFromComfy, uploadVideoToStorage } from "./lib/supabase";
 import { startJobMonitoring, checkComfyUIHealth } from "./components/utils";
 import JobFeed from "./components/JobFeed";
 import { useSmartResolution } from "./hooks/useSmartResolution";
@@ -343,7 +342,7 @@ export default function WANI2V({ comfyUrl }: Props) {
                 <input
                   type="number"
                   value={widthInput}
-                  onChange={handleWidthChange}
+                  onChange={(e) => handleWidthChange(e.target.value)}
                   className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 focus:border-purple-500 focus:outline-none transition-colors"
                   step="32"
                   min="64"
@@ -356,7 +355,7 @@ export default function WANI2V({ comfyUrl }: Props) {
                 <input
                   type="number"
                   value={heightInput}
-                  onChange={handleHeightChange}
+                  onChange={(e) => handleHeightChange(e.target.value)}
                   className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 focus:border-purple-500 focus:outline-none transition-colors"
                   step="32"
                   min="64"

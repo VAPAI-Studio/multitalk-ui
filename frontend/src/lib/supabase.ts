@@ -47,7 +47,7 @@ export interface CompleteJobPayload {
 }
 
 // Video storage functions - now handled by backend API
-export async function uploadVideoToStorage(file: File | Blob, fileName: string): Promise<string | null> {
+export async function uploadVideoToStorage(_file: File | Blob, _fileName: string): Promise<string | null> {
   // This function is no longer used - the job monitoring in utils.ts handles uploads
   // via the backend API (uploadVideoToSupabaseStorage from storageUtils)
   console.warn('uploadVideoToStorage called but deprecated - job monitoring should handle uploads')

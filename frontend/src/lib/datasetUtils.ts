@@ -64,25 +64,7 @@ export interface ImageWithCaption {
 
 export type WorkflowSettings = Dataset['settings'];
 
-// API Response interfaces for datasets
-interface CreateDatasetResponse {
-  success: boolean;
-  dataset?: Dataset;
-  error?: string;
-}
-
-interface LoadDatasetResponse {
-  success: boolean;
-  dataset?: Dataset;
-  data?: DataEntry[];
-  error?: string;
-}
-
-interface GetAllDatasetsResponse {
-  success: boolean;
-  datasets?: Dataset[];
-  error?: string;
-}
+// API Response interfaces for datasets (removed unused interfaces)
 
 // Create a new dataset with images and captions via API
 export async function saveDataset(

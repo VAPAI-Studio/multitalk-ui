@@ -31,6 +31,8 @@ interface VideoJob {
   timestamp_submitted: string
   timestamp_completed?: string
   filename?: string
+  subfolder?: string
+  comfy_url: string
   image_filename?: string
   audio_filename?: string
   width: number
@@ -55,7 +57,6 @@ interface FeedItem {
 // Lazy Video Component that only loads when visible
 const LazyVideo = ({ item, onError }: { item: FeedItem; onError: (error: any) => void }) => {
   const videoRef = useRef<HTMLVideoElement>(null)
-  const [isVisible, setIsVisible] = useState(false)
   const [shouldLoad, setShouldLoad] = useState(false)
 
   useEffect(() => {
@@ -66,11 +67,9 @@ const LazyVideo = ({ item, onError }: { item: FeedItem; onError: (error: any) =>
       (entries) => {
         const [entry] = entries
         if (entry.isIntersecting) {
-          setIsVisible(true)
           // Delay loading slightly to prevent resource exhaustion
           setTimeout(() => setShouldLoad(true), 100)
         } else {
-          setIsVisible(false)
           // Unload video when not visible to save resources
           if (video.src && video.src !== '') {
             video.pause()
@@ -163,7 +162,6 @@ export default function GenerationFeed() {
           
           // Fallback to ComfyUI URL if no Supabase URL
           if (!videoUrl && video.filename && video.comfy_url) {
-            const subfolder = video.subfolder ? `/${video.subfolder}` : '';
             videoUrl = `${video.comfy_url.replace(/\/$/, '')}/view?filename=${encodeURIComponent(video.filename)}&subfolder=${encodeURIComponent(video.subfolder || '')}&type=output`;
           }
           
@@ -174,7 +172,7 @@ export default function GenerationFeed() {
             title: `${video.image_filename || 'Video'} + ${video.audio_filename || 'Audio'}`,
             status: video.status,
             preview_url: undefined, // Videos don't have preview images
-            result_url: videoUrl,
+            result_url: videoUrl || undefined,
             processing_time: video.timestamp_completed && video.timestamp_submitted 
               ? Math.round((new Date(video.timestamp_completed).getTime() - new Date(video.timestamp_submitted).getTime()) / 1000)
               : undefined,
@@ -348,7 +346,6 @@ export default function GenerationFeed() {
                       
                       // If we have a Supabase URL that might be failing, also try ComfyUI URL
                       if (!urlToOpen && videoData.filename && videoData.comfy_url) {
-                        const subfolder = videoData.subfolder ? `/${videoData.subfolder}` : ''
                         urlToOpen = `${videoData.comfy_url.replace(/\/$/, '')}/view?filename=${encodeURIComponent(videoData.filename)}&subfolder=${encodeURIComponent(videoData.subfolder || '')}&type=output`
                       }
                       
@@ -425,7 +422,6 @@ export default function GenerationFeed() {
                                 
                                 // Try ComfyUI fallback if we started with Supabase
                                 if (item.result_url?.includes('supabase.co') && videoData.filename && videoData.comfy_url) {
-                                  const subfolder = videoData.subfolder ? `/${videoData.subfolder}` : '';
                                   const fallbackUrl = `${videoData.comfy_url.replace(/\/$/, '')}/view?filename=${encodeURIComponent(videoData.filename)}&subfolder=${encodeURIComponent(videoData.subfolder || '')}&type=output`;
                                   target.src = fallbackUrl
                                   return
