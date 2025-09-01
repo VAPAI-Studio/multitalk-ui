@@ -1,7 +1,7 @@
 import os
 import httpx
 import asyncio
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Dict, Any
 from models.comfyui import ComfyUIStatus, QueueStatus, SystemStats, SystemInfo, SystemDevice
 
 class ComfyUIService:
@@ -83,3 +83,81 @@ class ComfyUIService:
             if "connection" in error_message.lower():
                 error_message = "Connection failed - check if ComfyUI server is running"
             return False, None, error_message
+
+    async def upload_audio(self, base_url: str, audio_data: bytes, filename: str) -> Tuple[bool, Optional[str], Optional[str]]:
+        """Upload audio file to ComfyUI server"""
+        try:
+            clean_url = base_url.rstrip('/')
+            
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                files = {"audio": (filename, audio_data, "audio/wav")}
+                
+                response = await client.post(f"{clean_url}/upload/audio", files=files)
+                
+                if response.status_code != 200:
+                    return False, None, f"Upload failed: {response.status_code}"
+                
+                result = response.json()
+                # ComfyUI usually returns the filename in different formats
+                audio_filename = result.get("name") or result.get("filename") or filename
+                
+                return True, audio_filename, None
+                
+        except httpx.TimeoutException:
+            return False, None, "Upload timeout"
+        except Exception as error:
+            return False, None, str(error)
+
+    async def submit_prompt(self, base_url: str, prompt_data: Dict[str, Any]) -> Tuple[bool, Optional[str], Optional[str]]:
+        """Submit workflow prompt to ComfyUI"""
+        try:
+            clean_url = base_url.rstrip('/')
+            
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    f"{clean_url}/prompt",
+                    json=prompt_data,
+                    headers={"Content-Type": "application/json"}
+                )
+                
+                if response.status_code != 200:
+                    error_detail = ""
+                    try:
+                        error_data = response.json()
+                        error_detail = error_data.get("error") or error_data.get("message") or ""
+                    except:
+                        error_detail = response.text or ""
+                    
+                    return False, None, f"ComfyUI rejected prompt ({response.status_code}): {error_detail}"
+                
+                result = response.json()
+                prompt_id = result.get("prompt_id") or result.get("promptId") or result.get("node_id") or ""
+                
+                if not prompt_id:
+                    return False, None, f"ComfyUI didn't return valid prompt ID. Response: {result}"
+                
+                return True, prompt_id, None
+                
+        except httpx.TimeoutException:
+            return False, None, "Prompt submission timeout"
+        except Exception as error:
+            return False, None, str(error)
+
+    async def get_history(self, base_url: str, job_id: str) -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
+        """Get job history/status from ComfyUI"""
+        try:
+            clean_url = base_url.rstrip('/')
+            
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(f"{clean_url}/history/{job_id}")
+                
+                if response.status_code != 200:
+                    return False, None, f"History fetch failed: {response.status_code}"
+                
+                history_data = response.json()
+                return True, history_data, None
+                
+        except httpx.TimeoutException:
+            return False, None, "History fetch timeout"
+        except Exception as error:
+            return False, None, str(error)

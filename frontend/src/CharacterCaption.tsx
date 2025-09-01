@@ -717,7 +717,12 @@ export default function CharacterCaption({ comfyUrl }: Props) {
                       <h4 className="font-bold text-gray-800">{dataset.name}</h4>
                       <span className="text-xs text-gray-500">{new Date(dataset.created_at).toLocaleDateString()}</span>
                     </div>
-                    <p className="text-sm text-gray-600 mb-3">Trigger: {dataset.character_trigger}</p>
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-sm text-gray-600">Trigger: {dataset.character_trigger}</p>
+                      <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full font-medium">
+                        {dataset.image_count !== undefined ? `${dataset.image_count} images` : 'Loading...'}
+                      </span>
+                    </div>
                     <button
                       onClick={() => handleLoadDataset(dataset.id)}
                       className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"

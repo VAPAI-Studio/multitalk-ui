@@ -1,6 +1,7 @@
 import { completeJob } from './jobTracking'
 import { uploadVideoToSupabaseStorage } from './storageUtils'
 import { findVideoFromHistory } from '../components/utils'
+import { apiClient } from './apiClient'
 
 /**
  * Manually fix a stuck job by checking ComfyUI and completing it properly
@@ -9,15 +10,19 @@ export async function fixStuckJob(jobId: string, comfyUrl: string) {
   try {
     console.log('🔧 Manually fixing stuck job:', jobId)
     
-    // Get ComfyUI history for this job
-    const historyResponse = await fetch(`${comfyUrl}/history/${jobId}`)
-    
-    if (!historyResponse.ok) {
-      console.error('❌ Could not fetch ComfyUI history for job:', jobId)
-      return { success: false, error: 'Could not fetch history' }
+    // Get ComfyUI history for this job via backend
+    const historyResponse = await apiClient.getComfyUIHistory(comfyUrl, jobId) as { 
+      success: boolean; 
+      history?: any; 
+      error?: string 
     }
     
-    const historyData = await historyResponse.json()
+    if (!historyResponse.success) {
+      console.error('❌ Could not fetch ComfyUI history for job:', jobId, historyResponse.error)
+      return { success: false, error: historyResponse.error || 'Could not fetch history' }
+    }
+    
+    const historyData = historyResponse.history
     console.log('📊 ComfyUI history fetched for job:', jobId)
     
     // Check if video exists in the history

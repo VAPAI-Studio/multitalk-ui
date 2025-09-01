@@ -114,12 +114,12 @@ export function MaskEditor({ imageUrl, onMaskUpdate, maskName, existingMask }: M
     return () => ro.current?.disconnect()
   }, [imageUrl, existingMask, layout, redrawOverlay, loadExistingMask])
 
-  const drawBrushStroke = useCallback((ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number) => {
+  const drawBrushStroke = useCallback((ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number, brushSize: number = brush) => {
     ctx.globalCompositeOperation = 'source-over'
     ctx.fillStyle = erase ? '#000' : '#fff'
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
-    ctx.lineWidth = brush * 2
+    ctx.lineWidth = brushSize * 2
     ctx.strokeStyle = erase ? '#000' : '#fff'
     
     ctx.beginPath()
@@ -129,10 +129,10 @@ export function MaskEditor({ imageUrl, onMaskUpdate, maskName, existingMask }: M
     
     // Add brush caps
     ctx.beginPath()
-    ctx.arc(x1, y1, brush, 0, Math.PI * 2)
+    ctx.arc(x1, y1, brushSize, 0, Math.PI * 2)
     ctx.fill()
     ctx.beginPath()
-    ctx.arc(x2, y2, brush, 0, Math.PI * 2)
+    ctx.arc(x2, y2, brushSize, 0, Math.PI * 2)
     ctx.fill()
   }, [brush, erase])
 
@@ -147,6 +147,9 @@ export function MaskEditor({ imageUrl, onMaskUpdate, maskName, existingMask }: M
     const x = (e.clientX - rect.left) * sx
     const y = (e.clientY - rect.top) * sy
     
+    // Scale the brush size to match the coordinate scaling
+    const scaledBrush = brush * Math.max(sx, sy)
+    
     const ctx = mask.getContext('2d')!
     
     if (isStart || !lastPos.current) {
@@ -154,12 +157,12 @@ export function MaskEditor({ imageUrl, onMaskUpdate, maskName, existingMask }: M
       ctx.globalCompositeOperation = 'source-over'
       ctx.fillStyle = erase ? '#000' : '#fff'
       ctx.beginPath()
-      ctx.arc(x, y, brush, 0, Math.PI * 2)
+      ctx.arc(x, y, scaledBrush, 0, Math.PI * 2)
       ctx.fill()
       lastPos.current = { x, y }
     } else {
       // Draw smooth line from last position to current position
-      drawBrushStroke(ctx, lastPos.current.x, lastPos.current.y, x, y)
+      drawBrushStroke(ctx, lastPos.current.x, lastPos.current.y, x, y, scaledBrush)
       lastPos.current = { x, y }
     }
     
@@ -250,7 +253,7 @@ export function MaskEditor({ imageUrl, onMaskUpdate, maskName, existingMask }: M
             onPointerLeave={onUp}
             style={{ 
               touchAction: 'none',
-              cursor: `url("data:image/svg+xml,%3Csvg width='${brush * 2}' height='${brush * 2}' viewBox='0 0 ${brush * 2} ${brush * 2}' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='${brush}' cy='${brush}' r='${brush - 1}' fill='none' stroke='%23000' stroke-width='1'/%3E%3C/svg%3E") ${brush} ${brush}, crosshair`
+              cursor: `url("data:image/svg+xml,%3Csvg width='${brush * 2}' height='${brush * 2}' viewBox='0 0 ${brush * 2} ${brush * 2}' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='${brush}' cy='${brush}' r='${brush}' fill='none' stroke='%23000' stroke-width='1'/%3E%3C/svg%3E") ${brush} ${brush}, crosshair`
             }}
           />
           <canvas ref={maskRef} className="hidden" />

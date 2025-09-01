@@ -7,6 +7,7 @@ export interface Dataset {
   character_trigger: string;
   created_at: string;
   updated_at: string;
+  image_count?: number;
   settings: {
     caption_type: string;
     caption_length: string;
@@ -122,16 +123,27 @@ export async function saveDataset(
       formData.append('captions', JSON.stringify(captions));
     }
 
-    const response = await apiClient.createDataset(formData) as CreateDatasetResponse;
+    const response = await apiClient.createDataset(formData) as any;
     
+    // Handle different possible response structures
     if (response.success && response.dataset) {
       return response.dataset.id;
+    } else if (response.id) {
+      // Direct response with dataset ID
+      return response.id;
+    } else if (response.dataset_id) {
+      // Response with dataset_id field
+      return response.dataset_id;
     } else {
-      throw new Error(response.error || 'Failed to create dataset');
+      throw new Error(response.error || response.message || 'Failed to create dataset');
     }
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error saving dataset:', error);
+    // Provide more user-friendly error message
+    if (error.message && error.message.includes('API request failed')) {
+      throw new Error(`Backend API error: ${error.message}`);
+    }
     throw error;
   }
 }
@@ -142,19 +154,35 @@ export async function loadDataset(datasetId: string): Promise<{
   data: DataEntry[];
 }> {
   try {
-    const response = await apiClient.loadDataset(datasetId) as LoadDatasetResponse;
+    const response = await apiClient.loadDataset(datasetId) as any;
     
+    // Handle different possible response structures
     if (response.success && response.dataset) {
       return {
         dataset: response.dataset,
         data: response.data || []
       };
+    } else if (response.dataset) {
+      // Direct dataset response
+      return {
+        dataset: response.dataset,
+        data: response.data || response.images || []
+      };
+    } else if (response.id) {
+      // Response is the dataset itself
+      return {
+        dataset: response,
+        data: response.data || response.images || []
+      };
     } else {
-      throw new Error(response.error || 'Dataset not found');
+      throw new Error(response.error || response.message || 'Dataset not found');
     }
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error loading dataset:', error);
+    if (error.message && error.message.includes('API request failed')) {
+      throw new Error(`Backend API error: ${error.message}`);
+    }
     throw error;
   }
 }
@@ -162,16 +190,25 @@ export async function loadDataset(datasetId: string): Promise<{
 // Get all datasets (for selection) via API
 export async function getAllDatasets(): Promise<Dataset[]> {
   try {
-    const response = await apiClient.getAllDatasets() as GetAllDatasetsResponse;
+    const response = await apiClient.getAllDatasets() as any;
     
+    // Handle different possible response structures
     if (response.success) {
       return response.datasets || [];
+    } else if (Array.isArray(response)) {
+      // Direct array response
+      return response;
+    } else if (response.datasets) {
+      return response.datasets;
     } else {
-      throw new Error(response.error || 'Failed to load datasets');
+      throw new Error(response.error || response.message || 'Failed to load datasets');
     }
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error loading datasets:', error);
+    if (error.message && error.message.includes('API request failed')) {
+      throw new Error(`Backend API error: ${error.message}`);
+    }
     throw error;
   }
 }

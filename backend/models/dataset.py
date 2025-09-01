@@ -46,6 +46,7 @@ class Dataset(BaseModel):
     created_at: datetime
     updated_at: datetime
     settings: WorkflowSettings
+    image_count: Optional[int] = None
 
     class Config:
         json_encoders = {

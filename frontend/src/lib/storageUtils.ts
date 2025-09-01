@@ -33,6 +33,9 @@ export async function uploadVideoToSupabaseStorage(
   jobId: string
 ): Promise<{ success: boolean; publicUrl?: string; error?: string }> {
   try {
+    // Add a small delay to ensure ComfyUI has made the video file available
+    await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
+    
     const payload = {
       comfy_url: comfyUrl,
       filename,

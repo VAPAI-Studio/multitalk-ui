@@ -158,7 +158,6 @@ class JobService:
                         lambda: self.supabase.table('multitalk_jobs')
                         .select('*')
                         .eq('status', 'completed')
-                        .not_('filename', 'is', None)
                         .order('timestamp_completed', desc=True)
                         .limit(limit)
                         .execute()
@@ -167,8 +166,9 @@ class JobService:
                 )
                 
                 if response.data:
-                    jobs = [MultiTalkJob(**job) for job in response.data]
-                    return jobs, None
+                    # Filter jobs that have video files (filename is not None)
+                    completed_jobs = [MultiTalkJob(**job) for job in response.data if job.get('filename') is not None]
+                    return completed_jobs, None
                 else:
                     return [], None
                     

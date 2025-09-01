@@ -1,6 +1,5 @@
 // Note: Direct Supabase access removed from frontend
-// All database operations now go through the backend API via apiClient
-import { apiClient } from './apiClient'
+// All database operations now go through the backend API
 
 // Job status types
 export type JobStatus = 'submitted' | 'processing' | 'completed' | 'error'
@@ -49,30 +48,55 @@ export interface CompleteJobPayload {
 
 // Video storage functions - now handled by backend API
 export async function uploadVideoToStorage(file: File | Blob, fileName: string): Promise<string | null> {
+  // This function is no longer used - the job monitoring in utils.ts handles uploads
+  // via the backend API (uploadVideoToSupabaseStorage from storageUtils)
+  console.warn('uploadVideoToStorage called but deprecated - job monitoring should handle uploads')
+  return null
+}
+
+// New function that calls the backend API with the correct parameters
+export async function uploadVideoToSupabaseStorage(
+  comfyUrl: string, 
+  filename: string, 
+  subfolder: string | undefined, 
+  jobId: string
+): Promise<string | null> {
   try {
-    // Convert blob to base64 for API transmission
-    const arrayBuffer = await file.arrayBuffer()
-    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)))
+    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/storage/videos/upload`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        comfy_url: comfyUrl,
+        filename: filename,
+        subfolder: subfolder || '',
+        job_id: jobId
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Storage API request failed: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
     
-    // Use the API client to upload through backend
-    const response = await apiClient.uploadVideoToStorage({
-      file_data: base64,
-      file_name: fileName,
-      content_type: 'video/mp4'
-    }) as { success?: boolean; public_url?: string; error?: string }
+    if (!data.success) {
+      throw new Error(data.error || 'Storage upload failed');
+    }
     
-    return response.public_url || null
+    return data.public_url || null;
   } catch (error) {
-    console.error('Error uploading video via API:', error)
-    return null
+    console.error('Error uploading to Supabase storage:', error);
+    return null;
   }
 }
 
 export async function downloadVideoFromComfy(comfyUrl: string, filename: string, subfolder?: string): Promise<Blob | null> {
   try {
     const url = subfolder 
-      ? `${comfyUrl}/view?filename=${encodeURIComponent(filename)}&subfolder=${encodeURIComponent(subfolder)}&type=output`
-      : `${comfyUrl}/view?filename=${encodeURIComponent(filename)}&type=output`
+      ? `${comfyUrl}/api/view?filename=${encodeURIComponent(filename)}&subfolder=${encodeURIComponent(subfolder)}&type=temp`
+      : `${comfyUrl}/api/view?filename=${encodeURIComponent(filename)}&type=temp`
     
     console.log('Downloading video from ComfyUI:', url)
     const response = await fetch(url)

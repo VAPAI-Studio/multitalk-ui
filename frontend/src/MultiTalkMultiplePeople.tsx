@@ -8,6 +8,7 @@ import type { Mask, AudioTrack } from "./components/types";
 import { fileToBase64, uploadMediaToComfy, joinAudiosForMask, groupAudiosByMask, generateId, startJobMonitoring, checkComfyUIHealth } from "./components/utils";
 import JobFeed from "./components/JobFeed";
 import { useSmartResolution } from "./hooks/useSmartResolution";
+import { MaskEditor } from "./components/MaskEditor";
 
 interface Props {
   comfyUrl: string;
@@ -37,8 +38,8 @@ export default function MultiTalkMultiplePeople({ comfyUrl }: Props) {
   const [videoUrl, setVideoUrl] = useState<string>("")
   const [jobId, setJobId] = useState<string>("")
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
-  // const [isEditingMask, setIsEditingMask] = useState<string | null>(null)
-  // const [showMaskModal, setShowMaskModal] = useState<boolean>(false)
+  const [isEditingMask, setIsEditingMask] = useState<string | null>(null)
+  const [showMaskModal, setShowMaskModal] = useState<boolean>(false)
   const [jobMonitorCleanup, setJobMonitorCleanup] = useState<(() => void) | null>(null)
   const [customPrompt, setCustomPrompt] = useState<string>('people talking together')
 
@@ -84,13 +85,13 @@ export default function MultiTalkMultiplePeople({ comfyUrl }: Props) {
   // masks CRUD
   const createMask = () => {
     const m: Mask = { id: generateId(), name: `Mask ${masks.length + 1}`, maskData: null }
-    setMasks(v => [...v, m]); // setIsEditingMask(m.id); setShowMaskModal(true)
+    setMasks(v => [...v, m]); setIsEditingMask(m.id); setShowMaskModal(true)
   }
   const deleteMask = (id: string) => {
     setMasks(v => v.filter(m => m.id !== id))
     setAudioTracks(v => v.map(t => (t.assignedMaskId === id ? { ...t, assignedMaskId: null } : t)))
   }
-  // const updateMask = (id: string, data: string | null) => setMasks(v => v.map(m => (m.id === id ? { ...m, maskData: data } : m)))
+  const updateMask = (id: string, data: string | null) => setMasks(v => v.map(m => (m.id === id ? { ...m, maskData: data } : m)))
   const assignMask = (trackId: string, maskId: string | null) => setAudioTracks(v => v.map(t => (t.id === trackId ? { ...t, assignedMaskId: maskId } : t)))
 
   // audio tracks
@@ -739,8 +740,8 @@ export default function MultiTalkMultiplePeople({ comfyUrl }: Props) {
                             variant="secondary"
                             size="sm"
                             onClick={() => {
-                              // setIsEditingMask(m.id);
-                              // setShowMaskModal(true);
+                              setIsEditingMask(m.id);
+                              setShowMaskModal(true);
                             }}
                             disabled={!imagePreview}
                           >
@@ -885,6 +886,79 @@ export default function MultiTalkMultiplePeople({ comfyUrl }: Props) {
           </div>
         </div>
       </div>
+
+      {/* Mask Editing Modal */}
+      {showMaskModal && isEditingMask && imagePreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => {
+              setShowMaskModal(false)
+              setIsEditingMask(null)
+            }}
+          />
+          
+          {/* Modal */}
+          <div className="relative bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center gap-4">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                  Editor de Máscara
+                </h2>
+                <input
+                  type="text"
+                  value={masks.find(m => m.id === isEditingMask)?.name || ''}
+                  onChange={(e) => {
+                    const newName = e.target.value
+                    setMasks(v => v.map(m => m.id === isEditingMask ? { ...m, name: newName } : m))
+                  }}
+                  className="px-3 py-1 rounded-lg border border-gray-300 focus:border-purple-500 focus:outline-none"
+                  placeholder="Nombre de la máscara"
+                />
+              </div>
+              <button
+                onClick={() => {
+                  setShowMaskModal(false)
+                  setIsEditingMask(null)
+                }}
+                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+              <MaskEditor
+                imageUrl={imagePreview}
+                maskName={masks.find(m => m.id === isEditingMask)?.name || ''}
+                existingMask={masks.find(m => m.id === isEditingMask)?.maskData || null}
+                onMaskUpdate={(maskData) => {
+                  if (isEditingMask) {
+                    updateMask(isEditingMask, maskData)
+                  }
+                }}
+              />
+              
+              <div className="flex justify-end gap-3 pt-6 border-t border-gray-200 mt-6">
+                <button
+                  onClick={() => {
+                    setShowMaskModal(false)
+                    setIsEditingMask(null)
+                  }}
+                  className="px-6 py-2 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

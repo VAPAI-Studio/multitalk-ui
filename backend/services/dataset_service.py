@@ -31,8 +31,9 @@ class DatasetService:
                 .execute()
             )
             
-            if dataset_response.error or not dataset_response.data:
-                raise Exception(f"Failed to create dataset: {dataset_response.error}")
+            if (hasattr(dataset_response, 'error') and dataset_response.error) or not dataset_response.data:
+                error_msg = dataset_response.error if hasattr(dataset_response, 'error') else "Unknown error"
+                raise Exception(f"Failed to create dataset: {error_msg}")
             
             dataset = dataset_response.data[0]
             dataset_id = dataset['id']
@@ -59,7 +60,7 @@ class DatasetService:
                     .execute()
                 )
                 
-                if data_response.error:
+                if hasattr(data_response, 'error') and data_response.error:
                     print(f"Warning: Failed to insert some data entries: {data_response.error}")
                     # Don't throw here, as we want to keep the dataset even if some images fail
             
@@ -81,8 +82,9 @@ class DatasetService:
                 .execute()
             )
             
-            if dataset_response.error or not dataset_response.data:
-                raise Exception(f"Failed to load dataset: {dataset_response.error}")
+            if (hasattr(dataset_response, 'error') and dataset_response.error) or not dataset_response.data:
+                error_msg = dataset_response.error if hasattr(dataset_response, 'error') else "Unknown error"
+                raise Exception(f"Failed to load dataset: {error_msg}")
             
             dataset_data = dataset_response.data
             dataset = Dataset(**dataset_data)
@@ -96,7 +98,7 @@ class DatasetService:
                 .execute()
             )
             
-            if data_response.error:
+            if hasattr(data_response, 'error') and data_response.error:
                 raise Exception(f"Failed to load data entries: {data_response.error}")
             
             data_entries = [DataEntry(**entry) for entry in (data_response.data or [])]
@@ -108,8 +110,9 @@ class DatasetService:
             return None, [], str(error)
     
     async def get_all_datasets(self) -> Tuple[List[Dataset], Optional[str]]:
-        """Get all datasets (for selection)"""
+        """Get all datasets (for selection) with image counts"""
         try:
+            # Get datasets first
             response = await asyncio.to_thread(
                 lambda: self.supabase.table('datasets')
                 .select('*')
@@ -121,8 +124,25 @@ class DatasetService:
             if hasattr(response, 'error') and response.error:
                 raise Exception(f"Failed to load datasets: {response.error}")
             
-            datasets = [Dataset(**dataset) for dataset in (response.data or [])]
-            return datasets, None
+            # Process datasets and add image count for each
+            datasets_with_counts = []
+            for dataset_data in (response.data or []):
+                # Get image count for this dataset
+                count_response = await asyncio.to_thread(
+                    lambda dataset_id=dataset_data['id']: self.supabase.table('data')
+                    .select('*', count='exact')
+                    .eq('dataset_id', dataset_id)
+                    .execute()
+                )
+                
+                # Get the count from the response
+                image_count = count_response.count if hasattr(count_response, 'count') else 0
+                
+                # Add image_count to dataset data
+                dataset_data['image_count'] = image_count
+                datasets_with_counts.append(Dataset(**dataset_data))
+            
+            return datasets_with_counts, None
             
         except Exception as error:
             print(f"Error loading datasets: {error}")
@@ -148,7 +168,7 @@ class DatasetService:
                 )
             )
             
-            if upload_response.error:
+            if hasattr(upload_response, 'error') and upload_response.error:
                 raise Exception(f"Failed to upload image: {upload_response.error}")
             
             # Get public URL for the uploaded image
@@ -168,7 +188,7 @@ class DatasetService:
                 .execute()
             )
             
-            if update_response.error:
+            if hasattr(update_response, 'error') and update_response.error:
                 print(f"Warning: Failed to update data entry with image URL: {update_response.error}")
             
             return True, public_url, None

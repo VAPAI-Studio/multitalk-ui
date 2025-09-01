@@ -6,10 +6,11 @@ import VideoLipsync from "./VideoLipsync";
 import ImageEdit from "./ImageEdit";
 import GenerationFeed from "./GenerationFeed";
 import CharacterCaption from "./CharacterCaption";
+import WANI2V from "./WANI2V";
 import ComfyUIStatus from "./components/ComfyUIStatus";
 
 export default function App() {
-  const [currentPage, setCurrentPage] = useState<"home" | "multitalk-one" | "multitalk-multiple" | "video-lipsync" | "image-edit" | "generation-feed" | "character-caption">("home");
+  const [currentPage, setCurrentPage] = useState<"home" | "multitalk-one" | "multitalk-multiple" | "video-lipsync" | "image-edit" | "generation-feed" | "character-caption" | "wan-i2v">("home");
   const [comfyUrl, setComfyUrl] = useState<string>("https://comfy.vapai.studio");
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
 
@@ -18,7 +19,7 @@ export default function App() {
     const savedPage = localStorage.getItem('vapai-current-page') as typeof currentPage;
     const savedComfyUrl = localStorage.getItem('vapai-comfy-url');
     
-    if (savedPage && ['home', 'multitalk-one', 'multitalk-multiple', 'video-lipsync', 'image-edit', 'generation-feed', 'character-caption'].includes(savedPage)) {
+    if (savedPage && ['home', 'multitalk-one', 'multitalk-multiple', 'video-lipsync', 'image-edit', 'generation-feed', 'character-caption', 'wan-i2v'].includes(savedPage)) {
       setCurrentPage(savedPage);
     }
     
@@ -181,6 +182,17 @@ export default function App() {
                 <span className="text-lg">📝</span>
                 <span className="font-medium">Character Caption</span>
               </button>
+              <button
+                onClick={() => handlePageChange("wan-i2v")}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
+                  currentPage === "wan-i2v"
+                    ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg"
+                    : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                }`}
+              >
+                <span className="text-lg">🎬</span>
+                <span className="font-medium">WAN I2V</span>
+              </button>
             </div>
           </div>
         </div>
@@ -225,6 +237,9 @@ export default function App() {
             <div className="w-full max-w-7xl mx-auto p-6">
               <CharacterCaption comfyUrl={comfyUrl} />
             </div>
+          )}
+          {currentPage === "wan-i2v" && (
+            <WANI2V comfyUrl={comfyUrl} />
           )}
         </main>
       </div>

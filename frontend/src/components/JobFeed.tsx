@@ -32,7 +32,7 @@ export default function JobFeed({ comfyUrl }: JobFeedProps) {
           const timeDiff = now.getTime() - submittedTime.getTime();
           
           if (timeDiff > staleThresholdMs) {
-            console.warn(`🔄 Stale job detected:`, job.job_id.slice(-8), 'submitted', Math.round(timeDiff / (1000 * 60)), 'minutes ago');
+            //console.warn(`🔄 Stale job detected:`, job.job_id.slice(-8), 'submitted', Math.round(timeDiff / (1000 * 60)), 'minutes ago');
             
             // Update stale job status in database (fire and forget)
             completeJob({
@@ -52,12 +52,12 @@ export default function JobFeed({ comfyUrl }: JobFeedProps) {
         return job;
       });
       
-      console.log('📊 Video feed result:', { 
-        jobCount: processedJobs.length, 
-        error, 
-        jobsWithVideos: processedJobs.filter(j => j.video_url || j.filename).length,
-        staleJobs: processedJobs.filter(j => j.error_message === 'Timed out').length
-      })
+      // console.log('📊 Video feed result:', { 
+      //   jobCount: processedJobs.length, 
+      //   error, 
+      //   jobsWithVideos: processedJobs.filter(j => j.video_url || j.filename).length,
+      //   staleJobs: processedJobs.filter(j => j.error_message === 'Timed out').length
+      // })
       
       setVideoFeed(processedJobs);
     } catch (e) {
@@ -120,21 +120,21 @@ export default function JobFeed({ comfyUrl }: JobFeedProps) {
             // Prefer Supabase video_url, fallback to current ComfyUI URL (not stored comfy_url)
             const videoUrl = job.video_url || 
               (job.filename && comfyUrl ? 
-                `${comfyUrl.replace(/\/$/, '')}/view?filename=${encodeURIComponent(job.filename)}&subfolder=${encodeURIComponent(job.subfolder || '')}&type=output`
+                `${comfyUrl.replace(/\/$/, '')}/api/view?filename=${encodeURIComponent(job.filename)}&subfolder=${encodeURIComponent(job.subfolder || '')}&type=temp`
                 : null);
             
             const usingComfyFallback = !job.video_url && job.filename && comfyUrl;
             if (usingComfyFallback) {
-              console.warn('⚠️ Job', job.job_id.slice(-8), 'using ComfyUI fallback URL - Supabase upload likely failed');
+              //console.warn('⚠️ Job', job.job_id.slice(-8), 'using ComfyUI fallback URL - Supabase upload likely failed');
             }
-            console.log('🎥 Video URL for job', job.job_id.slice(-8), ':', {
-              hasSupabaseUrl: !!job.video_url,
-              hasFilename: !!job.filename,
-              usingSupabaseUrl: !!job.video_url,
-              usingComfyFallback,
-              finalUrl: videoUrl,
-              filename: job.filename
-            });
+            // console.log('🎥 Video URL for job', job.job_id.slice(-8), ':', {
+            //   hasSupabaseUrl: !!job.video_url,
+            //   hasFilename: !!job.filename,
+            //   usingSupabaseUrl: !!job.video_url,
+            //   usingComfyFallback,
+            //   finalUrl: videoUrl,
+            //   filename: job.filename
+            // });
               
             // Show compact view for failed/error jobs (now yellow)
             if (job.status === 'error' || job.error_message === 'Timed out') {

@@ -27,10 +27,11 @@ class StorageService:
             params = {
                 'filename': filename,
                 'subfolder': subfolder or '',
-                'type': 'output'
+                'type': 'temp'  # Changed from 'output' to 'temp' to match actual ComfyUI format
             }
             
-            video_url = f"{clean_url}/view?{urlencode(params)}"
+            video_url = f"{clean_url}/api/view?{urlencode(params)}"  # Added '/api' to path
+            print(f"🔍 Attempting to download video from ComfyUI: {video_url}")
             
             async with httpx.AsyncClient(timeout=60.0) as client:
                 video_response = await client.get(
@@ -39,6 +40,7 @@ class StorageService:
                 )
                 
                 if video_response.status_code != 200:
+                    print(f"❌ ComfyUI download failed: {video_response.status_code} - {video_response.text[:200]}")
                     raise Exception(f"Failed to download video from ComfyUI: {video_response.status_code}")
                 
                 video_content = video_response.content

@@ -1,6 +1,7 @@
 import type { AudioTrack, VideoResult } from './types'
 import { uploadVideoToSupabaseStorage } from '../lib/storageUtils'
 import { completeJob } from '../lib/jobTracking'
+import { apiClient } from '../lib/apiClient'
 
 export async function fileToBase64(file: File): Promise<string> {
   const buf = await file.arrayBuffer()
@@ -144,16 +145,11 @@ export async function pollForResult(promptId: string, baseUrl: string, intervalM
   while (Date.now() - start < maxSeconds * 1000) {
     try {
       await new Promise((r) => setTimeout(r, intervalMs));
-      const res = await fetch(`${baseUrl.replace(/\/$/, '')}/history/${promptId}`, { cache: 'no-store' });
-      if (!res.ok) {
-        if (res.status === 404) {
-          // Prompt not found yet, continue polling
-          continue;
-        }
-        throw new Error(`ComfyUI devolvió status ${res.status}`);
+      const response = await apiClient.getComfyUIHistory(baseUrl, promptId) as { success: boolean; history?: any; error?: string };
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to get ComfyUI history');
       }
-      
-      const data = await res.json();
+      const data = response.history;
       
       // Check for ComfyUI errors in the response
       const historyEntry = data?.[promptId];
@@ -168,7 +164,7 @@ export async function pollForResult(promptId: string, baseUrl: string, intervalM
       if (found) {
         // Upload video to Supabase Storage if we have a jobId
         if (jobId && found.filename) {
-          console.log('Video found, uploading to Supabase Storage...');
+          // Video found, uploading to Supabase Storage
           try {
             const uploadResult = await uploadVideoToSupabaseStorage(
               baseUrl,
@@ -179,7 +175,7 @@ export async function pollForResult(promptId: string, baseUrl: string, intervalM
             
             if (uploadResult.success && uploadResult.publicUrl) {
               // Update job with Supabase Storage URL
-              console.log('✅ Video upload successful! Saving Supabase URL to database:', uploadResult.publicUrl);
+              // Video upload successful
               await completeJob({
                 job_id: jobId,
                 status: 'completed',
@@ -187,10 +183,10 @@ export async function pollForResult(promptId: string, baseUrl: string, intervalM
                 subfolder: found.subfolder || undefined,
                 video_url: uploadResult.publicUrl
               });
-              console.log('✅ Job completed with Supabase URL:', uploadResult.publicUrl);
+              // Job completed with Supabase URL
             } else {
               console.error('❌ Failed to upload video to Supabase Storage:', uploadResult.error);
-              console.warn('⚠️ Completing job without Supabase URL - video will fallback to ComfyUI');
+              // Completing job without Supabase URL - video will fallback to ComfyUI
               // Still complete the job with ComfyUI info
               await completeJob({
                 job_id: jobId,
@@ -201,7 +197,7 @@ export async function pollForResult(promptId: string, baseUrl: string, intervalM
             }
           } catch (uploadError) {
             console.error('❌ Error during video upload:', uploadError);
-            console.warn('⚠️ Completing job without Supabase URL due to upload error - video will fallback to ComfyUI');
+            // Completing job without Supabase URL due to upload error
             // Still complete the job with ComfyUI info
             await completeJob({
               job_id: jobId,
@@ -225,7 +221,7 @@ export async function pollForResult(promptId: string, baseUrl: string, intervalM
         throw error;
       }
       // For network errors, continue retrying
-      console.warn('Network error during polling, retrying:', error.message);
+      // Network error during polling, retrying
     }
   }
   throw new Error(`Timeout: ComfyUI no completó el procesamiento en ${maxSeconds} segundos`);
@@ -286,14 +282,11 @@ export function startJobMonitoring(
   
   const checkStatus = async () => {
     try {
-      const res = await fetch(`${baseUrl.replace(/\/$/, '')}/history/${jobId}`, { cache: 'no-store' });
-      if (!res.ok) {
-        // If 404, job hasn't started yet, continue polling
-        if (res.status === 404) return;
-        throw new Error(`ComfyUI status check failed: ${res.status}`);
+      const response = await apiClient.getComfyUIHistory(baseUrl, jobId) as { success: boolean; history?: any; error?: string };
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to get ComfyUI history');
       }
-      
-      const data = await res.json();
+      const data = response.history;
       const historyEntry = data?.[jobId];
       
       if (!historyEntry) {
@@ -326,7 +319,7 @@ export function startJobMonitoring(
             
             if (uploadResult.success && uploadResult.publicUrl) {
               // Update job with Supabase Storage URL
-              console.log('✅ Video upload successful! Saving Supabase URL to database:', uploadResult.publicUrl);
+              // Video upload successful
               await completeJob({
                 job_id: jobId,
                 status: 'completed',
@@ -334,11 +327,11 @@ export function startJobMonitoring(
                 subfolder: videoInfo.subfolder || undefined,
                 video_url: uploadResult.publicUrl
               });
-              console.log('✅ Job completed with Supabase URL:', uploadResult.publicUrl);
+              // Job completed with Supabase URL
               onStatusUpdate('completed', 'Video guardado y completado', { ...videoInfo, video_url: uploadResult.publicUrl });
             } else {
               console.error('❌ Failed to upload video to Supabase Storage:', uploadResult.error);
-              console.warn('⚠️ Completing job without Supabase URL - video will fallback to ComfyUI');
+              // Completing job without Supabase URL - video will fallback to ComfyUI
               // Still complete the job with ComfyUI info
               await completeJob({
                 job_id: jobId,
@@ -350,7 +343,7 @@ export function startJobMonitoring(
             }
           } catch (uploadError) {
             console.error('❌ Error during video upload:', uploadError);
-            console.warn('⚠️ Completing job without Supabase URL due to upload error - video will fallback to ComfyUI');
+            // Completing job without Supabase URL due to upload error
             // Still complete the job with ComfyUI info
             await completeJob({
               job_id: jobId,
@@ -504,12 +497,7 @@ export async function joinAudiosForMask(tracks: AudioTrack[], totalDuration: num
   const length = Math.ceil(totalDuration * sampleRate)
   const offline = new (window as any).OfflineAudioContext(2, length, sampleRate)
   
-  console.log('joinAudiosForMask setup:', {
-    totalDuration,
-    sampleRate,
-    length,
-    expectedDurationSeconds: length / sampleRate
-  })
+  // Audio mixing setup complete
   
   // Add each track at its specific time with silence padding
   decoded.forEach(({ t, audio }) => {

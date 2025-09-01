@@ -130,6 +130,37 @@ class ApiClient {
     return this.request(`/comfyui/status${queryParam}`)
   }
 
+  async uploadAudioToComfyUI(baseUrl: string, audioFile: File) {
+    const formData = new FormData()
+    formData.append('audio', audioFile)
+    
+    return fetch(`${this.baseURL}/comfyui/upload-audio?base_url=${encodeURIComponent(baseUrl)}`, {
+      method: 'POST',
+      body: formData,
+    }).then(response => {
+      if (!response.ok) {
+        throw new Error(`Audio upload failed: ${response.status} ${response.statusText}`)
+      }
+      return response.json()
+    })
+  }
+
+  async submitPromptToComfyUI(baseUrl: string, prompt: any, clientId: string) {
+    return this.request('/comfyui/submit-prompt', {
+      method: 'POST',
+      body: JSON.stringify({
+        base_url: baseUrl,
+        prompt: prompt,
+        client_id: clientId,
+      }),
+    })
+  }
+
+  async getComfyUIHistory(baseUrl: string, jobId: string) {
+    const queryParam = `?base_url=${encodeURIComponent(baseUrl)}`
+    return this.request(`/comfyui/history/${jobId}${queryParam}`)
+  }
+
   // Edited Images endpoints
   async createEditedImage(payload: any) {
     return this.request('/edited-images', {

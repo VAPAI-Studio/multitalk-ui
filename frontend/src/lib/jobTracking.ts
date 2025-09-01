@@ -27,11 +27,11 @@ export async function createJob(payload: CreateJobPayload): Promise<{ success: b
     const response = await apiClient.createJob(payload) as JobApiResponse
     
     if (response.success) {
-      console.log('Job created successfully:', payload.job_id)
+      // Job created successfully
       return { success: true, error: response.error }
     } else {
       console.error('Error creating job:', response.error)
-      console.warn('Job tracking failed but continuing with ComfyUI processing')
+      // Job tracking failed but continuing with processing
       return { success: true, error: `DB error (non-blocking): ${response.error}` }
     }
   } catch (error: any) {
@@ -39,7 +39,7 @@ export async function createJob(payload: CreateJobPayload): Promise<{ success: b
     
     // Don't block the main workflow if API operations fail
     if (error.name === 'TypeError' || error.message?.includes('fetch')) {
-      console.warn('API timeout/connection error but continuing with processing')
+      // API timeout/connection error but continuing with processing
       return { success: true, error: 'API error (non-blocking)' }
     }
     
@@ -74,7 +74,7 @@ export async function completeJob(payload: CompleteJobPayload): Promise<{ succes
     const response = await apiClient.completeJob(payload.job_id, payload) as JobApiResponse
     
     if (response.success) {
-      console.log('Job completed successfully:', payload.job_id)
+      // Job completed successfully
       return { success: true, error: response.error }
     } else {
       console.error('Error completing job:', response.error)
