@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { createJob, updateJobToProcessing, completeJob } from "./lib/jobTracking";
 import { downloadVideoFromComfy, uploadVideoToStorage } from "./lib/supabase";
 import { startJobMonitoring, checkComfyUIHealth } from "./components/utils";
-import JobFeed from "./components/JobFeed";
+import UnifiedFeed from "./components/UnifiedFeed";
 import { useSmartResolution } from "./hooks/useSmartResolution";
 
 // VAPAI One-Person Frontend for ComfyUI
@@ -608,7 +608,17 @@ export default function MultiTalkOnePerson({ comfyUrl }: Props) {
         {/* Right Sidebar - Video Feed */}
         <div className="w-96 space-y-6">
           <div className="sticky top-6 h-[calc(100vh-3rem)]">
-            <JobFeed comfyUrl={comfyUrl} />
+            <UnifiedFeed 
+              comfyUrl={comfyUrl} 
+              config={{
+                type: 'video',
+                title: 'Feed de Generaciones',
+                showCompletedOnly: false,
+                maxItems: 10,
+                showFixButton: true,
+                showProgress: true
+              }}
+            />
           </div>
         </div>
       </div>
