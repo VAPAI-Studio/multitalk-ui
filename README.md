@@ -1,4 +1,4 @@
-# MultiTalk
+# VAPAI Studio
 
 A full-stack application for AI-powered video and audio processing with multi-character conversations.
 
