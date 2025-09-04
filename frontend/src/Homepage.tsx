@@ -1,6 +1,6 @@
 
 interface Props {
-  onNavigate: (page: "multitalk-one" | "multitalk-multiple" | "video-lipsync" | "image-edit" | "character-caption") => void;
+  onNavigate: (page: "multitalk-one" | "multitalk-multiple" | "video-lipsync" | "image-edit" | "character-caption" | "wan-i2v") => void;
 }
 
 export default function Homepage({ onNavigate }: Props) {
@@ -44,6 +44,14 @@ export default function Homepage({ onNavigate }: Props) {
       icon: "📝",
       gradient: "from-indigo-500 to-purple-600",
       features: ["AI caption generation", "Batch processing", "Model: JoyCaption Beta 2"]
+    },
+    {
+      id: "wan-i2v" as const,
+      title: "WAN I2V",
+      description: "Transform your images into captivating videos with AI-powered image-to-video generation.",
+      icon: "🎬",
+      gradient: "from-purple-600 to-pink-600",
+      features: ["Image to video generation", "Custom prompts", "Model: WAN I2V"]
     }
   ];
 
@@ -115,6 +123,70 @@ export default function Homepage({ onNavigate }: Props) {
               </div>
             </div>
           ))}
+        </div>
+
+        {/* External Tools Section */}
+        <div className="mb-16">
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">External Tools</h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+              Access powerful development and workflow tools to enhance your AI media creation process.
+            </p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+            <button
+              onClick={() => window.open('https://comfy.vapai.studio', '_blank')}
+              className="group p-6 rounded-3xl bg-white/80 backdrop-blur-sm border border-gray-200/50 shadow-lg hover:shadow-2xl transform hover:scale-[1.02] transition-all duration-300 cursor-pointer text-left"
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div className="w-14 h-14 bg-gradient-to-br from-orange-500 to-red-600 rounded-2xl flex items-center justify-center text-2xl shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  🔧
+                </div>
+                <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
+                    <span className="text-gray-600">↗</span>
+                  </div>
+                </div>
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-3 group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:bg-clip-text group-hover:from-orange-600 group-hover:to-red-600 transition-all duration-300">
+                ComfyUI
+              </h3>
+              <p className="text-gray-600 mb-4 leading-relaxed">
+                Advanced node-based workflow editor for AI image and video generation with custom pipelines.
+              </p>
+              <div className="inline-flex items-center gap-2 text-sm font-medium bg-gradient-to-r from-orange-500 to-red-600 bg-clip-text text-transparent">
+                <span>Open Workflow Editor</span>
+                <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">→</span>
+              </div>
+            </button>
+            
+            <button
+              onClick={() => window.open('https://notebook.vapai.studio', '_blank')}
+              className="group p-6 rounded-3xl bg-white/80 backdrop-blur-sm border border-gray-200/50 shadow-lg hover:shadow-2xl transform hover:scale-[1.02] transition-all duration-300 cursor-pointer text-left"
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-2xl flex items-center justify-center text-2xl shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  📓
+                </div>
+                <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
+                    <span className="text-gray-600">↗</span>
+                  </div>
+                </div>
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-3 group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:bg-clip-text group-hover:from-blue-600 group-hover:to-cyan-600 transition-all duration-300">
+                Jupyter Notebook
+              </h3>
+              <p className="text-gray-600 mb-4 leading-relaxed">
+                Interactive development environment for data science, AI experiments, and custom model training.
+              </p>
+              <div className="inline-flex items-center gap-2 text-sm font-medium bg-gradient-to-r from-blue-500 to-cyan-600 bg-clip-text text-transparent">
+                <span>Launch Notebook</span>
+                <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">→</span>
+              </div>
+            </button>
+          </div>
         </div>
 
         {/* Footer Info */}

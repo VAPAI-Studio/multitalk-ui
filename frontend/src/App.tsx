@@ -193,6 +193,33 @@ export default function App() {
                 <span className="text-lg">🎬</span>
                 <span className="font-medium">WAN I2V</span>
               </button>
+              
+              {/* External Tools Section */}
+              <div className="mt-6 pt-4 border-t border-gray-200/50">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-4 mb-3 block">External Tools</span>
+                <button
+                  onClick={() => window.open('https://comfy.vapai.studio', '_blank')}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                >
+                  <span className="text-lg">🔧</span>
+                  <div className="flex flex-col">
+                    <span className="font-medium">ComfyUI</span>
+                    <span className="text-xs text-gray-500">Workflow Editor</span>
+                  </div>
+                  <span className="text-xs text-gray-400 ml-auto">↗</span>
+                </button>
+                <button
+                  onClick={() => window.open('https://notebook.vapai.studio', '_blank')}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                >
+                  <span className="text-lg">📓</span>
+                  <div className="flex flex-col">
+                    <span className="font-medium">Jupyter</span>
+                    <span className="text-xs text-gray-500">Notebook</span>
+                  </div>
+                  <span className="text-xs text-gray-400 ml-auto">↗</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
