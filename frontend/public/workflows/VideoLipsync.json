@@ -48,7 +48,7 @@
       "steps": 4,
       "cfg": 1.0000000000000002,
       "shift": 11.000000000000002,
-      "seed": 2,
+      "seed": 1099262281264195,
       "force_offload": true,
       "scheduler": "dpm++_sde",
       "riflex_freq_index": 0,
@@ -120,16 +120,16 @@
     "inputs": {
       "frame_rate": 25,
       "loop_count": 0,
-      "filename_prefix": "VideoLipsync",
+      "filename_prefix": "AnimateDiff",
       "format": "video/h264-mp4",
       "pix_fmt": "yuv420p",
       "crf": 19,
       "save_metadata": true,
-      "trim_to_audio": "{{TRIM_TO_AUDIO}}",
+      "trim_to_audio": false,
       "pingpong": false,
       "save_output": true,
       "images": [
-        "299",
+        "130",
         0
       ],
       "audio": [
@@ -171,7 +171,7 @@
   "138": {
     "inputs": {
       "lora": "WAN\\lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors",
-      "strength": 1,
+      "strength": 1.0000000000000002,
       "low_mem_load": false,
       "merge_loras": false
     },
@@ -267,7 +267,7 @@
       ],
       "fps": 25,
       "audio_scale": "{{AUDIO_SCALE}}",
-      "audio_cfg_scale": 1,
+      "audio_cfg_scale": 1.0000000000000002,
       "multi_audio_type": "para",
       "wav2vec_model": [
         "137",
@@ -296,7 +296,7 @@
         0
       ],
       "frame_load_cap": 0,
-      "skip_first_frames": "{{VIDEO_START_FRAME}}",
+      "skip_first_frames": 0,
       "select_every_nth": 1,
       "format": "AnimateDiff"
     },
@@ -310,10 +310,10 @@
       "enable_vae_tiling": false,
       "tile_x": 272,
       "tile_y": 272,
-      "tile_stride_x": 144,
+      "tile_stride_x": 160,
       "tile_stride_y": 128,
       "noise_aug_strength": 0,
-      "latent_strength": 1,
+      "latent_strength": 1.0000000000000002,
       "vae": [
         "129",
         0
@@ -370,13 +370,13 @@
   },
   "237": {
     "inputs": {
-      "strength_1": 1,
-      "strength_2": 1,
+      "strength_1": 1.0000000000000002,
+      "strength_2": 1.0000000000000002,
       "crop": "center",
       "combine_embeds": "average",
       "force_offload": true,
       "tiles": 0,
-      "ratio": 0.5,
+      "ratio": 0.5000000000000001,
       "clip_vision": [
         "238",
         0
@@ -465,139 +465,6 @@
     "class_type": "PreviewAny",
     "_meta": {
       "title": "Preview Any"
-    }
-  },
-  "299": {
-    "inputs": {
-      "inputcount": "{{CONCAT_INPUT_COUNT}}",
-      "direction": "left",
-      "match_image_size": false,
-      "Update inputs": null,
-      "image_1": [
-        "{{CONCAT_INPUT_1_NODE}}",
-        "{{CONCAT_INPUT_1_INDEX}}"
-      ],
-      "image_2": [
-        "{{CONCAT_INPUT_2_NODE}}",
-        "{{CONCAT_INPUT_2_INDEX}}"
-      ],
-      "image_3": [
-        "{{CONCAT_INPUT_3_NODE}}",
-        "{{CONCAT_INPUT_3_INDEX}}"
-      ]
-    },
-    "class_type": "ImageConcatMulti",
-    "_meta": {
-      "title": "Image Concatenate Multi"
-    }
-  },
-  "310": {
-    "inputs": {
-      "width": [
-        "245",
-        0
-      ],
-      "height": [
-        "246",
-        0
-      ],
-      "batch_size": "{{BLACK_FRAME_COUNT_START}}",
-      "color": 0
-    },
-    "class_type": "EmptyLatentImage",
-    "_meta": {
-      "title": "Empty Latent Image - Start Black Frames"
-    }
-  },
-  "311": {
-    "inputs": {
-      "enable_vae_tiling": false,
-      "tile_x": 272,
-      "tile_y": 272,
-      "tile_stride_x": 144,
-      "tile_stride_y": 128,
-      "normalization": "default",
-      "vae": [
-        "129",
-        0
-      ],
-      "samples": [
-        "310",
-        0
-      ]
-    },
-    "class_type": "WanVideoDecode",
-    "_meta": {
-      "title": "WanVideo Decode - Start Black Frames"
-    }
-  },
-  "312": {
-    "inputs": {
-      "width": [
-        "245",
-        0
-      ],
-      "height": [
-        "246",
-        0
-      ],
-      "batch_size": "{{BLACK_FRAME_COUNT_END}}",
-      "color": 0
-    },
-    "class_type": "EmptyLatentImage",
-    "_meta": {
-      "title": "Empty Latent Image - End Black Frames"
-    }
-  },
-  "313": {
-    "inputs": {
-      "enable_vae_tiling": false,
-      "tile_x": 272,
-      "tile_y": 272,
-      "tile_stride_x": 144,
-      "tile_stride_y": 128,
-      "normalization": "default",
-      "vae": [
-        "129",
-        0
-      ],
-      "samples": [
-        "312",
-        0
-      ]
-    },
-    "class_type": "WanVideoDecode",
-    "_meta": {
-      "title": "WanVideo Decode - End Black Frames"
-    }
-  },
-  "300": {
-    "inputs": {
-      "image": [
-        "130",
-        0
-      ]
-    },
-    "class_type": "GetImageSizeAndCount",
-    "_meta": {
-      "title": "Get Image Size & Count"
-    }
-  },
-  "301": {
-    "inputs": {
-      "start_index": 0,
-      "num_frames": [
-        "300",
-        3
-      ],
-      "images": [
-        "300",
-        0
-      ]
-    },
-    "class_type": "GetImageRangeFromBatch",
-    "_meta": {
-      "title": "Get Image or Mask Range From Batch"
     }
   }
 }

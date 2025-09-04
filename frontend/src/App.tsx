@@ -8,6 +8,7 @@ import GenerationFeed from "./GenerationFeed";
 import CharacterCaption from "./CharacterCaption";
 import WANI2V from "./WANI2V";
 import ComfyUIStatus from "./components/ComfyUIStatus";
+import ConsoleToggle from "./components/ConsoleToggle";
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<"home" | "multitalk-one" | "multitalk-multiple" | "video-lipsync" | "image-edit" | "generation-feed" | "character-caption" | "wan-i2v">("home");
@@ -270,6 +271,9 @@ export default function App() {
           )}
         </main>
       </div>
+      
+      {/* Console Toggle */}
+      <ConsoleToggle comfyUrl={comfyUrl} />
     </div>
   );
 }
