@@ -89,9 +89,9 @@ export async function completeJob(payload: CompleteJobPayload): Promise<{ succes
 /**
  * Gets recent jobs via API
  */
-export async function getRecentJobs(limit: number = 50): Promise<{ jobs: MultiTalkJob[]; error?: string }> {
+export async function getRecentJobs(limit: number = 50, offset: number = 0): Promise<{ jobs: MultiTalkJob[]; error?: string }> {
   try {
-    const response = await apiClient.getRecentJobs(limit) as JobsListResponse
+    const response = await apiClient.getRecentJobs(limit, offset) as JobsListResponse
     
     if (response.success) {
       return { jobs: response.jobs || [], error: response.error }
@@ -127,9 +127,9 @@ export async function getJob(jobId: string): Promise<{ job: MultiTalkJob | null;
 /**
  * Gets jobs with completed status that have video files via API
  */
-export async function getCompletedJobsWithVideos(limit: number = 20): Promise<{ jobs: MultiTalkJob[]; error?: string }> {
+export async function getCompletedJobsWithVideos(limit: number = 20, offset: number = 0): Promise<{ jobs: MultiTalkJob[]; error?: string }> {
   try {
-    const response = await apiClient.getCompletedJobsWithVideos(limit) as JobsListResponse
+    const response = await apiClient.getCompletedJobsWithVideos(limit, offset) as JobsListResponse
     
     if (response.success) {
       return { jobs: response.jobs || [], error: response.error }

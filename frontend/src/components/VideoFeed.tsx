@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { getCompletedJobsWithVideos, getRecentJobs, completeJob } from '../lib/jobTracking'
 import { useComfyUIProgress } from '../hooks/useComfyUIProgress'
+import { fixStuckJob } from '../lib/fixStuckJob'
+import VideoThumbnail from './VideoThumbnail'
 import type { MultiTalkJob } from '../lib/supabase'
 
 interface VideoJob extends MultiTalkJob {
@@ -42,14 +44,14 @@ interface VideoFeedProps {
   config: VideoFeedConfig
 }
 
-// Lazy Video Component that only loads when visible
+// Lazy Video Component with thumbnail support
 const LazyVideo = ({ item, onError }: { item: VideoItem; onError: (error: any) => void }) => {
-  const videoRef = useRef<HTMLVideoElement>(null)
   const [shouldLoad, setShouldLoad] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const video = videoRef.current
-    if (!video) return
+    const container = containerRef.current
+    if (!container) return
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -58,73 +60,90 @@ const LazyVideo = ({ item, onError }: { item: VideoItem; onError: (error: any) =
           // Delay loading slightly to prevent resource exhaustion
           setTimeout(() => setShouldLoad(true), 100)
         } else {
-          // Unload video when not visible to save resources
-          if (video.src && video.src !== '') {
-            video.pause()
-            video.removeAttribute('src')
-            video.load()
-          }
           setShouldLoad(false)
         }
       },
       { threshold: 0.1 }
     )
 
-    observer.observe(video)
+    observer.observe(container)
     return () => observer.disconnect()
   }, [])
 
   return (
-    <video
-      ref={videoRef}
-      src={shouldLoad ? item.result_url : undefined}
-      controls={shouldLoad}
-      className="w-full rounded-xl shadow-lg"
-      style={{ maxHeight: '200px' }}
-      preload="none"
-      onError={onError}
-    />
+    <div ref={containerRef} className="w-full">
+      <VideoThumbnail
+        videoUrl={item.result_url || ''}
+        className="w-full rounded-xl shadow-lg"
+        style={{ maxHeight: '200px' }}
+        onError={onError}
+        showPlayButton={shouldLoad}
+      />
+    </div>
   )
 }
 
 export default function VideoFeed({ comfyUrl, config }: VideoFeedProps) {
-  const [feedItems, setFeedItems] = useState<VideoItem[]>([])
+  const [displayedItems, setDisplayedItems] = useState<VideoItem[]>([]) // Currently displayed items
   const [loading, setLoading] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [fixingJobs, setFixingJobs] = useState<Set<string>>(new Set())
   const [showFilteredOnly, setShowFilteredOnly] = useState(false) // Toggle between "Show All" and "Show Mine"
+  const [displayCount, setDisplayCount] = useState(config.maxItems || 10)
+  const [hasMore, setHasMore] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   
   // Use ComfyUI progress tracking
   const { progress } = useComfyUIProgress(comfyUrl, true)
   
   const getShortJobId = (jobId: string) => jobId.slice(-8)
 
-  const loadFeed = async () => {
-    setLoading(true)
+  const loadFeed = async (reset = true) => {
+    if (reset) {
+      setLoading(true)
+      setDisplayCount(config.maxItems || 10)
+      setHasMore(true)
+      setError(null) // Clear any previous errors
+    } else {
+      setLoadingMore(true)
+    }
+    
     try {
+      // Load a large batch of items from the API
+      const limit = config.maxItems || 10
+      
+      console.log(`🔄 Loading videos: reset=${reset}, displayCount=${displayCount}`)
+      
+      // Try without offset first to see if that works
       const jobsResponse = config.showCompletedOnly 
-        ? await getCompletedJobsWithVideos(config.maxItems || 10)
-        : await getRecentJobs(config.maxItems || 10)
+        ? await getCompletedJobsWithVideos(limit * 3, 0) // Load 3x more items, ignore offset for now
+        : await getRecentJobs(limit * 3, 0)
       
       if (!jobsResponse || !jobsResponse.jobs) {
-        setFeedItems([])
+        if (reset) {
+          setDisplayedItems([])
+        }
+        setHasMore(false)
         return
       }
 
       const jobs = jobsResponse.jobs
+      console.log(`📊 Received ${jobs.length} jobs from API`)
 
-      // Check for stale jobs and update their status
+      // Smart stuck job detection - focus on truly stuck jobs, not just time
       const now = new Date()
-      const staleThresholdMs = 6 * 60 * 60 * 1000 // 6 hours (very lenient for video generation)
+      const maxJobAgeMs = 4 * 60 * 60 * 1000 // 4 hours maximum (very generous for video generation)
+      const noProgressTimeoutMs = 45 * 60 * 1000 // 45 minutes without progress = likely stuck
       
       const processedJobs = jobs.map((job: MultiTalkJob) => {
-        // Check if job is stale (processing/submitted for more than 6 hours)
+        // Only check jobs that are in processing/submitted state
         if ((job.status === 'processing' || job.status === 'submitted')) {
-          // Handle timestamp parsing - the timestamp is already in ISO format
           const submittedTime = new Date(job.timestamp_submitted)
           const timeDiff = now.getTime() - submittedTime.getTime()
+          const timeDiffMinutes = Math.round(timeDiff / (1000 * 60))
           
-          // Debug logging for timeout detection
-          console.log(`🔍 Job ${getShortJobId(job.job_id)} (full: ${job.job_id}) timeout check:`, {
+          // Debug logging for stuck job detection
+          console.log(`🔍 Job ${getShortJobId(job.job_id)} (full: ${job.job_id}) stuck detection:`, {
             status: job.status,
             timestamp_submitted: job.timestamp_submitted,
             submittedTime: submittedTime.toISOString(),
@@ -132,37 +151,52 @@ export default function VideoFeed({ comfyUrl, config }: VideoFeedProps) {
             now: now.toISOString(),
             nowLocal: now.toLocaleString(),
             timeDiffMs: timeDiff,
-            timeDiffMinutes: Math.round(timeDiff / (1000 * 60)),
+            timeDiffMinutes,
             timeDiffHours: Math.round(timeDiff / (1000 * 60 * 60)),
-            staleThresholdMs,
-            staleThresholdHours: staleThresholdMs / (1000 * 60 * 60),
-            isStale: timeDiff > staleThresholdMs
+            maxJobAgeMs,
+            noProgressTimeoutMs
           })
           
-          if (timeDiff > staleThresholdMs) {
-            // Check if job is actively processing (has progress data or is connected to WebSocket)
-            const isActivelyProcessing = progress.total_nodes > 0 && progress.completed_nodes > 0
-            const isWebSocketConnected = progress.is_connected
+          // Check if job is actively processing (has progress data or is connected to WebSocket)
+          const isActivelyProcessing = progress.total_nodes > 0 && progress.completed_nodes > 0
+          const isWebSocketConnected = progress.is_connected
+          const hasRecentProgress = progress.completed_nodes > 0 && progress.total_nodes > 0
+          
+          // Smart stuck detection logic:
+          // 1. If job is older than 4 hours, it's definitely stuck
+          // 2. If job is older than 45 minutes AND not actively processing AND no WebSocket connection, it's likely stuck
+          // 3. If job is older than 45 minutes AND no recent progress, it's likely stuck
+          const isDefinitelyStuck = timeDiff > maxJobAgeMs
+          const isLikelyStuck = timeDiff > noProgressTimeoutMs && 
+                               !isActivelyProcessing && 
+                               !isWebSocketConnected && 
+                               !hasRecentProgress
+          
+          if (isDefinitelyStuck) {
+            console.log(`⏰ Job ${getShortJobId(job.job_id)} is definitely stuck (${timeDiffMinutes} minutes old, over 4 hours)`)
+            // Update stale job status in database (fire and forget)
+            completeJob({
+              job_id: job.job_id,
+              status: 'error',
+              error_message: 'Job exceeded maximum runtime (4 hours)'
+            }).catch(e => console.error('Failed to update stuck job:', e))
             
-            // Be more lenient - only mark as stale if it's really old AND not processing
-            if (isActivelyProcessing || isWebSocketConnected) {
-              console.log(`⏰ Job ${getShortJobId(job.job_id)} is old (${Math.round(timeDiff / (1000 * 60))} minutes) but actively processing, keeping alive`)
-            } else {
-              console.log(`⏰ Marking job ${getShortJobId(job.job_id)} as stale (${Math.round(timeDiff / (1000 * 60))} minutes old)`)
-              // Update stale job status in database (fire and forget)
-              completeJob({
-                job_id: job.job_id,
-                status: 'error',
-                error_message: 'Job timed out - likely cancelled or failed'
-              }).catch(e => console.error('Failed to update stale job:', e))
-              
-              // Return updated job for UI
-              return {
-                ...job,
-                status: 'error' as const,
-                error_message: 'Timed out'
-              }
+            return {
+              ...job,
+              status: 'error' as const,
+              error_message: 'Exceeded maximum runtime'
             }
+          } else if (isLikelyStuck) {
+            console.log(`⚠️ Job ${getShortJobId(job.job_id)} appears stuck (${timeDiffMinutes} minutes old, no progress/connection)`)
+            // Don't automatically mark as failed, but log for manual review
+            // The manual fix button will be available for these cases
+            return {
+              ...job,
+              status: job.status,
+              error_message: job.error_message || 'Appears stuck - use manual fix'
+            }
+          } else if (isActivelyProcessing || isWebSocketConnected) {
+            console.log(`✅ Job ${getShortJobId(job.job_id)} is actively processing (${timeDiffMinutes} minutes old)`)
           }
         }
         return job
@@ -205,11 +239,37 @@ export default function VideoFeed({ comfyUrl, config }: VideoFeedProps) {
         ? items.filter(item => item.status === 'completed' && item.result_url)
         : items
 
-      setFeedItems(filteredItems)
+      console.log(`📈 Processed ${filteredItems.length} items after filtering`)
+
+      // Update displayed items
+      
+      // Update displayed items based on current display count
+      const newDisplayCount = reset ? (config.maxItems || 10) : displayCount + (config.maxItems || 10)
+      setDisplayCount(newDisplayCount)
+      setDisplayedItems(filteredItems.slice(0, newDisplayCount))
+      
+      // Check if there are more items to show
+      setHasMore(newDisplayCount < filteredItems.length)
+
+      console.log(`📊 Display: ${newDisplayCount}/${filteredItems.length} items, hasMore=${newDisplayCount < filteredItems.length}`)
     } catch (error) {
       console.error('Error loading video feed:', error)
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred'
+      setError(errorMessage)
+      
+      // If this is a reset (initial load), show empty state
+      if (reset) {
+        setDisplayedItems([])
+      }
     } finally {
       setLoading(false)
+      setLoadingMore(false)
+    }
+  }
+
+  const loadMore = () => {
+    if (!loadingMore && hasMore) {
+      loadFeed(false)
     }
   }
 
@@ -221,10 +281,16 @@ export default function VideoFeed({ comfyUrl, config }: VideoFeedProps) {
     
     try {
       console.log('🔧 Manual fix requested for job:', job.job_id)
-      // You can implement fixStuckJob logic here if needed
+      const result = await fixStuckJob(job.job_id, comfyUrl)
       
-      // For now, just refresh the feed
-      await loadFeed()
+      if (result.success) {
+        console.log('✅ Job fixed successfully:', result.message)
+        // Refresh the feed to show updated status
+        await loadFeed()
+      } else {
+        console.error('❌ Failed to fix job:', result.error)
+        alert(`Failed to fix job: ${result.error}`)
+      }
     } catch (error) {
       console.error('💥 Error during manual job fix:', error)
       alert(`Error fixing job: ${error}`)
@@ -238,18 +304,18 @@ export default function VideoFeed({ comfyUrl, config }: VideoFeedProps) {
   }
 
   useEffect(() => {
-    loadFeed()
+    loadFeed(true) // Reset pagination when dependencies change
     
     // Refresh every 30 seconds
-    const interval = setInterval(loadFeed, 30000)
+    const interval = setInterval(() => loadFeed(true), 30000)
     return () => clearInterval(interval)
   }, [config.showCompletedOnly, config.maxItems, showFilteredOnly])
 
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-gray-900 mb-3 flex items-center gap-3">
+    <div className="h-full flex flex-col">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-bold text-gray-900 flex items-center gap-3">
           <div className="w-2 h-8 bg-gradient-to-b from-blue-500 to-purple-600 rounded-full"></div>
           Video Generation Feed
         </h2>
@@ -265,8 +331,16 @@ export default function VideoFeed({ comfyUrl, config }: VideoFeedProps) {
           >
             {showFilteredOnly ? 'Show Completed Only' : 'Show All'}
           </button>
+          {error && (
+            <div className="text-red-600 text-sm flex items-center">
+              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 19.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+              Connection issue
+            </div>
+          )}
           <button
-            onClick={loadFeed}
+            onClick={() => loadFeed(true)}
             disabled={loading}
             className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded-full border border-blue-300 hover:bg-blue-200 disabled:opacity-50"
           >
@@ -275,18 +349,37 @@ export default function VideoFeed({ comfyUrl, config }: VideoFeedProps) {
         </div>
       </div>
 
-      {loading && feedItems.length === 0 ? (
-        <div className="text-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="text-gray-500 mt-2">Loading videos...</p>
-        </div>
-      ) : feedItems.length === 0 ? (
-        <div className="text-center py-8">
-          <p className="text-gray-500">No videos found</p>
-        </div>
-      ) : (
-        <div className="space-y-4 flex-1 overflow-y-auto">
-          {feedItems.map((item) => {
+      <div className="flex-1 overflow-y-auto">
+        {error ? (
+          <div className="text-center py-8">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mx-4">
+              <div className="flex items-center justify-center mb-2">
+                <svg className="w-6 h-6 text-red-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 19.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+                <h3 className="text-red-800 font-medium">Connection Error</h3>
+              </div>
+              <p className="text-red-700 text-sm mb-3">{error}</p>
+              <button
+                onClick={() => loadFeed(true)}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
+              >
+                Try Again
+              </button>
+            </div>
+          </div>
+        ) : loading && displayedItems.length === 0 ? (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="text-gray-500 mt-2">Loading videos...</p>
+          </div>
+        ) : displayedItems.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-gray-500">No videos found</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+          {displayedItems.map((item) => {
             // Show compact view for failed/error items
             if (item.status === 'error' || (item.metadata as VideoJob).error_message === 'Timed out') {
               return (
@@ -431,8 +524,29 @@ export default function VideoFeed({ comfyUrl, config }: VideoFeedProps) {
               </div>
             )
           })}
-        </div>
-      )}
+          
+          {/* Load More Button */}
+          {hasMore && displayedItems.length > 0 && (
+            <div className="flex justify-center pt-4">
+              <button
+                onClick={loadMore}
+                disabled={loadingMore}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+              >
+                {loadingMore ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    Loading...
+                  </>
+                ) : (
+                  'Load More'
+                )}
+              </button>
+            </div>
+          )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

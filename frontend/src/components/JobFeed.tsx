@@ -28,53 +28,69 @@ export default function JobFeed({ comfyUrl }: JobFeedProps) {
         return;
       }
       
-      // Check for stale jobs and update their status
+      // Smart stuck job detection - focus on truly stuck jobs, not just time
       const now = new Date();
-              const staleThresholdMs = 6 * 60 * 60 * 1000; // 6 hours (very lenient for video generation)
+      const maxJobAgeMs = 4 * 60 * 60 * 1000; // 4 hours maximum (very generous for video generation)
+      const noProgressTimeoutMs = 45 * 60 * 1000; // 45 minutes without progress = likely stuck
       
       const processedJobs = jobs.map(job => {
-        // Check if job is stale (processing/submitted for more than 2 hours)
+        // Only check jobs that are in processing/submitted state
         if ((job.status === 'processing' || job.status === 'submitted')) {
-          // Handle timestamp parsing - the timestamp is already in ISO format
           const submittedTime = new Date(job.timestamp_submitted);
           const timeDiff = now.getTime() - submittedTime.getTime();
+          const timeDiffMinutes = Math.round(timeDiff / (1000 * 60));
           
-          // Debug logging for timeout detection
-          console.log(`🔍 JobFeed - Job ${getShortJobId(job.job_id)} (full: ${job.job_id}) timeout check:`, {
+          // Debug logging for stuck job detection
+          console.log(`🔍 JobFeed - Job ${getShortJobId(job.job_id)} (full: ${job.job_id}) stuck detection:`, {
             status: job.status,
             timestamp_submitted: job.timestamp_submitted,
             submittedTime: submittedTime.toISOString(),
             now: now.toISOString(),
             timeDiffMs: timeDiff,
-            timeDiffMinutes: Math.round(timeDiff / (1000 * 60)),
-            staleThresholdMs,
-            isStale: timeDiff > staleThresholdMs
+            timeDiffMinutes,
+            timeDiffHours: Math.round(timeDiff / (1000 * 60 * 60)),
+            maxJobAgeMs,
+            noProgressTimeoutMs
           })
           
-          if (timeDiff > staleThresholdMs) {
-            // Check if job is actively processing (has progress data or is connected to WebSocket)
-            const isActivelyProcessing = progress.total_nodes > 0 && progress.completed_nodes > 0
-            const isWebSocketConnected = progress.is_connected
+          // Check if job is actively processing (has progress data or is connected to WebSocket)
+          const isActivelyProcessing = progress.total_nodes > 0 && progress.completed_nodes > 0
+          const isWebSocketConnected = progress.is_connected
+          const hasRecentProgress = progress.completed_nodes > 0 && progress.total_nodes > 0
+          
+          // Smart stuck detection logic:
+          // 1. If job is older than 4 hours, it's definitely stuck
+          // 2. If job is older than 45 minutes AND not actively processing AND no WebSocket connection, it's likely stuck
+          const isDefinitelyStuck = timeDiff > maxJobAgeMs
+          const isLikelyStuck = timeDiff > noProgressTimeoutMs && 
+                               !isActivelyProcessing && 
+                               !isWebSocketConnected && 
+                               !hasRecentProgress
+          
+          if (isDefinitelyStuck) {
+            console.log(`⏰ JobFeed - Job ${getShortJobId(job.job_id)} is definitely stuck (${timeDiffMinutes} minutes old, over 4 hours)`)
+            // Update stale job status in database (fire and forget)
+            completeJob({
+              job_id: job.job_id,
+              status: 'error',
+              error_message: 'Job exceeded maximum runtime (4 hours)'
+            }).catch(e => console.error('Failed to update stuck job:', e));
             
-            // Be more lenient - only mark as stale if it's really old AND not processing
-            if (isActivelyProcessing || isWebSocketConnected) {
-              console.log(`⏰ JobFeed - Job ${getShortJobId(job.job_id)} is old (${Math.round(timeDiff / (1000 * 60))} minutes) but actively processing, keeping alive`)
-            } else {
-              console.log(`⏰ JobFeed - Marking job ${getShortJobId(job.job_id)} as stale (${Math.round(timeDiff / (1000 * 60))} minutes old)`)
-              // Update stale job status in database (fire and forget)
-              completeJob({
-                job_id: job.job_id,
-                status: 'error',
-                error_message: 'Job timed out - likely cancelled or failed'
-              }).catch(e => console.error('Failed to update stale job:', e));
-              
-              // Return updated job for UI
-              return {
-                ...job,
-                status: 'error' as const,
-                error_message: 'Timed out'
-              };
-            }
+            return {
+              ...job,
+              status: 'error' as const,
+              error_message: 'Exceeded maximum runtime'
+            };
+          } else if (isLikelyStuck) {
+            console.log(`⚠️ JobFeed - Job ${getShortJobId(job.job_id)} appears stuck (${timeDiffMinutes} minutes old, no progress/connection)`)
+            // Don't automatically mark as failed, but log for manual review
+            return {
+              ...job,
+              status: job.status,
+              error_message: job.error_message || 'Appears stuck - use manual fix'
+            };
+          } else if (isActivelyProcessing || isWebSocketConnected) {
+            console.log(`✅ JobFeed - Job ${getShortJobId(job.job_id)} is actively processing (${timeDiffMinutes} minutes old)`)
           }
         }
         return job;

@@ -80,17 +80,29 @@ interface ImageFeedProps {
 export default function ImageFeed({ config }: ImageFeedProps) {
   const [feedItems, setFeedItems] = useState<ImageItem[]>([])
   const [loading, setLoading] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [showFilteredOnly, setShowFilteredOnly] = useState(false) // Toggle between "Show All" and "Show Mine"
   const [selectedImage, setSelectedImage] = useState<ImageItem | null>(null)
+  const [currentOffset, setCurrentOffset] = useState(0)
+  const [hasMore, setHasMore] = useState(true)
   
-  const loadFeed = async () => {
-    setLoading(true)
+  const loadFeed = async (reset = true) => {
+    if (reset) {
+      setLoading(true)
+      setCurrentOffset(0)
+      setHasMore(true)
+    } else {
+      setLoadingMore(true)
+    }
+    
     try {
       const items: ImageItem[] = []
+      const offset = reset ? 0 : currentOffset
+      const limit = config.maxItems || 10
 
       // Load edited images
       try {
-        const response = await apiClient.getRecentEditedImages(config.maxItems || 10, 0, config.showCompletedOnly || false) as EditedImagesResponse
+        const response = await apiClient.getRecentEditedImages(limit, offset, config.showCompletedOnly || false) as EditedImagesResponse
         
         if (response.success && response.edited_images) {
           for (const image of response.edited_images) {
@@ -118,7 +130,7 @@ export default function ImageFeed({ config }: ImageFeedProps) {
 
       // Load style transfers (always load both types for unified feed)
       try {
-        const styleResponse = await apiClient.getRecentStyleTransfers(config.maxItems || 10, 0, config.showCompletedOnly || false) as StyleTransfersResponse
+        const styleResponse = await apiClient.getRecentStyleTransfers(limit, offset, config.showCompletedOnly || false) as StyleTransfersResponse
         
         if (styleResponse.success && styleResponse.style_transfers) {
           for (const transfer of styleResponse.style_transfers) {
@@ -152,11 +164,27 @@ export default function ImageFeed({ config }: ImageFeedProps) {
         ? items.filter(item => item.status === 'completed' && item.result_url)
         : items
 
-      setFeedItems(filteredItems)
+      if (reset) {
+        setFeedItems(filteredItems)
+      } else {
+        setFeedItems(prev => [...prev, ...filteredItems])
+      }
+      
+      // Update pagination state
+      setCurrentOffset(offset + limit)
+      setHasMore(filteredItems.length === limit)
+      
     } catch (error) {
       console.error('Error loading image feed:', error)
     } finally {
       setLoading(false)
+      setLoadingMore(false)
+    }
+  }
+
+  const loadMore = () => {
+    if (!loadingMore && hasMore) {
+      loadFeed(false)
     }
   }
 
@@ -164,7 +192,7 @@ export default function ImageFeed({ config }: ImageFeedProps) {
     loadFeed()
     
     // Refresh every 30 seconds
-    const interval = setInterval(loadFeed, 30000)
+    const interval = setInterval(() => loadFeed(), 30000)
     return () => clearInterval(interval)
   }, [config.showCompletedOnly, config.maxItems, showFilteredOnly])
 
@@ -189,33 +217,39 @@ export default function ImageFeed({ config }: ImageFeedProps) {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-gray-900 mb-3 flex items-center gap-3">
-          <div className="w-2 h-8 bg-gradient-to-b from-purple-500 to-pink-600 rounded-full"></div>
-          Image Generation Feed
-        </h2>
-        
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowFilteredOnly(!showFilteredOnly)}
-            className={`px-3 py-1 text-sm rounded-full transition-colors ${
-              showFilteredOnly 
-                ? 'bg-purple-100 text-purple-700 border border-purple-300' 
-                : 'bg-gray-100 text-gray-700 border border-gray-300'
-            }`}
-          >
-            {showFilteredOnly ? 'Show Completed Only' : 'Show All'}
-          </button>
-          <button
-            onClick={loadFeed}
-            disabled={loading}
-            className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded-full border border-blue-300 hover:bg-blue-200 disabled:opacity-50"
-          >
-            {loading ? 'Refreshing...' : 'Refresh'}
-          </button>
+    <div className="h-full flex flex-col">
+      {/* Header - Fixed */}
+      <div className="flex-shrink-0 p-4 border-b border-gray-200">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-bold text-gray-900 flex items-center gap-3">
+            <div className="w-2 h-8 bg-gradient-to-b from-purple-500 to-pink-600 rounded-full"></div>
+            Image Generation Feed
+          </h2>
+          
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowFilteredOnly(!showFilteredOnly)}
+              className={`px-3 py-1 text-sm rounded-full transition-colors ${
+                showFilteredOnly 
+                  ? 'bg-purple-100 text-purple-700 border border-purple-300' 
+                  : 'bg-gray-100 text-gray-700 border border-gray-300'
+              }`}
+            >
+              {showFilteredOnly ? 'Show Completed Only' : 'Show All'}
+            </button>
+            <button
+              onClick={() => loadFeed()}
+              disabled={loading}
+              className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded-full border border-blue-300 hover:bg-blue-200 disabled:opacity-50"
+            >
+              {loading ? 'Refreshing...' : 'Refresh'}
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Scrollable Content */}
+      <div className="flex-1 overflow-y-auto p-4">
 
       {loading && feedItems.length === 0 ? (
         <div className="text-center py-8">
@@ -318,6 +352,30 @@ export default function ImageFeed({ config }: ImageFeedProps) {
           })}
         </div>
       )}
+
+        {/* Load More Button */}
+        {!loading && feedItems.length > 0 && hasMore && (
+          <div className="flex justify-center pt-4">
+            <button
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-medium rounded-xl hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center gap-2"
+            >
+              {loadingMore ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  Loading...
+                </>
+              ) : (
+                <>
+                  <span>📸</span>
+                  Load More
+                </>
+              )}
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* Image Modal */}
       {selectedImage && (

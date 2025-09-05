@@ -7,22 +7,61 @@ class ApiClient {
     this.baseURL = config.apiBaseUrl
   }
 
-  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  private async request<T>(endpoint: string, options: RequestInit = {}, retries: number = 3): Promise<T> {
     const url = `${this.baseURL}${endpoint}`
     
-    const response = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-      ...options,
-    })
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        // Add timeout to prevent hanging requests
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
+        
+        const response = await fetch(url, {
+          headers: {
+            'Content-Type': 'application/json',
+            ...options.headers,
+          },
+          signal: controller.signal,
+          ...options,
+        })
 
-    if (!response.ok) {
-      throw new Error(`API request failed: ${response.status} ${response.statusText}`)
+        clearTimeout(timeoutId)
+
+        if (!response.ok) {
+          // Don't retry on client errors (4xx), only on server errors (5xx) and network issues
+          if (response.status >= 400 && response.status < 500) {
+            throw new Error(`API request failed: ${response.status} ${response.statusText}`)
+          }
+          throw new Error(`API request failed: ${response.status} ${response.statusText}`)
+        }
+
+        return response.json()
+      } catch (error) {
+        console.warn(`API request attempt ${attempt}/${retries} failed:`, error)
+        
+        // If this is the last attempt, throw the error
+        if (attempt === retries) {
+          // Provide more user-friendly error messages
+          if (error instanceof Error) {
+            if (error.name === 'AbortError') {
+              throw new Error('Request timed out. Please check your connection and try again.')
+            }
+            if (error.message.includes('Resource temporarily unavailable') || 
+                error.message.includes('ECONNREFUSED') ||
+                error.message.includes('ENOTFOUND')) {
+              throw new Error('Unable to connect to the server. Please check your connection and try again.')
+            }
+          }
+          throw error
+        }
+        
+        // Wait before retrying (exponential backoff)
+        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000)
+        await new Promise(resolve => setTimeout(resolve, delay))
+      }
     }
-
-    return response.json()
+    
+    throw new Error('All retry attempts failed')
   }
 
   // Job endpoints
@@ -46,16 +85,16 @@ class ApiClient {
     })
   }
 
-  async getRecentJobs(limit: number = 50) {
-    return this.request(`/jobs/recent?limit=${limit}`)
+  async getRecentJobs(limit: number = 50, offset: number = 0) {
+    return this.request(`/jobs/recent?limit=${limit}&offset=${offset}`)
   }
 
   async getJob(jobId: string) {
     return this.request(`/jobs/${jobId}`)
   }
 
-  async getCompletedJobsWithVideos(limit: number = 20) {
-    return this.request(`/jobs/completed/with-videos?limit=${limit}`)
+  async getCompletedJobsWithVideos(limit: number = 20, offset: number = 0) {
+    return this.request(`/jobs/completed/with-videos?limit=${limit}&offset=${offset}`)
   }
 
   // Storage endpoints
