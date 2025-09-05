@@ -7,11 +7,12 @@ import ImageEdit from "./ImageEdit";
 import GenerationFeed from "./GenerationFeed";
 import CharacterCaption from "./CharacterCaption";
 import WANI2V from "./WANI2V";
+import StyleTransfer from "./StyleTransfer";
 import ComfyUIStatus from "./components/ComfyUIStatus";
 import ConsoleToggle from "./components/ConsoleToggle";
 
 export default function App() {
-  const [currentPage, setCurrentPage] = useState<"home" | "multitalk-one" | "multitalk-multiple" | "video-lipsync" | "image-edit" | "generation-feed" | "character-caption" | "wan-i2v">("home");
+  const [currentPage, setCurrentPage] = useState<"home" | "multitalk-one" | "multitalk-multiple" | "video-lipsync" | "image-edit" | "generation-feed" | "character-caption" | "wan-i2v" | "style-transfer">("home");
   const [comfyUrl, setComfyUrl] = useState<string>("https://comfy.vapai.studio");
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
 
@@ -20,7 +21,7 @@ export default function App() {
     const savedPage = localStorage.getItem('vapai-current-page') as typeof currentPage;
     const savedComfyUrl = localStorage.getItem('vapai-comfy-url');
     
-    if (savedPage && ['home', 'multitalk-one', 'multitalk-multiple', 'video-lipsync', 'image-edit', 'generation-feed', 'character-caption', 'wan-i2v'].includes(savedPage)) {
+    if (savedPage && ['home', 'multitalk-one', 'multitalk-multiple', 'video-lipsync', 'image-edit', 'generation-feed', 'character-caption', 'wan-i2v', 'style-transfer'].includes(savedPage)) {
       setCurrentPage(savedPage);
     }
     
@@ -194,6 +195,17 @@ export default function App() {
                 <span className="text-lg">🎬</span>
                 <span className="font-medium">WAN I2V</span>
               </button>
+              <button
+                onClick={() => handlePageChange("style-transfer")}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
+                  currentPage === "style-transfer"
+                    ? "bg-gradient-to-r from-orange-500 to-red-600 text-white shadow-lg"
+                    : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                }`}
+              >
+                <span className="text-lg">🎨</span>
+                <span className="font-medium">Style Transfer</span>
+              </button>
               
               {/* External Tools Section */}
               <div className="mt-6 pt-4 border-t border-gray-200/50">
@@ -268,6 +280,9 @@ export default function App() {
           )}
           {currentPage === "wan-i2v" && (
             <WANI2V comfyUrl={comfyUrl} />
+          )}
+          {currentPage === "style-transfer" && (
+            <StyleTransfer comfyUrl={comfyUrl} />
           )}
         </main>
       </div>

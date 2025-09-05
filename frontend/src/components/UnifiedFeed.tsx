@@ -314,7 +314,7 @@ export default function UnifiedFeed({ comfyUrl, config }: UnifiedFeedProps) {
       <div className="mb-6">
         <h2 className="text-xl font-bold text-gray-900 mb-3 flex items-center gap-3">
           <div className="w-2 h-8 bg-gradient-to-b from-purple-500 to-pink-600 rounded-full"></div>
-          {config.title} Feed Unificado
+          {config.title} 
         </h2>
         
         {/* Filter Toggle - only show if pageContext is provided */}

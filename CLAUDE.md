@@ -424,6 +424,38 @@ if (savedPage && ['home', 'multitalk-one', /* existing pages */, 'your-feature']
 }
 ```
 
+### Step 4: Add to Homepage (REQUIRED)
+
+Update `frontend/src/Homepage.tsx` to include your new feature:
+
+1. **Update the Props interface**:
+```tsx
+interface Props {
+  onNavigate: (page: "multitalk-one" | "multitalk-multiple" | /* existing pages */ | "your-feature") => void;
+}
+```
+
+2. **Add your app to the apps array**:
+```tsx
+const apps = [
+  // ... existing apps
+  {
+    id: "your-feature" as const,
+    title: "Your Feature Name",
+    description: "Brief description of what your feature does and its benefits.",
+    icon: "🎯", // Choose an appropriate emoji
+    gradient: "from-orange-500 to-red-600", // Choose unique gradient colors
+    features: ["Key feature 1", "Key feature 2", "Model: Your AI Model"]
+  }
+];
+```
+
+This ensures your feature appears on the homepage grid with:
+- **Clickable card** that navigates to your feature
+- **Consistent styling** with gradient and hover effects
+- **Feature descriptions** to help users understand functionality
+- **Model information** showing which AI models are used
+
 ## Frontend Integration
 
 ### Required Imports and Dependencies
@@ -1039,6 +1071,7 @@ Before considering your feature complete:
 - [ ] Handles file uploads properly (if applicable)
 - [ ] Uses useSmartResolution for video/image dimensions (if applicable)
 - [ ] Implements proper cleanup on unmount
+- [ ] Added to Homepage.tsx with proper app entry
 
 ### ✅ Backend Requirements (if needed)
 - [ ] Creates appropriate API endpoints
@@ -1060,6 +1093,8 @@ Before considering your feature complete:
 - [ ] Adds navigation button to sidebar
 - [ ] Adds route to main content area
 - [ ] Updates localStorage validation array
+- [ ] Adds app entry to Homepage.tsx apps array
+- [ ] Updates Homepage.tsx Props interface
 
 ### ✅ Job Tracking
 - [ ] Sets correct workflow_type for filtering

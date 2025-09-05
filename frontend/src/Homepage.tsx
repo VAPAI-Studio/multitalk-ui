@@ -1,6 +1,6 @@
 
 interface Props {
-  onNavigate: (page: "multitalk-one" | "multitalk-multiple" | "video-lipsync" | "image-edit" | "character-caption" | "wan-i2v") => void;
+  onNavigate: (page: "multitalk-one" | "multitalk-multiple" | "video-lipsync" | "image-edit" | "character-caption" | "wan-i2v" | "style-transfer") => void;
 }
 
 export default function Homepage({ onNavigate }: Props) {
@@ -52,6 +52,14 @@ export default function Homepage({ onNavigate }: Props) {
       icon: "🎬",
       gradient: "from-purple-600 to-pink-600",
       features: ["Image to video generation", "Custom prompts", "Model: WAN I2V"]
+    },
+    {
+      id: "style-transfer" as const,
+      title: "Style Transfer",
+      description: "Transfer artistic styles between images using AI. Combine subject and style reference images to create unique artistic combinations.",
+      icon: "🎨",
+      gradient: "from-orange-500 to-red-600",
+      features: ["Dual image input", "Artistic style transfer", "Model: Flux with USO Style Reference"]
     }
   ];
 

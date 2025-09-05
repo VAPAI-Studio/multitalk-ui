@@ -286,8 +286,7 @@ export default function MultiTalkOnePerson({ comfyUrl }: Props) {
         audio_filename: audioFilename,
         width,
         height,
-        trim_to_audio: trimToAudio,
-        workflow_type: 'lipsync-one'
+        trim_to_audio: trimToAudio
       });
 
       // Update job to processing status
@@ -309,18 +308,7 @@ export default function MultiTalkOnePerson({ comfyUrl }: Props) {
               ? `${comfyUrl}/view?filename=${encodeURIComponent(videoInfo.filename)}&subfolder=${encodeURIComponent(videoInfo.subfolder)}&type=${videoInfo.type || 'output'}`
               : `${comfyUrl}/view?filename=${encodeURIComponent(videoInfo.filename)}&type=${videoInfo.type || 'output'}`;
             setVideoUrl(fallbackUrl);
-            
-            // Complete job in Supabase
-            await completeJob({
-              job_id: id,
-              status: 'completed',
-              filename: videoInfo.filename,
-              subfolder: videoInfo.subfolder,
-              video_url: videoStorageUrl || undefined
-            });
-
-            // Feed will refresh automatically via JobFeed component
-            
+                        
             setStatus("Listo ✅");
             setIsSubmitting(false);
             
