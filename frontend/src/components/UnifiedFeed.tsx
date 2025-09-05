@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { apiClient } from '../lib/apiClient'
 import { getCompletedJobsWithVideos, getRecentJobs, completeJob } from '../lib/jobTracking'
 import { fixStuckJob } from '../lib/fixStuckJob'
+import { useComfyUIProgress } from '../hooks/useComfyUIProgress'
 import type { MultiTalkJob } from '../lib/supabase'
 
 // Define interfaces
@@ -31,6 +32,7 @@ interface VideoJob extends MultiTalkJob {
     total_nodes: number
     current_node?: string
   }
+  workflow_type?: string
 }
 
 // Unified feed item interface
@@ -59,6 +61,7 @@ export interface FeedConfig {
   maxItems?: number
   showFixButton?: boolean
   showProgress?: boolean
+  pageContext?: string // Identifies which page/tool this feed is on (e.g., 'lipsync-one', 'lipsync-multi', 'videolipsync', 'wani2v')
 }
 
 interface UnifiedFeedProps {
@@ -115,6 +118,13 @@ export default function UnifiedFeed({ comfyUrl, config }: UnifiedFeedProps) {
   const [feedItems, setFeedItems] = useState<FeedItem[]>([])
   const [loading, setLoading] = useState(false)
   const [fixingJobs, setFixingJobs] = useState<Set<string>>(new Set())
+  const [showFilteredOnly, setShowFilteredOnly] = useState(false) // Toggle between "Show All" and "Show Mine"
+  
+  // Use ComfyUI progress tracking
+  const { progress } = useComfyUIProgress(comfyUrl, true)
+  
+  // Helper function to get short job ID consistently
+  const getShortJobId = (jobId: string) => jobId.slice(-8)
 
   const loadFeed = async () => {
     setLoading(true)
@@ -130,27 +140,54 @@ export default function UnifiedFeed({ comfyUrl, config }: UnifiedFeedProps) {
         if (!videoError && jobs) {
           // Check for stale jobs and update their status
           const now = new Date()
-          const staleThresholdMs = 30 * 60 * 1000 // 30 minutes
+          const staleThresholdMs = 6 * 60 * 60 * 1000 // 6 hours (very lenient for video generation)
           
           const processedJobs = jobs.map(job => {
-            // Check if job is stale (processing/submitted for more than 30 minutes)
+            // Check if job is stale (processing/submitted for more than 2 hours)
             if ((job.status === 'processing' || job.status === 'submitted')) {
+              // Handle timestamp parsing - the timestamp is already in ISO format
               const submittedTime = new Date(job.timestamp_submitted)
               const timeDiff = now.getTime() - submittedTime.getTime()
               
+              // Debug logging for timeout detection
+              console.log(`🔍 Job ${getShortJobId(job.job_id)} (full: ${job.job_id}) timeout check:`, {
+                status: job.status,
+                timestamp_submitted: job.timestamp_submitted,
+                submittedTime: submittedTime.toISOString(),
+                submittedTimeLocal: submittedTime.toLocaleString(),
+                now: now.toISOString(),
+                nowLocal: now.toLocaleString(),
+                timeDiffMs: timeDiff,
+                timeDiffMinutes: Math.round(timeDiff / (1000 * 60)),
+                timeDiffHours: Math.round(timeDiff / (1000 * 60 * 60)),
+                staleThresholdMs,
+                staleThresholdHours: staleThresholdMs / (1000 * 60 * 60),
+                isStale: timeDiff > staleThresholdMs
+              })
+              
               if (timeDiff > staleThresholdMs) {
-                // Update stale job status in database (fire and forget)
-                completeJob({
-                  job_id: job.job_id,
-                  status: 'error',
-                  error_message: 'Job timed out - likely cancelled or failed'
-                }).catch(e => console.error('Failed to update stale job:', e))
+                // Check if job is actively processing (has progress data or is connected to WebSocket)
+                const isActivelyProcessing = progress.total_nodes > 0 && progress.completed_nodes > 0
+                const isWebSocketConnected = progress.is_connected
                 
-                // Return updated job for UI
-                return {
-                  ...job,
-                  status: 'error' as const,
-                  error_message: 'Timed out'
+                // Be more lenient - only mark as stale if it's really old AND not processing
+                if (isActivelyProcessing || isWebSocketConnected) {
+                  console.log(`⏰ Job ${getShortJobId(job.job_id)} is old (${Math.round(timeDiff / (1000 * 60))} minutes) but actively processing, keeping alive`)
+                } else {
+                  console.log(`⏰ Marking job ${getShortJobId(job.job_id)} as stale (${Math.round(timeDiff / (1000 * 60))} minutes old)`)
+                  // Update stale job status in database (fire and forget)
+                  completeJob({
+                    job_id: job.job_id,
+                    status: 'error',
+                    error_message: 'Job timed out - likely cancelled or failed'
+                  }).catch(e => console.error('Failed to update stale job:', e))
+                  
+                  // Return updated job for UI
+                  return {
+                    ...job,
+                    status: 'error' as const,
+                    error_message: 'Timed out'
+                  }
                 }
               }
             }
@@ -160,13 +197,12 @@ export default function UnifiedFeed({ comfyUrl, config }: UnifiedFeedProps) {
           for (const video of processedJobs) {
             let videoUrl: string | undefined = undefined
             
-            // Prefer Supabase URL
-            if (video.video_url) {
+            // Always prefer Supabase URL if it exists and is not empty
+            if (video.video_url && video.video_url.trim() !== '') {
               videoUrl = video.video_url
             }
-            
-            // Fallback to ComfyUI URL if no Supabase URL
-            if (!videoUrl && video.filename && video.comfy_url) {
+            // Only use ComfyUI URL as fallback if no valid Supabase URL exists
+            else if (video.filename && video.comfy_url) {
               videoUrl = `${video.comfy_url.replace(/\/$/, '')}/api/view?filename=${encodeURIComponent(video.filename)}&subfolder=${encodeURIComponent(video.subfolder || '')}&type=temp`
             }
             
@@ -216,7 +252,20 @@ export default function UnifiedFeed({ comfyUrl, config }: UnifiedFeedProps) {
       // Sort by creation date (newest first)
       items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
       
-      setFeedItems(items.slice(0, config.maxItems || 10))
+      // Apply filtering if needed
+      let filteredItems = items
+      if (showFilteredOnly && config.pageContext) {
+        filteredItems = items.filter(item => {
+          if (item.type === 'video') {
+            const videoJob = item.metadata as VideoJob
+            return videoJob.workflow_type === config.pageContext
+          }
+          // For images, we might need to add workflow_type later, for now show all images
+          return item.type === 'image'
+        })
+      }
+      
+      setFeedItems(filteredItems.slice(0, config.maxItems || 10))
     } catch (error) {
       console.error('Error loading feed:', error)
     } finally {
@@ -258,14 +307,35 @@ export default function UnifiedFeed({ comfyUrl, config }: UnifiedFeedProps) {
     loadFeed()
     const interval = setInterval(loadFeed, 3000) // Refresh every 3 seconds
     return () => clearInterval(interval)
-  }, [config])
+  }, [config, showFilteredOnly]) // Also reload when filter changes
 
   return (
     <div className="rounded-3xl border border-gray-200/80 p-6 shadow-lg bg-gradient-to-br from-white to-gray-50/50 backdrop-blur-sm h-full flex flex-col">
-      <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-3">
-        <div className="w-2 h-8 bg-gradient-to-b from-purple-500 to-pink-600 rounded-full"></div>
-        {config.title}
-      </h2>
+      <div className="mb-6">
+        <h2 className="text-xl font-bold text-gray-900 mb-3 flex items-center gap-3">
+          <div className="w-2 h-8 bg-gradient-to-b from-purple-500 to-pink-600 rounded-full"></div>
+          {config.title} Feed Unificado
+        </h2>
+        
+        {/* Filter Toggle - only show if pageContext is provided */}
+        {config.pageContext && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowFilteredOnly(!showFilteredOnly)}
+              className={`px-3 py-1 text-xs rounded-full border transition-colors ${
+                showFilteredOnly 
+                  ? 'bg-purple-100 text-purple-700 border-purple-200' 
+                  : 'bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200'
+              }`}
+            >
+              {showFilteredOnly ? '🔍 Show Mine' : '🌍 Show All'}
+            </button>
+            <span className="text-xs text-gray-500">
+              {showFilteredOnly ? `Filtered to ${config.title} results` : 'Showing all results'}
+            </span>
+          </div>
+        )}
+      </div>
       
       {loading && feedItems.length === 0 ? (
         <div className="text-center py-8">
@@ -314,14 +384,16 @@ export default function UnifiedFeed({ comfyUrl, config }: UnifiedFeedProps) {
                           const target = e.target as HTMLVideoElement
                           const videoData = item.metadata as VideoJob
                           
-                          // Try ComfyUI fallback if we started with Supabase
+                          // Only try ComfyUI fallback if we started with Supabase and have ComfyUI data
                           if (item.result_url?.includes('supabase.co') && videoData.filename && videoData.comfy_url) {
                             const fallbackUrl = `${videoData.comfy_url.replace(/\/$/, '')}/api/view?filename=${encodeURIComponent(videoData.filename)}&subfolder=${encodeURIComponent(videoData.subfolder || '')}&type=temp`
+                            console.log('Video load failed, trying ComfyUI fallback:', fallbackUrl)
                             target.src = fallbackUrl
                             return
                           }
                           
                           // If all URLs fail, show fallback UI
+                          console.error('All video URLs failed for job:', item.id)
                           target.style.display = 'none'
                           const fallbackDiv = target.nextElementSibling as HTMLElement
                           if (fallbackDiv) fallbackDiv.style.display = 'block'
@@ -332,18 +404,50 @@ export default function UnifiedFeed({ comfyUrl, config }: UnifiedFeedProps) {
                         <div className="flex items-center gap-3">
                           <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full"></div>
                           <div className="text-blue-600 text-sm">
-                            {config.showProgress && item.progress ? (
-                              <div>
-                                <div>Processing... {item.progress.completed_nodes}/{item.progress.total_nodes} nodes</div>
-                                {item.progress.current_node && (
-                                  <div className="text-xs text-blue-500">Current: {item.progress.current_node}</div>
+                            {config.showProgress && progress.total_nodes > 0 ? (
+                              <div className="w-full">
+                                <div className="flex justify-between items-center mb-1">
+                                  <span className="text-sm font-medium">Processing...</span>
+                                  <span className="text-xs text-blue-600">
+                                    {progress.detailed_progress ? 
+                                      `${progress.detailed_progress.progress_percentage}%` : 
+                                      `${progress.completed_nodes}/${progress.total_nodes}`
+                                    }
+                                  </span>
+                                </div>
+                                <div className="w-full bg-blue-200 rounded-full h-2 mb-1">
+                                  <div 
+                                    className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
+                                    style={{ 
+                                      width: `${progress.detailed_progress ? 
+                                        progress.detailed_progress.progress_percentage : 
+                                        (progress.completed_nodes / progress.total_nodes) * 100
+                                      }%` 
+                                    }}
+                                  ></div>
+                                </div>
+                                {progress.current_node && (
+                                  <div className="text-xs text-blue-500 truncate">Current: {progress.current_node}</div>
+                                )}
+                                {progress.workflow_info && (
+                                  <div className="text-xs text-blue-400">
+                                    {progress.workflow_info.workflow_type}: {progress.completed_nodes}/{progress.workflow_info.expected_total_nodes} nodes
+                                  </div>
+                                )}
+                                {progress.detailed_progress && (
+                                  <div className="text-xs text-blue-400">
+                                    Steps: {progress.detailed_progress.total_progress}/{progress.detailed_progress.max_progress}
+                                  </div>
+                                )}
+                                {progress.queue_remaining > 0 && (
+                                  <div className="text-xs text-blue-400">Queue: {progress.queue_remaining} remaining</div>
                                 )}
                               </div>
                             ) : (
                               'Processing...'
                             )}
                           </div>
-                          {(item.status === 'processing' && comfyUrl && config.showFixButton) && (
+                          {(item.status === 'processing' && comfyUrl && config.showFixButton && !(progress.total_nodes > 0 && progress.completed_nodes > 0)) && (
                             <button
                               onClick={() => handleFixStuckJob(item.metadata as VideoJob)}
                               disabled={fixingJobs.has(item.id)}

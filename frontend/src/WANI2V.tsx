@@ -416,11 +416,12 @@ export default function WANI2V({ comfyUrl }: Props) {
               comfyUrl={comfyUrl} 
               config={{
                 type: 'video',
-                title: 'Generation Feed',
+                title: 'WAN I2V',
                 showCompletedOnly: false,
                 maxItems: 10,
                 showFixButton: true,
-                showProgress: true
+                showProgress: true,
+                pageContext: 'wani2v'
               }}
             />
           </div>

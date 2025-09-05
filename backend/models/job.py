@@ -19,6 +19,7 @@ class MultiTalkJob(BaseModel):
     comfy_url: str = Field(..., description="ComfyUI server URL")
     error_message: Optional[str] = Field(None, description="Error message if job failed")
     video_url: Optional[str] = Field(None, description="Supabase Storage URL for video")
+    # workflow_type removed - not in database schema
     created_at: Optional[datetime] = Field(None, description="Database creation timestamp")
     updated_at: Optional[datetime] = Field(None, description="Database update timestamp")
 
@@ -35,6 +36,7 @@ class CreateJobPayload(BaseModel):
     width: int
     height: int
     trim_to_audio: bool
+    # workflow_type removed - not in database schema
 
 class CompleteJobPayload(BaseModel):
     job_id: str
@@ -43,6 +45,8 @@ class CompleteJobPayload(BaseModel):
     subfolder: Optional[str] = None
     error_message: Optional[str] = None
     video_url: Optional[str] = None
+    comfy_url: Optional[str] = None  # Add comfy_url to avoid database lookup
+    video_type: Optional[str] = None  # Add video_type to use correct ComfyUI type
 
 class JobResponse(BaseModel):
     success: bool

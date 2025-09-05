@@ -1,12 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createJob, updateJobToProcessing, completeJob } from "./lib/jobTracking";
-import { downloadVideoFromComfy, uploadVideoToStorage } from "./lib/supabase";
+import { downloadVideoFromComfy } from "./lib/supabase";
 import { Label, Field, Section } from "./components/UI";
 import { Button, Badge } from "./components/DesignSystem";
 import { Timeline } from "./components/Timeline";
 import type { Mask, AudioTrack } from "./components/types";
 import { fileToBase64, uploadMediaToComfy, joinAudiosForMask, groupAudiosByMask, generateId, startJobMonitoring, checkComfyUIHealth } from "./components/utils";
-import JobFeed from "./components/JobFeed";
+import UnifiedFeed from "./components/UnifiedFeed";
 import { useSmartResolution } from "./hooks/useSmartResolution";
 import { MaskEditor } from "./components/MaskEditor";
 
@@ -493,40 +493,12 @@ export default function MultiTalkMultiplePeople({ comfyUrl }: Props) {
             setStatus(message || 'Procesando en ComfyUI…')
           } else if (jobStatus === 'completed' && videoInfo) {
             // Handle successful completion
-            setStatus('Subiendo video a Supabase Storage…')
-            let videoStorageUrl: string | null = null
-            try {
-              const videoBlob = await downloadVideoFromComfy(comfyUrl, videoInfo.filename, videoInfo.subfolder)
-              if (videoBlob) {
-                videoStorageUrl = await uploadVideoToStorage(videoBlob, videoInfo.filename)
-                if (videoStorageUrl) {
-                  console.log('Video uploaded to Supabase Storage:', videoStorageUrl)
-                  // Set video URL from Supabase
-                  setVideoUrl(videoStorageUrl)
-                } else {
-                  console.warn('Upload to Supabase succeeded but no URL returned')
-                  // Fallback to ComfyUI URL if no Supabase URL
-                  const fallbackUrl = videoInfo.subfolder
-                    ? `${comfyUrl.replace(/\/$/, '')}/view?filename=${encodeURIComponent(videoInfo.filename)}&subfolder=${encodeURIComponent(videoInfo.subfolder)}&type=output`
-                    : `${comfyUrl.replace(/\/$/, '')}/view?filename=${encodeURIComponent(videoInfo.filename)}&type=output`
-                  setVideoUrl(fallbackUrl)
-                }
-              } else {
-                console.warn('Failed to download video from ComfyUI')
-                // Still try to show ComfyUI URL even if download failed
-                const fallbackUrl = videoInfo.subfolder
-                  ? `${comfyUrl.replace(/\/$/, '')}/view?filename=${encodeURIComponent(videoInfo.filename)}&subfolder=${encodeURIComponent(videoInfo.subfolder)}&type=output`
-                  : `${comfyUrl.replace(/\/$/, '')}/view?filename=${encodeURIComponent(videoInfo.filename)}&type=output`
-                setVideoUrl(fallbackUrl)
-              }
-            } catch (storageError) {
-              console.warn('Failed to upload to Supabase Storage:', storageError)
-              // Fallback to ComfyUI URL if Supabase upload fails
-              const fallbackUrl = videoInfo.subfolder
-                ? `${comfyUrl.replace(/\/$/, '')}/view?filename=${encodeURIComponent(videoInfo.filename)}&subfolder=${encodeURIComponent(videoInfo.subfolder)}&type=output`
-                : `${comfyUrl.replace(/\/$/, '')}/view?filename=${encodeURIComponent(videoInfo.filename)}&type=output`
-              setVideoUrl(fallbackUrl)
-            }
+            setStatus('Procesamiento completado')
+            // Set ComfyUI URL as fallback - the job monitoring will handle Supabase upload
+            const fallbackUrl = videoInfo.subfolder
+              ? `${comfyUrl.replace(/\/$/, '')}/view?filename=${encodeURIComponent(videoInfo.filename)}&subfolder=${encodeURIComponent(videoInfo.subfolder)}&type=${videoInfo.type || 'output'}`
+              : `${comfyUrl.replace(/\/$/, '')}/view?filename=${encodeURIComponent(videoInfo.filename)}&type=${videoInfo.type || 'output'}`
+            setVideoUrl(fallbackUrl)
 
             await completeJob({ 
               job_id: id, 
@@ -882,7 +854,18 @@ export default function MultiTalkMultiplePeople({ comfyUrl }: Props) {
         {/* Right Sidebar - Video Feed */}
         <div className="w-96 space-y-6">
           <div className="sticky top-6 h-[calc(100vh-3rem)]">
-            <JobFeed comfyUrl={comfyUrl} />
+            <UnifiedFeed 
+              comfyUrl={comfyUrl} 
+              config={{
+                type: 'video',
+                title: 'Lipsync Multi',
+                showCompletedOnly: false,
+                maxItems: 10,
+                showFixButton: true,
+                showProgress: true,
+                pageContext: 'lipsync-multi'
+              }}
+            />
           </div>
         </div>
       </div>

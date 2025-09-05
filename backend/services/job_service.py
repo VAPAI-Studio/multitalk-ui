@@ -23,6 +23,7 @@ class JobService:
                 "width": payload.width,
                 "height": payload.height,
                 "trim_to_audio": payload.trim_to_audio,
+                # workflow_type removed - not in database schema
             }
 
             try:
@@ -90,6 +91,58 @@ class JobService:
             if payload.video_url:
                 update_data["video_url"] = payload.video_url
 
+            # If job completed successfully with a video file, upload to Supabase storage
+            if payload.status == "completed" and payload.filename and not payload.video_url:
+                try:
+                    # Use comfy_url from payload if available, otherwise try to get from database
+                    comfy_url = payload.comfy_url
+                    
+                    if not comfy_url:
+                        # Fallback: Get job data to get comfy_url
+                        try:
+                            job_response = await asyncio.to_thread(
+                                lambda: self.supabase.table('multitalk_jobs')
+                                .select('comfy_url')
+                                .eq('job_id', payload.job_id)
+                                .single()
+                                .execute()
+                            )
+                            
+                            if job_response.data and job_response.data.get('comfy_url'):
+                                comfy_url = job_response.data['comfy_url']
+                        except Exception as db_error:
+                            print(f"⚠️ Could not get comfy_url from database: {db_error}")
+                    
+                    if comfy_url:
+                        from services.storage_service import StorageService
+                        storage_service = StorageService()
+                        
+                        print(f"🔄 Uploading video to Supabase storage for job: {payload.job_id}")
+                        print(f"🔍 Upload parameters: comfy_url={comfy_url}, filename={payload.filename}, subfolder={payload.subfolder}, job_id={payload.job_id}")
+                        success, supabase_url, storage_error = await storage_service.upload_video_to_storage(
+                            comfy_url=comfy_url,
+                            filename=payload.filename,
+                            subfolder=payload.subfolder or "",
+                            job_id=payload.job_id,
+                            video_type=payload.video_type or 'output'
+                        )
+                        print(f"🔍 Storage upload completed: success={success}, url={supabase_url}, error={storage_error}")
+                        
+                        if success and supabase_url:
+                            update_data["video_url"] = supabase_url
+                            print(f"✅ Video uploaded to Supabase: {supabase_url}")
+                        else:
+                            print(f"⚠️ Failed to upload video to Supabase: {storage_error}")
+                            # Continue with job completion even if upload fails
+                    else:
+                        print(f"⚠️ No comfy_url available for job {payload.job_id}, skipping Supabase upload")
+                        
+                except Exception as storage_error:
+                    print(f"⚠️ Error during video upload: {storage_error}")
+                    # Continue with job completion even if upload fails
+
+            print(f"🔍 Attempting to update job {payload.job_id} with data: {update_data}")
+            
             response = await asyncio.to_thread(
                 lambda: self.supabase.table('multitalk_jobs')
                 .update(update_data)
@@ -97,10 +150,13 @@ class JobService:
                 .execute()
             )
             
+            print(f"🔍 Job update response: {response}")
+            
             if response.data:
                 print(f"Job completed successfully: {payload.job_id}")
                 return True, None
             else:
+                print(f"⚠️ No data returned from job update for {payload.job_id}")
                 return False, "Failed to complete job"
                 
         except Exception as error:

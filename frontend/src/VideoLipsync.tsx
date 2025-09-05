@@ -1,13 +1,14 @@
 import React, { useEffect, useRef, useState } from "react";
-import { createJob, updateJobToProcessing, completeJob, getCompletedJobsWithVideos } from "./lib/jobTracking";
+import { createJob, updateJobToProcessing, completeJob } from "./lib/jobTracking";
 import type { MultiTalkJob } from "./lib/supabase";
-import { downloadVideoFromComfy, uploadVideoToStorage } from "./lib/supabase";
+import { downloadVideoFromComfy } from "./lib/supabase";
 import { Label, Field, Section } from "./components/UI";
 import { Timeline } from "./components/Timeline";
 import type { VideoTrack, AudioTrackSimple } from "./components/types";
 import { uploadMediaToComfy, generateId, startJobMonitoring, checkComfyUIHealth } from "./components/utils";
 import { useSmartResolution } from "./hooks/useSmartResolution";
 import { AVPlayerWithPadding } from "./components/AVPlayerWithPadding";
+import UnifiedFeed from "./components/UnifiedFeed";
 
 interface Props {
   comfyUrl: string;
@@ -42,7 +43,6 @@ export default function VideoLipsync({ comfyUrl }: Props) {
   const [videoUrl, setVideoUrl] = useState<string>("");
   const [jobId, setJobId] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [videoFeed, setVideoFeed] = useState<MultiTalkJob[]>([]);
   const [jobMonitorCleanup, setJobMonitorCleanup] = useState<(() => void) | null>(null);
   const [audioPreviewUrl, setAudioPreviewUrl] = useState<string>("");
   const [originalVideoStart, setOriginalVideoStart] = useState<number>(0);
@@ -52,11 +52,6 @@ export default function VideoLipsync({ comfyUrl }: Props) {
   const audioInputRef = useRef<HTMLInputElement | null>(null);
 
   // Load video feed from Supabase
-  useEffect(() => {
-    loadVideoFeedFromDB();
-    const interval = setInterval(loadVideoFeedFromDB, 30000);
-    return () => clearInterval(interval);
-  }, [comfyUrl]);
 
   // Cleanup job monitor and URLs on unmount
   useEffect(() => {
@@ -73,19 +68,6 @@ export default function VideoLipsync({ comfyUrl }: Props) {
     };
   }, [jobMonitorCleanup, audioPreviewUrl, videoPreview]);
 
-  async function loadVideoFeedFromDB() {
-    try {
-      const { jobs, error } = await getCompletedJobsWithVideos(20);
-      if (error) {
-        return;
-      }
-      
-      const filteredJobs = jobs.filter(job => job.comfy_url === comfyUrl || !comfyUrl);
-      setVideoFeed(filteredJobs);
-    } catch (e) {
-      // Silent error - video feed loading failed
-    }
-  }
 
   // Calculate the final duration based on union of video and audio coverage
   const calculateFinalDuration = () => {
@@ -449,33 +431,12 @@ export default function VideoLipsync({ comfyUrl }: Props) {
           if (jobStatus === 'processing') {
             setStatus(message || 'Processing in ComfyUI…');
           } else if (jobStatus === 'completed' && videoInfo) {
-            setStatus('Uploading video to Supabase Storage…');
-            let videoStorageUrl: string | null = null;
-            try {
-              const videoBlob = await downloadVideoFromComfy(comfyUrl, videoInfo.filename, videoInfo.subfolder);
-              if (videoBlob) {
-                videoStorageUrl = await uploadVideoToStorage(videoBlob, videoInfo.filename);
-                if (videoStorageUrl) {
-                  setVideoUrl(videoStorageUrl);
-                } else {
-                  const fallbackUrl = videoInfo.subfolder
-                    ? `${comfyUrl}/view?filename=${encodeURIComponent(videoInfo.filename)}&subfolder=${encodeURIComponent(videoInfo.subfolder)}&type=output`
-                    : `${comfyUrl}/view?filename=${encodeURIComponent(videoInfo.filename)}&type=output`;
-                  setVideoUrl(fallbackUrl);
-                }
-              } else {
-                const fallbackUrl = videoInfo.subfolder
-                  ? `${comfyUrl}/view?filename=${encodeURIComponent(videoInfo.filename)}&subfolder=${encodeURIComponent(videoInfo.subfolder)}&type=output`
-                  : `${comfyUrl}/view?filename=${encodeURIComponent(videoInfo.filename)}&type=output`;
-                setVideoUrl(fallbackUrl);
-              }
-            } catch (storageError) {
-              // Failed to upload to Supabase Storage, falling back to ComfyUI URL
-              const fallbackUrl = videoInfo.subfolder
-                ? `${comfyUrl}/view?filename=${encodeURIComponent(videoInfo.filename)}&subfolder=${encodeURIComponent(videoInfo.subfolder)}&type=output`
-                : `${comfyUrl}/view?filename=${encodeURIComponent(videoInfo.filename)}&type=output`;
-              setVideoUrl(fallbackUrl);
-            }
+            setStatus('Processing completed');
+            // Set ComfyUI URL as fallback - the job monitoring will handle Supabase upload
+            const fallbackUrl = videoInfo.subfolder
+              ? `${comfyUrl}/view?filename=${encodeURIComponent(videoInfo.filename)}&subfolder=${encodeURIComponent(videoInfo.subfolder)}&type=${videoInfo.type || 'output'}`
+              : `${comfyUrl}/view?filename=${encodeURIComponent(videoInfo.filename)}&type=${videoInfo.type || 'output'}`;
+            setVideoUrl(fallbackUrl);
 
             await completeJob({
               job_id: id,
@@ -485,7 +446,7 @@ export default function VideoLipsync({ comfyUrl }: Props) {
               video_url: videoStorageUrl || undefined
             });
 
-            await loadVideoFeedFromDB();
+            // Feed will refresh automatically via UnifiedFeed component
             setStatus('Ready ✅');
             setIsSubmitting(false);
             
@@ -940,78 +901,18 @@ export default function VideoLipsync({ comfyUrl }: Props) {
         {/* Right Sidebar - Video Feed */}
         <div className="w-96 space-y-6">
           <div className="sticky top-6 h-[calc(100vh-3rem)]">
-            <div className="rounded-3xl border border-gray-200/80 p-6 shadow-lg bg-gradient-to-br from-white to-gray-50/50 backdrop-blur-sm h-full flex flex-col">
-              <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-3">
-                <div className="w-2 h-8 bg-gradient-to-b from-green-500 to-blue-600 rounded-full"></div>
-                Generated Videos
-              </h2>
-              
-              {videoFeed.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-gray-500 mb-3">No videos generated yet</p>
-                  <p className="text-xs text-gray-400">Videos will appear here when you generate content</p>
-                </div>
-              ) : (
-                <div className="space-y-4 flex-1 overflow-y-auto">
-                  {videoFeed.map((job) => {
-                    const videoUrl = job.video_url || 
-                      (job.filename ? 
-                        (job.subfolder 
-                          ? `${job.comfy_url}/view?filename=${encodeURIComponent(job.filename)}&subfolder=${encodeURIComponent(job.subfolder)}&type=output`
-                          : `${job.comfy_url}/view?filename=${encodeURIComponent(job.filename)}&type=output`)
-                        : null);
-                      
-                    return (
-                      <div key={job.job_id} className="border border-gray-200 rounded-2xl p-3 bg-white">
-                        {videoUrl && (
-                          <video 
-                            src={videoUrl} 
-                            controls 
-                            className="w-full rounded-xl mb-2"
-                            style={{ maxHeight: '150px' }}
-                          />
-                        )}
-                        <div className="space-y-1">
-                          <div className="text-xs text-gray-500 truncate" title={job.filename || job.job_id}>
-                            {job.filename || `Job: ${job.job_id.slice(0, 8)}...`}
-                          </div>
-                          <div className="text-xs text-gray-400">
-                            {job.timestamp_completed ? new Date(job.timestamp_completed).toLocaleString() : 'Processing...'}
-                          </div>
-                          <div className="text-xs">
-                            <span className={`px-2 py-1 rounded-full ${
-                              job.status === 'completed' ? 'bg-green-100 text-green-700' :
-                              job.status === 'error' ? 'bg-red-100 text-red-700' :
-                              'bg-blue-100 text-blue-700'
-                            }`}>
-                              {job.status}
-                            </span>
-                          </div>
-                          <div className="text-xs text-gray-400">
-                            {job.width}×{job.height} • {job.trim_to_audio ? 'Trim to audio' : 'Fixed length'}
-                          </div>
-                        </div>
-                        {videoUrl && (
-                          <button 
-                            className="mt-2 w-full text-xs px-2 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors"
-                            onClick={() => {
-                              const a = document.createElement("a");
-                              a.href = videoUrl;
-                              a.download = job.filename || 'video.mp4';
-                              document.body.appendChild(a);
-                              a.click();
-                              a.remove();
-                            }}
-                          >
-                            Download
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+            <UnifiedFeed 
+              comfyUrl={comfyUrl} 
+              config={{
+                type: 'video',
+                title: 'Video Lipsync',
+                showCompletedOnly: false,
+                maxItems: 10,
+                showFixButton: true,
+                showProgress: true,
+                pageContext: 'videolipsync'
+              }}
+            />
           </div>
         </div>
       </div>

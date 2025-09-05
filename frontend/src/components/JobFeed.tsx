@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { getRecentJobs, completeJob } from '../lib/jobTracking'
 import { fixStuckJob } from '../lib/fixStuckJob'
+import { useComfyUIProgress } from '../hooks/useComfyUIProgress'
 import type { MultiTalkJob } from '../lib/supabase'
 
 interface JobFeedProps {
@@ -10,6 +11,12 @@ interface JobFeedProps {
 export default function JobFeed({ comfyUrl }: JobFeedProps) {
   const [videoFeed, setVideoFeed] = useState<MultiTalkJob[]>([])
   const [fixingJobs, setFixingJobs] = useState<Set<string>>(new Set())
+  
+  // Use ComfyUI progress tracking
+  const { progress } = useComfyUIProgress(comfyUrl, true)
+  
+  // Helper function to get short job ID consistently
+  const getShortJobId = (jobId: string) => jobId.slice(-8)
 
   const loadVideoFeedFromDB = async () => {
     try {
@@ -23,30 +30,51 @@ export default function JobFeed({ comfyUrl }: JobFeedProps) {
       
       // Check for stale jobs and update their status
       const now = new Date();
-      const staleThresholdMs = 30 * 60 * 1000; // 30 minutes
+              const staleThresholdMs = 6 * 60 * 60 * 1000; // 6 hours (very lenient for video generation)
       
       const processedJobs = jobs.map(job => {
-        // Check if job is stale (processing/submitted for more than 30 minutes)
+        // Check if job is stale (processing/submitted for more than 2 hours)
         if ((job.status === 'processing' || job.status === 'submitted')) {
+          // Handle timestamp parsing - the timestamp is already in ISO format
           const submittedTime = new Date(job.timestamp_submitted);
           const timeDiff = now.getTime() - submittedTime.getTime();
           
+          // Debug logging for timeout detection
+          console.log(`🔍 JobFeed - Job ${getShortJobId(job.job_id)} (full: ${job.job_id}) timeout check:`, {
+            status: job.status,
+            timestamp_submitted: job.timestamp_submitted,
+            submittedTime: submittedTime.toISOString(),
+            now: now.toISOString(),
+            timeDiffMs: timeDiff,
+            timeDiffMinutes: Math.round(timeDiff / (1000 * 60)),
+            staleThresholdMs,
+            isStale: timeDiff > staleThresholdMs
+          })
+          
           if (timeDiff > staleThresholdMs) {
-            //console.warn(`🔄 Stale job detected:`, job.job_id.slice(-8), 'submitted', Math.round(timeDiff / (1000 * 60)), 'minutes ago');
+            // Check if job is actively processing (has progress data or is connected to WebSocket)
+            const isActivelyProcessing = progress.total_nodes > 0 && progress.completed_nodes > 0
+            const isWebSocketConnected = progress.is_connected
             
-            // Update stale job status in database (fire and forget)
-            completeJob({
-              job_id: job.job_id,
-              status: 'error',
-              error_message: 'Job timed out - likely cancelled or failed'
-            }).catch(e => console.error('Failed to update stale job:', e));
-            
-            // Return updated job for UI
-            return {
-              ...job,
-              status: 'error' as const,
-              error_message: 'Timed out'
-            };
+            // Be more lenient - only mark as stale if it's really old AND not processing
+            if (isActivelyProcessing || isWebSocketConnected) {
+              console.log(`⏰ JobFeed - Job ${getShortJobId(job.job_id)} is old (${Math.round(timeDiff / (1000 * 60))} minutes) but actively processing, keeping alive`)
+            } else {
+              console.log(`⏰ JobFeed - Marking job ${getShortJobId(job.job_id)} as stale (${Math.round(timeDiff / (1000 * 60))} minutes old)`)
+              // Update stale job status in database (fire and forget)
+              completeJob({
+                job_id: job.job_id,
+                status: 'error',
+                error_message: 'Job timed out - likely cancelled or failed'
+              }).catch(e => console.error('Failed to update stale job:', e));
+              
+              // Return updated job for UI
+              return {
+                ...job,
+                status: 'error' as const,
+                error_message: 'Timed out'
+              };
+            }
           }
         }
         return job;
@@ -142,7 +170,7 @@ export default function JobFeed({ comfyUrl }: JobFeedProps) {
                 <div key={job.job_id} className="border border-yellow-200 rounded-lg p-2 bg-yellow-50">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-mono text-gray-600">
-                      {job.job_id.slice(-8)}
+                      {getShortJobId(job.job_id)}
                     </span>
                     <span className="text-xs px-2 py-1 rounded bg-yellow-100 text-yellow-700">
                       {job.error_message === 'Timed out' ? 'cancelled' : job.status}
@@ -168,22 +196,60 @@ export default function JobFeed({ comfyUrl }: JobFeedProps) {
                     style={{ maxHeight: '150px' }}
                     preload="metadata"
                     onError={(e) => {
-                      console.error('❌ Video error for job', job.job_id.slice(-8), ':', e);
+                      console.error('❌ Video error for job', getShortJobId(job.job_id), ':', e);
                       console.error('Failed video URL:', videoUrl);
                     }}
                     onLoadStart={() => {
-                      console.log('⏳ Loading video for job', job.job_id.slice(-8), ':', videoUrl);
+                      console.log('⏳ Loading video for job', getShortJobId(job.job_id), ':', videoUrl);
                     }}
                     onLoadedMetadata={() => {
-                      console.log('✅ Video loaded for job', job.job_id.slice(-8));
+                      console.log('✅ Video loaded for job', getShortJobId(job.job_id));
                     }}
                   />
                 ) : job.status === 'processing' || job.status === 'submitted' ? (
                   <div className="w-full h-20 bg-blue-50 rounded-xl mb-2 flex items-center justify-center">
                     <div className="flex items-center gap-3">
                       <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full"></div>
-                      <p className="text-blue-600 text-sm">Processing...</p>
-                      {(job.status === 'processing' && comfyUrl) && (
+                      <div className="text-blue-600 text-sm">
+                        {progress.total_nodes > 0 ? (
+                          <div className="w-full">
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="text-sm font-medium">Processing...</span>
+                              <span className="text-xs text-blue-600">
+                                {progress.detailed_progress ? 
+                                  `${progress.detailed_progress.progress_percentage}%` : 
+                                  `${progress.completed_nodes}/${progress.total_nodes}`
+                                }
+                              </span>
+                            </div>
+                            <div className="w-full bg-blue-200 rounded-full h-2 mb-1">
+                              <div 
+                                className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
+                                style={{ 
+                                  width: `${progress.detailed_progress ? 
+                                    progress.detailed_progress.progress_percentage : 
+                                    (progress.completed_nodes / progress.total_nodes) * 100
+                                  }%` 
+                                }}
+                              ></div>
+                            </div>
+                            {progress.current_node && (
+                              <div className="text-xs text-blue-500 truncate">Current: {progress.current_node}</div>
+                            )}
+                            {progress.detailed_progress && (
+                              <div className="text-xs text-blue-400">
+                                Steps: {progress.detailed_progress.total_progress}/{progress.detailed_progress.max_progress}
+                              </div>
+                            )}
+                            {progress.queue_remaining > 0 && (
+                              <div className="text-xs text-blue-400">Queue: {progress.queue_remaining} remaining</div>
+                            )}
+                          </div>
+                        ) : (
+                          'Processing...'
+                        )}
+                      </div>
+                      {(job.status === 'processing' && comfyUrl && !(progress.total_nodes > 0 && progress.completed_nodes > 0)) && (
                         <button
                           onClick={() => handleFixStuckJob(job)}
                           disabled={fixingJobs.has(job.job_id)}
@@ -202,7 +268,7 @@ export default function JobFeed({ comfyUrl }: JobFeedProps) {
                 )}
                 <div className="space-y-1">
                   <div className="text-xs text-gray-500 truncate" title={job.filename || job.job_id}>
-                    {job.filename || `Job: ${job.job_id.slice(0, 8)}...`}
+                    {job.filename || `Job: ${getShortJobId(job.job_id)}...`}
                   </div>
                   <div className="text-xs text-gray-400">
                     {job.timestamp_completed ? new Date(job.timestamp_completed).toLocaleString() : 

@@ -6,6 +6,7 @@ class UploadVideoPayload(BaseModel):
     filename: str
     subfolder: str
     job_id: str
+    video_type: str = 'output'
 
 class VideoUploadResponse(BaseModel):
     success: bool

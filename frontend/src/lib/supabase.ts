@@ -44,6 +44,8 @@ export interface CompleteJobPayload {
   subfolder?: string
   error_message?: string
   video_url?: string // Added for Supabase Storage URL
+  comfy_url?: string // Added to avoid database lookup
+  video_type?: string // Added to use correct ComfyUI type
 }
 
 // Video storage functions - now handled by backend API

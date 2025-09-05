@@ -30,7 +30,8 @@ export async function uploadVideoToSupabaseStorage(
   comfyUrl: string,
   filename: string,
   subfolder: string,
-  jobId: string
+  jobId: string,
+  videoType: string = 'output'
 ): Promise<{ success: boolean; publicUrl?: string; error?: string }> {
   try {
     // Add a small delay to ensure ComfyUI has made the video file available
@@ -40,15 +41,22 @@ export async function uploadVideoToSupabaseStorage(
       comfy_url: comfyUrl,
       filename,
       subfolder,
-      job_id: jobId
+      job_id: jobId,
+      video_type: videoType
     }
     
     const response = await apiClient.uploadVideoToStorage(payload) as UploadVideoResponse
     
+    // Handle both object and dict response formats
+    const success = response.success || (response as any).success
+    const publicUrl = response.public_url || (response as any).public_url
+    const error = response.error || (response as any).error
+    
+    
     return {
-      success: response.success,
-      publicUrl: response.public_url,
-      error: response.error
+      success,
+      publicUrl,
+      error
     }
     
   } catch (error: any) {

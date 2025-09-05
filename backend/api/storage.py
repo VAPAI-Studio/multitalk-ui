@@ -23,7 +23,8 @@ async def upload_video_to_storage(payload: UploadVideoPayload):
         payload.comfy_url,
         payload.filename,
         payload.subfolder,
-        payload.job_id
+        payload.job_id,
+        payload.video_type
     )
     
     return VideoUploadResponse(

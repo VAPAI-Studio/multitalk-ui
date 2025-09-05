@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createJob, updateJobToProcessing, completeJob } from "./lib/jobTracking";
-import { downloadVideoFromComfy, uploadVideoToStorage } from "./lib/supabase";
+import { downloadVideoFromComfy } from "./lib/supabase";
 import { startJobMonitoring, checkComfyUIHealth } from "./components/utils";
 import UnifiedFeed from "./components/UnifiedFeed";
 import { useSmartResolution } from "./hooks/useSmartResolution";
@@ -286,7 +286,8 @@ export default function MultiTalkOnePerson({ comfyUrl }: Props) {
         audio_filename: audioFilename,
         width,
         height,
-        trim_to_audio: trimToAudio
+        trim_to_audio: trimToAudio,
+        workflow_type: 'lipsync-one'
       });
 
       // Update job to processing status
@@ -302,40 +303,12 @@ export default function MultiTalkOnePerson({ comfyUrl }: Props) {
             setStatus(message || 'Procesando en ComfyUI…');
           } else if (jobStatus === 'completed' && videoInfo) {
             // Handle successful completion
-            setStatus('Subiendo video a Supabase Storage…');
-            let videoStorageUrl: string | null = null;
-            try {
-              const videoBlob = await downloadVideoFromComfy(comfyUrl, videoInfo.filename, videoInfo.subfolder);
-              if (videoBlob) {
-                videoStorageUrl = await uploadVideoToStorage(videoBlob, videoInfo.filename);
-                if (videoStorageUrl) {
-                  console.log('Video uploaded to Supabase Storage:', videoStorageUrl);
-                  // Set video URL from Supabase
-                  setVideoUrl(videoStorageUrl);
-                } else {
-                  console.warn('Upload to Supabase succeeded but no URL returned');
-                  // Fallback to ComfyUI URL if no Supabase URL
-                  const fallbackUrl = videoInfo.subfolder
-                    ? `${comfyUrl}/view?filename=${encodeURIComponent(videoInfo.filename)}&subfolder=${encodeURIComponent(videoInfo.subfolder)}&type=output`
-                    : `${comfyUrl}/view?filename=${encodeURIComponent(videoInfo.filename)}&type=output`;
-                  setVideoUrl(fallbackUrl);
-                }
-              } else {
-                console.warn('Failed to download video from ComfyUI');
-                // Still try to show ComfyUI URL even if download failed
-                const fallbackUrl = videoInfo.subfolder
-                  ? `${comfyUrl}/view?filename=${encodeURIComponent(videoInfo.filename)}&subfolder=${encodeURIComponent(videoInfo.subfolder)}&type=output`
-                  : `${comfyUrl}/view?filename=${encodeURIComponent(videoInfo.filename)}&type=output`;
-                setVideoUrl(fallbackUrl);
-              }
-            } catch (storageError) {
-              console.warn('Failed to upload to Supabase Storage:', storageError);
-              // Fallback to ComfyUI URL if Supabase upload fails
-              const fallbackUrl = videoInfo.subfolder
-                ? `${comfyUrl}/view?filename=${encodeURIComponent(videoInfo.filename)}&subfolder=${encodeURIComponent(videoInfo.subfolder)}&type=output`
-                : `${comfyUrl}/view?filename=${encodeURIComponent(videoInfo.filename)}&type=output`;
-              setVideoUrl(fallbackUrl);
-            }
+            setStatus('Procesamiento completado');
+            // Set ComfyUI URL as fallback - the job monitoring will handle Supabase upload
+            const fallbackUrl = videoInfo.subfolder
+              ? `${comfyUrl}/view?filename=${encodeURIComponent(videoInfo.filename)}&subfolder=${encodeURIComponent(videoInfo.subfolder)}&type=${videoInfo.type || 'output'}`
+              : `${comfyUrl}/view?filename=${encodeURIComponent(videoInfo.filename)}&type=${videoInfo.type || 'output'}`;
+            setVideoUrl(fallbackUrl);
             
             // Complete job in Supabase
             await completeJob({
@@ -612,11 +585,12 @@ export default function MultiTalkOnePerson({ comfyUrl }: Props) {
               comfyUrl={comfyUrl} 
               config={{
                 type: 'video',
-                title: 'Feed de Generaciones',
+                title: 'Lipsync One',
                 showCompletedOnly: false,
                 maxItems: 10,
                 showFixButton: true,
-                showProgress: true
+                showProgress: true,
+                pageContext: 'lipsync-one'
               }}
             />
           </div>

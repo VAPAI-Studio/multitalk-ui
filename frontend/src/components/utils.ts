@@ -170,7 +170,8 @@ export async function pollForResult(promptId: string, baseUrl: string, intervalM
               baseUrl,
               found.filename,
               found.subfolder || '',
-              jobId
+              jobId,
+              found.type || 'output'
             );
             
             if (uploadResult.success && uploadResult.publicUrl) {
@@ -181,7 +182,9 @@ export async function pollForResult(promptId: string, baseUrl: string, intervalM
                 status: 'completed',
                 filename: found.filename,
                 subfolder: found.subfolder || undefined,
-                video_url: uploadResult.publicUrl
+                video_url: uploadResult.publicUrl,
+                comfy_url: baseUrl,
+                video_type: found.type || 'output'
               });
               // Job completed with Supabase URL
             } else {
@@ -192,7 +195,9 @@ export async function pollForResult(promptId: string, baseUrl: string, intervalM
                 job_id: jobId,
                 status: 'completed',
                 filename: found.filename,
-                subfolder: found.subfolder || undefined
+                subfolder: found.subfolder || undefined,
+                comfy_url: baseUrl,
+                video_type: found.type || 'output'
               });
             }
           } catch (uploadError) {
@@ -203,7 +208,9 @@ export async function pollForResult(promptId: string, baseUrl: string, intervalM
               job_id: jobId,
               status: 'completed',
               filename: found.filename,
-              subfolder: found.subfolder || undefined
+              subfolder: found.subfolder || undefined,
+              comfy_url: baseUrl,
+              video_type: found.type || 'output'
             });
           }
         }
@@ -239,7 +246,9 @@ export function findVideoFromHistory(historyJson: any): VideoResult | null {
         const arr = out?.[arrName];
         if (Array.isArray(arr)) {
           const mp4 = arr.find((x: any) => typeof x?.filename === 'string' && /\.mp4$/i.test(x.filename));
-          if (mp4) return { filename: mp4.filename, subfolder: mp4.subfolder ?? null, type: mp4.type ?? null };
+          if (mp4) {
+            return { filename: mp4.filename, subfolder: mp4.subfolder ?? null, type: mp4.type ?? null };
+          }
         }
       }
       if (out && typeof out === 'object') {
@@ -308,13 +317,14 @@ export function startJobMonitoring(
         const videoInfo = findVideoFromHistory(data);
         if (videoInfo) {
           // Upload video to Supabase Storage
-          console.log('Video completed, uploading to Supabase Storage...');
+          console.log('🎬 Video completed! Found video info:', videoInfo);
           try {
             const uploadResult = await uploadVideoToSupabaseStorage(
               baseUrl,
               videoInfo.filename,
               videoInfo.subfolder || '',
-              jobId
+              jobId,
+              videoInfo.type || 'output'
             );
             
             if (uploadResult.success && uploadResult.publicUrl) {
@@ -325,7 +335,9 @@ export function startJobMonitoring(
                 status: 'completed',
                 filename: videoInfo.filename,
                 subfolder: videoInfo.subfolder || undefined,
-                video_url: uploadResult.publicUrl
+                video_url: uploadResult.publicUrl,
+                comfy_url: baseUrl,
+                video_type: videoInfo.type || 'output'
               });
               // Job completed with Supabase URL
               onStatusUpdate('completed', 'Video guardado y completado', { ...videoInfo, video_url: uploadResult.publicUrl });
@@ -337,7 +349,9 @@ export function startJobMonitoring(
                 job_id: jobId,
                 status: 'completed',
                 filename: videoInfo.filename,
-                subfolder: videoInfo.subfolder || undefined
+                subfolder: videoInfo.subfolder || undefined,
+                comfy_url: baseUrl,
+                video_type: videoInfo.type || 'output'
               });
               onStatusUpdate('completed', 'Procesamiento completado (sin subir a storage)', videoInfo);
             }
@@ -349,7 +363,9 @@ export function startJobMonitoring(
               job_id: jobId,
               status: 'completed',
               filename: videoInfo.filename,
-              subfolder: videoInfo.subfolder || undefined
+              subfolder: videoInfo.subfolder || undefined,
+              comfy_url: baseUrl,
+              video_type: videoInfo.type || 'output'
             });
             onStatusUpdate('completed', 'Procesamiento completado (error subiendo)', videoInfo);
           }

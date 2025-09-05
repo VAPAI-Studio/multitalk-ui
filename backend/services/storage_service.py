@@ -18,16 +18,18 @@ class StorageService:
         comfy_url: str,
         filename: str,
         subfolder: str,
-        job_id: str
+        job_id: str,
+        video_type: str = 'output'
     ) -> Tuple[bool, Optional[str], Optional[str]]:
         """Downloads a video from ComfyUI and uploads it to Supabase Storage"""
+        print(f"🔍 Storage service called with: comfy_url={comfy_url}, filename={filename}, subfolder={subfolder}, job_id={job_id}")
         try:
             # Download video from ComfyUI
             clean_url = comfy_url.rstrip('/')
             params = {
                 'filename': filename,
                 'subfolder': subfolder or '',
-                'type': 'temp'  # Changed from 'output' to 'temp' to match actual ComfyUI format
+                'type': video_type
             }
             
             video_url = f"{clean_url}/api/view?{urlencode(params)}"  # Added '/api' to path
@@ -54,27 +56,39 @@ class StorageService:
             storage_path = f"videos/{timestamp}/{job_id}_{filename}"
             
             # Upload to Supabase Storage
+            print(f"🔍 Uploading to Supabase Storage: {storage_path}")
             upload_response = await asyncio.to_thread(
                 lambda: self.supabase.storage
                 .from_('multitalk-videos')
                 .upload(
                     storage_path,
                     video_content,
-                    {
+                    file_options={
                         'content-type': 'video/mp4',
                         'cache-control': '3600',
-                        'upsert': True
+                        'upsert': 'true'
                     }
                 )
             )
+            print(f"🔍 Upload response type: {type(upload_response)}")
             
             # Check for upload errors with different response formats
+            print(f"🔍 Upload response attributes: {dir(upload_response)}")
+            
+            # Check if upload was successful
             if hasattr(upload_response, 'error') and upload_response.error:
                 raise Exception(f"Failed to upload to Supabase Storage: {upload_response.error}")
+            elif isinstance(upload_response, dict) and upload_response.get('error'):
+                raise Exception(f"Failed to upload to Supabase Storage: {upload_response['error']}")
             elif hasattr(upload_response, 'status_code') and upload_response.status_code >= 400:
                 raise Exception(f"Failed to upload to Supabase Storage: HTTP {upload_response.status_code}")
             elif not upload_response:
                 raise Exception("Upload failed: No response from Supabase Storage")
+            
+            # For storage3.types.UploadResponse, check if the upload was successful
+            # The response should have a 'path' attribute if successful
+            if hasattr(upload_response, 'path') and not upload_response.path:
+                raise Exception("Upload failed: No path returned from Supabase Storage")
             
             # Get signed URL (since bucket is private)
             url_response = await asyncio.to_thread(
@@ -83,13 +97,49 @@ class StorageService:
                 .create_signed_url(storage_path, 60 * 60 * 24 * 7)  # 7 days expiry
             )
             
-            if url_response.error or not url_response.data:
-                raise Exception("Failed to get signed URL from Supabase Storage")
+            print(f"🔍 URL response type: {type(url_response)}")
+            print(f"🔍 URL response content: {url_response}")
             
-            return True, url_response.data['signedUrl'], None
+            # Handle different response formats for signed URL
+            signed_url = None
+            
+            # Check if response has error
+            if hasattr(url_response, 'error') and url_response.error:
+                raise Exception(f"Failed to get signed URL from Supabase Storage: {url_response.error}")
+            elif isinstance(url_response, dict) and url_response.get('error'):
+                raise Exception(f"Failed to get signed URL from Supabase Storage: {url_response['error']}")
+            
+            # Try different ways to extract the signed URL
+            if isinstance(url_response, dict):
+                # Check common signed URL field names
+                signed_url = (url_response.get('signedUrl') or 
+                            url_response.get('signed_url') or 
+                            url_response.get('url') or
+                            url_response.get('publicUrl') or
+                            url_response.get('public_url'))
+            elif hasattr(url_response, 'signedUrl'):
+                signed_url = url_response.signedUrl
+            elif hasattr(url_response, 'signed_url'):
+                signed_url = url_response.signed_url
+            elif hasattr(url_response, 'url'):
+                signed_url = url_response.url
+            elif hasattr(url_response, 'publicUrl'):
+                signed_url = url_response.publicUrl
+            elif hasattr(url_response, 'public_url'):
+                signed_url = url_response.public_url
+            elif isinstance(url_response, str):
+                # If the response is directly a string URL
+                signed_url = url_response
+            
+            if not signed_url:
+                raise Exception(f"No signed URL found in response. Response content: {url_response}")
+            
+            return True, signed_url, None
             
         except Exception as error:
             error_message = str(error)
+            print(f"❌ Storage service error: {error_message}")
+            print(f"❌ Error type: {type(error)}")
             
             # Provide more specific error messages
             if "timeout" in error_message.lower():
