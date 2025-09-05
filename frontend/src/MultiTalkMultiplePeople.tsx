@@ -5,7 +5,7 @@ import { Button, Badge } from "./components/DesignSystem";
 import { Timeline } from "./components/Timeline";
 import type { Mask, AudioTrack } from "./components/types";
 import { fileToBase64, uploadMediaToComfy, joinAudiosForMask, groupAudiosByMask, generateId, startJobMonitoring, checkComfyUIHealth } from "./components/utils";
-import UnifiedFeed from "./components/UnifiedFeed";
+import VideoFeed from "./components/VideoFeed";
 import { useSmartResolution } from "./hooks/useSmartResolution";
 import { MaskEditor } from "./components/MaskEditor";
 
@@ -847,11 +847,9 @@ export default function MultiTalkMultiplePeople({ comfyUrl }: Props) {
         {/* Right Sidebar - Video Feed */}
         <div className="w-96 space-y-6">
           <div className="sticky top-6 h-[calc(100vh-3rem)]">
-            <UnifiedFeed 
+            <VideoFeed 
               comfyUrl={comfyUrl} 
               config={{
-                type: 'video',
-                title: 'Lipsync Multi',
                 showCompletedOnly: false,
                 maxItems: 10,
                 showFixButton: true,

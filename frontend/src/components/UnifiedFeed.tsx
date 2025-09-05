@@ -26,6 +26,30 @@ interface EditedImagesResponse {
   error?: string
 }
 
+interface StyleTransfer {
+  id: string
+  created_at: string
+  source_image_url: string
+  style_image_url: string
+  prompt: string
+  result_image_url?: string
+  workflow_name: string
+  model_used?: string
+  processing_time_seconds?: number
+  user_ip?: string
+  status: string
+  comfyui_prompt_id?: string
+  error_message?: string
+  updated_at?: string
+}
+
+interface StyleTransfersResponse {
+  success: boolean
+  style_transfers: StyleTransfer[]
+  total_count: number
+  error?: string
+}
+
 interface VideoJob extends MultiTalkJob {
   progress?: {
     completed_nodes: number
@@ -50,7 +74,7 @@ interface FeedItem {
     total_nodes: number
     current_node?: string
   }
-  metadata: EditedImage | VideoJob
+  metadata: EditedImage | StyleTransfer | VideoJob
 }
 
 // Feed configuration
@@ -246,6 +270,31 @@ export default function UnifiedFeed({ comfyUrl, config }: UnifiedFeedProps) {
           }
         } catch (error) {
           console.error('Error loading images:', error)
+        }
+
+        // Load style transfers if on style-transfer page
+        if (config.pageContext === 'style-transfer') {
+          try {
+            const styleResponse = await apiClient.getRecentStyleTransfers(config.maxItems || 10, 0, config.showCompletedOnly || false) as StyleTransfersResponse
+            
+            if (styleResponse.success && styleResponse.style_transfers) {
+              for (const transfer of styleResponse.style_transfers) {
+                items.push({
+                  id: transfer.id,
+                  type: 'image',
+                  created_at: transfer.created_at,
+                  title: transfer.prompt || 'Style Transfer',
+                  status: transfer.status,
+                  preview_url: transfer.source_image_url,
+                  result_url: transfer.result_image_url,
+                  processing_time: transfer.processing_time_seconds,
+                  metadata: transfer
+                })
+              }
+            }
+          } catch (error) {
+            console.error('Error loading style transfers:', error)
+          }
         }
       }
 

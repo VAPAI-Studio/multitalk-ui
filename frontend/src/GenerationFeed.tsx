@@ -1,4 +1,5 @@
-import UnifiedFeed from './components/UnifiedFeed'
+import ImageFeed from './components/ImageFeed'
+import VideoFeed from './components/VideoFeed'
 
 export default function GenerationFeed() {
   return (
@@ -14,15 +15,24 @@ export default function GenerationFeed() {
           </p>
         </div>
 
-        {/* Unified Feed */}
-        <div className="max-w-6xl mx-auto">
-          <UnifiedFeed 
+        {/* Separate Feeds */}
+        <div className="max-w-6xl mx-auto space-y-12">
+          {/* Video Feed */}
+          <VideoFeed 
             comfyUrl=""  // Not needed for generation feed
             config={{
-              type: 'both',
-              title: 'All Generations',
               showCompletedOnly: true,
-              maxItems: 50,
+              maxItems: 25,
+              showFixButton: false,
+              showProgress: false
+            }}
+          />
+
+          {/* Image Feed */}
+          <ImageFeed 
+            config={{
+              showCompletedOnly: true,
+              maxItems: 25,
               showFixButton: false,
               showProgress: false
             }}

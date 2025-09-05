@@ -3,6 +3,22 @@ import { apiClient } from '../lib/apiClient'
 import ImageModal from './ImageModal'
 
 // Define interface locally to avoid import issues
+interface ImageItem {
+  id: string
+  type: 'edited-image' | 'style-transfer'
+  created_at: string
+  title: string
+  status: string
+  preview_url: string
+  result_url?: string
+  processing_time?: number
+  source_image_url: string
+  prompt: string
+  workflow_name: string
+  model_used?: string
+  user_ip?: string
+}
+
 interface EditedImage {
   id: string
   created_at: string
@@ -28,10 +44,10 @@ interface RecentImagesFeedProps {
 }
 
 export default function RecentImagesFeed({ refreshTrigger }: RecentImagesFeedProps) {
-  const [recentImages, setRecentImages] = useState<EditedImage[]>([])
+  const [recentImages, setRecentImages] = useState<ImageItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [selectedImage, setSelectedImage] = useState<EditedImage | null>(null)
+  const [selectedImage, setSelectedImage] = useState<ImageItem | null>(null)
 
   const fetchRecentImages = async () => {
     try {
@@ -39,7 +55,23 @@ export default function RecentImagesFeed({ refreshTrigger }: RecentImagesFeedPro
       setError(null)
       const response = await apiClient.getRecentEditedImages(10, 0, false) as EditedImagesResponse
       if (response.success) {
-        setRecentImages(response.edited_images)
+        // Convert EditedImage to ImageItem
+        const imageItems: ImageItem[] = response.edited_images.map(image => ({
+          id: image.id,
+          type: 'edited-image' as const,
+          created_at: image.created_at,
+          title: image.prompt || 'Image Edit',
+          status: image.status,
+          preview_url: image.result_image_url || image.source_image_url,
+          result_url: image.result_image_url,
+          processing_time: image.processing_time_seconds,
+          source_image_url: image.source_image_url,
+          prompt: image.prompt,
+          workflow_name: image.workflow_name,
+          model_used: image.model_used,
+          user_ip: image.user_ip
+        }))
+        setRecentImages(imageItems)
       } else {
         setError(response.error || 'Failed to load recent images')
       }
@@ -147,10 +179,10 @@ export default function RecentImagesFeed({ refreshTrigger }: RecentImagesFeedPro
 
                 {/* Image preview */}
                 <div className="relative aspect-square rounded-lg overflow-hidden bg-gray-100 mb-2">
-                  {image.result_image_url ? (
+                  {image.result_url ? (
                     <>
                       <img
-                        src={image.result_image_url}
+                        src={image.result_url}
                         alt="Generated result"
                         className="w-full h-full object-cover"
                       />

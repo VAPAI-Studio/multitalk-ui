@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Label, Field, Section } from "./components/UI";
 import { apiClient } from "./lib/apiClient";
-import RecentImagesFeed from "./components/RecentImagesFeed";
+import ImageFeed from "./components/ImageFeed";
 
 
 
@@ -15,7 +15,6 @@ export default function ImageEdit({}: Props) {
   const [originalImageUrl, setOriginalImageUrl] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [isConfigured, setIsConfigured] = useState<boolean>(false);
-  const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
 
   // Check OpenRouter configuration on component mount
   useEffect(() => {
@@ -77,8 +76,6 @@ export default function ImageEdit({}: Props) {
       if (response.success && response.image_url) {
         setEditedImageUrl(response.image_url);
         setResult("Image edited successfully!");
-        // Trigger refresh of recent images feed
-        setRefreshTrigger(prev => prev + 1);
       } else {
         throw new Error(response.error || "No edited image received");
       }
@@ -252,10 +249,18 @@ export default function ImageEdit({}: Props) {
           )}
         </div>
 
-        {/* Right Sidebar - Recent Images Feed */}
+        {/* Right Sidebar - Image Feed */}
         <div className="w-96 space-y-6">
           <div className="sticky top-6 h-[calc(100vh-3rem)]">
-            <RecentImagesFeed refreshTrigger={refreshTrigger} />
+            <ImageFeed
+              config={{
+                showCompletedOnly: false,
+                maxItems: 10,
+                showFixButton: false,
+                showProgress: false,
+                pageContext: 'image-edit'
+              }}
+            />
           </div>
         </div>
       </div>

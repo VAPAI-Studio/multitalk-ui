@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createJob, updateJobToProcessing, completeJob } from "./lib/jobTracking";
 import { startJobMonitoring, checkComfyUIHealth } from "./components/utils";
-import UnifiedFeed from "./components/UnifiedFeed";
+import VideoFeed from "./components/VideoFeed";
 import { useSmartResolution } from "./hooks/useSmartResolution";
 import { apiClient } from "./lib/apiClient";
 
@@ -412,11 +412,9 @@ export default function WANI2V({ comfyUrl }: Props) {
         {/* Right Sidebar - Video Feed */}
         <div className="w-96 space-y-6">
           <div className="sticky top-6 h-[calc(100vh-3rem)]">
-            <UnifiedFeed 
+            <VideoFeed 
               comfyUrl={comfyUrl} 
               config={{
-                type: 'video',
-                title: 'WAN I2V',
                 showCompletedOnly: false,
                 maxItems: 10,
                 showFixButton: true,

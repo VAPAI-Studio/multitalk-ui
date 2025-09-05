@@ -211,6 +211,71 @@ class ApiClient {
     })
     return this.request(`/edited-images?${params.toString()}`)
   }
+
+  // Style Transfer endpoints
+  async createStyleTransfer(payload: any) {
+    return this.request('/style-transfers', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  }
+
+  async getStyleTransfer(transferId: string) {
+    return this.request(`/style-transfers/${transferId}`)
+  }
+
+  async updateStyleTransfer(transferId: string, payload: any) {
+    return this.request(`/style-transfers/${transferId}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    })
+  }
+
+  async updateStyleTransferToProcessing(transferId: string) {
+    return this.request(`/style-transfers/${transferId}/processing`, {
+      method: 'PUT',
+    })
+  }
+
+  async completeStyleTransfer(transferId: string, resultImageUrl: string, processingTimeSeconds?: number, modelUsed?: string) {
+    const queryParams = new URLSearchParams({
+      result_image_url: resultImageUrl,
+      ...(processingTimeSeconds && { processing_time_seconds: processingTimeSeconds.toString() }),
+      ...(modelUsed && { model_used: modelUsed })
+    })
+    return this.request(`/style-transfers/${transferId}/complete?${queryParams}`, {
+      method: 'PUT',
+    })
+  }
+
+  async failStyleTransfer(transferId: string, errorMessage: string) {
+    const queryParams = new URLSearchParams({
+      error_message: errorMessage
+    })
+    return this.request(`/style-transfers/${transferId}/fail?${queryParams}`, {
+      method: 'PUT',
+    })
+  }
+
+  async getRecentStyleTransfers(limit: number = 20, offset: number = 0, completedOnly: boolean = false) {
+    const queryParams = new URLSearchParams({
+      limit: limit.toString(),
+      offset: offset.toString(),
+      completed_only: completedOnly.toString()
+    })
+    return this.request(`/style-transfers?${queryParams}`)
+  }
+
+  async submitStyleTransferToComfyUI(comfyUrl: string, transferId: string, promptJson: any) {
+    const queryParams = new URLSearchParams({
+      comfy_url: comfyUrl,
+      transfer_id: transferId
+    })
+    return this.request(`/style-transfers/submit-to-comfyui?${queryParams}`, {
+      method: 'POST',
+      body: JSON.stringify(promptJson),
+    })
+  }
 }
 
 export const apiClient = new ApiClient()

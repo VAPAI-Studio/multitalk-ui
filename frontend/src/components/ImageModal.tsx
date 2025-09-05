@@ -1,21 +1,24 @@
 import { useState } from 'react'
 
 // Define interface locally to avoid import issues
-interface EditedImage {
+interface ImageItem {
   id: string
+  type: 'edited-image' | 'style-transfer'
   created_at: string
+  title: string
+  status: string
+  preview_url: string
+  result_url?: string
+  processing_time?: number
   source_image_url: string
   prompt: string
-  result_image_url?: string
   workflow_name: string
   model_used?: string
-  processing_time_seconds?: number
   user_ip?: string
-  status: 'pending' | 'processing' | 'completed' | 'failed'
 }
 
 interface ImageModalProps {
-  image: EditedImage
+  image: ImageItem
   isOpen: boolean
   onClose: () => void
 }
@@ -147,9 +150,9 @@ export default function ImageModal({ image, isOpen, onClose }: ImageModalProps) 
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                   Generated Result
                 </h3>
-                {image.result_image_url && (
+                {image.result_url && (
                   <button
-                    onClick={() => downloadImage(image.result_image_url!, `generated-${image.id}.png`)}
+                    onClick={() => downloadImage(image.result_url!, `generated-${image.id}.png`)}
                     className="px-3 py-1 text-sm bg-green-100 hover:bg-green-200 text-green-800 rounded-lg transition-colors flex items-center gap-2"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -160,7 +163,7 @@ export default function ImageModal({ image, isOpen, onClose }: ImageModalProps) 
                 )}
               </div>
               <div className="relative bg-gray-50 dark:bg-gray-900 rounded-2xl overflow-hidden">
-                {image.result_image_url ? (
+                {image.result_url ? (
                   <>
                     {!resultLoaded && (
                       <div className="absolute inset-0 flex items-center justify-center">
@@ -168,7 +171,7 @@ export default function ImageModal({ image, isOpen, onClose }: ImageModalProps) 
                       </div>
                     )}
                     <img
-                      src={image.result_image_url}
+                      src={image.result_url}
                       alt="Generated result"
                       className={`w-full max-h-96 object-contain ${resultLoaded ? 'opacity-100' : 'opacity-0'}`}
                       onLoad={() => setResultLoaded(true)}
@@ -217,10 +220,10 @@ export default function ImageModal({ image, isOpen, onClose }: ImageModalProps) 
               </div>
             )}
 
-            {image.processing_time_seconds && (
+            {image.processing_time && (
               <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4">
                 <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Processing Time</h4>
-                <p className="text-sm text-gray-900 dark:text-gray-100">{formatProcessingTime(image.processing_time_seconds)}</p>
+                <p className="text-sm text-gray-900 dark:text-gray-100">{formatProcessingTime(image.processing_time)}</p>
               </div>
             )}
           </div>

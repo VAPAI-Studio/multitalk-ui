@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { apiClient } from "./lib/apiClient";
-import UnifiedFeed from "./components/UnifiedFeed";
+import ImageFeed from "./components/ImageFeed";
 import { useSmartResolution } from "./hooks/useSmartResolution";
 
 // UI Components
@@ -148,33 +148,32 @@ export default function StyleTransfer({ comfyUrl }: Props) {
       const promptJson = await buildPromptJSON(subjectBase64, styleBase64, customPrompt);
 
       setStatus("Creating image edit record…");
-      // Create the edited image record
-      const createResponse = await apiClient.createEditedImage({
+      // Create the style transfer record
+      const createResponse = await apiClient.createStyleTransfer({
         source_image_url: subjectPreview, // Use the preview URL as source
+        style_image_url: stylePreview, // Add style image URL
         prompt: customPrompt,
-        workflow_name: 'StyleTransfer',
-        status: 'pending'
+        workflow_name: 'StyleTransfer'
       }) as any;
 
-      if (!createResponse.success || !createResponse.edited_image) {
-        throw new Error(createResponse.error || 'Failed to create image edit record');
+      if (!createResponse.success || !createResponse.style_transfer) {
+        throw new Error(createResponse.error || 'Failed to create style transfer record');
       }
 
-      const editId = createResponse.edited_image.id;
+      const editId = createResponse.style_transfer.id;
       setImageId(editId);
 
       // Update status to processing
       setStatus("Starting processing…");
-      await apiClient.updateToProcessing(editId);
+      await apiClient.updateStyleTransferToProcessing(editId);
 
       setStatus("Sending to ComfyUI for processing…");
 
       // Submit to ComfyUI via our backend
-      const clientId = `style-transfer-${Math.random().toString(36).slice(2)}`;
-      const response = await apiClient.submitPromptToComfyUI(
+      const response = await apiClient.submitStyleTransferToComfyUI(
         comfyUrl,
-        promptJson,
-        clientId
+        editId,
+        promptJson
       ) as { success: boolean; prompt_id?: string; error?: string };
       
       if (!response.success) {
@@ -243,8 +242,8 @@ export default function StyleTransfer({ comfyUrl }: Props) {
               setResultUrl(imageUrl);
               setStatus("✅ Style transfer completed!");
 
-              // Complete the edit record
-              await apiClient.completeEditedImage(
+              // Complete the style transfer record
+              await apiClient.completeStyleTransfer(
                 editId, 
                 imageUrl, 
                 Math.round((Date.now() - startTime) / 1000),
@@ -279,7 +278,7 @@ export default function StyleTransfer({ comfyUrl }: Props) {
       // Mark edit as failed if we have an ID
       if (imageId) {
         try {
-          await apiClient.failEditedImage(imageId, error.message || 'Unknown error');
+          await apiClient.failStyleTransfer(imageId, error.message || 'Unknown error');
         } catch (failError) {
           console.error('Failed to update edit status:', failError);
         }
@@ -315,13 +314,6 @@ export default function StyleTransfer({ comfyUrl }: Props) {
               Transfer artistic styles between images using AI. Upload a subject image and a style reference to create unique artistic combinations.
             </p>
             
-            {/* Instructions */}
-            <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mt-6">
-              <p className="text-sm text-blue-800 flex items-center gap-2">
-                <span>💡</span>
-                <strong>Setup Required:</strong> Make sure you have the StyleTransfer.json workflow file in your ComfyUI workflows folder, and the required models: Flux1 Dev FP8, USO Flux1 DIT Lora V1, Flux1 Projector v1, and sigclip_vision_patch14_384.
-              </p>
-            </div>
           </div>
 
           {/* Image Upload Section */}
@@ -468,11 +460,8 @@ export default function StyleTransfer({ comfyUrl }: Props) {
         {/* Right Sidebar - UnifiedFeed */}
         <div className="w-96 space-y-6">
           <div className="sticky top-6 h-[calc(100vh-3rem)]">
-            <UnifiedFeed 
-              comfyUrl={comfyUrl} 
+            <ImageFeed
               config={{
-                type: 'image',
-                title: 'Style Transfer',
                 showCompletedOnly: false,
                 maxItems: 10,
                 showFixButton: false, // Image editing doesn't need the fix button

@@ -6,7 +6,7 @@ import type { VideoTrack, AudioTrackSimple } from "./components/types";
 import { uploadMediaToComfy, generateId, startJobMonitoring, checkComfyUIHealth } from "./components/utils";
 import { useSmartResolution } from "./hooks/useSmartResolution";
 import { AVPlayerWithPadding } from "./components/AVPlayerWithPadding";
-import UnifiedFeed from "./components/UnifiedFeed";
+import VideoFeed from "./components/VideoFeed";
 
 interface Props {
   comfyUrl: string;
@@ -437,7 +437,7 @@ export default function VideoLipsync({ comfyUrl }: Props) {
             setVideoUrl(fallbackUrl);
 
 
-            // Feed will refresh automatically via UnifiedFeed component
+            // Feed will refresh automatically via VideoFeed component
             setStatus('Ready ✅');
             setIsSubmitting(false);
             
@@ -892,11 +892,9 @@ export default function VideoLipsync({ comfyUrl }: Props) {
         {/* Right Sidebar - Video Feed */}
         <div className="w-96 space-y-6">
           <div className="sticky top-6 h-[calc(100vh-3rem)]">
-            <UnifiedFeed 
+            <VideoFeed 
               comfyUrl={comfyUrl} 
               config={{
-                type: 'video',
-                title: 'Video Lipsync',
                 showCompletedOnly: false,
                 maxItems: 10,
                 showFixButton: true,
