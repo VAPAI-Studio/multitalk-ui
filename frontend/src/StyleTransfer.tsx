@@ -154,7 +154,7 @@ export default function StyleTransfer({ comfyUrl }: Props) {
         prompt: customPrompt,
         workflow_name: 'StyleTransfer',
         status: 'pending'
-      });
+      }) as any;
 
       if (!createResponse.success || !createResponse.edited_image) {
         throw new Error(createResponse.error || 'Failed to create image edit record');

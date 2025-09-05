@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createJob, updateJobToProcessing, completeJob } from "./lib/jobTracking";
-import { downloadVideoFromComfy } from "./lib/supabase";
 import { Label, Field, Section } from "./components/UI";
 import { Button, Badge } from "./components/DesignSystem";
 import { Timeline } from "./components/Timeline";
@@ -500,13 +499,7 @@ export default function MultiTalkMultiplePeople({ comfyUrl }: Props) {
               : `${comfyUrl.replace(/\/$/, '')}/view?filename=${encodeURIComponent(videoInfo.filename)}&type=${videoInfo.type || 'output'}`
             setVideoUrl(fallbackUrl)
 
-            await completeJob({ 
-              job_id: id, 
-              status: 'completed', 
-              filename: videoInfo.filename, 
-              subfolder: videoInfo.subfolder,
-              video_url: videoStorageUrl || undefined
-            })
+                        // Job completion is handled by the monitoring system in utils.ts
             
             setStatus('Listo ✅')
             setIsSubmitting(false)

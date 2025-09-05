@@ -22,18 +22,18 @@ interface ProgressMessage {
   data: any;
 }
 
-// Workflow node counts based on our analysis
-const WORKFLOW_NODE_COUNTS = {
-  'MultiTalkOnePerson': 22,
-  'MultiTalkMultiplePeople': 30,
-  'VideoLipsync': 27,
-  'InfiniteTalkOnePerson': 22, // Assuming similar to MultiTalkOnePerson
-  'WANI2V': 20, // Estimated
-  'joycaption': 15 // Estimated
-};
+// Workflow node counts based on our analysis (currently unused but kept for future reference)
+// const WORKFLOW_NODE_COUNTS = {
+//   'MultiTalkOnePerson': 22,
+//   'MultiTalkMultiplePeople': 30,
+//   'VideoLipsync': 27,
+//   'InfiniteTalkOnePerson': 22, // Assuming similar to MultiTalkOnePerson
+//   'WANI2V': 20, // Estimated
+//   'joycaption': 15 // Estimated
+// };
 
 // Function to determine workflow type and expected node count
-function getWorkflowInfo(promptId: string, activeNodes: string[]): { workflow_type: string; expected_total_nodes: number } {
+function getWorkflowInfo(_promptId: string, activeNodes: string[]): { workflow_type: string; expected_total_nodes: number } {
   // For now, we'll use a simple heuristic based on the number of active nodes
   // In a real implementation, you might want to pass the workflow type from the job creation
   

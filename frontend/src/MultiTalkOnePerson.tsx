@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createJob, updateJobToProcessing, completeJob } from "./lib/jobTracking";
-import { downloadVideoFromComfy } from "./lib/supabase";
 import { startJobMonitoring, checkComfyUIHealth } from "./components/utils";
 import UnifiedFeed from "./components/UnifiedFeed";
 import { useSmartResolution } from "./hooks/useSmartResolution";

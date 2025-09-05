@@ -1,7 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createJob, updateJobToProcessing, completeJob } from "./lib/jobTracking";
-import type { MultiTalkJob } from "./lib/supabase";
-import { downloadVideoFromComfy } from "./lib/supabase";
 import { Label, Field, Section } from "./components/UI";
 import { Timeline } from "./components/Timeline";
 import type { VideoTrack, AudioTrackSimple } from "./components/types";
@@ -438,13 +436,6 @@ export default function VideoLipsync({ comfyUrl }: Props) {
               : `${comfyUrl}/view?filename=${encodeURIComponent(videoInfo.filename)}&type=${videoInfo.type || 'output'}`;
             setVideoUrl(fallbackUrl);
 
-            await completeJob({
-              job_id: id,
-              status: 'completed',
-              filename: videoInfo.filename,
-              subfolder: videoInfo.subfolder,
-              video_url: videoStorageUrl || undefined
-            });
 
             // Feed will refresh automatically via UnifiedFeed component
             setStatus('Ready ✅');
