@@ -386,11 +386,11 @@ export default function MultiTalkOnePerson({ comfyUrl }: Props) {
           </h1>
           <div className="text-lg md:text-xl font-medium text-gray-700">
             <span className={`px-4 py-2 rounded-full border ${mode === 'multitalk' ? 'bg-gradient-to-r from-blue-100 to-purple-100 border-blue-200/50' : 'bg-gradient-to-r from-purple-100 to-pink-100 border-purple-200/50'}`}>
-              {mode === 'multitalk' ? 'Lipsync 1 Person' : 'InfiniteTalk'}
+              {mode === 'multitalk' ? 'MultiTalk' : 'InfiniteTalk'}
             </span>
           </div>
           <p className="text-gray-600 max-w-2xl mx-auto leading-relaxed">
-            Frontend elegante para disparar tu workflow de {mode === 'multitalk' ? 'Lipsync 1 Person' : 'InfiniteTalk'} en ComfyUI con estilo.
+            Frontend elegante para disparar tu workflow de {mode === 'multitalk' ? 'MultiTalk' : 'InfiniteTalk'} en ComfyUI con estilo.
           </p>
         </div>
 
