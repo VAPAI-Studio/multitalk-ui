@@ -69,8 +69,9 @@ export function useComfyUIProgress(comfyUrl: string, enabled: boolean = true) {
     if (!comfyUrl || !enabled || wsRef.current?.readyState === WebSocket.OPEN) return;
     
     try {
-      // Convert HTTP URL to WebSocket URL
-      const wsUrl = comfyUrl.replace(/^https?:\/\//, 'ws://') + '/ws';
+      // Convert HTTP URL to WebSocket URL with proper protocol
+      const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+      const wsUrl = comfyUrl.replace(/^https?:\/\//, protocol) + '/ws';
       
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
