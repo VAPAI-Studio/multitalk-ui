@@ -137,9 +137,14 @@ export default function ImageModal({ image, isOpen, onClose }: ImageModalProps) 
                 )}
                 <img
                   src={image.source_image_url}
-                  alt="Original image"
+                  alt={`Original image | Source: ${image.source_image_url.startsWith('data:') ? 'Data URL' : image.source_image_url.startsWith('blob:') ? 'Blob URL (may fail)' : image.source_image_url.includes('supabase') ? 'Supabase' : 'External'}`}
                   className={`w-full max-h-96 object-contain ${sourceLoaded ? 'opacity-100' : 'opacity-0'}`}
                   onLoad={() => setSourceLoaded(true)}
+                  onError={(e) => {
+                    console.error(`Failed to load source image: ${image.source_image_url}`)
+                    const target = e.target as HTMLImageElement
+                    target.alt = `Failed to load source: ${image.source_image_url.startsWith('blob:') ? 'Blob URL expired' : 'Image not accessible from localhost'}`
+                  }}
                 />
               </div>
             </div>
@@ -172,9 +177,14 @@ export default function ImageModal({ image, isOpen, onClose }: ImageModalProps) 
                     )}
                     <img
                       src={image.result_url}
-                      alt="Generated result"
+                      alt={`Generated result | Source: ${image.result_url.startsWith('data:') ? 'Data URL' : image.result_url.startsWith('blob:') ? 'Blob URL (may fail)' : image.result_url.includes('supabase') ? 'Supabase' : 'External'}`}
                       className={`w-full max-h-96 object-contain ${resultLoaded ? 'opacity-100' : 'opacity-0'}`}
                       onLoad={() => setResultLoaded(true)}
+                      onError={(e) => {
+                        console.error(`Failed to load result image: ${image.result_url}`)
+                        const target = e.target as HTMLImageElement
+                        target.alt = `Failed to load result: ${image.result_url.startsWith('blob:') ? 'Blob URL expired' : 'Image not accessible from localhost'}`
+                      }}
                     />
                   </>
                 ) : (

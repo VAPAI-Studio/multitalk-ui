@@ -140,7 +140,7 @@ export default function ImageFeed({ config }: ImageFeedProps) {
               created_at: transfer.created_at,
               title: transfer.prompt || 'Style Transfer',
               status: transfer.status,
-                              preview_url: transfer.result_image_url || transfer.source_image_url,
+              preview_url: transfer.result_image_url || transfer.source_image_url,
               result_url: transfer.result_image_url,
               processing_time: transfer.processing_time_seconds,
               source_image_url: transfer.source_image_url,
@@ -293,8 +293,13 @@ export default function ImageFeed({ config }: ImageFeedProps) {
                   {item.preview_url ? (
                     <img 
                       src={item.preview_url} 
-                      alt={item.title}
+                      alt={`${item.title} | Source: ${item.preview_url.startsWith('data:') ? 'Data URL' : item.preview_url.startsWith('blob:') ? 'Blob URL (may fail)' : item.preview_url.includes('supabase') ? 'Supabase' : 'External'}`}
                       className="w-full h-full object-cover"
+                      onError={(e) => {
+                        console.error(`Failed to load image: ${item.preview_url}`)
+                        const target = e.target as HTMLImageElement
+                        target.alt = `Failed to load: ${item.preview_url.startsWith('blob:') ? 'Blob URL expired' : 'Image not accessible'}`
+                      }}
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">

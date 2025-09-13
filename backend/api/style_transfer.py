@@ -161,17 +161,27 @@ async def get_recent_style_transfers(
 
 @router.post("/submit-to-comfyui")
 async def submit_style_transfer_to_comfyui(
+    request: Request,
     comfy_url: str = Query(...),
-    transfer_id: str = Query(...),
-    prompt_json: dict = None
+    transfer_id: str = Query(...)
 ):
     """Submit a style transfer workflow to ComfyUI"""
     try:
         comfyui_service = get_comfyui_service()
         style_transfer_service = get_style_transfer_service()
         
+        # Get the JSON data from the request body
+        prompt_json = await request.json()
+        
+        # ComfyUI expects the workflow wrapped in a "prompt" field with a client_id
+        import uuid
+        comfyui_payload = {
+            "prompt": prompt_json,
+            "client_id": f"style-transfer-{uuid.uuid4().hex[:8]}"
+        }
+        
         # Submit to ComfyUI
-        success, prompt_id, error = await comfyui_service.submit_prompt(comfy_url, prompt_json)
+        success, prompt_id, error = await comfyui_service.submit_prompt(comfy_url, comfyui_payload)
         
         if success:
             # Update the style transfer with the ComfyUI prompt ID

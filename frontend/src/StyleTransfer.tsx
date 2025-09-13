@@ -71,28 +71,39 @@ export default function StyleTransfer({ comfyUrl }: Props) {
   // Handle subject image upload
   useEffect(() => {
     if (!subjectImage) return;
-    const url = URL.createObjectURL(subjectImage);
-    setSubjectPreview(url);
     
-    const img = new Image();
-    img.onload = () => {
-      const ar = img.width / img.height;
-      // Initialize W/H based on subject image aspect ratio
-      const targetW = Math.max(32, Math.round(Math.min(1024, img.width) / 32) * 32);
-      const targetH = Math.max(32, Math.round((targetW / ar) / 32) * 32);
-      setWidth(targetW);
-      setHeight(targetH);
+    // Convert to data URL for persistent preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      setSubjectPreview(dataUrl);
+      
+      // Calculate dimensions
+      const img = new Image();
+      img.onload = () => {
+        const ar = img.width / img.height;
+        // Initialize W/H based on subject image aspect ratio
+        const targetW = Math.max(32, Math.round(Math.min(1024, img.width) / 32) * 32);
+        const targetH = Math.max(32, Math.round((targetW / ar) / 32) * 32);
+        setWidth(targetW);
+        setHeight(targetH);
+      };
+      img.src = dataUrl;
     };
-    img.src = url;
-    return () => URL.revokeObjectURL(url);
+    reader.readAsDataURL(subjectImage);
   }, [subjectImage, setWidth, setHeight]);
 
   // Handle style image upload
   useEffect(() => {
     if (!styleImage) return;
-    const url = URL.createObjectURL(styleImage);
-    setStylePreview(url);
-    return () => URL.revokeObjectURL(url);
+    
+    // Convert to data URL for persistent preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      setStylePreview(dataUrl);
+    };
+    reader.readAsDataURL(styleImage);
   }, [styleImage]);
 
   async function buildPromptJSON(subjectBase64: string, styleBase64: string, prompt: string) {
@@ -147,39 +158,27 @@ export default function StyleTransfer({ comfyUrl }: Props) {
       setStatus("Building workflow…");
       const promptJson = await buildPromptJSON(subjectBase64, styleBase64, customPrompt);
 
-      setStatus("Creating image edit record…");
-      // Create the style transfer record
-      const createResponse = await apiClient.createStyleTransfer({
-        source_image_url: subjectPreview, // Use the preview URL as source
-        style_image_url: stylePreview, // Add style image URL
+      setStatus("Uploading images and creating style transfer…");
+      
+      // Convert File to data URL for upload
+      const subjectDataUrl = `data:${subjectImage.type};base64,${subjectBase64}`;
+      const styleDataUrl = `data:${styleImage.type};base64,${styleBase64}`;
+      
+      // Use the new endpoint that uploads images to Supabase
+      const response = await apiClient.submitStyleTransferWithUpload({
+        subject_image_data: subjectDataUrl,
+        style_image_data: styleDataUrl,
         prompt: customPrompt,
-        workflow_name: 'StyleTransfer'
-      }) as any;
-
-      if (!createResponse.success || !createResponse.style_transfer) {
-        throw new Error(createResponse.error || 'Failed to create style transfer record');
-      }
-
-      const editId = createResponse.style_transfer.id;
-      setImageId(editId);
-
-      // Update status to processing
-      setStatus("Starting processing…");
-      await apiClient.updateStyleTransferToProcessing(editId);
-
-      setStatus("Sending to ComfyUI for processing…");
-
-      // Submit to ComfyUI via our backend
-      const response = await apiClient.submitStyleTransferToComfyUI(
-        comfyUrl,
-        editId,
-        promptJson
-      ) as { success: boolean; prompt_id?: string; error?: string };
+        workflow_json: promptJson,
+        comfy_url: comfyUrl
+      }) as { success: boolean; style_transfer_id?: string; prompt_id?: string; error?: string };
       
       if (!response.success) {
-        throw new Error(response.error || 'Failed to submit prompt to ComfyUI');
+        throw new Error(response.error || 'Failed to create style transfer');
       }
       
+      const editId = response.style_transfer_id;
+      setImageId(editId || '');
       const promptId = response.prompt_id;
       if (!promptId) {
         throw new Error('ComfyUI did not return a valid prompt ID');
@@ -239,16 +238,21 @@ export default function StyleTransfer({ comfyUrl }: Props) {
                 ? `${comfyUrl.replace(/\/$/, '')}/api/view?filename=${encodeURIComponent(imageInfo.filename)}&subfolder=${encodeURIComponent(imageInfo.subfolder)}&type=output`
                 : `${comfyUrl.replace(/\/$/, '')}/api/view?filename=${encodeURIComponent(imageInfo.filename)}&type=output`;
 
-              setResultUrl(imageUrl);
-              setStatus("✅ Style transfer completed!");
+              setStatus("Uploading result to storage...");
 
-              // Complete the style transfer record
-              await apiClient.completeStyleTransfer(
+              // Complete the style transfer record with Supabase upload
+              const completionResponse = await apiClient.completeStyleTransferWithUpload(
                 editId, 
-                imageUrl, 
-                Math.round((Date.now() - startTime) / 1000),
-                'Flux Style Transfer'
-              );
+                imageUrl  // ComfyUI URL - backend will download and upload to Supabase
+              ) as { success: boolean; style_transfer: any; error?: string };
+
+              if (completionResponse.success && completionResponse.style_transfer?.result_image_url) {
+                // Use the Supabase URL for display
+                setResultUrl(completionResponse.style_transfer.result_image_url);
+                setStatus("✅ Style transfer completed!");
+              } else {
+                throw new Error(completionResponse.error || 'Failed to upload result to storage');
+              }
               
               setIsSubmitting(false);
               return;

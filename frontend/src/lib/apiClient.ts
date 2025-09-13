@@ -315,6 +315,26 @@ class ApiClient {
       body: JSON.stringify(promptJson),
     })
   }
+
+  async submitStyleTransferWithUpload(payload: {
+    subject_image_data: string;
+    style_image_data: string;
+    prompt: string;
+    workflow_json: any;
+    comfy_url?: string;
+  }) {
+    return this.request('/style-transfers-v2/submit-with-upload', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  }
+
+  async completeStyleTransferWithUpload(transferId: string, resultUrl: string) {
+    return this.request(`/style-transfers-v2/complete-with-upload/${transferId}`, {
+      method: 'POST',
+      body: JSON.stringify({ result_url: resultUrl }),
+    })
+  }
 }
 
 export const apiClient = new ApiClient()
