@@ -25,7 +25,8 @@
       "mcp__supabase__execute_sql",
       "Bash(git checkout:*)",
       "Read(//Users/yvesfogel/Desktop/programacion/**)",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []

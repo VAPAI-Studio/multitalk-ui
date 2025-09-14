@@ -335,6 +335,67 @@ class ApiClient {
       body: JSON.stringify({ result_url: resultUrl }),
     })
   }
+
+  // New template-based approach
+  async submitStyleTransferWithTemplate(payload: {
+    subject_image_data: string;
+    style_image_data: string;
+    prompt: string;
+    width: number;
+    height: number;
+    comfy_url?: string;
+  }) {
+    return this.request('/style-transfers-v3/submit-with-template', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  }
+
+  async completeStyleTransferV3(transferId: string, resultUrl: string) {
+    return this.request(`/style-transfers-v3/complete-with-upload/${transferId}`, {
+      method: 'POST',
+      body: JSON.stringify({ result_url: resultUrl }),
+    })
+  }
+
+  // MultiTalk endpoints
+  async uploadAudioForMultiTalk(audioFile: File, comfyUrl: string = "https://comfy.vapai.studio") {
+    const formData = new FormData()
+    formData.append('audio', audioFile)
+    formData.append('comfy_url', comfyUrl)
+    
+    return fetch(`${this.baseURL}/multitalk/upload-audio`, {
+      method: 'POST',
+      body: formData,
+    }).then(response => {
+      if (!response.ok) {
+        throw new Error(`Audio upload failed: ${response.status} ${response.statusText}`)
+      }
+      return response.json()
+    })
+  }
+
+  async submitMultiTalkWithTemplate(payload: {
+    image_data: string;
+    audio_filename: string;
+    width: number;
+    height: number;
+    mode: string;
+    audio_scale?: number;
+    custom_prompt: string;
+    trim_to_audio: boolean;
+    audio_end_time?: number;
+    comfy_url?: string;
+  }) {
+    return this.request('/multitalk/submit-with-template', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  }
+
+  async getMultiTalkTemplates() {
+    return this.request('/multitalk/templates')
+  }
 }
 
 export const apiClient = new ApiClient()

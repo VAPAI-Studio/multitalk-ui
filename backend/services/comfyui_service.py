@@ -85,21 +85,35 @@ class ComfyUIService:
             return False, None, error_message
 
     async def upload_audio(self, base_url: str, audio_data: bytes, filename: str) -> Tuple[bool, Optional[str], Optional[str]]:
-        """Upload audio file to ComfyUI server"""
+        """Upload audio file to ComfyUI server using the /upload/image endpoint with 'image' key"""
         try:
             clean_url = base_url.rstrip('/')
             
             async with httpx.AsyncClient(timeout=30.0) as client:
-                files = {"audio": (filename, audio_data, "audio/wav")}
+                # Use "image" key like the frontend does, even for audio files
+                files = {"image": (filename, audio_data, "audio/wav")}
                 
-                response = await client.post(f"{clean_url}/upload/audio", files=files)
+                # Use /upload/image endpoint (ComfyUI standard for all media)
+                response = await client.post(f"{clean_url}/upload/image", files=files)
                 
                 if response.status_code != 200:
                     return False, None, f"Upload failed: {response.status_code}"
                 
-                result = response.json()
-                # ComfyUI usually returns the filename in different formats
-                audio_filename = result.get("name") or result.get("filename") or filename
+                # Try to parse as JSON first
+                try:
+                    result = response.json()
+                    # ComfyUI usually returns the filename in different formats
+                    if isinstance(result, dict):
+                        audio_filename = result.get("name") or result.get("filename") or filename
+                    elif isinstance(result, list) and len(result) > 0:
+                        # Sometimes returns array of filenames
+                        audio_filename = result[0]
+                    else:
+                        audio_filename = str(result) if result else filename
+                except:
+                    # If not JSON, try as text
+                    text = response.text
+                    audio_filename = text.strip() if text.strip() else filename
                 
                 return True, audio_filename, None
                 

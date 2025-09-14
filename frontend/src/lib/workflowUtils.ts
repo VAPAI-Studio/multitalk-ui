@@ -169,11 +169,13 @@ export const processImageWithWorkflow = async (
             throw new Error('No caption found in ComfyUI output');
           }
           
-          // Check for errors
+          // Check for errors - provide more detailed error information
           if (historyData[promptId] && historyData[promptId].status?.status_str) {
             const status = historyData[promptId].status.status_str;
             if (status.includes('error') || status.includes('failed')) {
-              throw new Error(`ComfyUI processing failed: ${status}`);
+              // Get error details if available
+              const errorDetails = historyData[promptId].status?.error || status;
+              throw new Error(`ComfyUI processing failed: ${errorDetails}. This may indicate missing JoyCaption nodes or model files.`);
             }
           }
         }
@@ -190,8 +192,10 @@ export const processImageWithWorkflow = async (
     console.error('Error processing image with ComfyUI:', error);
     
     // Fallback to mock caption if ComfyUI fails
-    const mockCaption = `[ComfyUI Error] Mock caption for ${file.name}. ComfyUI processing failed: ${error instanceof Error ? error.message : 'Unknown error'}. Character: "${settings.character_name}", Type: "${settings.caption_type}", Length: "${settings.caption_length}".`;
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const mockCaption = `[${settings.character_name || 'character'}] A detailed image showing the character. ComfyUI processing failed: ${errorMessage}`;
     
+    console.warn('ComfyUI processing failed, returning mock caption:', errorMessage);
     return mockCaption;
   }
 };

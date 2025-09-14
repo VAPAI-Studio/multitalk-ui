@@ -368,22 +368,27 @@ export default function CharacterCaption({ comfyUrl }: Props) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-indigo-50">
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-4">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Character Caption Generator</h1>
-              <p className="text-gray-600">Generate captions for images to train LoRA models</p>
-            </div>
+        <div className="max-w-6xl mx-auto space-y-8">
+          {/* Header */}
+          <div className="text-center space-y-4 py-8">
+            <h1 className="text-4xl md:text-6xl font-black bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 bg-clip-text text-transparent">
+              Character Caption Generator
+            </h1>
+            <p className="text-gray-600 max-w-2xl mx-auto leading-relaxed">
+              Generate captions for images to train LoRA models using AI-powered captioning
+            </p>
           </div>
-        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Settings Panel - Left Side */}
           <div>
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <h2 className="text-xl font-bold mb-4">Caption Settings</h2>
+            <div className="rounded-3xl border border-gray-200/80 p-6 md:p-8 shadow-lg bg-gradient-to-br from-white to-gray-50/50 backdrop-blur-sm">
+              <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+                <div className="w-2 h-8 bg-gradient-to-b from-purple-500 to-pink-600 rounded-full"></div>
+                Caption Settings
+              </h2>
               
               <div className="space-y-4">
                 <div>
@@ -540,10 +545,13 @@ export default function CharacterCaption({ comfyUrl }: Props) {
           </div>
           
           {/* Upload and Images - Right Side */}
-          <div className="space-y-6">
+          <div className="lg:col-span-3 space-y-6">
             {/* Image Upload */}
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <h2 className="text-xl font-bold mb-4">Upload Images</h2>
+            <div className="rounded-3xl border border-gray-200/80 p-6 md:p-8 shadow-lg bg-gradient-to-br from-white to-gray-50/50 backdrop-blur-sm">
+              <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+                <div className="w-2 h-8 bg-gradient-to-b from-purple-500 to-pink-600 rounded-full"></div>
+                Upload Images
+              </h2>
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-500 transition-colors">
                 <input
                   type="file"
@@ -567,45 +575,45 @@ export default function CharacterCaption({ comfyUrl }: Props) {
             </div>
             
             {/* Action Buttons */}
-            <div className="bg-white p-4 rounded-lg shadow-md">
+            <div className="rounded-3xl border border-gray-200/80 p-6 md:p-8 shadow-lg bg-gradient-to-br from-white to-gray-50/50 backdrop-blur-sm">
               <div className="flex flex-wrap gap-2 justify-between items-center">
                 <div className="flex flex-wrap gap-2">
                   <button
                     onClick={openLoadModal}
                     disabled={isProcessing}
-                    className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="px-6 py-3 rounded-2xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold shadow-lg hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02] transition-all duration-200"
                   >
-                    Load from Dataset
+                    📚 Load from Dataset
                   </button>
                   {images.length > 0 && (
                     <>
                       <button
                         onClick={handleProcessAll}
                         disabled={images.length === 0 || images.some(img => img.isProcessing)}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="px-6 py-3 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02] transition-all duration-200"
                       >
-                        Process All
+                        🎯 Process All
                       </button>
                       <button
                         onClick={openSaveModal}
                         disabled={isProcessing || images.length === 0}
-                        className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="px-6 py-3 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold shadow-lg hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02] transition-all duration-200"
                       >
-                        Save to Dataset
+                        💾 Save to Dataset
                       </button>
                       <button
                         onClick={handleExport}
                         disabled={isProcessing || images.length === 0 || images.some(img => img.isProcessing)}
-                        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="px-6 py-3 rounded-2xl bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold shadow-lg hover:from-green-700 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02] transition-all duration-200"
                       >
-                        Download ZIP
+                        📦 Download ZIP
                       </button>
                       <button
                         onClick={handleClearAll}
                         disabled={isProcessing}
-                        className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="px-6 py-3 rounded-2xl bg-gradient-to-r from-red-600 to-pink-600 text-white font-bold shadow-lg hover:from-red-700 hover:to-pink-700 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02] transition-all duration-200"
                       >
-                        Clear All
+                        🗑️ Clear All
                       </button>
                     </>
                   )}
@@ -620,17 +628,29 @@ export default function CharacterCaption({ comfyUrl }: Props) {
             
             {/* Image Grid */}
             {images.length > 0 && (
-              <div className="bg-white p-6 rounded-lg shadow-md">
-                <h2 className="text-xl font-bold mb-4">Images & Captions</h2>
+              <div className="rounded-3xl border border-gray-200/80 p-6 md:p-8 shadow-lg bg-gradient-to-br from-white to-gray-50/50 backdrop-blur-sm">
+                <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+                  <div className="w-2 h-8 bg-gradient-to-b from-purple-500 to-pink-600 rounded-full"></div>
+                  Images & Captions
+                </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {images.map((image) => (
                     <div key={image.id} className="border border-gray-200 rounded-lg overflow-hidden">
                       <div className="relative">
-                        <img
-                          src={image.url}
-                          alt={image.file.name}
-                          className="w-full h-64 object-cover"
-                        />
+                        {image.url ? (
+                          <img
+                            src={image.url}
+                            alt={image.file.name}
+                            className="w-full h-64 object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-64 bg-gray-200 flex items-center justify-center">
+                            <div className="text-center">
+                              <div className="text-4xl mb-2">🖼️</div>
+                              <p className="text-gray-500 text-sm">Loading image...</p>
+                            </div>
+                          </div>
+                        )}
                         {image.isProcessing && (
                           <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
                             <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -663,6 +683,7 @@ export default function CharacterCaption({ comfyUrl }: Props) {
               </div>
             )}
           </div>
+        </div>
         </div>
       </div>
 

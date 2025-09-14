@@ -172,12 +172,10 @@ class DatasetService:
                 raise Exception(f"Failed to upload image: {upload_response.error}")
             
             # Get public URL for the uploaded image
-            public_url_response = self.supabase.storage.from_('images').get_public_url(storage_file_name)
+            public_url = self.supabase.storage.from_('images').get_public_url(storage_file_name)
             
-            if not public_url_response.data:
+            if not public_url:
                 raise Exception("Failed to get public URL for uploaded image")
-            
-            public_url = public_url_response.data['publicUrl']
             
             # Update the data entry with the image URL
             update_response = await asyncio.to_thread(

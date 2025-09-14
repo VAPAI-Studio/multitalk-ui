@@ -106,30 +106,6 @@ export default function StyleTransfer({ comfyUrl }: Props) {
     reader.readAsDataURL(styleImage);
   }, [styleImage]);
 
-  async function buildPromptJSON(subjectBase64: string, styleBase64: string, prompt: string) {
-    try {
-      const response = await fetch('/workflows/StyleTransfer.json');
-      if (!response.ok) {
-        throw new Error(`Failed to load workflow template: ${response.status}`);
-      }
-      const template = await response.json();
-      
-      // Clean the prompt to avoid JSON issues
-      const cleanPrompt = prompt.replace(/"/g, '\\"').replace(/\n/g, '\\n');
-      
-      // Replace placeholders in the workflow
-      let promptString = JSON.stringify(template)
-        .replace(/"\{\{SUBJECT_IMAGE\}\}"/g, `"${subjectBase64}"`)
-        .replace(/"\{\{STYLE_IMAGE\}\}"/g, `"${styleBase64}"`)
-        .replace(/"\{\{CUSTOM_PROMPT\}\}"/g, `"${cleanPrompt}"`)
-        .replace(/"\{\{WIDTH\}\}"/g, width.toString())
-        .replace(/"\{\{HEIGHT\}\}"/g, height.toString());
-      
-      return JSON.parse(promptString);
-    } catch (error: any) {
-      throw new Error(`Failed to build prompt JSON: ${error.message}`);
-    }
-  }
 
   async function submit() {
     setStatus("");
@@ -155,21 +131,19 @@ export default function StyleTransfer({ comfyUrl }: Props) {
       const subjectBase64 = await fileToBase64(subjectImage);
       const styleBase64 = await fileToBase64(styleImage);
 
-      setStatus("Building workflow…");
-      const promptJson = await buildPromptJSON(subjectBase64, styleBase64, customPrompt);
-
       setStatus("Uploading images and creating style transfer…");
       
       // Convert File to data URL for upload
       const subjectDataUrl = `data:${subjectImage.type};base64,${subjectBase64}`;
       const styleDataUrl = `data:${styleImage.type};base64,${styleBase64}`;
       
-      // Use the new endpoint that uploads images to Supabase
-      const response = await apiClient.submitStyleTransferWithUpload({
+      // Use the new template-based approach (backend handles workflow building)
+      const response = await apiClient.submitStyleTransferWithTemplate({
         subject_image_data: subjectDataUrl,
         style_image_data: styleDataUrl,
         prompt: customPrompt,
-        workflow_json: promptJson,
+        width: width,
+        height: height,
         comfy_url: comfyUrl
       }) as { success: boolean; style_transfer_id?: string; prompt_id?: string; error?: string };
       
@@ -240,8 +214,8 @@ export default function StyleTransfer({ comfyUrl }: Props) {
 
               setStatus("Uploading result to storage...");
 
-              // Complete the style transfer record with Supabase upload
-              const completionResponse = await apiClient.completeStyleTransferWithUpload(
+              // Complete the style transfer record with Supabase upload (using v3 API)
+              const completionResponse = await apiClient.completeStyleTransferV3(
                 editId, 
                 imageUrl  // ComfyUI URL - backend will download and upload to Supabase
               ) as { success: boolean; style_transfer: any; error?: string };

@@ -106,14 +106,23 @@ export default function ImageFeed({ config }: ImageFeedProps) {
         
         if (response.success && response.edited_images) {
           for (const image of response.edited_images) {
+            // Filter out blob URLs as they're not persistent and cause errors
+            const getValidImageUrl = (url?: string) => {
+              if (!url || url.startsWith('blob:')) return undefined
+              return url
+            }
+            
+            const validResultUrl = getValidImageUrl(image.result_image_url)
+            const validSourceUrl = getValidImageUrl(image.source_image_url)
+            
             items.push({
               id: image.id,
               type: 'edited-image',
               created_at: image.created_at,
               title: image.prompt || 'Image Edit',
               status: image.status,
-              preview_url: image.result_image_url || image.source_image_url,
-              result_url: image.result_image_url,
+              preview_url: validResultUrl || validSourceUrl || '',
+              result_url: validResultUrl,
               processing_time: image.processing_time_seconds,
               source_image_url: image.source_image_url,
               prompt: image.prompt,
@@ -134,14 +143,23 @@ export default function ImageFeed({ config }: ImageFeedProps) {
         
         if (styleResponse.success && styleResponse.style_transfers) {
           for (const transfer of styleResponse.style_transfers) {
+            // Filter out blob URLs as they're not persistent and cause errors
+            const getValidImageUrl = (url?: string) => {
+              if (!url || url.startsWith('blob:')) return undefined
+              return url
+            }
+            
+            const validResultUrl = getValidImageUrl(transfer.result_image_url)
+            const validSourceUrl = getValidImageUrl(transfer.source_image_url)
+            
             items.push({
               id: transfer.id,
               type: 'style-transfer',
               created_at: transfer.created_at,
               title: transfer.prompt || 'Style Transfer',
               status: transfer.status,
-              preview_url: transfer.result_image_url || transfer.source_image_url,
-              result_url: transfer.result_image_url,
+              preview_url: validResultUrl || validSourceUrl || '',
+              result_url: validResultUrl,
               processing_time: transfer.processing_time_seconds,
               source_image_url: transfer.source_image_url,
               prompt: transfer.prompt,
@@ -190,11 +208,14 @@ export default function ImageFeed({ config }: ImageFeedProps) {
 
   useEffect(() => {
     loadFeed()
-    
-    // Refresh every 30 seconds
-    const interval = setInterval(() => loadFeed(), 30000)
-    return () => clearInterval(interval)
   }, [config.showCompletedOnly, config.maxItems, showFilteredOnly])
+
+  // Separate effect for auto-refresh to avoid resetting on filter changes
+  useEffect(() => {
+    // Refresh every 10 seconds for more responsive updates
+    const interval = setInterval(() => loadFeed(), 10000)
+    return () => clearInterval(interval)
+  }, [])
 
   const getStatusColor = (status: string) => {
     switch (status) {

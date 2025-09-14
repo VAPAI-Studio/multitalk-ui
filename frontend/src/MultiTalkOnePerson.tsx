@@ -3,6 +3,7 @@ import { createJob, updateJobToProcessing, completeJob } from "./lib/jobTracking
 import { startJobMonitoring, checkComfyUIHealth } from "./components/utils";
 import VideoFeed from "./components/VideoFeed";
 import { useSmartResolution } from "./hooks/useSmartResolution";
+import { apiClient } from "./lib/apiClient";
 
 // VAPAI One-Person Frontend for ComfyUI
 // - Enter ComfyUI URL
@@ -127,80 +128,7 @@ export default function MultiTalkOnePerson({ comfyUrl }: Props) {
     });
   }
 
-  async function uploadAudioToComfy(baseUrl: string, file: File): Promise<string> {
-    const form = new FormData();
-    // La clave estándar es "image" aunque sea audio; ComfyUI lo guarda igual
-    form.append("image", file, file.name);
 
-    try {
-      const r = await fetch(`${baseUrl}/upload/image`, {
-        method: "POST",
-        body: form,
-        credentials: "omit", // importantísimo para evitar preflight
-      });
-      
-      if (!r.ok) {
-        throw new Error(`Upload falló: HTTP ${r.status}`);
-      }
-
-      // Respuestas típicas de ComfyUI
-      let data: any = null;
-      try { 
-        data = await r.json(); 
-      } catch { 
-        // Puede ser texto plano
-      }
-      
-      if (data?.name) return data.name as string;
-      
-      if (Array.isArray(data?.files) && data.files[0]) return data.files[0] as string;
-      
-      const text = typeof data === "string" ? data : await r.text().catch(() => "");
-      if (text.trim()) return text.trim();
-      
-      throw new Error("Respuesta inesperada del servidor");
-      
-    } catch (e: any) {
-      if (e.name === 'TypeError' && e.message.includes('fetch')) {
-        throw new Error('No se pudo conectar al servidor. Verificá la URL de ngrok.');
-      }
-      throw new Error(`No se pudo subir el audio: ${e.message}`);
-    }
-  }
-
-  async function buildPromptJSON(base64Image: string, audioFilename: string) {
-    try {
-      const workflowFile = mode === 'infinitetalk' ? '/workflows/InfiniteTalkOnePerson.json' : '/workflows/MultiTalkOnePerson.json';
-      const response = await fetch(workflowFile);
-      if (!response.ok) {
-        throw new Error('Failed to load workflow template');
-      }
-      const template = await response.json();
-      
-      let promptString = JSON.stringify(template)
-        .replace(/"\{\{BASE64_IMAGE\}\}"/g, `"${base64Image}"`)
-        .replace(/"\{\{AUDIO_FILENAME\}\}"/g, `"${audioFilename}"`)
-        .replace(/"\{\{WIDTH\}\}"/g, width.toString())
-        .replace(/"\{\{HEIGHT\}\}"/g, height.toString())
-        .replace(/"\{\{TRIM_TO_AUDIO\}\}"/g, trimToAudio.toString());
-      
-      // Replace custom prompt
-      promptString = promptString.replace(/"\{\{CUSTOM_PROMPT\}\}"/g, `"${customPrompt.replace(/"/g, '\\"')}"`);
-      
-      // Add audio_scale and audio_end_time replacement for InfiniteTalk mode
-      if (mode === 'infinitetalk') {
-        promptString = promptString.replace(/"\{\{AUDIO_SCALE\}\}"/g, audioScale.toString());
-        // Format audio duration for AudioCrop (add 1 second buffer)
-        const audioEndTime = Math.ceil(audioDuration + 1).toString();
-        promptString = promptString.replace(/"\{\{AUDIO_END_TIME\}\}"/g, audioEndTime);
-      }
-      
-      return JSON.parse(promptString);
-    } catch (error) {
-      console.error('Error loading workflow template:', error);
-      throw new Error('Failed to build prompt JSON');
-    }
-  }
 
   async function submit() {
     setStatus("");
@@ -233,47 +161,48 @@ export default function MultiTalkOnePerson({ comfyUrl }: Props) {
       const base64Image = await fileToBase64(imageFile);
 
       setStatus("Subiendo audio a ComfyUI…");
-      const audioFilename = await uploadAudioToComfy(comfyUrl, audioFile);
+      // Use the new backend audio upload
+      const audioUploadResponse = await apiClient.uploadAudioForMultiTalk(audioFile, comfyUrl) as { 
+        success: boolean; 
+        audio_filename?: string; 
+        error?: string 
+      };
+      
+      if (!audioUploadResponse.success) {
+        throw new Error(audioUploadResponse.error || 'Failed to upload audio');
+      }
+      
+      const audioFilename = audioUploadResponse.audio_filename;
+      if (!audioFilename) {
+        throw new Error('No audio filename received from upload');
+      }
 
       setStatus("Enviando prompt a ComfyUI…");
-      const payload = {
-        prompt: await buildPromptJSON(base64Image, audioFilename),
-        client_id: `multitalk-ui-${Math.random().toString(36).slice(2)}`,
-      };
-
-      let r: Response;
-      try {
-        r = await fetch(`${comfyUrl}/prompt`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-          signal: AbortSignal.timeout(30000) // 30 second timeout
-        });
-      } catch (error: any) {
-        if (error.name === 'TimeoutError') {
-          throw new Error('Timeout al conectar con ComfyUI. Verificá que esté ejecutándose y la URL sea correcta.');
-        }
-        if (error.name === 'TypeError') {
-          throw new Error('No se pudo conectar a ComfyUI. Verificá la URL y que CORS esté habilitado.');
-        }
-        throw new Error(`Error de red: ${error.message}`);
+      
+      // Convert File to data URL for backend
+      const imageDataUrl = `data:${imageFile.type};base64,${base64Image}`;
+      
+      // Use the new backend template-based approach
+      const response = await apiClient.submitMultiTalkWithTemplate({
+        image_data: imageDataUrl,
+        audio_filename: audioFilename,
+        width: width,
+        height: height,
+        mode: mode,
+        audio_scale: audioScale,
+        custom_prompt: customPrompt,
+        trim_to_audio: trimToAudio,
+        audio_end_time: mode === 'infinitetalk' ? audioDuration + 1 : undefined,
+        comfy_url: comfyUrl
+      }) as { success: boolean; prompt_id?: string; error?: string };
+      
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to submit to ComfyUI');
       }
       
-      if (!r.ok) {
-        let errorDetail = '';
-        try {
-          const errorData = await r.json();
-          errorDetail = errorData.error || errorData.message || '';
-        } catch {
-          errorDetail = await r.text().catch(() => '');
-        }
-        throw new Error(`ComfyUI rechazó el prompt (${r.status}): ${errorDetail || 'Error desconocido'}`);
-      }
-      
-      const resp = await r.json();
-      const id = resp?.prompt_id || resp?.promptId || resp?.node_id || "";
+      const id = response.prompt_id;
       if (!id) {
-        throw new Error('ComfyUI no devolvió un ID de prompt válido. Respuesta: ' + JSON.stringify(resp));
+        throw new Error('ComfyUI did not return a valid prompt ID');
       }
       setJobId(id);
 
