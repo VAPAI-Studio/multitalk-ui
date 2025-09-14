@@ -152,7 +152,12 @@ export default function StyleTransfer({ comfyUrl }: Props) {
       }
       
       const editId = response.style_transfer_id;
-      setImageId(editId || '');
+      if (!editId) {
+        throw new Error('Backend did not return a valid style transfer ID');
+      }
+      // TypeScript assertion: editId is now guaranteed to be a string
+      const transferId: string = editId;
+      setImageId(editId);
       const promptId = response.prompt_id;
       if (!promptId) {
         throw new Error('ComfyUI did not return a valid prompt ID');
@@ -212,11 +217,15 @@ export default function StyleTransfer({ comfyUrl }: Props) {
                 ? `${comfyUrl.replace(/\/$/, '')}/api/view?filename=${encodeURIComponent(imageInfo.filename)}&subfolder=${encodeURIComponent(imageInfo.subfolder)}&type=output`
                 : `${comfyUrl.replace(/\/$/, '')}/api/view?filename=${encodeURIComponent(imageInfo.filename)}&type=output`;
 
+              if (!imageUrl) {
+                throw new Error('Failed to construct image URL');
+              }
+
               setStatus("Uploading result to storage...");
 
               // Complete the style transfer record with Supabase upload (using v3 API)
               const completionResponse = await apiClient.completeStyleTransferV3(
-                editId, 
+                transferId, 
                 imageUrl  // ComfyUI URL - backend will download and upload to Supabase
               ) as { success: boolean; style_transfer: any; error?: string };
 

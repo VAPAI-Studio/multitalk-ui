@@ -176,14 +176,14 @@ export default function ImageModal({ image, isOpen, onClose }: ImageModalProps) 
                       </div>
                     )}
                     <img
-                      src={image.result_url}
-                      alt={`Generated result | Source: ${image.result_url.startsWith('data:') ? 'Data URL' : image.result_url.startsWith('blob:') ? 'Blob URL (may fail)' : image.result_url.includes('supabase') ? 'Supabase' : 'External'}`}
+                      src={image.result_url || ''}
+                      alt={`Generated result | Source: ${image.result_url && image.result_url.startsWith('data:') ? 'Data URL' : image.result_url && image.result_url.startsWith('blob:') ? 'Blob URL (may fail)' : image.result_url && image.result_url.includes('supabase') ? 'Supabase' : 'External'}`}
                       className={`w-full max-h-96 object-contain ${resultLoaded ? 'opacity-100' : 'opacity-0'}`}
                       onLoad={() => setResultLoaded(true)}
                       onError={(e) => {
-                        console.error(`Failed to load result image: ${image.result_url}`)
+                        console.error(`Failed to load result image: ${image.result_url || 'undefined'}`)
                         const target = e.target as HTMLImageElement
-                        target.alt = `Failed to load result: ${image.result_url.startsWith('blob:') ? 'Blob URL expired' : 'Image not accessible from localhost'}`
+                        target.alt = `Failed to load result: ${image.result_url && image.result_url.startsWith('blob:') ? 'Blob URL expired' : 'Image not accessible from localhost'}`
                       }}
                     />
                   </>
