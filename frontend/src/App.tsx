@@ -10,11 +10,33 @@ import WANI2V from "./WANI2V";
 import StyleTransfer from "./StyleTransfer";
 import ComfyUIStatus from "./components/ComfyUIStatus";
 import ConsoleToggle from "./components/ConsoleToggle";
+import AuthPage from "./components/AuthPage";
+import { useAuth } from "./contexts/AuthContext";
 
 export default function App() {
+  const { isAuthenticated, loading, user, logout } = useAuth();
   const [currentPage, setCurrentPage] = useState<"home" | "multitalk-one" | "multitalk-multiple" | "video-lipsync" | "image-edit" | "generation-feed" | "character-caption" | "wan-i2v" | "style-transfer">("home");
   const [comfyUrl, setComfyUrl] = useState<string>("https://comfy.vapai.studio");
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
+
+  // Show loading state while checking authentication
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-gradient-to-br from-blue-500 via-purple-600 to-pink-500 rounded-2xl flex items-center justify-center shadow-lg mx-auto mb-4 animate-pulse">
+            <span className="text-white font-bold text-3xl">🎬</span>
+          </div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show auth page if not authenticated
+  if (!isAuthenticated) {
+    return <AuthPage />;
+  }
 
   // Load saved page and ComfyUI URL from localStorage on mount
   useEffect(() => {
@@ -70,7 +92,7 @@ export default function App() {
               </div>
             </div>
             
-            {/* Right: ComfyUI Settings */}
+            {/* Right: ComfyUI Settings + User Menu */}
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <label className="text-xs font-medium text-gray-700">ComfyUI</label>
@@ -83,6 +105,19 @@ export default function App() {
                 />
               </div>
               <ComfyUIStatus baseUrl={comfyUrl} />
+
+              {/* User Menu */}
+              <div className="flex items-center gap-3 pl-3 border-l border-gray-200">
+                <div className="text-right">
+                  <p className="text-xs font-medium text-gray-700">{user?.full_name || user?.email}</p>
+                </div>
+                <button
+                  onClick={logout}
+                  className="px-4 py-2 bg-red-500 text-white text-sm font-medium rounded-xl hover:bg-red-600 hover:scale-105 transition-all duration-200 shadow"
+                >
+                  Logout
+                </button>
+              </div>
             </div>
           </div>
         </div>
