@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import os
 
-from api import jobs, storage, datasets, image_edit, comfyui, edited_images, style_transfer, style_transfer_v2, style_transfer_v3, multitalk
+from api import jobs, storage, datasets, image_edit, comfyui, edited_images, style_transfer, style_transfer_v2, style_transfer_v3, multitalk, auth
 
 # Only load .env file if not running on Heroku
 if not os.getenv("DYNO"):  # DYNO is a Heroku-specific environment variable
@@ -24,6 +24,7 @@ app.add_middleware(
 )
 
 # Include API routers
+app.include_router(auth.router, prefix="/api")
 app.include_router(jobs.router, prefix="/api")
 app.include_router(storage.router, prefix="/api")
 app.include_router(datasets.router, prefix="/api")
