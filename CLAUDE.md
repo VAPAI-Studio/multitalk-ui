@@ -184,6 +184,10 @@ As of the latest update, the application includes these features:
 - **Style Transfer** - Transfer artistic styles between images using AI (Model: Flux with USO Style Reference)
 - **Generation Feed** - View and manage all generations across all features in one unified interface
 
+---
+
+Use context7 to check for up-to-date documentation when needed for implementing new libraries or frameworks, or adding features using them.
+
 
 @new_feature_guide.md
 @api_doc.md
