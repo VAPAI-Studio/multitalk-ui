@@ -1,6 +1,27 @@
 # VAPAI Studio
 
-A full-stack application for AI-powered video and audio processing with multi-character conversations.
+A full-stack application for AI-powered video and audio processing with multi-character conversations. Built with React, TypeScript, FastAPI, ComfyUI, and Supabase.
+
+## Features
+
+VAPAI Studio offers a comprehensive suite of AI-powered media creation tools:
+
+- 🎬 **Lipsync 1 Person** - Generate realistic talking videos from single person images
+- 🎵 **Lipsync Multi Person** - Create multi-character conversations with synchronized audio
+- 🎬 **Video Lipsync** - Add perfect lip-sync to existing videos
+- ✨ **Image Edit** - AI-powered image editing with natural language
+- 📝 **Character Caption** - Generate training datasets for LoRA models
+- 🎬 **WAN I2V** - Transform images into videos
+- 🎨 **Style Transfer** - Artistic style transfer between images
+- 🖼️ **Generation Feed** - Unified interface for all your generations
+
+## Tech Stack
+
+- **Frontend**: React 19, TypeScript, Vite, TailwindCSS
+- **Backend**: FastAPI, Python 3.11+, Pydantic
+- **AI Workflows**: ComfyUI integration
+- **Database & Auth**: Supabase (PostgreSQL + Auth)
+- **Storage**: Supabase Storage
 
 ## Project Structure
 
@@ -14,7 +35,9 @@ multitalk-ui/
 │   ├── main.py
 │   ├── requirements.txt
 │   └── api/
-└── README.md
+├── CLAUDE.md          # Detailed architecture & development guide
+├── new_feature_guide.md  # Guide for adding new features
+└── README.md          # This file
 ```
 
 ## Development
@@ -70,3 +93,13 @@ The frontend can be deployed to Vercel, Netlify, or any static hosting service.
 ## Environment Variables
 
 See `.env.example` files in both frontend and backend directories for required configuration.
+
+## Documentation
+
+- **[CLAUDE.md](CLAUDE.md)** - Complete architecture overview, development workflows, and integration patterns
+- **[new_feature_guide.md](new_feature_guide.md)** - Step-by-step guide for adding new AI workflow features
+- **[api_doc.md](api_doc.md)** - ComfyUI server API reference
+- **[backend/setup_supabase_auth.md](backend/setup_supabase_auth.md)** - Supabase authentication setup
+- **[TODO.md](TODO.md)** - Project roadmap and planned improvements
+
+For detailed information about the architecture, development setup, and contributing guidelines, see [CLAUDE.md](CLAUDE.md).
