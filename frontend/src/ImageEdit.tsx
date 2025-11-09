@@ -282,19 +282,30 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
             }
 
             if (imageInfo) {
-              // Construct the image URL
-              const imageUrl = imageInfo.subfolder
-                ? `${comfyUrl.replace(/\/$/, '')}/api/view?filename=${encodeURIComponent(imageInfo.filename)}&subfolder=${encodeURIComponent(imageInfo.subfolder)}&type=output`
-                : `${comfyUrl.replace(/\/$/, '')}/api/view?filename=${encodeURIComponent(imageInfo.filename)}&type=output`;
+              // Construct the ComfyUI view URL
+              const comfyImageUrl = imageInfo.subfolder
+                ? `${comfyUrl.replace(/\/$/, '')}/view?filename=${encodeURIComponent(imageInfo.filename)}&subfolder=${encodeURIComponent(imageInfo.subfolder)}&type=output`
+                : `${comfyUrl.replace(/\/$/, '')}/view?filename=${encodeURIComponent(imageInfo.filename)}&type=output`;
 
-              // Update job as completed
+              setCameraStatus("💾 Saving image to storage...");
+
+              // Upload image from ComfyUI URL to Supabase Storage
+              const uploadResult = await apiClient.uploadImageFromUrl(comfyImageUrl, 'camera-angle-results') as any;
+
+              if (!uploadResult.success || !uploadResult.public_url) {
+                throw new Error(uploadResult.error || 'Failed to upload image to storage');
+              }
+
+              const storedImageUrl = uploadResult.public_url;
+
+              // Update job as completed with stored URL
               await apiClient.completeImageJob(promptId, {
                 job_id: promptId,
                 status: 'completed',
-                output_image_urls: [imageUrl]
+                output_image_urls: [storedImageUrl]
               });
 
-              setCameraResultUrl(imageUrl);
+              setCameraResultUrl(storedImageUrl);
               setCameraStatus("✅ Camera angle generated successfully!");
               return;
             }

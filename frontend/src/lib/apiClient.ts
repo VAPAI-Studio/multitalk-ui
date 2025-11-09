@@ -99,6 +99,13 @@ class ApiClient {
   }
 
   // Storage endpoints
+  async uploadImageFromUrl(imageUrl: string, folder: string = 'images') {
+    return this.request('/storage/images/upload-from-url', {
+      method: 'POST',
+      body: JSON.stringify({ image_url: imageUrl, folder }),
+    })
+  }
+
   async uploadVideoToStorage(payload: any) {
     return this.request('/storage/videos/upload', {
       method: 'POST',

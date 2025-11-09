@@ -8,12 +8,37 @@ from models.storage import (
     DeleteVideoResponse,
     VideoFile
 )
+from pydantic import BaseModel
 from services.storage_service import StorageService
 
 router = APIRouter(prefix="/storage", tags=["storage"])
 
+class UploadImageFromUrlPayload(BaseModel):
+    image_url: str
+    folder: str = "images"
+
+class ImageUploadResponse(BaseModel):
+    success: bool
+    public_url: str | None = None
+    error: str | None = None
+
 def get_storage_service():
     return StorageService()
+
+@router.post("/images/upload-from-url", response_model=ImageUploadResponse)
+async def upload_image_from_url(payload: UploadImageFromUrlPayload):
+    """Download image from URL and upload to Supabase Storage"""
+    storage_service = get_storage_service()
+    success, public_url, error = await storage_service.upload_image_from_url(
+        payload.image_url,
+        payload.folder
+    )
+
+    return ImageUploadResponse(
+        success=success,
+        public_url=public_url,
+        error=error
+    )
 
 @router.post("/videos/upload", response_model=VideoUploadResponse)
 async def upload_video_to_storage(payload: UploadVideoPayload):
@@ -26,7 +51,7 @@ async def upload_video_to_storage(payload: UploadVideoPayload):
         payload.job_id,
         payload.video_type
     )
-    
+
     return VideoUploadResponse(
         success=success,
         public_url=public_url,
