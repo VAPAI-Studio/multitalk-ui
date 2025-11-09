@@ -134,6 +134,17 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
       const result = e.target?.result as string;
       setCameraImagePreview(result);
       setCameraStatus("");
+
+      // Automatically set width and height based on image dimensions
+      const img = new Image();
+      img.onload = () => {
+        // Round to nearest multiple of 32 for compatibility
+        const roundedWidth = Math.round(img.width / 32) * 32;
+        const roundedHeight = Math.round(img.height / 32) * 32;
+        setWidth(roundedWidth);
+        setHeight(roundedHeight);
+      };
+      img.src = result;
     };
     reader.readAsDataURL(file);
   };
