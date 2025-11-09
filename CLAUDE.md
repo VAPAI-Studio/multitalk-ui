@@ -176,11 +176,46 @@ Authentication requires Supabase configuration:
 
 ### Branch Workflow
 
-- `main` - Production-ready code
+**Branch Structure:**
+- `main` - Production-ready code (protected, no direct pushes)
 - `dev` - Integration branch for testing features
 - `feature-*` - Feature branches created from `dev`
 
-Create feature branches from dev, merge back to dev for testing, then dev to main for release.
+**IMPORTANT RULES:**
+- ❌ **NEVER push or merge directly to `main`**
+- ❌ **NEVER create feature branches from `main`**
+- ✅ **ALWAYS start from `dev`** when creating new feature branches
+- ✅ **ALWAYS merge feature branches back to `dev`** first
+- ✅ Only `dev` can be merged to `main` (after testing)
+
+**Standard Workflow:**
+```bash
+# 1. Start from dev
+git checkout dev
+git pull origin dev
+
+# 2. Create feature branch from dev
+git checkout -b feature/your-feature-name
+
+# 3. Make changes and commit
+git add .
+git commit -m "Your changes"
+
+# 4. Push feature branch
+git push -u origin feature/your-feature-name
+
+# 5. Create PR to merge feature → dev
+# (Use GitHub UI)
+
+# 6. After PR approval, dev → main happens separately
+# (Only when dev is stable and tested)
+```
+
+**Why this workflow?**
+- `dev` is the integration branch where features are tested together
+- `main` always represents production-ready, stable code
+- Feature branches allow isolated development and easy rollback
+- This prevents breaking production with untested changes
 
 ## Related Documentation
 
