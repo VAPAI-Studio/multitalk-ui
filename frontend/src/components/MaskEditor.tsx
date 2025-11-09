@@ -173,7 +173,9 @@ export function MaskEditor({ imageUrl, onMaskUpdate, maskName, existingMask }: M
     e.preventDefault()
     drawing.current = true
     lastPos.current = null
-    try { e.currentTarget.setPointerCapture(e.pointerId) } catch {}
+    try { e.currentTarget.setPointerCapture(e.pointerId) } catch {
+      // Ignore pointer capture errors
+    }
     pointer(e, true)
   }
   
@@ -185,7 +187,9 @@ export function MaskEditor({ imageUrl, onMaskUpdate, maskName, existingMask }: M
     e.preventDefault()
     drawing.current = false
     lastPos.current = null
-    try { e.currentTarget.releasePointerCapture(e.pointerId) } catch {}
+    try { e.currentTarget.releasePointerCapture(e.pointerId) } catch {
+      // Ignore pointer capture errors
+    }
     const mask = maskRef.current
     if (mask) {
       const imageData = mask.getContext('2d')!.getImageData(0, 0, mask.width, mask.height)

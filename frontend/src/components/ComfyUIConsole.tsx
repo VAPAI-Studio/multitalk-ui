@@ -62,11 +62,12 @@ export default function ComfyUIConsole({ comfyUrl, isVisible, onClose }: ComfyUI
       
       case 'executed':
         return `✨ Node ${data.node} completed with UI output`;
-      
-      case 'progress':
+
+      case 'progress': {
         const percent = data.max ? Math.round((data.value / data.max) * 100) : 0;
         return `📊 ${data.node}: ${data.value}/${data.max} (${percent}%)`;
-      
+      }
+
       case 'status':
         return `📋 Queue status: ${data.exec_info?.queue_remaining || 0} jobs remaining`;
       
