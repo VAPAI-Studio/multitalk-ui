@@ -244,7 +244,7 @@ export default function ImageFeed({ config }: ImageFeedProps) {
       setLoading(false)
       setLoadingMore(false)
     }
-  }, [config.showCompletedOnly, config.maxItems, config.useNewJobSystem, config.workflowName, config.userId, showFilteredOnly, currentOffset])
+  }, [config.showCompletedOnly, config.maxItems, config.useNewJobSystem, config.workflowName, config.userId, showFilteredOnly])
 
   const loadMore = () => {
     if (!loadingMore && hasMore) {
