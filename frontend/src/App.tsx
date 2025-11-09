@@ -10,11 +10,15 @@ import WANI2V from "./WANI2V";
 import StyleTransfer from "./StyleTransfer";
 import ComfyUIStatus from "./components/ComfyUIStatus";
 import ConsoleToggle from "./components/ConsoleToggle";
+import AuthPage from "./components/AuthPage";
+import { useAuth } from "./contexts/AuthContext";
 
 export default function App() {
+  const { isAuthenticated, loading, user, logout } = useAuth();
   const [currentPage, setCurrentPage] = useState<"home" | "multitalk-one" | "multitalk-multiple" | "video-lipsync" | "image-edit" | "generation-feed" | "character-caption" | "wan-i2v" | "style-transfer">("home");
   const [comfyUrl, setComfyUrl] = useState<string>("https://comfy.vapai.studio");
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
+  const [userMenuOpen, setUserMenuOpen] = useState<boolean>(false);
 
   // Load saved page and ComfyUI URL from localStorage on mount
   useEffect(() => {
@@ -43,6 +47,25 @@ export default function App() {
     localStorage.setItem('vapai-comfy-url', url);
   };
 
+  // Show loading state while checking authentication
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-gradient-to-br from-blue-500 via-purple-600 to-pink-500 rounded-2xl flex items-center justify-center shadow-lg mx-auto mb-4 animate-pulse">
+            <span className="text-white font-bold text-3xl">🎬</span>
+          </div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show auth page if not authenticated
+  if (!isAuthenticated) {
+    return <AuthPage />;
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
       {/* Header */}
@@ -70,7 +93,7 @@ export default function App() {
               </div>
             </div>
             
-            {/* Right: ComfyUI Settings */}
+            {/* Right: ComfyUI Settings + User Menu */}
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <label className="text-xs font-medium text-gray-700">ComfyUI</label>
@@ -83,6 +106,79 @@ export default function App() {
                 />
               </div>
               <ComfyUIStatus baseUrl={comfyUrl} />
+
+              {/* User Menu */}
+              <div className="relative flex items-center gap-3 pl-3 border-l border-gray-200">
+                <button
+                  onClick={() => setUserMenuOpen(!userMenuOpen)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-gray-100 transition-all duration-200"
+                >
+                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                    <span className="text-white text-sm font-bold">
+                      {(user?.full_name?.[0] || user?.email?.[0] || 'U').toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="text-left">
+                    <p className="text-sm font-medium text-gray-700">{user?.full_name || user?.email}</p>
+                  </div>
+                  <svg
+                    className={`w-4 h-4 text-gray-500 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {/* Dropdown Menu */}
+                {userMenuOpen && (
+                  <>
+                    {/* Backdrop */}
+                    <div
+                      className="fixed inset-0 z-30"
+                      onClick={() => setUserMenuOpen(false)}
+                    />
+
+                    {/* Dropdown */}
+                    <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-200 py-2 z-40">
+                      <div className="px-4 py-3 border-b border-gray-100">
+                        <p className="text-sm font-medium text-gray-900">{user?.full_name || 'User'}</p>
+                        <p className="text-xs text-gray-500">{user?.email}</p>
+                      </div>
+
+                      {/* Dev-only: Clear session */}
+                      {import.meta.env.DEV && (
+                        <button
+                          onClick={() => {
+                            localStorage.clear();
+                            window.location.reload();
+                          }}
+                          className="w-full text-left px-4 py-2 text-sm text-yellow-700 hover:bg-yellow-50 transition-colors flex items-center gap-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                          Clear Session (Dev)
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => {
+                          logout();
+                          setUserMenuOpen(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50 transition-colors flex items-center gap-2"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                        Logout
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>
