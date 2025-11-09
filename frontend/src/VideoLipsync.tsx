@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from "react";
-import { createJob, updateJobToProcessing, completeJob } from "./lib/jobTracking";
 import { Label, Field, Section } from "./components/UI";
 import { Timeline } from "./components/Timeline";
 import type { VideoTrack, AudioTrackSimple } from "./components/types";
@@ -7,6 +6,7 @@ import { uploadMediaToComfy, generateId, startJobMonitoring, checkComfyUIHealth 
 import { useSmartResolution } from "./hooks/useSmartResolution";
 import { AVPlayerWithPadding } from "./components/AVPlayerWithPadding";
 import VideoFeed from "./components/VideoFeed";
+import { apiClient } from "./lib/apiClient";
 
 interface Props {
   comfyUrl: string;
@@ -302,7 +302,7 @@ export default function VideoLipsync({ comfyUrl }: Props) {
         concatInput2Index = "0";
       }
 
-      let promptString = JSON.stringify(template)
+      const promptString = JSON.stringify(template)
         .replace(/"\{\{VIDEO_FILENAME\}\}"/g, `"${videoFilename}"`)
         .replace(/"\{\{AUDIO_FILENAME\}\}"/g, `"${audioFilename}"`)
         .replace(/"\{\{WIDTH\}\}"/g, width.toString())
@@ -327,7 +327,7 @@ export default function VideoLipsync({ comfyUrl }: Props) {
       
       
       return JSON.parse(promptString);
-    } catch (error) {
+    } catch {
       throw new Error('Failed to build prompt JSON');
     }
   }
@@ -408,17 +408,25 @@ export default function VideoLipsync({ comfyUrl }: Props) {
       }
       setJobId(id);
 
-      await createJob({
-        job_id: id,
+      // Create job record in new video_jobs table
+      await apiClient.createVideoJob({
+        comfy_job_id: id,
+        workflow_name: 'video-lipsync',
         comfy_url: comfyUrl,
-        image_filename: videoFile.name,
-        audio_filename: audioFilename,
+        input_video_urls: [videoFile.name],
+        input_audio_urls: [audioFilename],
         width,
         height,
-        trim_to_audio: trimToAudio
+        fps: 25,
+        parameters: {
+          audio_scale: audioScale,
+          trim_to_audio: trimToAudio,
+          has_video: !!videoTrack,
+          has_audio: !!audioTrack
+        }
       });
 
-      await updateJobToProcessing(id);
+      await apiClient.updateVideoJobToProcessing(id);
 
       // Start monitoring job status
       setStatus('Processing in ComfyUI…');
@@ -436,22 +444,27 @@ export default function VideoLipsync({ comfyUrl }: Props) {
               : `${comfyUrl}/view?filename=${encodeURIComponent(videoInfo.filename)}&type=${videoInfo.type || 'output'}`;
             setVideoUrl(fallbackUrl);
 
-
-            // Feed will refresh automatically via VideoFeed component
             setStatus('Ready ✅');
             setIsSubmitting(false);
-            
+
+            // Complete job in new system
+            await apiClient.completeVideoJob(id, {
+              job_id: id,
+              status: 'completed',
+              output_video_urls: [fallbackUrl]
+            });
+
           } else if (jobStatus === 'error') {
             setStatus(`❌ ${message}`);
             setIsSubmitting(false);
-            
+
             try {
-              await completeJob({
+              await apiClient.completeVideoJob(id, {
                 job_id: id,
-                status: 'error',
+                status: 'failed',
                 error_message: message || 'Unknown error'
               });
-            } catch (dbError) {
+            } catch {
               // Silent error - job status update failed
             }
           }
@@ -476,12 +489,12 @@ export default function VideoLipsync({ comfyUrl }: Props) {
       
       if (jobId) {
         try {
-          await completeJob({
+          await apiClient.completeVideoJob(jobId, {
             job_id: jobId,
-            status: 'error',
+            status: 'failed',
             error_message: errorMessage
           });
-        } catch (dbError) {
+        } catch {
           // Silent error - job status update failed but main error is more important
         }
       }
@@ -811,7 +824,7 @@ export default function VideoLipsync({ comfyUrl }: Props) {
                   audioDuration={audioTrack?.duration}
                   viewportSize={{ width: width, height: height }}
                   className="max-w-2xl mx-auto"
-                  onTimeUpdate={(_time) => {
+                  onTimeUpdate={() => {
                     // Optional: could sync with timeline visualization
                   }}
                 />
@@ -892,14 +905,16 @@ export default function VideoLipsync({ comfyUrl }: Props) {
         {/* Right Sidebar - Video Feed */}
         <div className="w-96 space-y-6">
           <div className="sticky top-6 h-[calc(100vh-3rem)]">
-            <VideoFeed 
-              comfyUrl={comfyUrl} 
+            <VideoFeed
+              comfyUrl={comfyUrl}
               config={{
+                useNewJobSystem: true,
+                workflowName: 'video-lipsync',
                 showCompletedOnly: false,
                 maxItems: 10,
                 showFixButton: true,
                 showProgress: true,
-                pageContext: 'videolipsync'
+                pageContext: 'video-lipsync'
               }}
             />
           </div>

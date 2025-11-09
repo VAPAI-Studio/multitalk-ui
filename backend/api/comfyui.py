@@ -75,21 +75,52 @@ async def upload_audio(
     try:
         if not audio.filename:
             raise HTTPException(status_code=400, detail="No filename provided")
-            
+
         # Read the audio data
         audio_data = await audio.read()
-        
+
         comfyui_service = get_comfyui_service()
         success, filename, error = await comfyui_service.upload_audio(
             base_url, audio_data, audio.filename
         )
-        
+
         return AudioUploadResponse(
             success=success,
             filename=filename,
             error=error
         )
-        
+
+    except Exception as e:
+        return AudioUploadResponse(
+            success=False,
+            error=f"Server error: {str(e)}"
+        )
+
+@router.post("/upload-image", response_model=AudioUploadResponse)  # Reusing AudioUploadResponse as it has the same structure
+async def upload_image(
+    base_url: str = Query(..., description="ComfyUI server URL"),
+    image: UploadFile = File(..., description="Image file to upload")
+):
+    """Upload image file to ComfyUI server"""
+    try:
+        if not image.filename:
+            raise HTTPException(status_code=400, detail="No filename provided")
+
+        # Read the image data
+        image_data = await image.read()
+
+        comfyui_service = get_comfyui_service()
+        # Reusing upload_audio method as ComfyUI uses the same endpoint for both
+        success, filename, error = await comfyui_service.upload_audio(
+            base_url, image_data, image.filename
+        )
+
+        return AudioUploadResponse(
+            success=success,
+            filename=filename,
+            error=error
+        )
+
     except Exception as e:
         return AudioUploadResponse(
             success=False,

@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { createJob, updateJobToProcessing, completeJob } from "./lib/jobTracking";
 import { startJobMonitoring, checkComfyUIHealth } from "./components/utils";
 import VideoFeed from "./components/VideoFeed";
 import { useSmartResolution } from "./hooks/useSmartResolution";
@@ -27,15 +26,48 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 // Helper functions
-function fileToBase64(file: File): Promise<string> {
+async function resizeImageToTarget(file: File, targetWidth: number, targetHeight: number): Promise<File> {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      resolve(result.split(',')[1]); // Remove data:image/...;base64, prefix
+    const img = new Image();
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    if (!ctx) {
+      reject(new Error('Failed to get canvas context'));
+      return;
+    }
+
+    img.onload = () => {
+      // Set canvas to exact target dimensions
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+
+      // Draw image scaled to target size
+      ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+
+      // Convert to JPEG with good quality (85%)
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            reject(new Error('Failed to resize image'));
+            return;
+          }
+
+          const resizedFile = new File([blob], file.name.replace(/\.\w+$/, '.jpg'), {
+            type: 'image/jpeg',
+            lastModified: Date.now(),
+          });
+
+          console.log(`Resized image: ${img.width}x${img.height} (${(file.size / 1024 / 1024).toFixed(2)}MB) → ${targetWidth}x${targetHeight} (${(resizedFile.size / 1024 / 1024).toFixed(2)}MB)`);
+          resolve(resizedFile);
+        },
+        'image/jpeg',
+        0.85
+      );
     };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
+
+    img.onerror = () => reject(new Error('Failed to load image for resizing'));
+    img.src = URL.createObjectURL(file);
   });
 }
 
@@ -48,17 +80,18 @@ export default function WANI2V({ comfyUrl }: Props) {
   const [imagePreview, setImagePreview] = useState<string>("");
   const [imageAR, setImageAR] = useState<number | null>(null);
   const [customPrompt, setCustomPrompt] = useState<string>('a beautiful scene transforming through time');
+  const [duration, setDuration] = useState<number>(3.375); // Duration in seconds (3-10)
 
   // Smart resolution handling with auto-correction to multiples of 32
-  const { 
-    width, 
-    height, 
-    widthInput, 
-    heightInput, 
-    handleWidthChange, 
-    handleHeightChange, 
-    setWidth, 
-    setHeight 
+  const {
+    width,
+    height,
+    widthInput,
+    heightInput,
+    handleWidthChange,
+    handleHeightChange,
+    setWidth,
+    setHeight
   } = useSmartResolution(640, 360) // defaults for video
 
   const [status, setStatus] = useState<string>("");
@@ -104,34 +137,47 @@ export default function WANI2V({ comfyUrl }: Props) {
     }
   }, [width, imageAR, height, setHeight]);
 
-  async function buildPromptJSON(base64Image: string, prompt: string) {
+  async function buildPromptJSON(imageFilename: string, prompt: string) {
     try {
       // Ensure width and height are valid numbers
       const safeWidth = width || 640;
       const safeHeight = height || 360;
-      
+
+      // Calculate frame count from duration (fps = 24)
+      const frameRate = 24;
+      const frameCount = Math.round(duration * frameRate);
+
       const response = await fetch('/workflows/WANI2V.json');
       if (!response.ok) {
         throw new Error(`Failed to load workflow template: ${response.status}`);
       }
       const template = await response.json();
-      
+
       // Clean the prompt to avoid JSON issues
       const cleanPrompt = prompt.replace(/"/g, '\\"').replace(/\n/g, '\\n');
-      
+
       // Instead of string replacement on the entire JSON, let's modify the template object directly
       const modifiedTemplate = JSON.parse(JSON.stringify(template));
-      
+
       // Replace prompt
       if (modifiedTemplate["149"] && modifiedTemplate["149"].inputs) {
         modifiedTemplate["149"].inputs.value = cleanPrompt;
       }
-      
-      // Replace image
-      if (modifiedTemplate["295"] && modifiedTemplate["295"].inputs) {
-        modifiedTemplate["295"].inputs.image = base64Image;
+
+      // Replace image node to use LoadImage instead of Base64
+      // Change node type and provide filename
+      if (modifiedTemplate["295"]) {
+        modifiedTemplate["295"] = {
+          "inputs": {
+            "image": imageFilename
+          },
+          "class_type": "LoadImage",
+          "_meta": {
+            "title": "Load Image"
+          }
+        };
       }
-      
+
       // Replace width and height in all relevant nodes
       const widthHeightNodes = ["257", "258", "259", "264"];
       widthHeightNodes.forEach(nodeId => {
@@ -144,7 +190,15 @@ export default function WANI2V({ comfyUrl }: Props) {
           }
         }
       });
-      
+
+      // Replace length (duration) in WanImageToVideo nodes (257, 258, 264)
+      const durationNodes = ["257", "258", "264"];
+      durationNodes.forEach(nodeId => {
+        if (modifiedTemplate[nodeId] && modifiedTemplate[nodeId].inputs) {
+          modifiedTemplate[nodeId].inputs.length = frameCount;
+        }
+      });
+
       return modifiedTemplate;
     } catch (error: any) {
       throw new Error(`Failed to build prompt JSON: ${error.message}`);
@@ -178,12 +232,23 @@ export default function WANI2V({ comfyUrl }: Props) {
         throw new Error(`${healthCheck.error}${healthCheck.details ? `. ${healthCheck.details}` : ''}`);
       }
 
-      setStatus("Converting image to Base64…");
-      const base64Image = await fileToBase64(imageFile);
+      // Always resize image to target dimensions (width x height)
+      setStatus(`Resizing image to ${width}x${height}...`);
+      const fileToUpload = await resizeImageToTarget(imageFile, width, height);
+
+      setStatus("Uploading image to ComfyUI…");
+      const uploadResult = await apiClient.uploadImageToComfyUI(comfyUrl, fileToUpload);
+
+      if (!uploadResult.success || !uploadResult.filename) {
+        throw new Error(uploadResult.error || 'Failed to upload image to ComfyUI');
+      }
+
+      const uploadedFilename = uploadResult.filename;
+      console.log('Uploaded image filename:', uploadedFilename);
 
       setStatus("Sending prompt to ComfyUI…");
       const clientId = `wani2v-ui-${Math.random().toString(36).slice(2)}`;
-      const promptJson = await buildPromptJSON(base64Image, customPrompt);
+      const promptJson = await buildPromptJSON(uploadedFilename, customPrompt);
 
       const response = await apiClient.submitPromptToComfyUI(
         comfyUrl,
@@ -201,19 +266,23 @@ export default function WANI2V({ comfyUrl }: Props) {
       }
       setJobId(id);
 
-      // Create job record in Supabase
-      await createJob({
-        job_id: id,
+      // Create job record in new video_jobs table
+      await apiClient.createVideoJob({
+        comfy_job_id: id,
+        workflow_name: 'wan-i2v',
         comfy_url: comfyUrl,
-        image_filename: imageFile?.name,
-        audio_filename: undefined, // No audio for I2V
+        input_image_urls: [imageFile.name], // Just filename for now, not full URL
         width,
         height,
-        trim_to_audio: false
+        fps: 24,
+        duration_seconds: duration,
+        parameters: {
+          prompt: customPrompt
+        }
       });
 
       // Update job to processing status
-      await updateJobToProcessing(id);
+      await apiClient.updateVideoJobToProcessing(id);
 
       // Start monitoring job status
       setStatus("Processing in ComfyUI…");
@@ -224,27 +293,34 @@ export default function WANI2V({ comfyUrl }: Props) {
           if (jobStatus === 'processing') {
             setStatus(message || 'Processing in ComfyUI…');
           } else if (jobStatus === 'completed' && videoInfo) {
-            // Job monitoring in utils.ts will handle Supabase upload
-            // Just set the ComfyUI URL for immediate viewing and let the job monitor complete the job
-            const fallbackUrl = videoInfo.subfolder
+            // Construct video URL
+            const videoUrl = videoInfo.subfolder
               ? `${comfyUrl}/api/view?filename=${encodeURIComponent(videoInfo.filename)}&subfolder=${encodeURIComponent(videoInfo.subfolder)}&type=temp`
               : `${comfyUrl}/api/view?filename=${encodeURIComponent(videoInfo.filename)}&type=temp`;
-            setVideoUrl(fallbackUrl);
+
+            setVideoUrl(videoUrl);
             setStatus("✅ Video generated successfully!");
             setIsSubmitting(false);
+
+            // Complete job in new system
+            await apiClient.completeVideoJob(id, {
+              job_id: id,
+              status: 'completed',
+              output_video_urls: [videoUrl]
+            });
           } else if (jobStatus === 'error') {
             // Handle error
             setStatus(`❌ ${message}`);
             setIsSubmitting(false);
-            
+
             try {
-              await completeJob({
+              await apiClient.completeVideoJob(id, {
                 job_id: id,
-                status: 'error',
+                status: 'failed',
                 error_message: message || 'Unknown error'
               });
             } catch (dbError) {
-              // Silent error for DB issues
+              console.error('Failed to update job error:', dbError);
             }
           }
         }
@@ -254,9 +330,9 @@ export default function WANI2V({ comfyUrl }: Props) {
 
     } catch (error: any) {
       if (jobId) {
-        await completeJob({
+        await apiClient.completeVideoJob(jobId, {
           job_id: jobId,
-          status: 'error',
+          status: 'failed',
           error_message: error.message || 'Unknown error'
         }).catch(() => {});
       }
@@ -334,8 +410,8 @@ export default function WANI2V({ comfyUrl }: Props) {
             </Field>
           </Section>
 
-          {/* Resolution */}
-          <Section title="Video Resolution">
+          {/* Resolution and Duration */}
+          <Section title="Video Settings">
             <div className="grid grid-cols-2 gap-4">
               <Field>
                 <Label>Width</Label>
@@ -369,6 +445,38 @@ export default function WANI2V({ comfyUrl }: Props) {
                 💡 Resolution will be adjusted to maintain aspect ratio: {imageAR.toFixed(2)}
               </p>
             )}
+
+            <Field>
+              <Label>Duration (seconds)</Label>
+              <div className="flex items-center gap-4">
+                <input
+                  type="range"
+                  min="3"
+                  max="10"
+                  step="0.125"
+                  value={duration}
+                  onChange={(e) => setDuration(parseFloat(e.target.value))}
+                  className="flex-1"
+                />
+                <input
+                  type="number"
+                  min="3"
+                  max="10"
+                  step="0.125"
+                  value={duration}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    if (!isNaN(val) && val >= 3 && val <= 10) {
+                      setDuration(val);
+                    }
+                  }}
+                  className="w-24 px-3 py-2 rounded-xl border-2 border-gray-200 focus:border-purple-500 focus:outline-none transition-colors"
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                {duration.toFixed(2)}s = {Math.round(duration * 24)} frames @ 24fps
+              </p>
+            </Field>
           </Section>
 
           {/* Generation */}
@@ -412,14 +520,15 @@ export default function WANI2V({ comfyUrl }: Props) {
         {/* Right Sidebar - Video Feed */}
         <div className="w-96 space-y-6">
           <div className="sticky top-6 h-[calc(100vh-3rem)]">
-            <VideoFeed 
-              comfyUrl={comfyUrl} 
+            <VideoFeed
+              comfyUrl={comfyUrl}
               config={{
+                useNewJobSystem: true,
+                workflowName: 'wan-i2v',
                 showCompletedOnly: false,
                 maxItems: 10,
                 showFixButton: true,
-                showProgress: true,
-                pageContext: 'wani2v'
+                showProgress: true
               }}
             />
           </div>

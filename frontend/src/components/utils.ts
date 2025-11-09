@@ -275,6 +275,61 @@ export function findVideoFromHistory(historyJson: any): VideoResult | null {
   return null;
 }
 
+// Find image output from ComfyUI history (for img2img, style transfer, etc.)
+export function findImageFromHistory(historyJson: any): VideoResult | null {
+  if (!historyJson) return null;
+
+  const tryScanOutputs = (outputs: any): VideoResult | null => {
+    if (!outputs || typeof outputs !== 'object') return null;
+    for (const k of Object.keys(outputs)) {
+      const out = outputs[k];
+      const arrays = ['images', 'files', 'items'];
+      for (const arrName of arrays) {
+        const arr = out?.[arrName];
+        if (Array.isArray(arr)) {
+          // Find first image file (png, jpg, jpeg, webp)
+          const image = arr.find((x: any) =>
+            typeof x?.filename === 'string' &&
+            /\.(png|jpg|jpeg|webp)$/i.test(x.filename)
+          );
+          if (image) {
+            return { filename: image.filename, subfolder: image.subfolder ?? null, type: image.type ?? null };
+          }
+        }
+      }
+      if (out && typeof out === 'object') {
+        const nested: VideoResult | null = tryScanOutputs(out);
+        if (nested) return nested;
+      }
+    }
+    return null;
+  };
+
+  if (historyJson.outputs) {
+    const hit = tryScanOutputs(historyJson.outputs);
+    if (hit) return hit;
+  }
+
+  for (const key of Object.keys(historyJson)) {
+    const maybe = historyJson[key];
+    if (maybe?.outputs) {
+      const hit = tryScanOutputs(maybe.outputs);
+      if (hit) return hit;
+    }
+  }
+
+  return null;
+}
+
+// Generic function to find any output (tries video first, then image)
+export function findOutputFromHistory(historyJson: any, preferType: 'video' | 'image' = 'video'): VideoResult | null {
+  if (preferType === 'video') {
+    return findVideoFromHistory(historyJson) || findImageFromHistory(historyJson);
+  } else {
+    return findImageFromHistory(historyJson) || findVideoFromHistory(historyJson);
+  }
+}
+
 export function generateId(): string {
   return Math.random().toString(36).slice(2, 11);
 }
@@ -403,19 +458,24 @@ export function startJobMonitoring(
 }
 
 // Check if ComfyUI is available and properly configured
-export async function checkComfyUIHealth(baseUrl: string): Promise<{ 
-  available: boolean; 
-  error?: string; 
-  details?: string 
+export async function checkComfyUIHealth(baseUrl: string): Promise<{
+  available: boolean;
+  error?: string;
+  details?: string
 }> {
   try {
     // First check if the server responds at all
+    const controller1 = new AbortController()
+    const timeout1 = setTimeout(() => controller1.abort(), 10000) // 10 second timeout
+
     const healthResponse = await fetch(`${baseUrl.replace(/\/$/, '')}/system_stats`, {
       method: 'GET',
-      signal: AbortSignal.timeout(10000), // 10 second timeout
+      signal: controller1.signal,
       cache: 'no-store'
     });
-    
+
+    clearTimeout(timeout1)
+
     if (!healthResponse.ok) {
       return {
         available: false,
@@ -425,11 +485,16 @@ export async function checkComfyUIHealth(baseUrl: string): Promise<{
     }
 
     // Try to get the queue status to ensure ComfyUI core is working
+    const controller2 = new AbortController()
+    const timeout2 = setTimeout(() => controller2.abort(), 5000)
+
     const queueResponse = await fetch(`${baseUrl.replace(/\/$/, '')}/queue`, {
       method: 'GET',
-      signal: AbortSignal.timeout(5000),
+      signal: controller2.signal,
       cache: 'no-store'
     });
+
+    clearTimeout(timeout2)
 
     if (!queueResponse.ok) {
       return {
@@ -440,11 +505,16 @@ export async function checkComfyUIHealth(baseUrl: string): Promise<{
     }
 
     // Check if we can get object info (indicates nodes are loaded)
+    const controller3 = new AbortController()
+    const timeout3 = setTimeout(() => controller3.abort(), 5000)
+
     const objectInfoResponse = await fetch(`${baseUrl.replace(/\/$/, '')}/object_info`, {
       method: 'GET',
-      signal: AbortSignal.timeout(5000),
+      signal: controller3.signal,
       cache: 'no-store'
     });
+
+    clearTimeout(timeout3)
 
     if (!objectInfoResponse.ok) {
       return {
@@ -471,14 +541,14 @@ export async function checkComfyUIHealth(baseUrl: string): Promise<{
     return { available: true };
 
   } catch (error: any) {
-    if (error.name === 'TimeoutError') {
+    if (error.name === 'AbortError' || error.name === 'TimeoutError') {
       return {
         available: false,
         error: 'Timeout al conectar con ComfyUI',
         details: 'ComfyUI no responde. Verificá que esté ejecutándose y la URL sea correcta.'
       };
     }
-    
+
     if (error.name === 'TypeError' && error.message.includes('fetch')) {
       return {
         available: false,

@@ -70,7 +70,10 @@ export interface ImageFeedConfig {
   maxItems?: number
   showFixButton?: boolean
   showProgress?: boolean
-  pageContext?: string // Identifies which page/tool this feed is on (e.g., 'image-edit', 'style-transfer')
+  pageContext?: string // Identifies which page/tool this feed is on (e.g., 'image-edit', 'style-transfer') - DEPRECATED, use workflowName
+  useNewJobSystem?: boolean // Use new image_jobs table instead of edited_images + style_transfers
+  workflowName?: string // Filter by workflow_name in new system (img2img, style-transfer, image-edit)
+  userId?: string // Filter by user_id in new system
 }
 
 interface ImageFeedProps {
@@ -94,91 +97,134 @@ export default function ImageFeed({ config }: ImageFeedProps) {
     } else {
       setLoadingMore(true)
     }
-    
+
     try {
       const items: ImageItem[] = []
       const offset = reset ? 0 : currentOffset
       const limit = config.maxItems || 10
 
-      // Load edited images
-      try {
-        const response = await apiClient.getRecentEditedImages(limit, offset, config.showCompletedOnly || false) as EditedImagesResponse
-        
-        if (response.success && response.edited_images) {
-          for (const image of response.edited_images) {
-            // Filter out blob URLs as they're not persistent and cause errors
-            const getValidImageUrl = (url?: string) => {
-              if (!url || url.startsWith('blob:')) return undefined
-              return url
-            }
-            
-            const validResultUrl = getValidImageUrl(image.result_image_url)
-            const validSourceUrl = getValidImageUrl(image.source_image_url)
-            
-            items.push({
-              id: image.id,
-              type: 'edited-image',
-              created_at: image.created_at,
-              title: image.prompt || 'Image Edit',
-              status: image.status,
-              preview_url: validResultUrl || validSourceUrl || '',
-              result_url: validResultUrl,
-              processing_time: image.processing_time_seconds,
-              source_image_url: image.source_image_url,
-              prompt: image.prompt,
-              workflow_name: image.workflow_name,
-              model_used: image.model_used,
-              user_ip: image.user_ip,
-              metadata: image
-            })
-          }
+      // Use new image_jobs system if enabled
+      if (config.useNewJobSystem) {
+        const params = {
+          limit,
+          offset,
+          workflow_name: config.workflowName,
+          user_id: config.userId
         }
-      } catch (error) {
-        console.error('Error loading edited images:', error)
-      }
 
-      // Load style transfers (always load both types for unified feed)
-      try {
-        const styleResponse = await apiClient.getRecentStyleTransfers(limit, offset, config.showCompletedOnly || false) as StyleTransfersResponse
-        
-        if (styleResponse.success && styleResponse.style_transfers) {
-          for (const transfer of styleResponse.style_transfers) {
-            // Filter out blob URLs as they're not persistent and cause errors
+        const jobsResponse = config.showCompletedOnly
+          ? await apiClient.getCompletedImageJobs(params) as any
+          : await apiClient.getImageJobs(params) as any
+
+        if (jobsResponse && jobsResponse.success && jobsResponse.image_jobs) {
+          for (const job of jobsResponse.image_jobs) {
+            // Filter out blob URLs
             const getValidImageUrl = (url?: string) => {
               if (!url || url.startsWith('blob:')) return undefined
               return url
             }
-            
-            const validResultUrl = getValidImageUrl(transfer.result_image_url)
-            const validSourceUrl = getValidImageUrl(transfer.source_image_url)
-            
+
+            const validResultUrl = getValidImageUrl(job.output_image_urls?.[0])
+            const validSourceUrl = getValidImageUrl(job.input_image_urls?.[0])
+
             items.push({
-              id: transfer.id,
-              type: 'style-transfer',
-              created_at: transfer.created_at,
-              title: transfer.prompt || 'Style Transfer',
-              status: transfer.status,
+              id: job.id,
+              type: job.workflow_name === 'style-transfer' ? 'style-transfer' : 'edited-image',
+              created_at: job.created_at,
+              title: job.prompt || job.workflow_name || 'Image',
+              status: job.status,
               preview_url: validResultUrl || validSourceUrl || '',
               result_url: validResultUrl,
-              processing_time: transfer.processing_time_seconds,
-              source_image_url: transfer.source_image_url,
-              prompt: transfer.prompt,
-              workflow_name: transfer.workflow_name,
-              model_used: transfer.model_used,
-              user_ip: transfer.user_ip,
-              metadata: transfer
+              processing_time: undefined, // Not stored in new schema
+              source_image_url: job.input_image_urls?.[0] || '',
+              prompt: job.prompt || '',
+              workflow_name: job.workflow_name,
+              model_used: job.model_used,
+              user_ip: job.user_ip,
+              metadata: job as any
             })
           }
         }
-      } catch (error) {
-        console.error('Error loading style transfers:', error)
+      } else {
+        // Use old system - load from both edited_images and style_transfers tables
+        // Load edited images
+        try {
+          const response = await apiClient.getRecentEditedImages(limit, offset, config.showCompletedOnly || false) as EditedImagesResponse
+
+          if (response.success && response.edited_images) {
+            for (const image of response.edited_images) {
+              const getValidImageUrl = (url?: string) => {
+                if (!url || url.startsWith('blob:')) return undefined
+                return url
+              }
+
+              const validResultUrl = getValidImageUrl(image.result_image_url)
+              const validSourceUrl = getValidImageUrl(image.source_image_url)
+
+              items.push({
+                id: image.id,
+                type: 'edited-image',
+                created_at: image.created_at,
+                title: image.prompt || 'Image Edit',
+                status: image.status,
+                preview_url: validResultUrl || validSourceUrl || '',
+                result_url: validResultUrl,
+                processing_time: image.processing_time_seconds,
+                source_image_url: image.source_image_url,
+                prompt: image.prompt,
+                workflow_name: image.workflow_name,
+                model_used: image.model_used,
+                user_ip: image.user_ip,
+                metadata: image
+              })
+            }
+          }
+        } catch (error) {
+          console.error('Error loading edited images:', error)
+        }
+
+        // Load style transfers
+        try {
+          const styleResponse = await apiClient.getRecentStyleTransfers(limit, offset, config.showCompletedOnly || false) as StyleTransfersResponse
+
+          if (styleResponse.success && styleResponse.style_transfers) {
+            for (const transfer of styleResponse.style_transfers) {
+              const getValidImageUrl = (url?: string) => {
+                if (!url || url.startsWith('blob:')) return undefined
+                return url
+              }
+
+              const validResultUrl = getValidImageUrl(transfer.result_image_url)
+              const validSourceUrl = getValidImageUrl(transfer.source_image_url)
+
+              items.push({
+                id: transfer.id,
+                type: 'style-transfer',
+                created_at: transfer.created_at,
+                title: transfer.prompt || 'Style Transfer',
+                status: transfer.status,
+                preview_url: validResultUrl || validSourceUrl || '',
+                result_url: validResultUrl,
+                processing_time: transfer.processing_time_seconds,
+                source_image_url: transfer.source_image_url,
+                prompt: transfer.prompt,
+                workflow_name: transfer.workflow_name,
+                model_used: transfer.model_used,
+                user_ip: transfer.user_ip,
+                metadata: transfer
+              })
+            }
+          }
+        } catch (error) {
+          console.error('Error loading style transfers:', error)
+        }
       }
 
       // Sort by creation date (newest first)
       items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-      
+
       // Apply filtering if needed
-      const filteredItems = showFilteredOnly 
+      const filteredItems = showFilteredOnly
         ? items.filter(item => item.status === 'completed' && item.result_url)
         : items
 
@@ -187,11 +233,11 @@ export default function ImageFeed({ config }: ImageFeedProps) {
       } else {
         setFeedItems(prev => [...prev, ...filteredItems])
       }
-      
+
       // Update pagination state
       setCurrentOffset(offset + limit)
       setHasMore(filteredItems.length === limit)
-      
+
     } catch (error) {
       console.error('Error loading image feed:', error)
     } finally {
@@ -208,7 +254,7 @@ export default function ImageFeed({ config }: ImageFeedProps) {
 
   useEffect(() => {
     loadFeed()
-  }, [config.showCompletedOnly, config.maxItems, showFilteredOnly])
+  }, [config.showCompletedOnly, config.maxItems, config.useNewJobSystem, config.workflowName, config.userId, showFilteredOnly])
 
   // Separate effect for auto-refresh to avoid resetting on filter changes
   useEffect(() => {
