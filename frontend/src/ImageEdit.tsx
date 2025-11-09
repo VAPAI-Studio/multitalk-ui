@@ -621,8 +621,8 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
           <div className="sticky top-6 h-[calc(100vh-3rem)]">
             <ImageFeed
               config={{
-                useNewJobSystem: true,
-                workflowName: activeTab === "edit" ? "image-edit" : "camera-angle",
+                useNewJobSystem: activeTab === "camera-angle", // Only use new system for camera-angle
+                workflowName: activeTab === "camera-angle" ? "camera-angle" : undefined,
                 showCompletedOnly: false,
                 maxItems: 10,
                 showFixButton: false,
