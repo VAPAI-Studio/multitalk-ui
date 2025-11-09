@@ -38,7 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } else {
       setLoading(false);
     }
-  }, []);
+  }, [verifyToken]);
 
   const verifyToken = async (authToken: string) => {
     try {
