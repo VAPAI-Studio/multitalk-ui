@@ -490,8 +490,6 @@ export default function MultiTalkMultiplePeople({ comfyUrl }: Props) {
         height,
         fps: 25,
         parameters: {
-          mode,
-          audio_scale: audioScale,
           trim_to_audio: trimToAudio,
           masks: masks.length,
           audio_tracks: audioTracks.length

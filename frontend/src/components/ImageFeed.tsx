@@ -113,8 +113,8 @@ export default function ImageFeed({ config }: ImageFeedProps) {
         }
 
         const jobsResponse = config.showCompletedOnly
-          ? await apiClient.getCompletedImageJobs(params)
-          : await apiClient.getImageJobs(params)
+          ? await apiClient.getCompletedImageJobs(params) as any
+          : await apiClient.getImageJobs(params) as any
 
         if (jobsResponse && jobsResponse.success && jobsResponse.image_jobs) {
           for (const job of jobsResponse.image_jobs) {

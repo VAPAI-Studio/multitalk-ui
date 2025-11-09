@@ -130,8 +130,8 @@ export default function VideoFeed({ comfyUrl, config }: VideoFeedProps) {
         }
 
         const jobsResponse = config.showCompletedOnly
-          ? await apiClient.getCompletedVideoJobs(params)
-          : await apiClient.getVideoJobs(params)
+          ? await apiClient.getCompletedVideoJobs(params) as any
+          : await apiClient.getVideoJobs(params) as any
 
         if (!jobsResponse || !jobsResponse.success || !jobsResponse.video_jobs) {
           if (reset) {

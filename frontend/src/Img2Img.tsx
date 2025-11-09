@@ -96,7 +96,7 @@ export default function Img2Img({ comfyUrl }: Props) {
         },
         comfyUrl,
         clientId
-      );
+      ) as any;
 
       if (!response.success) {
         throw new Error(response.error || 'Failed to submit workflow to ComfyUI');
@@ -130,7 +130,7 @@ export default function Img2Img({ comfyUrl }: Props) {
 
       const checkStatus = async () => {
         try {
-          const response = await apiClient.getComfyUIHistory(comfyUrl, id);
+          const response = await apiClient.getComfyUIHistory(comfyUrl, id) as any;
           if (!response.success) {
             console.warn('Failed to get history:', response.error);
             return;
@@ -161,7 +161,7 @@ export default function Img2Img({ comfyUrl }: Props) {
 
           // Check if completed
           if (historyEntry?.status?.status_str === "success" || historyEntry?.status?.completed) {
-            const imageInfo = findImageFromHistory(response.history);
+            const imageInfo = findImageFromHistory(response.history) as any;
             console.log('Image generation completed. Image info:', imageInfo);
 
             if (imageInfo) {

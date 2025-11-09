@@ -421,8 +421,8 @@ export default function VideoLipsync({ comfyUrl }: Props) {
         parameters: {
           audio_scale: audioScale,
           trim_to_audio: trimToAudio,
-          video_tracks: videoTracks.length,
-          audio_tracks: audioTracks.length
+          has_video: !!videoTrack,
+          has_audio: !!audioTrack
         }
       });
 
