@@ -195,6 +195,26 @@ class ApiClient {
     })
   }
 
+  async submitWorkflow(workflowName: string, parameters: any, baseUrl: string, clientId: string) {
+    return this.request('/comfyui/submit-workflow', {
+      method: 'POST',
+      body: JSON.stringify({
+        workflow_name: workflowName,
+        parameters: parameters,
+        base_url: baseUrl,
+        client_id: clientId,
+      }),
+    })
+  }
+
+  async listWorkflows() {
+    return this.request('/comfyui/workflows')
+  }
+
+  async getWorkflowParameters(workflowName: string) {
+    return this.request(`/comfyui/workflows/${workflowName}/parameters`)
+  }
+
   async getComfyUIHistory(baseUrl: string, jobId: string) {
     const queryParam = `?base_url=${encodeURIComponent(baseUrl)}`
     return this.request(`/comfyui/history/${jobId}${queryParam}`)
