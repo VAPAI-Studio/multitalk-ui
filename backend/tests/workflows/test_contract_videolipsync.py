@@ -6,6 +6,7 @@ Every workflow should have a similar contract test.
 """
 import pytest
 import json
+import re
 
 
 @pytest.mark.workflow
@@ -75,8 +76,10 @@ class TestVideoLipsyncContract:
         assert success is True
 
         workflow_str = json.dumps(workflow)
-        assert "{{" not in workflow_str, "Found unsubstituted placeholders"
-        assert "}}" not in workflow_str, "Found unsubstituted placeholders"
+        # Use regex to match actual placeholders, not unicode escape sequences like \ud83c\udfa5
+        placeholder_pattern = r'(?<!\\u[0-9a-fA-F]{4})\{\{[A-Z_]+\}\}'
+        matches = re.findall(placeholder_pattern, workflow_str)
+        assert len(matches) == 0, f"Unsubstituted placeholders found: {matches}"
 
     async def test_validates_successfully(self, workflow_service):
         """Test that built workflow passes validation"""
