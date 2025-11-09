@@ -224,13 +224,43 @@ class ApiClient {
     const formData = new FormData()
     formData.append('image', file)
 
-    const queryParam = `?base_url=${encodeURIComponent(baseUrl)}`
-    return this.request(`/comfyui/upload-image${queryParam}`, {
-      method: 'POST',
-      body: formData,
-      // Don't set Content-Type header - let browser set it with boundary
-      headers: {}
-    })
+    const url = `${this.baseURL}/comfyui/upload-image?base_url=${encodeURIComponent(baseUrl)}`
+    console.log('Upload URL:', url)
+    console.log('File:', file.name, file.size, 'bytes')
+
+    // Use fetch directly to avoid Content-Type header issues with FormData
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout for file uploads
+
+    try {
+      console.log('Sending upload request...')
+      const response = await fetch(url, {
+        method: 'POST',
+        body: formData,
+        signal: controller.signal,
+        // Don't set Content-Type - browser will set it with multipart boundary
+      })
+
+      clearTimeout(timeoutId)
+      console.log('Upload response status:', response.status, response.statusText)
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('Upload failed:', response.status, errorText)
+        throw new Error(`Upload failed: ${response.status} ${response.statusText}`)
+      }
+
+      const result = await response.json()
+      console.log('Upload result:', result)
+      return result
+    } catch (error) {
+      clearTimeout(timeoutId)
+      console.error('Upload error:', error)
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error('Upload timed out. Please try again.')
+      }
+      throw error
+    }
   }
 
   // Edited Images endpoints

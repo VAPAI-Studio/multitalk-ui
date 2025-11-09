@@ -72,13 +72,17 @@ export default function Img2Img({ comfyUrl }: Props) {
     try {
       // Upload image to ComfyUI via backend
       setStatus("Uploading image...");
+      console.log('Uploading image:', inputImage.name, 'to ComfyUI:', comfyUrl);
+
       const uploadResponse = await apiClient.uploadImageToComfyUI(comfyUrl, inputImage);
+      console.log('Upload response:', uploadResponse);
 
       if (!uploadResponse.success) {
         throw new Error(uploadResponse.error || 'Failed to upload image');
       }
 
       const imageFilename = uploadResponse.filename;
+      console.log('Image uploaded successfully:', imageFilename);
 
       // Submit workflow
       setStatus("Sending workflow to ComfyUI...");
@@ -110,10 +114,9 @@ export default function Img2Img({ comfyUrl }: Props) {
         comfy_url: comfyUrl,
         image_filename: inputImage.name,
         audio_filename: undefined,
-        width: undefined,
-        height: undefined,
-        trim_to_audio: false,
-        workflow_type: 'img2img'
+        width: 512,  // Default width for img2img
+        height: 512, // Default height for img2img
+        trim_to_audio: false
       });
 
       await updateJobToProcessing(id);
