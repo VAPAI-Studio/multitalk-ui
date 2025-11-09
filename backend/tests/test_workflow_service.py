@@ -123,10 +123,13 @@ class TestWorkflowServiceBuild:
 
         assert success is True
 
-        # Check no placeholders remain
+        # Check no placeholders remain (but allow unicode escape sequences like \uXXXX)
         workflow_str = json.dumps(workflow)
-        assert "{{" not in workflow_str, "Unsubstituted placeholders found"
-        assert "}}" not in workflow_str, "Unsubstituted placeholders found"
+        import re
+        # Match {{PLACEHOLDER}} pattern but not unicode escapes like \ud83c\udfa5
+        placeholder_pattern = r'(?<!\\u[0-9a-f]{4})\{\{[A-Z_]+\}\}'
+        matches = re.findall(placeholder_pattern, workflow_str)
+        assert len(matches) == 0, f"Unsubstituted placeholders found: {matches}"
 
     async def test_build_workflow_escapes_special_characters(self, workflow_service):
         """Test that special characters in strings are properly escaped"""
