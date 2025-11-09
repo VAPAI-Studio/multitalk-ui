@@ -172,7 +172,7 @@ class TestGetWorkflowParametersEndpoint:
 
     def test_get_parameters_success(self, client):
         """Test successfully getting workflow parameters"""
-        response = client.get("/comfyui/workflows/VideoLipsync/parameters")
+        response = client.get("/api/comfyui/workflows/VideoLipsync/parameters")
 
         assert response.status_code == 200
         data = response.json()
@@ -193,7 +193,7 @@ class TestGetWorkflowParametersEndpoint:
 
     def test_get_parameters_nonexistent_workflow(self, client):
         """Test getting parameters for non-existent workflow"""
-        response = client.get("/comfyui/workflows/NonExistentWorkflow/parameters")
+        response = client.get("/api/comfyui/workflows/NonExistentWorkflow/parameters")
 
         assert response.status_code == 404
 
