@@ -254,6 +254,8 @@ export default function ImageEdit({}: Props) {
           <div className="sticky top-6 h-[calc(100vh-3rem)]">
             <ImageFeed
               config={{
+                useNewJobSystem: true,
+                workflowName: 'image-edit',
                 showCompletedOnly: false,
                 maxItems: 10,
                 showFixButton: false,

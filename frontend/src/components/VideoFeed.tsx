@@ -4,6 +4,7 @@ import { useComfyUIProgress } from '../hooks/useComfyUIProgress'
 import { fixStuckJob } from '../lib/fixStuckJob'
 import VideoThumbnail from './VideoThumbnail'
 import type { MultiTalkJob } from '../lib/supabase'
+import { apiClient } from '../lib/apiClient'
 
 interface VideoJob extends MultiTalkJob {
   progress?: {
@@ -36,7 +37,10 @@ export interface VideoFeedConfig {
   maxItems?: number
   showFixButton?: boolean
   showProgress?: boolean
-  pageContext?: string // Identifies which page/tool this feed is on
+  pageContext?: string // Identifies which page/tool this feed is on (DEPRECATED - use workflowName)
+  useNewJobSystem?: boolean // Use new video_jobs table instead of multitalk_jobs
+  workflowName?: string // Filter by workflow_name in new system (lipsync-one, lipsync-multi, video-lipsync, wan-i2v)
+  userId?: string // Filter by user_id in new system
 }
 
 interface VideoFeedProps {
@@ -107,27 +111,69 @@ export default function VideoFeed({ comfyUrl, config }: VideoFeedProps) {
     } else {
       setLoadingMore(true)
     }
-    
+
     try {
       // Load a large batch of items from the API
       const limit = config.maxItems || 10
-      
-      console.log(`🔄 Loading videos: reset=${reset}, displayCount=${displayCount}`)
-      
-      // Try without offset first to see if that works
-      const jobsResponse = config.showCompletedOnly 
-        ? await getCompletedJobsWithVideos(limit * 3, 0) // Load 3x more items, ignore offset for now
-        : await getRecentJobs(limit * 3, 0)
-      
-      if (!jobsResponse || !jobsResponse.jobs) {
-        if (reset) {
-          setDisplayedItems([])
+
+      console.log(`🔄 Loading videos: reset=${reset}, displayCount=${displayCount}, useNewJobSystem=${config.useNewJobSystem}`)
+
+      let jobs: any[] = []
+
+      // Use new video_jobs system if enabled
+      if (config.useNewJobSystem) {
+        const params = {
+          limit: limit * 3,
+          offset: 0,
+          workflow_name: config.workflowName,
+          user_id: config.userId
         }
-        setHasMore(false)
-        return
+
+        const jobsResponse = config.showCompletedOnly
+          ? await apiClient.getCompletedVideoJobs(params)
+          : await apiClient.getVideoJobs(params)
+
+        if (!jobsResponse || !jobsResponse.success || !jobsResponse.video_jobs) {
+          if (reset) {
+            setDisplayedItems([])
+          }
+          setHasMore(false)
+          return
+        }
+
+        // Convert new job format to old format for compatibility
+        jobs = jobsResponse.video_jobs.map((job: any) => ({
+          job_id: job.comfy_job_id || job.id,
+          status: job.status,
+          timestamp_submitted: job.created_at,
+          timestamp_completed: job.status === 'completed' ? job.updated_at : null,
+          filename: job.output_video_urls?.[0]?.split('/').pop() || null,
+          subfolder: '',
+          comfy_url: job.comfy_url,
+          video_url: job.output_video_urls?.[0] || null,
+          image_filename: job.input_image_urls?.[0]?.split('/').pop() || 'Image',
+          audio_filename: job.input_audio_urls?.[0]?.split('/').pop() || 'Audio',
+          error_message: job.error_message,
+          width: job.width,
+          height: job.height
+        }))
+      } else {
+        // Use old multitalk_jobs system
+        const jobsResponse = config.showCompletedOnly
+          ? await getCompletedJobsWithVideos(limit * 3, 0)
+          : await getRecentJobs(limit * 3, 0)
+
+        if (!jobsResponse || !jobsResponse.jobs) {
+          if (reset) {
+            setDisplayedItems([])
+          }
+          setHasMore(false)
+          return
+        }
+
+        jobs = jobsResponse.jobs
       }
 
-      const jobs = jobsResponse.jobs
       console.log(`📊 Received ${jobs.length} jobs from API`)
 
       // Smart stuck job detection - focus on truly stuck jobs, not just time
@@ -139,23 +185,32 @@ export default function VideoFeed({ comfyUrl, config }: VideoFeedProps) {
         // Only check jobs that are in processing/submitted state
         if ((job.status === 'processing' || job.status === 'submitted')) {
           const submittedTime = new Date(job.timestamp_submitted)
+
+          // Check if the parsed date is valid
+          if (isNaN(submittedTime.getTime())) {
+            console.warn(`Invalid timestamp for job ${job.job_id}:`, job.timestamp_submitted)
+            return job // Skip stuck detection for invalid timestamps
+          }
+
           const timeDiff = now.getTime() - submittedTime.getTime()
           const timeDiffMinutes = Math.round(timeDiff / (1000 * 60))
-          
-          // Debug logging for stuck job detection
-          console.log(`🔍 Job ${getShortJobId(job.job_id)} (full: ${job.job_id}) stuck detection:`, {
-            status: job.status,
-            timestamp_submitted: job.timestamp_submitted,
-            submittedTime: submittedTime.toISOString(),
-            submittedTimeLocal: submittedTime.toLocaleString(),
-            now: now.toISOString(),
-            nowLocal: now.toLocaleString(),
-            timeDiffMs: timeDiff,
-            timeDiffMinutes,
-            timeDiffHours: Math.round(timeDiff / (1000 * 60 * 60)),
-            maxJobAgeMs,
-            noProgressTimeoutMs
-          })
+
+          // Skip stuck detection for very recent jobs (less than 2 minutes old)
+          if (timeDiff < 120000) {
+            return job // Too new to be stuck
+          }
+
+          // Only log if time difference seems wrong (negative or very large)
+          if (timeDiff < 0 || timeDiff > maxJobAgeMs) {
+            console.log(`🔍 Job ${getShortJobId(job.job_id)} unusual time:`, {
+              status: job.status,
+              timestamp_submitted: job.timestamp_submitted,
+              submittedTime: submittedTime.toISOString(),
+              now: now.toISOString(),
+              timeDiffMinutes,
+              timeDiffHours: Math.round(timeDiff / (1000 * 60 * 60))
+            })
+          }
           
           // Check if job is actively processing (has progress data or is connected to WebSocket)
           const isActivelyProcessing = progress.total_nodes > 0 && progress.completed_nodes > 0
@@ -305,11 +360,11 @@ export default function VideoFeed({ comfyUrl, config }: VideoFeedProps) {
 
   useEffect(() => {
     loadFeed(true) // Reset pagination when dependencies change
-    
+
     // Refresh every 30 seconds
     const interval = setInterval(() => loadFeed(true), 30000)
     return () => clearInterval(interval)
-  }, [config.showCompletedOnly, config.maxItems, showFilteredOnly])
+  }, [config.showCompletedOnly, config.maxItems, config.useNewJobSystem, config.workflowName, config.userId, showFilteredOnly])
 
 
   return (

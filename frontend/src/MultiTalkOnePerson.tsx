@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from "react";
-import { createJob, updateJobToProcessing, completeJob } from "./lib/jobTracking";
 import { startJobMonitoring, checkComfyUIHealth } from "./components/utils";
 import VideoFeed from "./components/VideoFeed";
 import { useSmartResolution } from "./hooks/useSmartResolution";
@@ -206,19 +205,26 @@ export default function MultiTalkOnePerson({ comfyUrl }: Props) {
       }
       setJobId(id);
 
-      // Create job record in Supabase
-      await createJob({
-        job_id: id,
+      // Create job record in new video_jobs table
+      await apiClient.createVideoJob({
+        comfy_job_id: id,
+        workflow_name: 'lipsync-one',
         comfy_url: comfyUrl,
-        image_filename: imageFile?.name,
-        audio_filename: audioFilename,
+        input_image_urls: [imageFile?.name || ''],
+        input_audio_urls: [audioFilename],
         width,
         height,
-        trim_to_audio: trimToAudio
+        fps: 25,
+        parameters: {
+          mode,
+          audio_scale: audioScale,
+          prompt: customPrompt,
+          trim_to_audio: trimToAudio
+        }
       });
 
       // Update job to processing status
-      await updateJobToProcessing(id);
+      await apiClient.updateVideoJobToProcessing(id);
 
       // Start monitoring job status
       setStatus("Procesando en ComfyUI…");
@@ -236,19 +242,26 @@ export default function MultiTalkOnePerson({ comfyUrl }: Props) {
               ? `${comfyUrl}/view?filename=${encodeURIComponent(videoInfo.filename)}&subfolder=${encodeURIComponent(videoInfo.subfolder)}&type=${videoInfo.type || 'output'}`
               : `${comfyUrl}/view?filename=${encodeURIComponent(videoInfo.filename)}&type=${videoInfo.type || 'output'}`;
             setVideoUrl(fallbackUrl);
-                        
+
             setStatus("Listo ✅");
             setIsSubmitting(false);
-            
+
+            // Complete job in new system
+            await apiClient.completeVideoJob(id, {
+              job_id: id,
+              status: 'completed',
+              output_video_urls: [fallbackUrl]
+            });
+
           } else if (jobStatus === 'error') {
             // Handle error
             setStatus(`❌ ${message}`);
             setIsSubmitting(false);
-            
+
             try {
-              await completeJob({
+              await apiClient.completeVideoJob(id, {
                 job_id: id,
-                status: 'error',
+                status: 'failed',
                 error_message: message || 'Unknown error'
               });
             } catch (dbError) {
@@ -279,9 +292,9 @@ export default function MultiTalkOnePerson({ comfyUrl }: Props) {
       // Complete job with error status if we have a job ID
       if (jobId) {
         try {
-          await completeJob({
+          await apiClient.completeVideoJob(jobId, {
             job_id: jobId,
-            status: 'error',
+            status: 'failed',
             error_message: errorMessage
           });
         } catch (dbError) {
@@ -497,9 +510,11 @@ export default function MultiTalkOnePerson({ comfyUrl }: Props) {
         {/* Right Sidebar - Video Feed */}
         <div className="w-96 space-y-6">
           <div className="sticky top-6 h-[calc(100vh-3rem)]">
-            <VideoFeed 
-              comfyUrl={comfyUrl} 
+            <VideoFeed
+              comfyUrl={comfyUrl}
               config={{
+                useNewJobSystem: true,
+                workflowName: 'lipsync-one',
                 showCompletedOnly: false,
                 maxItems: 10,
                 showFixButton: true,

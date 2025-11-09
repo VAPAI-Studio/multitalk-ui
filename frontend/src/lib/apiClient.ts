@@ -185,14 +185,38 @@ class ApiClient {
   }
 
   async submitPromptToComfyUI(baseUrl: string, prompt: any, clientId: string) {
-    return this.request('/comfyui/submit-prompt', {
-      method: 'POST',
-      body: JSON.stringify({
-        base_url: baseUrl,
-        prompt: prompt,
-        client_id: clientId,
-      }),
-    })
+    // Use longer timeout for workflow submissions with large base64 images
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 60000) // 60 second timeout
+
+    try {
+      const response = await fetch(`${this.baseURL}/comfyui/submit-prompt`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          base_url: baseUrl,
+          prompt: prompt,
+          client_id: clientId,
+        }),
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      if (!response.ok) {
+        throw new Error(`API request failed: ${response.status} ${response.statusText}`)
+      }
+
+      return response.json()
+    } catch (error) {
+      clearTimeout(timeoutId)
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error('Request timed out. The workflow may be too large or the server is slow.')
+      }
+      throw error
+    }
   }
 
   async submitWorkflow(workflowName: string, parameters: any, baseUrl: string, clientId: string) {
@@ -458,6 +482,142 @@ class ApiClient {
 
   async getMultiTalkTemplates() {
     return this.request('/multitalk/templates')
+  }
+
+  // Video Jobs endpoints (new output-type-based system)
+  async createVideoJob(payload: any) {
+    return this.request('/video-jobs', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  }
+
+  async getVideoJobs(params?: {
+    limit?: number;
+    offset?: number;
+    workflow_name?: string;
+    user_id?: string;
+  }) {
+    const queryParams = new URLSearchParams()
+    if (params?.limit) queryParams.append('limit', params.limit.toString())
+    if (params?.offset) queryParams.append('offset', params.offset.toString())
+    if (params?.workflow_name) queryParams.append('workflow_name', params.workflow_name)
+    if (params?.user_id) queryParams.append('user_id', params.user_id)
+
+    const query = queryParams.toString()
+    return this.request(`/video-jobs${query ? `?${query}` : ''}`)
+  }
+
+  async getCompletedVideoJobs(params?: {
+    limit?: number;
+    offset?: number;
+    workflow_name?: string;
+    user_id?: string;
+  }) {
+    const queryParams = new URLSearchParams()
+    if (params?.limit) queryParams.append('limit', params.limit.toString())
+    if (params?.offset) queryParams.append('offset', params.offset.toString())
+    if (params?.workflow_name) queryParams.append('workflow_name', params.workflow_name)
+    if (params?.user_id) queryParams.append('user_id', params.user_id)
+
+    const query = queryParams.toString()
+    return this.request(`/video-jobs/completed/recent${query ? `?${query}` : ''}`)
+  }
+
+  async getVideoJob(jobId: string) {
+    return this.request(`/video-jobs/${jobId}`)
+  }
+
+  async getVideoJobByComfyId(comfyJobId: string) {
+    return this.request(`/video-jobs/comfy/${comfyJobId}`)
+  }
+
+  async updateVideoJobToProcessing(jobId: string) {
+    return this.request(`/video-jobs/${jobId}/processing`, {
+      method: 'PUT',
+    })
+  }
+
+  async updateVideoJob(jobId: string, payload: any) {
+    return this.request(`/video-jobs/${jobId}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    })
+  }
+
+  async completeVideoJob(jobId: string, payload: any) {
+    return this.request(`/video-jobs/${jobId}/complete`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    })
+  }
+
+  // Image Jobs endpoints (new output-type-based system)
+  async createImageJob(payload: any) {
+    return this.request('/image-jobs', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  }
+
+  async getImageJobs(params?: {
+    limit?: number;
+    offset?: number;
+    workflow_name?: string;
+    user_id?: string;
+  }) {
+    const queryParams = new URLSearchParams()
+    if (params?.limit) queryParams.append('limit', params.limit.toString())
+    if (params?.offset) queryParams.append('offset', params.offset.toString())
+    if (params?.workflow_name) queryParams.append('workflow_name', params.workflow_name)
+    if (params?.user_id) queryParams.append('user_id', params.user_id)
+
+    const query = queryParams.toString()
+    return this.request(`/image-jobs${query ? `?${query}` : ''}`)
+  }
+
+  async getCompletedImageJobs(params?: {
+    limit?: number;
+    offset?: number;
+    workflow_name?: string;
+    user_id?: string;
+  }) {
+    const queryParams = new URLSearchParams()
+    if (params?.limit) queryParams.append('limit', params.limit.toString())
+    if (params?.offset) queryParams.append('offset', params.offset.toString())
+    if (params?.workflow_name) queryParams.append('workflow_name', params.workflow_name)
+    if (params?.user_id) queryParams.append('user_id', params.user_id)
+
+    const query = queryParams.toString()
+    return this.request(`/image-jobs/completed/recent${query ? `?${query}` : ''}`)
+  }
+
+  async getImageJob(jobId: string) {
+    return this.request(`/image-jobs/${jobId}`)
+  }
+
+  async getImageJobByComfyId(comfyJobId: string) {
+    return this.request(`/image-jobs/comfy/${comfyJobId}`)
+  }
+
+  async updateImageJobToProcessing(jobId: string) {
+    return this.request(`/image-jobs/${jobId}/processing`, {
+      method: 'PUT',
+    })
+  }
+
+  async updateImageJob(jobId: string, payload: any) {
+    return this.request(`/image-jobs/${jobId}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    })
+  }
+
+  async completeImageJob(jobId: string, payload: any) {
+    return this.request(`/image-jobs/${jobId}/complete`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    })
   }
 }
 

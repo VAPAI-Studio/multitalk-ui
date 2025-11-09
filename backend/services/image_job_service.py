@@ -1,6 +1,6 @@
 from typing import Tuple, Optional, List
 from datetime import datetime
-from core.supabase import get_supabase_client
+from core.supabase import get_supabase
 from models.image_job import (
     ImageJob,
     CreateImageJobPayload,
@@ -12,7 +12,7 @@ class ImageJobService:
     """Service for managing image generation jobs (img2img, style-transfer, image-edit)"""
 
     def __init__(self):
-        self.supabase = get_supabase_client()
+        self.supabase = get_supabase()
 
     async def create_job(self, payload: CreateImageJobPayload) -> Tuple[bool, Optional[str]]:
         """Create a new image job"""

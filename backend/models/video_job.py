@@ -68,6 +68,8 @@ class CreateVideoJobPayload(BaseModel):
     # Output dimensions (optional, might be in parameters)
     width: Optional[int] = None
     height: Optional[int] = None
+    fps: Optional[int] = None
+    duration_seconds: Optional[float] = None
 
     # Workflow-specific parameters
     parameters: Dict[str, Any] = Field(default_factory=dict)

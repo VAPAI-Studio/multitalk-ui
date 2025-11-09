@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from "react";
-import { createJob, updateJobToProcessing, completeJob } from "./lib/jobTracking";
 import { Label, Field, Section } from "./components/UI";
 import { Button, Badge } from "./components/DesignSystem";
 import { Timeline } from "./components/Timeline";
@@ -8,6 +7,7 @@ import { fileToBase64, uploadMediaToComfy, joinAudiosForMask, groupAudiosByMask,
 import VideoFeed from "./components/VideoFeed";
 import { useSmartResolution } from "./hooks/useSmartResolution";
 import { MaskEditor } from "./components/MaskEditor";
+import { apiClient } from "./lib/apiClient";
 
 interface Props {
   comfyUrl: string;
@@ -479,8 +479,27 @@ export default function MultiTalkMultiplePeople({ comfyUrl }: Props) {
       }
       setJobId(id)
 
-      await createJob({ job_id: id, comfy_url: comfyUrl, image_filename: imageFile.name, audio_filename: 'multiple_masks_audio', width, height, trim_to_audio: trimToAudio })
-      await updateJobToProcessing(id)
+      // Create job record in new video_jobs table
+      const audioFilenames = audioTracks.map(track => track.file?.name || 'audio').join(', ');
+      await apiClient.createVideoJob({
+        comfy_job_id: id,
+        workflow_name: 'lipsync-multi',
+        comfy_url: comfyUrl,
+        input_image_urls: [imageFile.name],
+        input_audio_urls: audioTracks.map(track => track.file?.name || ''),
+        width,
+        height,
+        fps: 25,
+        parameters: {
+          mode,
+          audio_scale: audioScale,
+          trim_to_audio: trimToAudio,
+          masks: masks.length,
+          audio_tracks: audioTracks.length
+        }
+      });
+
+      await apiClient.updateVideoJobToProcessing(id)
 
       // Start monitoring job status
       setStatus('Procesando en ComfyUI…')
@@ -499,20 +518,27 @@ export default function MultiTalkMultiplePeople({ comfyUrl }: Props) {
               : `${comfyUrl.replace(/\/$/, '')}/view?filename=${encodeURIComponent(videoInfo.filename)}&type=${videoInfo.type || 'output'}`
             setVideoUrl(fallbackUrl)
 
-                        // Job completion is handled by the monitoring system in utils.ts
-            
             setStatus('Listo ✅')
             setIsSubmitting(false)
-            
-            // Feed will refresh automatically via JobFeed component
-            
+
+            // Complete job in new system
+            await apiClient.completeVideoJob(id, {
+              job_id: id,
+              status: 'completed',
+              output_video_urls: [fallbackUrl]
+            });
+
           } else if (jobStatus === 'error') {
             // Handle error
             setStatus(`❌ ${message}`)
             setIsSubmitting(false)
-            
+
             try {
-              await completeJob({ job_id: id, status: 'error', error_message: message || 'Unknown error' })
+              await apiClient.completeVideoJob(id, {
+                job_id: id,
+                status: 'failed',
+                error_message: message || 'Unknown error'
+              })
             } catch (dbError) {
               console.error('Error updating job status:', dbError)
             }
@@ -540,7 +566,11 @@ export default function MultiTalkMultiplePeople({ comfyUrl }: Props) {
       
       if (jobId) {
         try {
-          await completeJob({ job_id: jobId, status: 'error', error_message: errorMessage });
+          await apiClient.completeVideoJob(jobId, {
+            job_id: jobId,
+            status: 'failed',
+            error_message: errorMessage
+          });
         } catch (dbError) {
           console.error('Error updating job status:', dbError);
         }
@@ -847,9 +877,11 @@ export default function MultiTalkMultiplePeople({ comfyUrl }: Props) {
         {/* Right Sidebar - Video Feed */}
         <div className="w-96 space-y-6">
           <div className="sticky top-6 h-[calc(100vh-3rem)]">
-            <VideoFeed 
-              comfyUrl={comfyUrl} 
+            <VideoFeed
+              comfyUrl={comfyUrl}
               config={{
+                useNewJobSystem: true,
+                workflowName: 'lipsync-multi',
                 showCompletedOnly: false,
                 maxItems: 10,
                 showFixButton: true,
