@@ -200,12 +200,15 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
       setCameraStatus("🔨 Building workflow...");
 
       // 3. Build workflow using backend template
+      // Append Chinese lighting instruction to prompt (hidden from user)
+      const enhancedPrompt = `${cameraPrompt}\n移除光影,使用柔和光线对图片进行重新照明`;
+
       const clientId = `camera-angle-${Math.random().toString(36).slice(2)}`;
       const workflowResponse = await apiClient.submitWorkflow(
         'QwenCameraAngle',
         {
           IMAGE_FILENAME: uploadedFilename,
-          PROMPT: cameraPrompt,
+          PROMPT: enhancedPrompt,
           WIDTH: width,
           HEIGHT: height
         },
