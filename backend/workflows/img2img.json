@@ -31,7 +31,7 @@
   },
   "6": {
     "inputs": {
-      "text": "photograph of victorian woman with wings, sky clouds, meadow grass\n",
+      "text": "{{PROMPT}}",
       "clip": [
         "14",
         1
@@ -86,7 +86,7 @@
   },
   "10": {
     "inputs": {
-      "image": "example.png"
+      "image": "{{IMAGE_FILENAME}}"
     },
     "class_type": "LoadImage",
     "_meta": {
