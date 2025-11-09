@@ -304,7 +304,8 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
 
               setCameraResultUrl(storedImageUrl);
               setCameraStatus("✅ Camera angle generated successfully!");
-              return;
+              setIsCameraGenerating(false);
+              return; // STOP POLLING - job is complete!
             }
           }
 
@@ -313,11 +314,11 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
           return pollForResult();
 
         } catch (pollError: any) {
-          // If it's a timeout, rethrow
-          if (pollError.message.includes('timeout')) {
+          // If it's a timeout or completion error, rethrow (don't retry)
+          if (pollError.message.includes('timeout') || pollError.message.includes('save image')) {
             throw pollError;
           }
-          // Otherwise, retry polling
+          // Only retry on transient ComfyUI history fetch errors
           await new Promise(resolve => setTimeout(resolve, 2000));
           return pollForResult();
         }
