@@ -375,7 +375,7 @@ export default function App() {
           )}
           {currentPage === "image-edit" && (
             <div className="w-full max-w-6xl mx-auto p-6">
-              <ImageEdit />
+              <ImageEdit comfyUrl={comfyUrl} />
             </div>
           )}
           {currentPage === "generation-feed" && (

@@ -6,7 +6,11 @@ import { useSmartResolution } from "./hooks/useSmartResolution";
 
 type Tab = "edit" | "camera-angle";
 
-export default function ImageEdit() {
+interface Props {
+  comfyUrl?: string;
+}
+
+export default function ImageEdit({ comfyUrl = "" }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>("edit");
 
   // Original Image Edit State
@@ -134,6 +138,20 @@ export default function ImageEdit() {
     reader.readAsDataURL(file);
   };
 
+  // Helper function to convert File to base64
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        const base64 = result.split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
   const generateCameraAngle = async () => {
     if (!cameraImage) {
       setCameraStatus("❌ Please upload an image");
@@ -145,23 +163,168 @@ export default function ImageEdit() {
       return;
     }
 
+    if (!comfyUrl) {
+      setCameraStatus("❌ ComfyUI URL is not configured");
+      return;
+    }
+
     setIsCameraGenerating(true);
-    setCameraStatus("📤 Uploading image to ComfyUI...");
+    setCameraStatus("📤 Converting image...");
     setCameraResultUrl("");
     setCameraJobId("");
 
     try {
-      // TODO: Implement ComfyUI workflow execution
-      // 1. Upload image to ComfyUI
-      // 2. Build workflow JSON with QwenCameraAngle template
-      // 3. Submit to ComfyUI
-      // 4. Create job record in database
-      // 5. Monitor progress
+      // 1. Convert image to base64
+      const imageBase64 = await fileToBase64(cameraImage);
+      const imageDataUrl = `data:${cameraImage.type};base64,${imageBase64}`;
 
-      setCameraStatus("🚧 Camera angle feature in development - workflow integration pending");
+      setCameraStatus("☁️ Uploading to ComfyUI...");
+
+      // 2. Upload image to ComfyUI
+      const uploadFormData = new FormData();
+      uploadFormData.append('image', cameraImage);
+      const uploadResponse = await fetch(`${comfyUrl}/upload/image`, {
+        method: 'POST',
+        body: uploadFormData,
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error(`Failed to upload image to ComfyUI: ${uploadResponse.status}`);
+      }
+
+      const uploadData = await uploadResponse.json();
+      const uploadedFilename = uploadData.name || cameraImage.name;
+
+      setCameraStatus("🔨 Building workflow...");
+
+      // 3. Build workflow using backend template
+      const workflowResponse = await apiClient.submitWorkflow({
+        workflow_name: 'QwenCameraAngle',
+        parameters: {
+          IMAGE_FILENAME: uploadedFilename,
+          PROMPT: cameraPrompt,
+          WIDTH: width,
+          HEIGHT: height
+        },
+        client_id: `camera-angle-${Math.random().toString(36).slice(2)}`,
+        base_url: comfyUrl
+      }) as { success: boolean; prompt_id?: string; error?: string };
+
+      if (!workflowResponse.success || !workflowResponse.prompt_id) {
+        throw new Error(workflowResponse.error || 'Failed to submit workflow to ComfyUI');
+      }
+
+      const promptId = workflowResponse.prompt_id;
+      setCameraJobId(promptId);
+
+      setCameraStatus("💾 Creating job record...");
+
+      // 4. Create image job in database
+      await apiClient.createImageJob({
+        comfy_job_id: promptId,
+        workflow_name: 'camera-angle',
+        comfy_url: comfyUrl,
+        input_image_urls: [uploadedFilename],
+        width,
+        height,
+        parameters: {
+          prompt: cameraPrompt
+        }
+      });
+
+      setCameraStatus("⏳ Processing in ComfyUI...");
+
+      // 5. Poll for completion
+      const startTime = Date.now();
+      const maxWaitTime = 300000; // 5 minutes
+
+      const pollForResult = async (): Promise<void> => {
+        const elapsed = Date.now() - startTime;
+        if (elapsed > maxWaitTime) {
+          throw new Error('Processing timeout after 5 minutes');
+        }
+
+        try {
+          const historyResponse = await apiClient.getComfyUIHistory(comfyUrl, promptId) as {
+            success: boolean;
+            history?: any;
+            error?: string;
+          };
+
+          if (!historyResponse.success) {
+            throw new Error(historyResponse.error || 'Failed to get ComfyUI history');
+          }
+
+          const history = historyResponse.history;
+          const historyEntry = history?.[promptId];
+
+          // Check for errors
+          if (historyEntry?.status?.status_str === "error" || historyEntry?.status?.error) {
+            const errorMsg = historyEntry.status?.error?.message ||
+                            historyEntry.status?.error ||
+                            "Unknown error in ComfyUI";
+            throw new Error(`ComfyUI error: ${errorMsg}`);
+          }
+
+          // Check if completed
+          if (historyEntry?.status?.status_str === "success" || historyEntry?.outputs) {
+            const outputs = historyEntry.outputs;
+            let imageInfo = null;
+
+            // Find the generated image
+            for (const nodeId in outputs) {
+              const nodeOutputs = outputs[nodeId];
+              if (nodeOutputs.images && nodeOutputs.images.length > 0) {
+                imageInfo = nodeOutputs.images[0];
+                break;
+              }
+            }
+
+            if (imageInfo) {
+              // Construct the image URL
+              const imageUrl = imageInfo.subfolder
+                ? `${comfyUrl.replace(/\/$/, '')}/api/view?filename=${encodeURIComponent(imageInfo.filename)}&subfolder=${encodeURIComponent(imageInfo.subfolder)}&type=output`
+                : `${comfyUrl.replace(/\/$/, '')}/api/view?filename=${encodeURIComponent(imageInfo.filename)}&type=output`;
+
+              // Update job as completed
+              await apiClient.completeImageJob(promptId, {
+                job_id: promptId,
+                status: 'completed',
+                output_image_urls: [imageUrl]
+              });
+
+              setCameraResultUrl(imageUrl);
+              setCameraStatus("✅ Camera angle generated successfully!");
+              return;
+            }
+          }
+
+          // Still processing, poll again
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          return pollForResult();
+
+        } catch (pollError: any) {
+          // If it's a timeout, rethrow
+          if (pollError.message.includes('timeout')) {
+            throw pollError;
+          }
+          // Otherwise, retry polling
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          return pollForResult();
+        }
+      };
+
+      await pollForResult();
 
     } catch (err: any) {
       setCameraStatus(`❌ Error: ${err.message || "Unknown error"}`);
+      if (cameraJobId) {
+        await apiClient.completeImageJob(cameraJobId, {
+          job_id: cameraJobId,
+          status: 'error',
+          error_message: err.message || 'Unknown error'
+        }).catch(() => {});
+      }
     } finally {
       setIsCameraGenerating(false);
     }
