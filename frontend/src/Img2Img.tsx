@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { createJob, updateJobToProcessing, completeJob } from "./lib/jobTracking";
-import { startJobMonitoring } from "./components/utils";
+import { findImageFromHistory } from "./components/utils";
 import UnifiedFeed from "./components/UnifiedFeed";
 import { apiClient } from "./lib/apiClient";
 
@@ -123,48 +123,109 @@ export default function Img2Img({ comfyUrl }: Props) {
 
       // Start monitoring
       setStatus("Processing in ComfyUI…");
-      const cleanup = startJobMonitoring(
-        id,
-        comfyUrl,
-        async (jobStatus, message, outputInfo) => {
-          if (jobStatus === 'processing') {
-            setStatus(message || 'Processing in ComfyUI…');
-          } else if (jobStatus === 'completed' && outputInfo) {
-            // Construct result URL from output info
-            const filename = outputInfo.filename;
-            const subfolder = outputInfo.subfolder || '';
-            const type = outputInfo.type || 'output';
 
-            let url = `${comfyUrl}/view?filename=${encodeURIComponent(filename)}`;
-            if (subfolder) {
-              url += `&subfolder=${encodeURIComponent(subfolder)}`;
-            }
-            url += `&type=${type}`;
+      // Custom monitoring for image generation
+      const startTime = Date.now();
+      const maxTime = 30 * 60 * 1000; // 30 minutes
 
-            setResultUrl(url);
-            setStatus("✅ Image generation completed!");
-            setIsSubmitting(false);
+      const checkStatus = async () => {
+        try {
+          const response = await apiClient.getComfyUIHistory(comfyUrl, id);
+          if (!response.success) {
+            console.warn('Failed to get history:', response.error);
+            return;
+          }
 
-            // Complete job in database
-            await completeJob({
-              job_id: id,
-              status: 'completed',
-              result_url: url
-            }).catch(() => { });
-          } else if (jobStatus === 'error') {
-            setStatus(`❌ ${message}`);
+          const historyEntry = response.history?.[id];
+          if (!historyEntry) {
+            // Job not found yet, continue polling
+            return;
+          }
+
+          // Check for errors
+          if (historyEntry?.status?.status_str === "error" || historyEntry?.status?.error) {
+            const errorMsg = historyEntry.status?.error?.message ||
+                            historyEntry.status?.error ||
+                            "Unknown error in ComfyUI";
+            setStatus(`❌ Error: ${errorMsg}`);
             setIsSubmitting(false);
 
             await completeJob({
               job_id: id,
               status: 'error',
-              error_message: message || 'Unknown error'
-            }).catch(() => { });
-          }
-        }
-      );
+              error_message: errorMsg
+            }).catch(() => {});
 
-      setJobMonitorCleanup(() => cleanup);
+            return 'stop';
+          }
+
+          // Check if completed
+          if (historyEntry?.status?.status_str === "success" || historyEntry?.status?.completed) {
+            const imageInfo = findImageFromHistory(response.history);
+            console.log('Image generation completed. Image info:', imageInfo);
+
+            if (imageInfo) {
+              // Construct result URL from output info
+              const filename = imageInfo.filename;
+              const subfolder = imageInfo.subfolder || '';
+              const type = imageInfo.type || 'output';
+
+              let url = `${comfyUrl}/view?filename=${encodeURIComponent(filename)}`;
+              if (subfolder) {
+                url += `&subfolder=${encodeURIComponent(subfolder)}`;
+              }
+              url += `&type=${type}`;
+
+              setResultUrl(url);
+              setStatus("✅ Image generation completed!");
+              setIsSubmitting(false);
+
+              // Complete job in database
+              await completeJob({
+                job_id: id,
+                status: 'completed',
+                filename: imageInfo.filename,
+                subfolder: imageInfo.subfolder || undefined,
+                comfy_url: comfyUrl
+              }).catch(() => {});
+            } else {
+              setStatus("❌ ComfyUI completed but no image output found");
+              setIsSubmitting(false);
+            }
+
+            return 'stop';
+          }
+
+          // Still processing
+          setStatus("Processing in ComfyUI…");
+
+        } catch (error: any) {
+          console.warn('Error checking job status:', error.message);
+          // Don't stop monitoring on network errors
+        }
+
+        // Check timeout
+        if (Date.now() - startTime > maxTime) {
+          setStatus("❌ Timeout: Processing took too long");
+          setIsSubmitting(false);
+          await completeJob({
+            job_id: id,
+            status: 'error',
+            error_message: 'Timeout'
+          }).catch(() => {});
+          return 'stop';
+        }
+      };
+
+      // Poll every 3 seconds
+      const intervalId = setInterval(async () => {
+        const result = await checkStatus();
+        if (result === 'stop') {
+          clearInterval(intervalId);
+        }
+      }, 3000);
+
+      setJobMonitorCleanup(() => () => clearInterval(intervalId));
 
     } catch (error: any) {
       setStatus(`❌ Error: ${error.message || 'Unknown error'}`);

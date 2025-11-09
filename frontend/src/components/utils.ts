@@ -275,6 +275,61 @@ export function findVideoFromHistory(historyJson: any): VideoResult | null {
   return null;
 }
 
+// Find image output from ComfyUI history (for img2img, style transfer, etc.)
+export function findImageFromHistory(historyJson: any): VideoResult | null {
+  if (!historyJson) return null;
+
+  const tryScanOutputs = (outputs: any): VideoResult | null => {
+    if (!outputs || typeof outputs !== 'object') return null;
+    for (const k of Object.keys(outputs)) {
+      const out = outputs[k];
+      const arrays = ['images', 'files', 'items'];
+      for (const arrName of arrays) {
+        const arr = out?.[arrName];
+        if (Array.isArray(arr)) {
+          // Find first image file (png, jpg, jpeg, webp)
+          const image = arr.find((x: any) =>
+            typeof x?.filename === 'string' &&
+            /\.(png|jpg|jpeg|webp)$/i.test(x.filename)
+          );
+          if (image) {
+            return { filename: image.filename, subfolder: image.subfolder ?? null, type: image.type ?? null };
+          }
+        }
+      }
+      if (out && typeof out === 'object') {
+        const nested: VideoResult | null = tryScanOutputs(out);
+        if (nested) return nested;
+      }
+    }
+    return null;
+  };
+
+  if (historyJson.outputs) {
+    const hit = tryScanOutputs(historyJson.outputs);
+    if (hit) return hit;
+  }
+
+  for (const key of Object.keys(historyJson)) {
+    const maybe = historyJson[key];
+    if (maybe?.outputs) {
+      const hit = tryScanOutputs(maybe.outputs);
+      if (hit) return hit;
+    }
+  }
+
+  return null;
+}
+
+// Generic function to find any output (tries video first, then image)
+export function findOutputFromHistory(historyJson: any, preferType: 'video' | 'image' = 'video'): VideoResult | null {
+  if (preferType === 'video') {
+    return findVideoFromHistory(historyJson) || findImageFromHistory(historyJson);
+  } else {
+    return findImageFromHistory(historyJson) || findVideoFromHistory(historyJson);
+  }
+}
+
 export function generateId(): string {
   return Math.random().toString(36).slice(2, 11);
 }
