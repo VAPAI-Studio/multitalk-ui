@@ -289,21 +289,18 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
 
               setCameraStatus("💾 Saving image to storage...");
 
-              // Upload image from ComfyUI URL to Supabase Storage
-              const uploadResult = await apiClient.uploadImageFromUrl(comfyImageUrl, 'camera-angle-results') as any;
-
-              if (!uploadResult.success || !uploadResult.public_url) {
-                throw new Error(uploadResult.error || 'Failed to upload image to storage');
-              }
-
-              const storedImageUrl = uploadResult.public_url;
-
-              // Update job as completed with stored URL
-              await apiClient.completeImageJob(promptId, {
+              // Complete job - backend will download from ComfyUI and upload to Supabase
+              const completionResult = await apiClient.completeImageJob(promptId, {
                 job_id: promptId,
                 status: 'completed',
-                output_image_urls: [storedImageUrl]
-              });
+                output_image_urls: [comfyImageUrl] // Pass ComfyUI URL, backend handles storage upload
+              }) as any;
+
+              if (!completionResult.success || !completionResult.image_job?.output_image_urls?.[0]) {
+                throw new Error('Failed to save image to storage');
+              }
+
+              const storedImageUrl = completionResult.image_job.output_image_urls[0];
 
               setCameraResultUrl(storedImageUrl);
               setCameraStatus("✅ Camera angle generated successfully!");

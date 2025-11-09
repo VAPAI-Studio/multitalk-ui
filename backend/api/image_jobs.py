@@ -9,6 +9,7 @@ from models.image_job import (
     ImageJobListResponse
 )
 from services.image_job_service import ImageJobService
+from services.storage_service import StorageService
 
 router = APIRouter(prefix="/image-jobs", tags=["image-jobs"])
 
@@ -100,6 +101,27 @@ async def complete_image_job(job_id: str, payload: CompleteImageJobPayload):
         raise HTTPException(status_code=400, detail="Job ID mismatch")
 
     service = get_service()
+    storage_service = StorageService()
+
+    # If completing successfully with output URLs, download from ComfyUI and upload to Supabase
+    if payload.status == 'completed' and payload.output_image_urls:
+        supabase_urls = []
+        for comfy_url in payload.output_image_urls:
+            # Download from ComfyUI and upload to Supabase
+            success, supabase_url, error = await storage_service.upload_image_from_url(
+                comfy_url,
+                'camera-angle-results'
+            )
+
+            if success and supabase_url:
+                supabase_urls.append(supabase_url)
+            else:
+                # If upload fails, keep the ComfyUI URL (fallback)
+                supabase_urls.append(comfy_url)
+
+        # Replace ComfyUI URLs with Supabase URLs
+        payload.output_image_urls = supabase_urls
+
     success, error = await service.complete_job(payload)
 
     if success:

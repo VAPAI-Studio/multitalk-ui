@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from typing import List
+from typing import List, Optional
 
 from models.storage import (
     UploadVideoPayload,
@@ -19,8 +19,8 @@ class UploadImageFromUrlPayload(BaseModel):
 
 class ImageUploadResponse(BaseModel):
     success: bool
-    public_url: str | None = None
-    error: str | None = None
+    public_url: Optional[str] = None
+    error: Optional[str] = None
 
 def get_storage_service():
     return StorageService()
