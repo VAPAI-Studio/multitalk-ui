@@ -173,6 +173,8 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
     setCameraResultUrl("");
     setCameraJobId("");
 
+    let databaseJobId: string | null = null;
+
     try {
       // 1. Convert image to base64
       const imageBase64 = await fileToBase64(cameraImage);
@@ -221,7 +223,7 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
       setCameraStatus("💾 Creating job record...");
 
       // 4. Create image job in database
-      await apiClient.createImageJob({
+      const jobCreationResponse = await apiClient.createImageJob({
         comfy_job_id: promptId,
         workflow_name: 'camera-angle',
         comfy_url: comfyUrl,
@@ -231,7 +233,13 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
         parameters: {
           prompt: cameraPrompt
         }
-      });
+      }) as any;
+
+      if (!jobCreationResponse.success || !jobCreationResponse.image_job?.id) {
+        throw new Error('Failed to create job record in database');
+      }
+
+      databaseJobId = jobCreationResponse.image_job.id;
 
       setCameraStatus("⏳ Processing in ComfyUI...");
 
@@ -290,8 +298,8 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
               setCameraStatus("💾 Saving image to storage...");
 
               // Complete job - backend will download from ComfyUI and upload to Supabase
-              const completionResult = await apiClient.completeImageJob(promptId, {
-                job_id: promptId,
+              const completionResult = await apiClient.completeImageJob(databaseJobId, {
+                job_id: databaseJobId,
                 status: 'completed',
                 output_image_urls: [comfyImageUrl] // Pass ComfyUI URL, backend handles storage upload
               }) as any;
@@ -328,9 +336,9 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
 
     } catch (err: any) {
       setCameraStatus(`❌ Error: ${err.message || "Unknown error"}`);
-      if (cameraJobId) {
-        await apiClient.completeImageJob(cameraJobId, {
-          job_id: cameraJobId,
+      if (databaseJobId) {
+        await apiClient.completeImageJob(databaseJobId, {
+          job_id: databaseJobId,
           status: 'error',
           error_message: err.message || 'Unknown error'
         }).catch(() => {});
