@@ -8,21 +8,21 @@ class WorkflowService:
     """Service for managing ComfyUI workflow templates"""
     
     def __init__(self):
-        # Get the templates directory path
-        self.templates_dir = Path(__file__).parent.parent / "templates"
+        # Get the workflows directory path
+        self.workflows_dir = Path(__file__).parent.parent / "workflows"
         
     async def load_template(self, template_name: str) -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
         """
-        Load a workflow template from the templates directory
-        
+        Load a workflow template from the workflows directory
+
         Args:
-            template_name: Name of the template file (e.g., "style_transfer_v1")
-            
+            template_name: Name of the template file (e.g., "VideoLipsync", "WANI2V")
+
         Returns:
             (success, template_dict, error_message)
         """
         try:
-            template_path = self.templates_dir / f"{template_name}.json"
+            template_path = self.workflows_dir / f"{template_name}.json"
             
             if not template_path.exists():
                 return False, None, f"Template '{template_name}' not found"
@@ -106,21 +106,21 @@ class WorkflowService:
     
     def list_templates(self) -> Dict[str, str]:
         """
-        List all available templates
-        
+        List all available workflow templates
+
         Returns:
             Dictionary mapping template names to their descriptions
         """
         templates = {}
-        
+
         try:
-            for template_file in self.templates_dir.glob("*.json"):
+            for template_file in self.workflows_dir.glob("*.json"):
                 template_name = template_file.stem
                 templates[template_name] = f"Workflow template: {template_name}"
-                
+
         except Exception as e:
             print(f"Error listing templates: {e}")
-            
+
         return templates
     
     async def validate_workflow(self, workflow: Dict[str, Any]) -> Tuple[bool, Optional[str]]:

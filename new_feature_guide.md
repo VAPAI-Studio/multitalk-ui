@@ -1025,16 +1025,20 @@ export default function VideoProcessor({ comfyUrl }: Props) {
 
 ### Workflow Type Reference
 
-Use these standardized workflow types:
+Use these standardized workflow types (based on current features):
 
-- `'lipsync-one'` - Single person lipsync
-- `'lipsync-multi'` - Multiple person lipsync  
-- `'video-lipsync'` - Video-to-video lipsync
-- `'image-edit'` - Image editing
+**Current Active Types:**
+- `'lipsync-one'` - Lipsync 1 Person (single person avatar)
+- `'lipsync-multi'` - Lipsync Multi Person (multiple avatars)
+- `'video-lipsync'` - Video Lipsync (video-to-video)
+- `'image-edit'` - Image Edit (AI-powered editing)
+- `'character-caption'` - Character Caption (training datasets)
+- `'wan-i2v'` - WAN I2V (image-to-video generation)
+- `'style-transfer'` - Style Transfer (artistic style transfer)
+
+**Generic Types (for new features):**
 - `'image-gen'` - Image generation
 - `'video-gen'` - Video generation
-- `'i2v'` - Image to video
-- `'v2v'` - Video to video
 - `'audio-gen'` - Audio generation
 - `'your-feature-type'` - Your custom type
 

@@ -47,6 +47,24 @@ npm run preview
 npm run lint
 ```
 
+### Testing
+
+```bash
+# Backend tests
+cd backend
+pip install -r requirements-dev.txt  # First time only
+pytest                                # Run all tests
+pytest --cov                         # With coverage
+
+# Run specific test layers
+pytest tests/test_workflows_static.py  # Static validation
+pytest tests/test_workflow_service.py  # Service unit tests
+pytest tests/test_comfyui_api.py       # API integration
+pytest tests/workflows/                # Workflow contracts
+```
+
+**See [TESTING.md](TESTING.md) for complete testing guide.**
+
 ### Running Full Stack
 
 Open two terminals:
@@ -122,16 +140,18 @@ frontend/src/
 
 ### ComfyUI Integration
 
-The app executes AI workflows via ComfyUI:
+The app executes AI workflows via ComfyUI using a centralized workflow system:
 1. User uploads media through frontend
-2. Frontend sends to backend API endpoint
-3. Backend loads workflow JSON from `frontend/public/workflows/`
-4. Backend modifies workflow with user inputs (image paths, prompts, etc.)
-5. Backend sends workflow to ComfyUI server via WebSocket
-6. Backend polls for completion, retrieves output
+2. Frontend sends parameters to backend API endpoint
+3. Backend loads workflow template from `backend/workflows/`
+4. Backend fills template with user parameters (filenames, prompts, dimensions, etc.)
+5. Backend validates and sends workflow to ComfyUI server
+6. Backend monitors for completion, retrieves output
 7. Output stored in Supabase Storage, URL returned to frontend
 
 ComfyUI server URL is configurable in the UI header.
+
+**See [WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md) for detailed documentation on the workflow system, including how to create and use workflow templates.**
 
 ### Environment Configuration
 
@@ -161,3 +181,39 @@ Authentication requires Supabase configuration:
 - `feature-*` - Feature branches created from `dev`
 
 Create feature branches from dev, merge back to dev for testing, then dev to main for release.
+
+## Related Documentation
+
+For specialized topics, see these additional guides:
+
+- **[new_feature_guide.md](new_feature_guide.md)** - Comprehensive guide for creating new AI workflow features with step-by-step instructions, component patterns, and integration requirements
+- **[WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md)** - Complete documentation on the centralized workflow system, including template creation, parameter substitution, API usage, and migration guide
+- **[TESTING.md](TESTING.md)** - Comprehensive testing guide covering all test layers, running tests, writing tests, workflow testing, and CI/CD integration
+- **[api_doc.md](api_doc.md)** - Complete ComfyUI server API reference documenting all REST endpoints, WebSocket integration, and workflow execution patterns
+- **[backend/setup_supabase_auth.md](backend/setup_supabase_auth.md)** - Supabase authentication setup instructions including provider configuration and troubleshooting
+- **[TODO.md](TODO.md)** - Project roadmap and planned improvements across security, testing, performance, and features
+
+### Current Features
+
+As of the latest update, the application includes these features:
+
+- **Lipsync 1 Person** - Generate realistic talking videos from a single person image with custom audio (Model: Multitalk and Infinite Talk with WAN 2.1)
+- **Lipsync Multi Person** - Create conversations between multiple people with synchronized audio and video (Model: Multitalk and Infinite Talk with WAN 2.1)
+- **Video Lipsync** - Add perfect lip-synchronization to existing videos with new audio tracks (Model: Infinite Talk with WAN 2.1)
+- **Image Edit** - Edit and enhance images using AI-powered editing with natural language instructions (Model: Nano Banana)
+- **Character Caption** - Generate detailed captions for character images to create training datasets for LoRA models (Model: JoyCaption Beta 2)
+- **WAN I2V** - Transform images into captivating videos with AI-powered image-to-video generation (Model: WAN I2V)
+- **Style Transfer** - Transfer artistic styles between images using AI (Model: Flux with USO Style Reference)
+- **Generation Feed** - View and manage all generations across all features in one unified interface
+
+---
+
+Use context7 to check for up-to-date documentation when needed for implementing new libraries or frameworks, or adding features using them.
+
+
+@new_feature_guide.md
+@WORKFLOW_SYSTEM.md
+@TESTING.md
+@api_doc.md
+@backend/setup_supabase_auth.md
+@TODO.md
