@@ -31,7 +31,7 @@ class TestSubmitWorkflowEndpoint:
             # Mock successful ComfyUI response
             mock_submit.return_value = (True, "prompt-id-123", None)
 
-            response = client.post("/comfyui/submit-workflow", json={
+            response = client.post("/api/comfyui/submit-workflow", json={
                 "workflow_name": "VideoLipsync",
                 "parameters": {
                     "VIDEO_FILENAME": "test.mp4",
@@ -60,7 +60,7 @@ class TestSubmitWorkflowEndpoint:
 
     def test_submit_workflow_nonexistent(self, client):
         """Test submitting non-existent workflow"""
-        response = client.post("/comfyui/submit-workflow", json={
+        response = client.post("/api/comfyui/submit-workflow", json={
             "workflow_name": "NonExistentWorkflow",
             "parameters": {},
             "client_id": "test-client",
@@ -77,7 +77,7 @@ class TestSubmitWorkflowEndpoint:
     def test_submit_workflow_missing_parameters(self, client):
         """Test submitting workflow with missing required parameters"""
         # VideoLipsync requires specific parameters
-        response = client.post("/comfyui/submit-workflow", json={
+        response = client.post("/api/comfyui/submit-workflow", json={
             "workflow_name": "VideoLipsync",
             "parameters": {
                 # Missing most required parameters
@@ -100,7 +100,7 @@ class TestSubmitWorkflowEndpoint:
             # Mock ComfyUI error
             mock_submit.return_value = (False, None, "ComfyUI connection failed")
 
-            response = client.post("/comfyui/submit-workflow", json={
+            response = client.post("/api/comfyui/submit-workflow", json={
                 "workflow_name": "VideoLipsync",
                 "parameters": {
                     "VIDEO_FILENAME": "test.mp4",
@@ -124,7 +124,7 @@ class TestSubmitWorkflowEndpoint:
 
     def test_submit_workflow_invalid_request_body(self, client):
         """Test submitting with invalid request body"""
-        response = client.post("/comfyui/submit-workflow", json={
+        response = client.post("/api/comfyui/submit-workflow", json={
             # Missing required fields
             "workflow_name": "VideoLipsync"
         })
@@ -138,7 +138,7 @@ class TestListWorkflowsEndpoint:
 
     def test_list_workflows_success(self, client):
         """Test successfully listing workflows"""
-        response = client.get("/comfyui/workflows")
+        response = client.get("/api/comfyui/workflows")
 
         assert response.status_code == 200
         data = response.json()
@@ -155,7 +155,7 @@ class TestListWorkflowsEndpoint:
 
     def test_list_workflows_returns_descriptions(self, client):
         """Test that workflow list includes descriptions"""
-        response = client.get("/comfyui/workflows")
+        response = client.get("/api/comfyui/workflows")
 
         assert response.status_code == 200
         data = response.json()
@@ -207,7 +207,7 @@ class TestLegacyEndpoints:
         with patch('services.comfyui_service.ComfyUIService.submit_prompt') as mock_submit:
             mock_submit.return_value = (True, "prompt-123", None)
 
-            response = client.post("/comfyui/submit-prompt", json={
+            response = client.post("/api/comfyui/submit-prompt", json={
                 "base_url": "http://comfy.test",
                 "prompt": {
                     "1": {
