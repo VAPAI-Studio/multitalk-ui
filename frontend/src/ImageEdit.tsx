@@ -16,7 +16,6 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
   // Original Image Edit State
   const [userPrompt, setUserPrompt] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
-  const [result, setResult] = useState<string>("");
   const [editedImageUrl, setEditedImageUrl] = useState<string>("");
   const [originalImageUrl, setOriginalImageUrl] = useState<string>("");
   const [error, setError] = useState<string>("");
@@ -37,8 +36,14 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
     widthInput,
     heightInput,
     handleWidthChange,
-    handleHeightChange
+    handleHeightChange,
+    setWidth,
+    setHeight
   } = useSmartResolution(1280, 720);
+
+  // Aspect ratio lock state
+  const [aspectRatioLocked, setAspectRatioLocked] = useState<boolean>(true);
+  const [aspectRatio, setAspectRatio] = useState<number>(1280 / 720);
 
   // Check OpenRouter configuration on component mount
   useEffect(() => {
@@ -91,7 +96,6 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
 
     setIsGenerating(true);
     setError("");
-    setResult("");
     setEditedImageUrl("");
 
     try {
@@ -99,7 +103,6 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
 
       if (response.success && response.image_url) {
         setEditedImageUrl(response.image_url);
-        setResult("Image edited successfully!");
       } else {
         throw new Error(response.error || "No edited image received");
       }
@@ -119,6 +122,38 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
   };
 
   // Camera Angle Handlers
+  const handleWidthChangeWithAspectRatio = (value: string) => {
+    handleWidthChange(value);
+
+    if (aspectRatioLocked && aspectRatio > 0) {
+      const numericWidth = parseInt(value) || 32;
+      const calculatedHeight = Math.round(numericWidth / aspectRatio);
+      const roundedHeight = Math.round(calculatedHeight / 32) * 32;
+      setHeight(roundedHeight);
+    }
+  };
+
+  const handleHeightChangeWithAspectRatio = (value: string) => {
+    handleHeightChange(value);
+
+    if (aspectRatioLocked && aspectRatio > 0) {
+      const numericHeight = parseInt(value) || 32;
+      const calculatedWidth = Math.round(numericHeight * aspectRatio);
+      const roundedWidth = Math.round(calculatedWidth / 32) * 32;
+      setWidth(roundedWidth);
+    }
+  };
+
+  const toggleAspectRatioLock = () => {
+    const newLockState = !aspectRatioLocked;
+    setAspectRatioLocked(newLockState);
+
+    // When locking, update aspect ratio to current dimensions
+    if (newLockState && width > 0 && height > 0) {
+      setAspectRatio(width / height);
+    }
+  };
+
   const handleCameraImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -143,24 +178,12 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
         const roundedHeight = Math.round(img.height / 32) * 32;
         setWidth(roundedWidth);
         setHeight(roundedHeight);
+        // Update aspect ratio for locked mode
+        setAspectRatio(roundedWidth / roundedHeight);
       };
       img.src = result;
     };
     reader.readAsDataURL(file);
-  };
-
-  // Helper function to convert File to base64
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result as string;
-        const base64 = result.split(',')[1];
-        resolve(base64);
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
   };
 
   const generateCameraAngle = async () => {
@@ -187,10 +210,6 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
     let databaseJobId: string | null = null;
 
     try {
-      // 1. Convert image to base64
-      const imageBase64 = await fileToBase64(cameraImage);
-      const imageDataUrl = `data:${cameraImage.type};base64,${imageBase64}`;
-
       setCameraStatus("☁️ Uploading to ComfyUI...");
 
       // 2. Upload image to ComfyUI
@@ -312,6 +331,10 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
               setCameraStatus("💾 Saving image to storage...");
 
               // Complete job - backend will download from ComfyUI and upload to Supabase
+              if (!databaseJobId) {
+                throw new Error('Database job ID is missing');
+              }
+
               const completionResult = await apiClient.completeImageJob(databaseJobId, {
                 job_id: databaseJobId,
                 status: 'completed',
@@ -575,6 +598,26 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
               </Section>
 
               <Section title="Resolution">
+                {/* Aspect Ratio Lock Toggle */}
+                <div className="mb-4 flex items-center gap-3">
+                  <button
+                    onClick={toggleAspectRatioLock}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all duration-200 ${
+                      aspectRatioLocked
+                        ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-md'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    <span className="text-lg">{aspectRatioLocked ? '🔒' : '🔓'}</span>
+                    <span>Maintain Aspect Ratio</span>
+                  </button>
+                  {aspectRatioLocked && aspectRatio > 0 && (
+                    <span className="text-xs text-gray-500">
+                      ({aspectRatio.toFixed(2)}:1)
+                    </span>
+                  )}
+                </div>
+
                 <div className="grid md:grid-cols-2 gap-4">
                   <Field>
                     <Label>Width (px)</Label>
@@ -582,7 +625,7 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
                       type="number"
                       className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all duration-200 bg-white/80"
                       value={widthInput}
-                      onChange={(e) => handleWidthChange(e.target.value)}
+                      onChange={(e) => handleWidthChangeWithAspectRatio(e.target.value)}
                     />
                   </Field>
                   <Field>
@@ -591,7 +634,7 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
                       type="number"
                       className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all duration-200 bg-white/80"
                       value={heightInput}
-                      onChange={(e) => handleHeightChange(e.target.value)}
+                      onChange={(e) => handleHeightChangeWithAspectRatio(e.target.value)}
                     />
                   </Field>
                 </div>
