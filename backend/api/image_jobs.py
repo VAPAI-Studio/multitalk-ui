@@ -107,6 +107,8 @@ async def complete_image_job(job_id: str, payload: CompleteImageJobPayload):
     if payload.status == 'completed' and payload.output_image_urls:
         supabase_urls = []
         for comfy_url in payload.output_image_urls:
+            print(f"[IMAGE_JOBS] Downloading image from ComfyUI: {comfy_url}")
+
             # Download from ComfyUI and upload to Supabase
             success, supabase_url, error = await storage_service.upload_image_from_url(
                 comfy_url,
@@ -114,9 +116,11 @@ async def complete_image_job(job_id: str, payload: CompleteImageJobPayload):
             )
 
             if success and supabase_url:
+                print(f"[IMAGE_JOBS] Successfully uploaded to Supabase: {supabase_url}")
                 supabase_urls.append(supabase_url)
             else:
-                # If upload fails, keep the ComfyUI URL (fallback)
+                # If upload fails, log error and keep the ComfyUI URL (fallback)
+                print(f"[IMAGE_JOBS] Failed to upload to Supabase: {error}")
                 supabase_urls.append(comfy_url)
 
         # Replace ComfyUI URLs with Supabase URLs
