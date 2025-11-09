@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { createJob, updateJobToProcessing, completeJob } from "./lib/jobTracking";
-import { startJobMonitoring, checkComfyUIHealth } from "./components/utils";
+import { startJobMonitoring } from "./components/utils";
 import UnifiedFeed from "./components/UnifiedFeed";
 import { apiClient } from "./lib/apiClient";
 
@@ -49,25 +49,6 @@ export default function Img2Img({ comfyUrl }: Props) {
     };
   }, [jobMonitorCleanup]);
 
-  // Upload image to ComfyUI
-  async function uploadImageToComfyUI(baseUrl: string, file: File): Promise<string> {
-    const formData = new FormData();
-    formData.append('image', file);
-
-    const response = await fetch(`${baseUrl}/upload/image`, {
-      method: 'POST',
-      body: formData,
-      credentials: 'omit'
-    });
-
-    if (!response.ok) {
-      throw new Error(`Upload failed: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data.name || data.files?.[0] || '';
-  }
-
   async function submit() {
     setStatus("");
     setResultUrl("");
@@ -89,16 +70,15 @@ export default function Img2Img({ comfyUrl }: Props) {
 
     setIsSubmitting(true);
     try {
-      // Health check
-      setStatus("Checking ComfyUI...");
-      const healthCheck = await checkComfyUIHealth(comfyUrl);
-      if (!healthCheck.available) {
-        throw new Error(`${healthCheck.error}${healthCheck.details ? `. ${healthCheck.details}` : ''}`);
+      // Upload image to ComfyUI via backend
+      setStatus("Uploading image...");
+      const uploadResponse = await apiClient.uploadImageToComfyUI(comfyUrl, inputImage);
+
+      if (!uploadResponse.success) {
+        throw new Error(uploadResponse.error || 'Failed to upload image');
       }
 
-      // Upload image to ComfyUI
-      setStatus("Uploading image to ComfyUI...");
-      const imageFilename = await uploadImageToComfyUI(comfyUrl, inputImage);
+      const imageFilename = uploadResponse.filename;
 
       // Submit workflow
       setStatus("Sending workflow to ComfyUI...");

@@ -220,6 +220,19 @@ class ApiClient {
     return this.request(`/comfyui/history/${jobId}${queryParam}`)
   }
 
+  async uploadImageToComfyUI(baseUrl: string, file: File) {
+    const formData = new FormData()
+    formData.append('image', file)
+
+    const queryParam = `?base_url=${encodeURIComponent(baseUrl)}`
+    return this.request(`/comfyui/upload-image${queryParam}`, {
+      method: 'POST',
+      body: formData,
+      // Don't set Content-Type header - let browser set it with boundary
+      headers: {}
+    })
+  }
+
   // Edited Images endpoints
   async createEditedImage(payload: any) {
     return this.request('/edited-images', {
