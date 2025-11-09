@@ -480,7 +480,6 @@ export default function MultiTalkMultiplePeople({ comfyUrl }: Props) {
       setJobId(id)
 
       // Create job record in new video_jobs table
-      const audioFilenames = audioTracks.map(track => track.file?.name || 'audio').join(', ');
       await apiClient.createVideoJob({
         comfy_job_id: id,
         workflow_name: 'lipsync-multi',

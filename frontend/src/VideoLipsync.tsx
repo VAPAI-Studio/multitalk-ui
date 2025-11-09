@@ -302,7 +302,7 @@ export default function VideoLipsync({ comfyUrl }: Props) {
         concatInput2Index = "0";
       }
 
-      let promptString = JSON.stringify(template)
+      const promptString = JSON.stringify(template)
         .replace(/"\{\{VIDEO_FILENAME\}\}"/g, `"${videoFilename}"`)
         .replace(/"\{\{AUDIO_FILENAME\}\}"/g, `"${audioFilename}"`)
         .replace(/"\{\{WIDTH\}\}"/g, width.toString())
@@ -327,7 +327,7 @@ export default function VideoLipsync({ comfyUrl }: Props) {
       
       
       return JSON.parse(promptString);
-    } catch (error) {
+    } catch {
       throw new Error('Failed to build prompt JSON');
     }
   }
@@ -464,7 +464,7 @@ export default function VideoLipsync({ comfyUrl }: Props) {
                 status: 'failed',
                 error_message: message || 'Unknown error'
               });
-            } catch (dbError) {
+            } catch {
               // Silent error - job status update failed
             }
           }
@@ -494,7 +494,7 @@ export default function VideoLipsync({ comfyUrl }: Props) {
             status: 'failed',
             error_message: errorMessage
           });
-        } catch (dbError) {
+        } catch {
           // Silent error - job status update failed but main error is more important
         }
       }
@@ -824,7 +824,7 @@ export default function VideoLipsync({ comfyUrl }: Props) {
                   audioDuration={audioTrack?.duration}
                   viewportSize={{ width: width, height: height }}
                   className="max-w-2xl mx-auto"
-                  onTimeUpdate={(_time) => {
+                  onTimeUpdate={() => {
                     // Optional: could sync with timeline visualization
                   }}
                 />

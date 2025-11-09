@@ -3,11 +3,7 @@ import { Label, Field, Section } from "./components/UI";
 import { apiClient } from "./lib/apiClient";
 import ImageFeed from "./components/ImageFeed";
 
-
-
-interface Props {}
-
-export default function ImageEdit({}: Props) {
+export default function ImageEdit() {
   const [userPrompt, setUserPrompt] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [result, setResult] = useState<string>("");
