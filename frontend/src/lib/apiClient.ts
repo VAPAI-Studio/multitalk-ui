@@ -574,7 +574,7 @@ class ApiClient {
     if (params?.user_id) queryParams.append('user_id', params.user_id)
 
     const query = queryParams.toString()
-    return this.request(`/image-jobs${query ? `?${query}` : ''}`)
+    return this.request(`/image-jobs/${query ? `?${query}` : ''}`)
   }
 
   async getCompletedImageJobs(params?: {
