@@ -198,17 +198,18 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
       setCameraStatus("🔨 Building workflow...");
 
       // 3. Build workflow using backend template
-      const workflowResponse = await apiClient.submitWorkflow({
-        workflow_name: 'QwenCameraAngle',
-        parameters: {
+      const clientId = `camera-angle-${Math.random().toString(36).slice(2)}`;
+      const workflowResponse = await apiClient.submitWorkflow(
+        'QwenCameraAngle',
+        {
           IMAGE_FILENAME: uploadedFilename,
           PROMPT: cameraPrompt,
           WIDTH: width,
           HEIGHT: height
         },
-        client_id: `camera-angle-${Math.random().toString(36).slice(2)}`,
-        base_url: comfyUrl
-      }) as { success: boolean; prompt_id?: string; error?: string };
+        comfyUrl,
+        clientId
+      ) as { success: boolean; prompt_id?: string; error?: string };
 
       if (!workflowResponse.success || !workflowResponse.prompt_id) {
         throw new Error(workflowResponse.error || 'Failed to submit workflow to ComfyUI');
