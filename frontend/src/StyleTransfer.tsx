@@ -449,6 +449,8 @@ export default function StyleTransfer({ comfyUrl }: Props) {
           <div className="sticky top-6 h-[calc(100vh-3rem)]">
             <ImageFeed
               config={{
+                useNewJobSystem: true,
+                workflowName: 'style-transfer',
                 showCompletedOnly: false,
                 maxItems: 10,
                 showFixButton: false, // Image editing doesn't need the fix button

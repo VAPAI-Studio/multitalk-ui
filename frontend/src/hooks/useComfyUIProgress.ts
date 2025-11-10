@@ -83,7 +83,7 @@ export function useComfyUIProgress(comfyUrl: string, enabled: boolean = true) {
       
       ws.onmessage = (event) => {
         try {
-          let data = event.data;
+          const data = event.data;
           
           // Handle blob data
           if (data instanceof Blob) {
@@ -97,7 +97,7 @@ export function useComfyUIProgress(comfyUrl: string, enabled: boolean = true) {
                 } else {
                   console.log('Blob data is not JSON, ignoring:', text.substring(0, 50));
                 }
-              } catch (error) {
+              } catch {
                 console.log('Blob data parsing failed, ignoring:', text.substring(0, 50));
               }
             });

@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+/* eslint-disable react-refresh/only-export-components */
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import { config } from '../config/environment';
 
 interface User {
@@ -25,22 +26,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Load auth data from localStorage on mount
-  useEffect(() => {
-    const storedToken = localStorage.getItem('vapai-auth-token');
-    const storedUser = localStorage.getItem('vapai-user');
-
-    if (storedToken && storedUser) {
-      setToken(storedToken);
-      setUser(JSON.parse(storedUser));
-      // Verify token is still valid
-      verifyToken(storedToken);
-    } else {
-      setLoading(false);
-    }
+  // Declare logout first so it can be referenced by verifyToken
+  const logout = useCallback(() => {
+    setUser(null);
+    setToken(null);
+    localStorage.removeItem('vapai-auth-token');
+    localStorage.removeItem('vapai-user');
+    localStorage.removeItem('vapai-refresh-token');
   }, []);
 
-  const verifyToken = async (authToken: string) => {
+  const verifyToken = useCallback(async (authToken: string) => {
     try {
       const response = await fetch(`${config.apiBaseUrl}/auth/me`, {
         headers: {
@@ -61,7 +56,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [logout]);
+
+  // Load auth data from localStorage on mount
+  useEffect(() => {
+    const storedToken = localStorage.getItem('vapai-auth-token');
+    const storedUser = localStorage.getItem('vapai-user');
+
+    if (storedToken && storedUser) {
+      setToken(storedToken);
+      setUser(JSON.parse(storedUser));
+      // Verify token is still valid
+      verifyToken(storedToken);
+    } else {
+      setLoading(false);
+    }
+  }, [verifyToken]);
 
   const login = async (email: string, password: string) => {
     const response = await fetch(`${config.apiBaseUrl}/auth/login`, {
@@ -113,14 +123,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('vapai-auth-token', data.access_token);
     localStorage.setItem('vapai-user', JSON.stringify(data.user));
     localStorage.setItem('vapai-refresh-token', data.refresh_token);
-  };
-
-  const logout = () => {
-    setUser(null);
-    setToken(null);
-    localStorage.removeItem('vapai-auth-token');
-    localStorage.removeItem('vapai-user');
-    localStorage.removeItem('vapai-refresh-token');
   };
 
   return (

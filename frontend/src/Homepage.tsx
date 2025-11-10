@@ -1,6 +1,6 @@
 
 interface Props {
-  onNavigate: (page: "multitalk-one" | "multitalk-multiple" | "video-lipsync" | "image-edit" | "character-caption" | "wan-i2v" | "style-transfer") => void;
+  onNavigate: (page: "multitalk-one" | "multitalk-multiple" | "video-lipsync" | "image-edit" | "character-caption" | "wan-i2v" | "style-transfer" | "img2img") => void;
 }
 
 export default function Homepage({ onNavigate }: Props) {
@@ -60,6 +60,14 @@ export default function Homepage({ onNavigate }: Props) {
       icon: "🎨",
       gradient: "from-orange-500 to-red-600",
       features: ["Dual image input", "Artistic style transfer", "Model: Flux with USO Style Reference"]
+    },
+    {
+      id: "img2img" as const,
+      title: "Image to Image",
+      description: "Transform your images with AI-powered modifications. Upload an image and describe the changes you want.",
+      icon: "🖼️",
+      gradient: "from-purple-500 to-pink-600",
+      features: ["Image transformation", "Custom prompts", "Model: Dreamshaper 8"]
     }
   ];
 
