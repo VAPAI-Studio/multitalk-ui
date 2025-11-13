@@ -51,7 +51,7 @@
     "inputs": {
       "shift": 3,
       "model": [
-        "292",
+        "215",
         0
       ]
     },
@@ -254,20 +254,6 @@
     "class_type": "SaveImage",
     "_meta": {
       "title": "Save Image"
-    }
-  },
-  "292": {
-    "inputs": {
-      "lora_name": "QWEN\\Qwen-Image-Edit-2509-Light_restoration.safetensors",
-      "strength_model": 1,
-      "model": [
-        "215",
-        0
-      ]
-    },
-    "class_type": "LoraLoaderModelOnly",
-    "_meta": {
-      "title": "LoraLoaderModelOnly"
     }
   }
 }
