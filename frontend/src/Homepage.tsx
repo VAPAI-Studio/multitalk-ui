@@ -1,6 +1,6 @@
 
 interface Props {
-  onNavigate: (page: "multitalk-one" | "multitalk-multiple" | "video-lipsync" | "image-edit" | "character-caption" | "wan-i2v" | "style-transfer" | "img2img") => void;
+  onNavigate: (page: "multitalk-one" | "multitalk-multiple" | "video-lipsync" | "image-edit" | "character-caption" | "wan-i2v" | "style-transfer" | "flux-lora" | "img2img") => void;
 }
 
 export default function Homepage({ onNavigate }: Props) {
@@ -60,6 +60,14 @@ export default function Homepage({ onNavigate }: Props) {
       icon: "🎨",
       gradient: "from-orange-500 to-red-600",
       features: ["Dual image input", "Artistic style transfer", "Model: Flux with USO Style Reference"]
+    },
+    {
+      id: "flux-lora" as const,
+      title: "Flux LoRA",
+      description: "Generate images using Flux with custom LoRA models. Add multiple LoRAs with adjustable weights for precise control.",
+      icon: "⚡",
+      gradient: "from-indigo-500 to-purple-600",
+      features: ["Multiple LoRA support", "Adjustable weights per LoRA", "Model: Flux Dev"]
     }
     // Hidden: Image to Image
     // {
