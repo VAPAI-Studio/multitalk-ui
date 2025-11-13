@@ -275,15 +275,18 @@ class StorageService:
     async def upload_image_from_url(self, image_url: str, folder: str = "images") -> Tuple[bool, Optional[str], Optional[str]]:
         """Download an image from URL and upload to Supabase Storage"""
         try:
-            # Download image from URL
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            print(f"[STORAGE] Attempting to download image from: {image_url}")
+            # Download image from URL (increased timeout for large images)
+            async with httpx.AsyncClient(timeout=60.0) as client:
                 image_response = await client.get(image_url)
                 
                 if image_response.status_code != 200:
+                    print(f"[STORAGE] Failed to download image: HTTP {image_response.status_code}")
                     raise Exception(f"Failed to download image: {image_response.status_code}")
-                
+
                 image_content = image_response.content
-                
+                print(f"[STORAGE] Downloaded {len(image_content)} bytes")
+
                 if len(image_content) == 0:
                     raise Exception("Downloaded image file is empty")
             
@@ -300,12 +303,14 @@ class StorageService:
             }
             
             extension = extension_map.get(content_type, 'png')
-            
+
             # Generate storage path
             timestamp = datetime.now().strftime('%Y-%m-%d')
             unique_id = str(uuid.uuid4())[:8]
             storage_path = f"{folder}/{timestamp}/{unique_id}.{extension}"
-            
+
+            print(f"[STORAGE] Uploading to Supabase Storage: {storage_path}")
+
             # Upload to Supabase Storage
             upload_response = await asyncio.to_thread(
                 lambda: self.supabase.storage
@@ -316,6 +321,8 @@ class StorageService:
                     file_options={'upsert': 'true'}
                 )
             )
+
+            print(f"[STORAGE] Upload response: {upload_response}")
             
             # Check for upload errors with different response formats
             if hasattr(upload_response, 'error') and upload_response.error:

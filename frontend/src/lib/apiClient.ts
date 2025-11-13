@@ -99,6 +99,13 @@ class ApiClient {
   }
 
   // Storage endpoints
+  async uploadImageFromUrl(imageUrl: string, folder: string = 'images') {
+    return this.request('/storage/images/upload-from-url', {
+      method: 'POST',
+      body: JSON.stringify({ image_url: imageUrl, folder }),
+    })
+  }
+
   async uploadVideoToStorage(payload: any) {
     return this.request('/storage/videos/upload', {
       method: 'POST',
@@ -574,7 +581,7 @@ class ApiClient {
     if (params?.user_id) queryParams.append('user_id', params.user_id)
 
     const query = queryParams.toString()
-    return this.request(`/image-jobs${query ? `?${query}` : ''}`)
+    return this.request(`/image-jobs/${query ? `?${query}` : ''}`)
   }
 
   async getCompletedImageJobs(params?: {

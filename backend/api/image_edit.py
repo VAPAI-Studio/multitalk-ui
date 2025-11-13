@@ -3,8 +3,11 @@ from models.image_edit import ImageEditRequest, ImageEditResponse
 from services.openrouter_service import OpenRouterService
 from services.storage_service import StorageService
 from services.edited_image_service import EditedImageService
+from services.image_job_service import ImageJobService
 from models.edited_image import CreateEditedImagePayload, ImageEditStatus
+from models.image_job import CreateImageJobPayload, CompleteImageJobPayload
 import time
+import uuid
 
 router = APIRouter(prefix="/image-edit", tags=["image-edit"])
 
@@ -16,6 +19,9 @@ def get_storage_service():
 
 def get_edited_image_service():
     return EditedImageService()
+
+def get_image_job_service():
+    return ImageJobService()
 
 def get_client_ip(request: Request) -> str:
     """Extract client IP from request"""
@@ -34,12 +40,14 @@ async def edit_image(edit_request: ImageEditRequest, request: Request):
     """Edit an image using OpenRouter's Gemini model with storage and database tracking"""
     start_time = time.time()
     edited_image_id = None
-    
+    image_job_id = None
+
     try:
         # Initialize services
         openrouter_service = get_openrouter_service()
         storage_service = get_storage_service()
         edited_image_service = get_edited_image_service()
+        image_job_service = get_image_job_service()
         
         # Step 1: Upload source image to storage
         source_upload_success, source_storage_url, source_error = await storage_service.upload_image_from_data_url(
@@ -61,15 +69,37 @@ async def edit_image(edit_request: ImageEditRequest, request: Request):
         )
         
         create_success, edited_image_id, create_error = await edited_image_service.create_edited_image(create_payload)
-        
+
         if not create_success:
             return ImageEditResponse(
                 success=False,
                 error=f"Failed to create database record: {create_error}"
             )
-        
+
+        # Step 2.5: Create image job in new system
+        job_id = str(uuid.uuid4())
+        image_job_payload = CreateImageJobPayload(
+            comfy_job_id=job_id,  # Generate unique ID for tracking
+            workflow_name="image-edit",
+            comfy_url="openrouter",  # Not using ComfyUI for this
+            input_image_urls=[source_storage_url],
+            prompt=edit_request.prompt,
+            parameters={"model": "google/gemini-flash-1.5-8b"}
+        )
+
+        job_create_success, job_create_error = await image_job_service.create_job(image_job_payload)
+        if job_create_success:
+            # Get the created job ID
+            jobs, _, _ = await image_job_service.get_recent_jobs(limit=1, workflow_name="image-edit")
+            if jobs:
+                image_job_id = jobs[0].get("id")
+
         # Step 3: Update status to processing
         await edited_image_service.update_to_processing(edited_image_id)
+
+        # Update image job to processing
+        if image_job_id:
+            await image_job_service.update_job(image_job_id, {"status": "processing"})
         
         # Step 4: Generate edited image
         edit_success, result_image_url, edit_error = await openrouter_service.edit_image(
@@ -80,10 +110,19 @@ async def edit_image(edit_request: ImageEditRequest, request: Request):
         if not edit_success or not result_image_url:
             # Mark as failed in database
             await edited_image_service.fail_edited_image(
-                edited_image_id, 
+                edited_image_id,
                 edit_error or "Image generation failed"
             )
-            
+
+            # Mark image job as failed
+            if image_job_id:
+                fail_payload = CompleteImageJobPayload(
+                    job_id=image_job_id,
+                    status="error",
+                    error_message=edit_error or "Image generation failed"
+                )
+                await image_job_service.complete_job(fail_payload)
+
             return ImageEditResponse(
                 success=False,
                 error=edit_error or "Image generation failed"
@@ -105,10 +144,19 @@ async def edit_image(edit_request: ImageEditRequest, request: Request):
         if not result_upload_success:
             # Mark as failed in database
             await edited_image_service.fail_edited_image(
-                edited_image_id, 
+                edited_image_id,
                 f"Failed to store result image: {result_error}"
             )
-            
+
+            # Mark image job as failed
+            if image_job_id:
+                fail_payload = CompleteImageJobPayload(
+                    job_id=image_job_id,
+                    status="error",
+                    error_message=f"Failed to store result image: {result_error}"
+                )
+                await image_job_service.complete_job(fail_payload)
+
             return ImageEditResponse(
                 success=False,
                 error=f"Failed to store result image: {result_error}"
@@ -122,10 +170,19 @@ async def edit_image(edit_request: ImageEditRequest, request: Request):
             processing_time,
             "google/gemini-flash-1.5-8b"
         )
-        
+
         if not completion_success:
             print(f"Warning: Failed to mark image as completed: {completion_error}")
-        
+
+        # Complete image job in new system
+        if image_job_id:
+            complete_job_payload = CompleteImageJobPayload(
+                job_id=image_job_id,
+                status="completed",
+                output_image_urls=[result_storage_url]
+            )
+            await image_job_service.complete_job(complete_job_payload)
+
         # Return the stored result image URL
         return ImageEditResponse(
             success=True,
@@ -138,12 +195,25 @@ async def edit_image(edit_request: ImageEditRequest, request: Request):
         if edited_image_id:
             try:
                 await edited_image_service.fail_edited_image(
-                    edited_image_id, 
+                    edited_image_id,
                     f"Server error: {str(e)}"
                 )
             except:
                 pass
-        
+
+        # Mark image job as failed
+        if image_job_id:
+            try:
+                image_job_service_instance = get_image_job_service()
+                fail_payload = CompleteImageJobPayload(
+                    job_id=image_job_id,
+                    status="error",
+                    error_message=f"Server error: {str(e)}"
+                )
+                await image_job_service_instance.complete_job(fail_payload)
+            except:
+                pass
+
         return ImageEditResponse(
             success=False,
             error=f"Server error: {str(e)}"
