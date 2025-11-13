@@ -303,7 +303,8 @@ export default function App() {
                 <span className="text-lg">🎨</span>
                 <span className="font-medium">Style Transfer</span>
               </button>
-              <button
+              {/* Hidden: Image to Image page */}
+              {/* <button
                 onClick={() => handlePageChange("img2img")}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
                   currentPage === "img2img"
@@ -313,7 +314,7 @@ export default function App() {
               >
                 <span className="text-lg">🖼️</span>
                 <span className="font-medium">Image to Image</span>
-              </button>
+              </button> */}
 
               {/* External Tools Section */}
               <div className="mt-6 pt-4 border-t border-gray-200/50">
@@ -392,9 +393,10 @@ export default function App() {
           {currentPage === "style-transfer" && (
             <StyleTransfer comfyUrl={comfyUrl} />
           )}
-          {currentPage === "img2img" && (
+          {/* Hidden: Image to Image page */}
+          {/* {currentPage === "img2img" && (
             <Img2Img comfyUrl={comfyUrl} />
-          )}
+          )} */}
         </main>
       </div>
       
