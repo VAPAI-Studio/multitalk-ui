@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Label, Field, Section } from "./components/UI";
 import { apiClient } from "./lib/apiClient";
 import ImageFeed from "./components/ImageFeed";
@@ -20,6 +20,8 @@ export default function FluxLora({ comfyUrl = "" }: Props) {
   const [steps, setSteps] = useState<number>(30);
   const [seed, setSeed] = useState<number>(Math.floor(Math.random() * 1000000000));
   const [loras, setLoras] = useState<LoraConfig[]>([]);
+  const [availableLoras, setAvailableLoras] = useState<string[]>([]);
+  const [isLoadingLoras, setIsLoadingLoras] = useState<boolean>(false);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [status, setStatus] = useState<string>("");
   const [resultUrl, setResultUrl] = useState<string>("");
@@ -70,6 +72,32 @@ export default function FluxLora({ comfyUrl = "" }: Props) {
       setAspectRatio(width / height);
     }
   };
+
+  // Fetch available LoRAs from ComfyUI
+  useEffect(() => {
+    const fetchAvailableLoras = async () => {
+      if (!comfyUrl) return;
+
+      setIsLoadingLoras(true);
+      try {
+        const response = await fetch(`${comfyUrl}/object_info/LoraLoaderModelOnly`);
+        if (!response.ok) {
+          console.error('Failed to fetch LoRA list');
+          return;
+        }
+
+        const data = await response.json();
+        const loraList = data?.LoraLoaderModelOnly?.input?.required?.lora_name?.[0] || [];
+        setAvailableLoras(loraList);
+      } catch (error) {
+        console.error('Error fetching LoRAs:', error);
+      } finally {
+        setIsLoadingLoras(false);
+      }
+    };
+
+    fetchAvailableLoras();
+  }, [comfyUrl]);
 
   const addLora = () => {
     const newLora: LoraConfig = {
@@ -318,13 +346,21 @@ export default function FluxLora({ comfyUrl = "" }: Props) {
                     />
                   </div>
                   <div className="flex-1 space-y-3">
-                    <input
-                      type="text"
-                      placeholder="LoRA path (e.g., lucy-20-ago\lucy-20-ago.safetensors)"
+                    <select
                       className="w-full rounded-xl border-2 border-gray-200 px-3 py-2 text-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all duration-200 bg-white"
                       value={lora.name}
                       onChange={(e) => updateLora(lora.id, 'name', e.target.value)}
-                    />
+                      disabled={isLoadingLoras}
+                    >
+                      <option value="">
+                        {isLoadingLoras ? 'Loading LoRAs...' : 'Select a LoRA model'}
+                      </option>
+                      {availableLoras.map((loraName) => (
+                        <option key={loraName} value={loraName}>
+                          {loraName}
+                        </option>
+                      ))}
+                    </select>
                     <div className="flex items-center gap-3">
                       <Label className="!mb-0 w-20">Strength:</Label>
                       <input
