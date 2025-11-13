@@ -164,6 +164,9 @@ export default function FluxLora({ comfyUrl = "" }: Props) {
       };
 
       // Fill in LoRA slots (max 5)
+      // Use first available LoRA for all slots, but disable unused ones
+      const firstLora = availableLoras.length > 0 ? availableLoras[0] : "";
+
       for (let i = 1; i <= 5; i++) {
         const loraIndex = i - 1;
         if (loraIndex < enabledLoras.length) {
@@ -172,9 +175,9 @@ export default function FluxLora({ comfyUrl = "" }: Props) {
           parameters[`LORA_${i}_NAME`] = lora.name;
           parameters[`LORA_${i}_STRENGTH`] = lora.strength;
         } else {
-          // Empty slot
+          // Empty slot - use first available LoRA but disabled
           parameters[`LORA_${i}_ENABLED`] = false;
-          parameters[`LORA_${i}_NAME`] = "";
+          parameters[`LORA_${i}_NAME`] = firstLora;
           parameters[`LORA_${i}_STRENGTH`] = 1.0;
         }
       }
