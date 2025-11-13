@@ -106,6 +106,10 @@ export default function FluxLora({ comfyUrl = "" }: Props) {
   }, [comfyUrl]);
 
   const addLora = () => {
+    if (loras.length >= 5) {
+      setStatus("⚠️ Maximum 5 LoRAs allowed");
+      return;
+    }
     const newLora: LoraConfig = {
       id: Math.random().toString(36).slice(2),
       name: "",
@@ -150,28 +154,35 @@ export default function FluxLora({ comfyUrl = "" }: Props) {
     let databaseJobId: string | null = null;
 
     try {
-      // Build LoRA configuration for Power Lora Loader
-      const loraInputs: any = {};
-      enabledLoras.forEach((lora, index) => {
-        const loraKey = `lora_${index + 1}`;
-        loraInputs[loraKey] = {
-          on: true,
-          lora: lora.name,
-          strength: lora.strength
-        };
-      });
+      // Build parameters for up to 5 LoRA slots
+      const parameters: any = {
+        PROMPT: prompt,
+        WIDTH: width,
+        HEIGHT: height,
+        STEPS: steps,
+        SEED: seed
+      };
+
+      // Fill in LoRA slots (max 5)
+      for (let i = 1; i <= 5; i++) {
+        const loraIndex = i - 1;
+        if (loraIndex < enabledLoras.length) {
+          const lora = enabledLoras[loraIndex];
+          parameters[`LORA_${i}_ENABLED`] = true;
+          parameters[`LORA_${i}_NAME`] = lora.name;
+          parameters[`LORA_${i}_STRENGTH`] = lora.strength;
+        } else {
+          // Empty slot
+          parameters[`LORA_${i}_ENABLED`] = false;
+          parameters[`LORA_${i}_NAME`] = "";
+          parameters[`LORA_${i}_STRENGTH`] = 1.0;
+        }
+      }
 
       const clientId = `flux-lora-${Math.random().toString(36).slice(2)}`;
       const workflowResponse = await apiClient.submitWorkflow(
         'FluxLora',
-        {
-          PROMPT: prompt,
-          WIDTH: width,
-          HEIGHT: height,
-          STEPS: steps,
-          SEED: seed,
-          LORAS: JSON.stringify(loraInputs)
-        },
+        parameters,
         comfyUrl,
         clientId
       ) as { success: boolean; prompt_id?: string; error?: string };

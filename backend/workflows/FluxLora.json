@@ -257,7 +257,31 @@
       "PowerLoraLoaderHeaderWidget": {
         "type": "PowerLoraLoaderHeaderWidget"
       },
-      "{{LORAS}}": "",
+      "lora_01": {
+        "on": "{{LORA_1_ENABLED}}",
+        "lora": "{{LORA_1_NAME}}",
+        "strength": "{{LORA_1_STRENGTH}}"
+      },
+      "lora_02": {
+        "on": "{{LORA_2_ENABLED}}",
+        "lora": "{{LORA_2_NAME}}",
+        "strength": "{{LORA_2_STRENGTH}}"
+      },
+      "lora_03": {
+        "on": "{{LORA_3_ENABLED}}",
+        "lora": "{{LORA_3_NAME}}",
+        "strength": "{{LORA_3_STRENGTH}}"
+      },
+      "lora_04": {
+        "on": "{{LORA_4_ENABLED}}",
+        "lora": "{{LORA_4_NAME}}",
+        "strength": "{{LORA_4_STRENGTH}}"
+      },
+      "lora_05": {
+        "on": "{{LORA_5_ENABLED}}",
+        "lora": "{{LORA_5_NAME}}",
+        "strength": "{{LORA_5_STRENGTH}}"
+      },
       "model": [
         "10",
         0
