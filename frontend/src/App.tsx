@@ -8,7 +8,7 @@ import GenerationFeed from "./GenerationFeed";
 import CharacterCaption from "./CharacterCaption";
 import WANI2V from "./WANI2V";
 import StyleTransfer from "./StyleTransfer";
-import Img2Img from "./Img2Img";
+// import Img2Img from "./Img2Img"; // Hidden: Image to Image page
 import ComfyUIStatus from "./components/ComfyUIStatus";
 import ConsoleToggle from "./components/ConsoleToggle";
 import AuthPage from "./components/AuthPage";
