@@ -73,7 +73,7 @@ export default function FluxLora({ comfyUrl = "" }: Props) {
     }
   };
 
-  // Fetch available LoRAs from ComfyUI
+  // Fetch available LoRAs from ComfyUI (FLUX folder only)
   useEffect(() => {
     const fetchAvailableLoras = async () => {
       if (!comfyUrl) return;
@@ -87,8 +87,14 @@ export default function FluxLora({ comfyUrl = "" }: Props) {
         }
 
         const data = await response.json();
-        const loraList = data?.LoraLoaderModelOnly?.input?.required?.lora_name?.[0] || [];
-        setAvailableLoras(loraList);
+        const allLoras = data?.LoraLoaderModelOnly?.input?.required?.lora_name?.[0] || [];
+
+        // Filter to only show LoRAs in FLUX/ folder
+        const fluxLoras = allLoras.filter((lora: string) =>
+          lora.toUpperCase().startsWith('FLUX/') || lora.toUpperCase().startsWith('FLUX\\')
+        );
+
+        setAvailableLoras(fluxLoras);
       } catch (error) {
         console.error('Error fetching LoRAs:', error);
       } finally {
