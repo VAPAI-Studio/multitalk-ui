@@ -113,20 +113,6 @@
       "title": "ModelSamplingFlux"
     }
   },
-  "10": {
-    "inputs": {
-      "lora_name": "estilo-20-ago\\estilo-20-ago.safetensors",
-      "strength_model": 0.30000000000000004,
-      "model": [
-        "11",
-        0
-      ]
-    },
-    "class_type": "LoraLoaderModelOnly",
-    "_meta": {
-      "title": "LoraLoaderModelOnly"
-    }
-  },
   "11": {
     "inputs": {
       "unet_name": "FLUX\\flux1-dev.safetensors",
@@ -283,7 +269,7 @@
         "strength": "{{LORA_5_STRENGTH}}"
       },
       "model": [
-        "10",
+        "11",
         0
       ],
       "clip": [
