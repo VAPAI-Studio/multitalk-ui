@@ -35,7 +35,7 @@ export default function FluxLora({ comfyUrl = "" }: Props) {
 
   const [prompt, setPrompt] = useState<string>(savedSettings?.prompt || "");
   const [steps, setSteps] = useState<number>(savedSettings?.steps || 30);
-  const [seed, setSeed] = useState<number>(savedSettings?.seed || Math.floor(Math.random() * 1000000000));
+  const [seed, setSeed] = useState<number>(savedSettings?.seed || 42);
   const [loras, setLoras] = useState<LoraConfig[]>(savedSettings?.loras || []);
   const [availableLoras, setAvailableLoras] = useState<string[]>([]);
   const [isLoadingLoras, setIsLoadingLoras] = useState<boolean>(false);
