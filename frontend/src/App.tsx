@@ -8,7 +8,8 @@ import GenerationFeed from "./GenerationFeed";
 import CharacterCaption from "./CharacterCaption";
 import WANI2V from "./WANI2V";
 import StyleTransfer from "./StyleTransfer";
-import Img2Img from "./Img2Img";
+import FluxLora from "./FluxLora";
+// import Img2Img from "./Img2Img"; // Hidden: Image to Image page
 import ComfyUIStatus from "./components/ComfyUIStatus";
 import ConsoleToggle from "./components/ConsoleToggle";
 import AuthPage from "./components/AuthPage";
@@ -16,7 +17,7 @@ import { useAuth } from "./contexts/AuthContext";
 
 export default function App() {
   const { isAuthenticated, loading, user, logout } = useAuth();
-  const [currentPage, setCurrentPage] = useState<"home" | "multitalk-one" | "multitalk-multiple" | "video-lipsync" | "image-edit" | "generation-feed" | "character-caption" | "wan-i2v" | "style-transfer" | "img2img">("home");
+  const [currentPage, setCurrentPage] = useState<"home" | "multitalk-one" | "multitalk-multiple" | "video-lipsync" | "image-edit" | "generation-feed" | "character-caption" | "wan-i2v" | "style-transfer" | "flux-lora" | "img2img">("home");
   const [comfyUrl, setComfyUrl] = useState<string>("https://comfy.vapai.studio");
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
   const [userMenuOpen, setUserMenuOpen] = useState<boolean>(false);
@@ -26,7 +27,7 @@ export default function App() {
     const savedPage = localStorage.getItem('vapai-current-page') as typeof currentPage;
     const savedComfyUrl = localStorage.getItem('vapai-comfy-url');
     
-    if (savedPage && ['home', 'multitalk-one', 'multitalk-multiple', 'video-lipsync', 'image-edit', 'generation-feed', 'character-caption', 'wan-i2v', 'style-transfer', 'img2img'].includes(savedPage)) {
+    if (savedPage && ['home', 'multitalk-one', 'multitalk-multiple', 'video-lipsync', 'image-edit', 'generation-feed', 'character-caption', 'wan-i2v', 'style-transfer', 'flux-lora', 'img2img'].includes(savedPage)) {
       setCurrentPage(savedPage);
     }
     
@@ -304,6 +305,18 @@ export default function App() {
                 <span className="font-medium">Style Transfer</span>
               </button>
               <button
+                onClick={() => handlePageChange("flux-lora")}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
+                  currentPage === "flux-lora"
+                    ? "bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg"
+                    : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                }`}
+              >
+                <span className="text-lg">⚡</span>
+                <span className="font-medium">Flux LoRA</span>
+              </button>
+              {/* Hidden: Image to Image page */}
+              {/* <button
                 onClick={() => handlePageChange("img2img")}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
                   currentPage === "img2img"
@@ -313,7 +326,7 @@ export default function App() {
               >
                 <span className="text-lg">🖼️</span>
                 <span className="font-medium">Image to Image</span>
-              </button>
+              </button> */}
 
               {/* External Tools Section */}
               <div className="mt-6 pt-4 border-t border-gray-200/50">
@@ -375,7 +388,7 @@ export default function App() {
           )}
           {currentPage === "image-edit" && (
             <div className="w-full max-w-6xl mx-auto p-6">
-              <ImageEdit />
+              <ImageEdit comfyUrl={comfyUrl} />
             </div>
           )}
           {currentPage === "generation-feed" && (
@@ -392,9 +405,13 @@ export default function App() {
           {currentPage === "style-transfer" && (
             <StyleTransfer comfyUrl={comfyUrl} />
           )}
-          {currentPage === "img2img" && (
-            <Img2Img comfyUrl={comfyUrl} />
+          {currentPage === "flux-lora" && (
+            <FluxLora comfyUrl={comfyUrl} />
           )}
+          {/* Hidden: Image to Image page */}
+          {/* {currentPage === "img2img" && (
+            <Img2Img comfyUrl={comfyUrl} />
+          )} */}
         </main>
       </div>
       

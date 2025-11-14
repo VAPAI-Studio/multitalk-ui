@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { apiClient } from '../lib/apiClient'
 import ImageModal from './ImageModal'
 
@@ -88,8 +88,8 @@ export default function ImageFeed({ config }: ImageFeedProps) {
   const [selectedImage, setSelectedImage] = useState<ImageItem | null>(null)
   const [currentOffset, setCurrentOffset] = useState(0)
   const [hasMore, setHasMore] = useState(true)
-  
-  const loadFeed = async (reset = true) => {
+
+  const loadFeed = useCallback(async (reset = true) => {
     if (reset) {
       setLoading(true)
       setCurrentOffset(0)
@@ -244,7 +244,7 @@ export default function ImageFeed({ config }: ImageFeedProps) {
       setLoading(false)
       setLoadingMore(false)
     }
-  }
+  }, [config.showCompletedOnly, config.maxItems, config.useNewJobSystem, config.workflowName, config.userId, showFilteredOnly])
 
   const loadMore = () => {
     if (!loadingMore && hasMore) {
@@ -254,14 +254,11 @@ export default function ImageFeed({ config }: ImageFeedProps) {
 
   useEffect(() => {
     loadFeed()
-  }, [config.showCompletedOnly, config.maxItems, config.useNewJobSystem, config.workflowName, config.userId, showFilteredOnly])
 
-  // Separate effect for auto-refresh to avoid resetting on filter changes
-  useEffect(() => {
     // Refresh every 10 seconds for more responsive updates
     const interval = setInterval(() => loadFeed(), 10000)
     return () => clearInterval(interval)
-  }, [])
+  }, [loadFeed])
 
   const getStatusColor = (status: string) => {
     switch (status) {
