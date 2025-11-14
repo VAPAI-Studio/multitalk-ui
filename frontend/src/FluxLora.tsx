@@ -88,15 +88,6 @@ export default function FluxLora({ comfyUrl = "" }: Props) {
     }
   };
 
-  const toggleAspectRatioLock = () => {
-    const newLockState = !aspectRatioLocked;
-    setAspectRatioLocked(newLockState);
-
-    if (newLockState && width > 0 && height > 0) {
-      setAspectRatio(width / height);
-    }
-  };
-
   // Save settings to localStorage whenever they change
   useEffect(() => {
     const settings = {
@@ -503,17 +494,20 @@ export default function FluxLora({ comfyUrl = "" }: Props) {
           {/* Resolution Section */}
           <Section title="Resolution">
             <div className="mb-4 flex items-center gap-3">
-              <button
-                onClick={toggleAspectRatioLock}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all duration-200 ${
-                  aspectRatioLocked
-                    ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-md'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                <span className="text-lg">{aspectRatioLocked ? '🔒' : '🔓'}</span>
-                <span>Maintain Aspect Ratio</span>
-              </button>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={aspectRatioLocked}
+                  onChange={(e) => {
+                    setAspectRatioLocked(e.target.checked);
+                    if (e.target.checked && width > 0 && height > 0) {
+                      setAspectRatio(width / height);
+                    }
+                  }}
+                  className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                />
+                <span className="font-medium text-gray-700">Maintain Aspect Ratio</span>
+              </label>
               {aspectRatioLocked && aspectRatio > 0 && (
                 <span className="text-xs text-gray-500">
                   ({aspectRatio.toFixed(2)}:1)
