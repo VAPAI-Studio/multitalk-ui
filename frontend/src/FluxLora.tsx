@@ -15,11 +15,28 @@ interface LoraConfig {
   enabled: boolean;
 }
 
+const STORAGE_KEY = 'fluxLora_settings';
+
 export default function FluxLora({ comfyUrl = "" }: Props) {
-  const [prompt, setPrompt] = useState<string>("");
-  const [steps, setSteps] = useState<number>(30);
-  const [seed, setSeed] = useState<number>(Math.floor(Math.random() * 1000000000));
-  const [loras, setLoras] = useState<LoraConfig[]>([]);
+  // Load saved settings from localStorage
+  const loadSettings = () => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (error) {
+      console.error('Error loading saved settings:', error);
+    }
+    return null;
+  };
+
+  const savedSettings = loadSettings();
+
+  const [prompt, setPrompt] = useState<string>(savedSettings?.prompt || "");
+  const [steps, setSteps] = useState<number>(savedSettings?.steps || 30);
+  const [seed, setSeed] = useState<number>(savedSettings?.seed || Math.floor(Math.random() * 1000000000));
+  const [loras, setLoras] = useState<LoraConfig[]>(savedSettings?.loras || []);
   const [availableLoras, setAvailableLoras] = useState<string[]>([]);
   const [isLoadingLoras, setIsLoadingLoras] = useState<boolean>(false);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
@@ -36,11 +53,18 @@ export default function FluxLora({ comfyUrl = "" }: Props) {
     handleHeightChange,
     setWidth,
     setHeight
-  } = useSmartResolution(1024, 1024);
+  } = useSmartResolution(
+    savedSettings?.width || 1024,
+    savedSettings?.height || 1024
+  );
 
   // Aspect ratio lock state
-  const [aspectRatioLocked, setAspectRatioLocked] = useState<boolean>(true);
-  const [aspectRatio, setAspectRatio] = useState<number>(1);
+  const [aspectRatioLocked, setAspectRatioLocked] = useState<boolean>(
+    savedSettings?.aspectRatioLocked !== undefined ? savedSettings.aspectRatioLocked : true
+  );
+  const [aspectRatio, setAspectRatio] = useState<number>(
+    savedSettings?.aspectRatio || 1
+  );
 
   const handleWidthChangeWithAspectRatio = (value: string) => {
     handleWidthChange(value);
@@ -72,6 +96,26 @@ export default function FluxLora({ comfyUrl = "" }: Props) {
       setAspectRatio(width / height);
     }
   };
+
+  // Save settings to localStorage whenever they change
+  useEffect(() => {
+    const settings = {
+      prompt,
+      steps,
+      seed,
+      loras,
+      width,
+      height,
+      aspectRatioLocked,
+      aspectRatio
+    };
+
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    } catch (error) {
+      console.error('Error saving settings:', error);
+    }
+  }, [prompt, steps, seed, loras, width, height, aspectRatioLocked, aspectRatio]);
 
   // Fetch available LoRAs from ComfyUI (FLUX folder only)
   useEffect(() => {
