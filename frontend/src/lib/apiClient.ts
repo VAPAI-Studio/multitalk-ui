@@ -8,18 +8,24 @@ class ApiClient {
     this.baseURL = config.apiBaseUrl
   }
 
+  private getAuthToken(): string | null {
+    return localStorage.getItem('vapai-auth-token')
+  }
+
   private async request<T>(endpoint: string, options: RequestInit = {}, retries: number = 3): Promise<T> {
     const url = `${this.baseURL}${endpoint}`
-    
+    const token = this.getAuthToken()
+
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
         // Add timeout to prevent hanging requests
         const controller = new AbortController()
         const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
-        
+
         const response = await fetch(url, {
           headers: {
             'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
             ...options.headers,
           },
           signal: controller.signal,
@@ -626,6 +632,73 @@ class ApiClient {
       method: 'PUT',
       body: JSON.stringify(payload),
     })
+  }
+
+  // LoRA Trainer endpoints (Musubi Tuner for QWEN Image LoRA)
+  async startMusubiTraining(payload: {
+    images: Array<{ filename: string; data: string; caption: string }>;
+    output_name: string;
+    network_dim?: number;
+    network_alpha?: number;
+    learning_rate?: number;
+    max_train_epochs?: number;
+    max_train_steps?: number;
+    seed?: number;
+    resolution?: [number, number];
+  }) {
+    // Use longer timeout for training requests with potentially large base64 images
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 300000) // 5 minute timeout
+    const token = this.getAuthToken()
+
+    try {
+      const response = await fetch(`${this.baseURL}/lora-trainer/train`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`API request failed: ${response.status} ${response.statusText} - ${errorText}`)
+      }
+
+      return response.json()
+    } catch (error) {
+      clearTimeout(timeoutId)
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error('Training request timed out. The server may be processing the request.')
+      }
+      throw error
+    }
+  }
+
+  async getMusubiTrainingStatus(jobId: string) {
+    return this.request(`/lora-trainer/status/${jobId}`)
+  }
+
+  async getMusubiTrainingJobs() {
+    return this.request('/lora-trainer/jobs')
+  }
+
+  async cancelMusubiTraining(jobId: string) {
+    return this.request(`/lora-trainer/cancel/${jobId}`, {
+      method: 'POST',
+    })
+  }
+
+  async getMusubiTrainingLogs(jobId: string) {
+    return this.request(`/lora-trainer/logs/${jobId}`)
+  }
+
+  async checkMusubiHealth() {
+    return this.request('/lora-trainer/health')
   }
 }
 

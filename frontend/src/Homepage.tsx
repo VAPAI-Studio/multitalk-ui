@@ -1,6 +1,6 @@
 
 interface Props {
-  onNavigate: (page: "multitalk-one" | "multitalk-multiple" | "video-lipsync" | "image-edit" | "character-caption" | "wan-i2v" | "style-transfer" | "create-image" | "flux-trainer" | "img2img") => void;
+  onNavigate: (page: "multitalk-one" | "multitalk-multiple" | "video-lipsync" | "image-edit" | "character-caption" | "wan-i2v" | "style-transfer" | "create-image" | "lora-trainer" | "img2img") => void;
 }
 
 export default function Homepage({ onNavigate }: Props) {
@@ -70,12 +70,12 @@ export default function Homepage({ onNavigate }: Props) {
       features: ["Multiple LoRA support", "Flux & Qwen models", "Adjustable weights per LoRA"]
     },
     {
-      id: "flux-trainer" as const,
-      title: "Flux Trainer",
-      description: "Train your own custom Flux LoRA models with your images. Perfect for creating consistent characters, styles, or objects.",
-      icon: "🎓",
-      gradient: "from-orange-500 to-red-600",
-      features: ["Custom LoRA training", "20-100 training images", "Advanced parameters", "Model: Flux Dev via kohya_ss"]
+      id: "lora-trainer" as const,
+      title: "LoRA Trainer",
+      description: "Train your own custom QWEN Image LoRA models with your datasets. Perfect for creating consistent characters, styles, or objects.",
+      icon: "🧠",
+      gradient: "from-amber-500 to-orange-600",
+      features: ["Custom LoRA training", "Dataset-based", "Advanced parameters", "Model: QWEN Image via Musubi Tuner"]
     }
     // Hidden: Image to Image
     // {

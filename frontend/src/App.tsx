@@ -9,7 +9,7 @@ import CharacterCaption from "./CharacterCaption";
 import WANI2V from "./WANI2V";
 import StyleTransfer from "./StyleTransfer";
 import CreateImage from "./CreateImage";
-import FluxTrainer from "./FluxTrainer";
+import LoRATrainer from "./LoRATrainer";
 // import Img2Img from "./Img2Img"; // Hidden: Image to Image page
 import ComfyUIStatus from "./components/ComfyUIStatus";
 import ConsoleToggle from "./components/ConsoleToggle";
@@ -18,7 +18,7 @@ import { useAuth } from "./contexts/AuthContext";
 
 export default function App() {
   const { isAuthenticated, loading, user, logout } = useAuth();
-  const [currentPage, setCurrentPage] = useState<"home" | "multitalk-one" | "multitalk-multiple" | "video-lipsync" | "image-edit" | "generation-feed" | "character-caption" | "wan-i2v" | "style-transfer" | "create-image" | "flux-trainer" | "img2img">("home");
+  const [currentPage, setCurrentPage] = useState<"home" | "multitalk-one" | "multitalk-multiple" | "video-lipsync" | "image-edit" | "generation-feed" | "character-caption" | "wan-i2v" | "style-transfer" | "create-image" | "lora-trainer" | "img2img">("home");
   const [comfyUrl, setComfyUrl] = useState<string>("https://comfy.vapai.studio");
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
   const [userMenuOpen, setUserMenuOpen] = useState<boolean>(false);
@@ -28,7 +28,7 @@ export default function App() {
     const savedPage = localStorage.getItem('vapai-current-page') as typeof currentPage;
     const savedComfyUrl = localStorage.getItem('vapai-comfy-url');
     
-    if (savedPage && ['home', 'multitalk-one', 'multitalk-multiple', 'video-lipsync', 'image-edit', 'generation-feed', 'character-caption', 'wan-i2v', 'style-transfer', 'create-image', 'flux-trainer', 'img2img'].includes(savedPage)) {
+    if (savedPage && ['home', 'multitalk-one', 'multitalk-multiple', 'video-lipsync', 'image-edit', 'generation-feed', 'character-caption', 'wan-i2v', 'style-transfer', 'create-image', 'lora-trainer', 'img2img'].includes(savedPage)) {
       setCurrentPage(savedPage);
     }
     
@@ -317,15 +317,15 @@ export default function App() {
                 <span className="font-medium">Create Image</span>
               </button>
               <button
-                onClick={() => handlePageChange("flux-trainer")}
+                onClick={() => handlePageChange("lora-trainer")}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
-                  currentPage === "flux-trainer"
-                    ? "bg-gradient-to-r from-orange-500 to-red-600 text-white shadow-lg"
+                  currentPage === "lora-trainer"
+                    ? "bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-lg"
                     : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
                 }`}
               >
-                <span className="text-lg">🎓</span>
-                <span className="font-medium">Flux Trainer</span>
+                <span className="text-lg">🧠</span>
+                <span className="font-medium">LoRA Trainer</span>
               </button>
               {/* Hidden: Image to Image page */}
               {/* <button
@@ -420,8 +420,8 @@ export default function App() {
           {currentPage === "create-image" && (
             <CreateImage comfyUrl={comfyUrl} />
           )}
-          {currentPage === "flux-trainer" && (
-            <FluxTrainer comfyUrl={comfyUrl} />
+          {currentPage === "lora-trainer" && (
+            <LoRATrainer />
           )}
           {/* Hidden: Image to Image page */}
           {/* {currentPage === "img2img" && (
