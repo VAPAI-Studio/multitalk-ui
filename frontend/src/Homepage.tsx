@@ -1,6 +1,6 @@
 
 interface Props {
-  onNavigate: (page: "multitalk-one" | "multitalk-multiple" | "video-lipsync" | "image-edit" | "character-caption" | "wan-i2v" | "style-transfer" | "create-image" | "img2img") => void;
+  onNavigate: (page: "multitalk-one" | "multitalk-multiple" | "video-lipsync" | "image-edit" | "character-caption" | "wan-i2v" | "style-transfer" | "create-image" | "flux-trainer" | "img2img") => void;
 }
 
 export default function Homepage({ onNavigate }: Props) {
@@ -68,6 +68,14 @@ export default function Homepage({ onNavigate }: Props) {
       icon: "✨",
       gradient: "from-indigo-500 to-purple-600",
       features: ["Multiple LoRA support", "Flux & Qwen models", "Adjustable weights per LoRA"]
+    },
+    {
+      id: "flux-trainer" as const,
+      title: "Flux Trainer",
+      description: "Train your own custom Flux LoRA models with your images. Perfect for creating consistent characters, styles, or objects.",
+      icon: "🎓",
+      gradient: "from-orange-500 to-red-600",
+      features: ["Custom LoRA training", "20-100 training images", "Advanced parameters", "Model: Flux Dev via kohya_ss"]
     }
     // Hidden: Image to Image
     // {
