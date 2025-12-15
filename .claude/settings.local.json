@@ -28,7 +28,10 @@
       "Bash(pkill:*)",
       "Bash(find:*)",
       "Bash(export SUPABASE_URL=https://rwbhfxltyxaegtalgxdx.supabase.co)",
-      "Bash(export:*)"
+      "Bash(export:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push)"
     ],
     "deny": [],
     "ask": []

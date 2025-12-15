@@ -167,7 +167,7 @@ export default function Homepage({ onNavigate }: Props) {
             </p>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto">
             <button
               onClick={() => window.open('https://comfy.vapai.studio', '_blank')}
               className="group p-6 rounded-3xl bg-white/80 backdrop-blur-sm border border-gray-200/50 shadow-lg hover:shadow-2xl transform hover:scale-[1.02] transition-all duration-300 cursor-pointer text-left"
@@ -216,6 +216,32 @@ export default function Homepage({ onNavigate }: Props) {
               </p>
               <div className="inline-flex items-center gap-2 text-sm font-medium bg-gradient-to-r from-blue-500 to-cyan-600 bg-clip-text text-transparent">
                 <span>Launch Notebook</span>
+                <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">→</span>
+              </div>
+            </button>
+
+            <button
+              onClick={() => window.open('https://n8n.vapai.studio', '_blank')}
+              className="group p-6 rounded-3xl bg-white/80 backdrop-blur-sm border border-gray-200/50 shadow-lg hover:shadow-2xl transform hover:scale-[1.02] transition-all duration-300 cursor-pointer text-left"
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div className="w-14 h-14 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center text-2xl shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  ⚡
+                </div>
+                <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
+                    <span className="text-gray-600">↗</span>
+                  </div>
+                </div>
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-3 group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:bg-clip-text group-hover:from-green-600 group-hover:to-emerald-600 transition-all duration-300">
+                n8n Automation
+              </h3>
+              <p className="text-gray-600 mb-4 leading-relaxed">
+                Powerful workflow automation platform to connect apps and automate AI-powered media pipelines.
+              </p>
+              <div className="inline-flex items-center gap-2 text-sm font-medium bg-gradient-to-r from-green-500 to-emerald-600 bg-clip-text text-transparent">
+                <span>Open Automation</span>
                 <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">→</span>
               </div>
             </button>
