@@ -205,7 +205,7 @@ export default function App() {
             </div>
 
             {/* Navigation Items */}
-            <div className="flex-1 p-6 space-y-2">
+            <div className="flex-1 p-6 space-y-2 overflow-y-auto">
               <button
                 onClick={() => handlePageChange("home")}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
@@ -262,17 +262,6 @@ export default function App() {
                 <span className="font-medium">Image Edit</span>
               </button>
               <button
-                onClick={() => handlePageChange("generation-feed")}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
-                  currentPage === "generation-feed"
-                    ? "bg-gradient-to-r from-pink-500 to-rose-600 text-white shadow-lg"
-                    : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
-                }`}
-              >
-                <span className="text-lg">🖼️</span>
-                <span className="font-medium">Generation Feed</span>
-              </button>
-              <button
                 onClick={() => handlePageChange("character-caption")}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
                   currentPage === "character-caption"
@@ -327,6 +316,17 @@ export default function App() {
                 <span className="text-lg">🧠</span>
                 <span className="font-medium">LoRA Trainer</span>
               </button>
+              <button
+                onClick={() => handlePageChange("generation-feed")}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
+                  currentPage === "generation-feed"
+                    ? "bg-gradient-to-r from-pink-500 to-rose-600 text-white shadow-lg"
+                    : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                }`}
+              >
+                <span className="text-lg">🖼️</span>
+                <span className="font-medium">Generation Feed</span>
+              </button>
               {/* Hidden: Image to Image page */}
               {/* <button
                 onClick={() => handlePageChange("img2img")}
@@ -362,6 +362,17 @@ export default function App() {
                   <div className="flex flex-col">
                     <span className="font-medium">Jupyter</span>
                     <span className="text-xs text-gray-500">Notebook</span>
+                  </div>
+                  <span className="text-xs text-gray-400 ml-auto">↗</span>
+                </button>
+                <button
+                  onClick={() => window.open('https://n8n.vapai.studio', '_blank')}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                >
+                  <span className="text-lg">⚡</span>
+                  <div className="flex flex-col">
+                    <span className="font-medium">n8n</span>
+                    <span className="text-xs text-gray-500">Automation</span>
                   </div>
                   <span className="text-xs text-gray-400 ml-auto">↗</span>
                 </button>
