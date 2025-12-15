@@ -6,32 +6,56 @@ from pathlib import Path
 
 class WorkflowService:
     """Service for managing ComfyUI workflow templates"""
-    
+
     def __init__(self):
         # Get the workflows directory path
         self.workflows_dir = Path(__file__).parent.parent / "workflows"
-        
-    async def load_template(self, template_name: str) -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
+
+    def _find_template_path(self, template_name: str) -> Optional[Path]:
         """
-        Load a workflow template from the workflows directory
+        Find a template file by name, searching in root and subdirectories
 
         Args:
-            template_name: Name of the template file (e.g., "VideoLipsync", "WANI2V")
+            template_name: Name of the template file (without .json extension)
+
+        Returns:
+            Path to the template file, or None if not found
+        """
+        # First check root workflows directory
+        root_path = self.workflows_dir / f"{template_name}.json"
+        if root_path.exists():
+            return root_path
+
+        # Then check subdirectories
+        for subdir in self.workflows_dir.iterdir():
+            if subdir.is_dir():
+                subdir_path = subdir / f"{template_name}.json"
+                if subdir_path.exists():
+                    return subdir_path
+
+        return None
+
+    async def load_template(self, template_name: str) -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
+        """
+        Load a workflow template from the workflows directory or subdirectories
+
+        Args:
+            template_name: Name of the template file (e.g., "VideoLipsync", "WANI2V", "FluxLora")
 
         Returns:
             (success, template_dict, error_message)
         """
         try:
-            template_path = self.workflows_dir / f"{template_name}.json"
-            
-            if not template_path.exists():
+            template_path = self._find_template_path(template_name)
+
+            if template_path is None:
                 return False, None, f"Template '{template_name}' not found"
-            
+
             with open(template_path, 'r', encoding='utf-8') as f:
                 template = json.load(f)
-            
+
             return True, template, None
-            
+
         except json.JSONDecodeError as e:
             return False, None, f"Invalid JSON in template '{template_name}': {str(e)}"
         except Exception as e:
@@ -106,7 +130,7 @@ class WorkflowService:
     
     def list_templates(self) -> Dict[str, str]:
         """
-        List all available workflow templates
+        List all available workflow templates from root and subdirectories
 
         Returns:
             Dictionary mapping template names to their descriptions
@@ -114,9 +138,18 @@ class WorkflowService:
         templates = {}
 
         try:
+            # Get templates from root directory
             for template_file in self.workflows_dir.glob("*.json"):
                 template_name = template_file.stem
                 templates[template_name] = f"Workflow template: {template_name}"
+
+            # Get templates from subdirectories
+            for subdir in self.workflows_dir.iterdir():
+                if subdir.is_dir():
+                    for template_file in subdir.glob("*.json"):
+                        template_name = template_file.stem
+                        folder_name = subdir.name
+                        templates[template_name] = f"Workflow template: {template_name} (in {folder_name}/)"
 
         except Exception as e:
             print(f"Error listing templates: {e}")

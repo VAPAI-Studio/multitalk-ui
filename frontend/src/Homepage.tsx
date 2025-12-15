@@ -1,6 +1,6 @@
 
 interface Props {
-  onNavigate: (page: "multitalk-one" | "multitalk-multiple" | "video-lipsync" | "image-edit" | "character-caption" | "wan-i2v" | "style-transfer" | "flux-lora" | "img2img") => void;
+  onNavigate: (page: "multitalk-one" | "multitalk-multiple" | "video-lipsync" | "image-edit" | "character-caption" | "wan-i2v" | "style-transfer" | "create-image" | "lora-trainer" | "img2img") => void;
 }
 
 export default function Homepage({ onNavigate }: Props) {
@@ -62,12 +62,20 @@ export default function Homepage({ onNavigate }: Props) {
       features: ["Dual image input", "Artistic style transfer", "Model: Flux with USO Style Reference"]
     },
     {
-      id: "flux-lora" as const,
-      title: "Flux LoRA",
-      description: "Generate images using Flux with custom LoRA models. Add multiple LoRAs with adjustable weights for precise control.",
-      icon: "⚡",
+      id: "create-image" as const,
+      title: "Create Image",
+      description: "Generate images using Flux or Qwen with custom LoRA models. Add multiple LoRAs with adjustable weights for precise control.",
+      icon: "✨",
       gradient: "from-indigo-500 to-purple-600",
-      features: ["Multiple LoRA support", "Adjustable weights per LoRA", "Model: Flux Dev"]
+      features: ["Multiple LoRA support", "Flux & Qwen models", "Adjustable weights per LoRA"]
+    },
+    {
+      id: "lora-trainer" as const,
+      title: "LoRA Trainer",
+      description: "Train your own custom QWEN Image LoRA models with your datasets. Perfect for creating consistent characters, styles, or objects.",
+      icon: "🧠",
+      gradient: "from-amber-500 to-orange-600",
+      features: ["Custom LoRA training", "Dataset-based", "Advanced parameters", "Model: QWEN Image via Musubi Tuner"]
     }
     // Hidden: Image to Image
     // {
