@@ -12,14 +12,14 @@ import re
 
 from models.training_job import TrainingConfigTOML, TrainingStatus
 from services.storage_service import StorageService
-from core.supabase import get_supabase_client
+from core.supabase import get_supabase
 
 
 class FluxTrainerService:
     """Service for Flux LoRA training operations."""
 
     def __init__(self):
-        self.supabase = get_supabase_client()
+        self.supabase = get_supabase()
         self.storage_service = StorageService()
 
         # Training workspace directory

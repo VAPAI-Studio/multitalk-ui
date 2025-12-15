@@ -1,11 +1,10 @@
 """API endpoints for Flux LoRA training."""
 
 from fastapi import APIRouter, HTTPException, Depends, File, UploadFile, Form, status
-from typing import List, Optional
+from typing import List, Optional, Any
 from pydantic import ValidationError
 
 from core.auth import get_current_user
-from models.user import User
 from models.training_job import (
     TrainingJobCreate,
     TrainingJobResponse,
@@ -26,7 +25,7 @@ def get_trainer_service():
 @router.post("/jobs", response_model=TrainingJobResponse, status_code=status.HTTP_201_CREATED)
 async def create_training_job(
     job_data: TrainingJobCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: Any = Depends(get_current_user),
     service: FluxTrainerService = Depends(get_trainer_service)
 ):
     """
@@ -86,7 +85,7 @@ async def create_training_job(
 async def upload_training_images(
     job_id: str,
     images: List[UploadFile] = File(..., description="Training images (20-100 recommended)"),
-    current_user: User = Depends(get_current_user),
+    current_user: Any = Depends(get_current_user),
     service: FluxTrainerService = Depends(get_trainer_service)
 ):
     """
@@ -145,7 +144,7 @@ async def upload_training_images(
 @router.post("/jobs/{job_id}/start")
 async def start_training(
     job_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: Any = Depends(get_current_user),
     service: FluxTrainerService = Depends(get_trainer_service)
 ):
     """
@@ -234,7 +233,7 @@ async def list_training_jobs(
     status: Optional[str] = None,
     limit: int = 50,
     offset: int = 0,
-    current_user: User = Depends(get_current_user),
+    current_user: Any = Depends(get_current_user),
     service: FluxTrainerService = Depends(get_trainer_service)
 ):
     """
@@ -281,7 +280,7 @@ async def list_training_jobs(
 @router.get("/jobs/{job_id}", response_model=TrainingJobResponse)
 async def get_training_job(
     job_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: Any = Depends(get_current_user),
     service: FluxTrainerService = Depends(get_trainer_service)
 ):
     """Get details of a specific training job."""
@@ -324,7 +323,7 @@ async def get_training_job(
 @router.post("/jobs/{job_id}/cancel")
 async def cancel_training_job(
     job_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: Any = Depends(get_current_user),
     service: FluxTrainerService = Depends(get_trainer_service)
 ):
     """Cancel a running training job."""
@@ -354,7 +353,7 @@ async def cancel_training_job(
 @router.delete("/jobs/{job_id}")
 async def delete_training_job(
     job_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: Any = Depends(get_current_user),
     service: FluxTrainerService = Depends(get_trainer_service)
 ):
     """Delete a training job and its associated files."""
