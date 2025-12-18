@@ -239,7 +239,7 @@ export default function VideoLipsync({ comfyUrl }: Props) {
       
       // Calculate timing parameters
       const audioStartTime = audioTrack ? `${Math.floor(audioTrack.startTime / 60)}:${String(Math.floor(audioTrack.startTime % 60)).padStart(2, '0')}` : "0:00";
-      const audioEndTime = audioTrack ? `${Math.floor((audioTrack.startTime + audioTrack.duration) / 60)}:${String(Math.floor((audioTrack.startTime + audioTrack.duration) % 60)).padStart(2, '0')}` : "2:00";
+      const audioEndTime = audioTrack ? `${Math.floor((audioTrack.startTime + audioTrack.duration) / 60)}:${String(Math.ceil((audioTrack.startTime + audioTrack.duration) % 60)).padStart(2, '0')}` : "2:00";
       const videoStartFrame = videoTrack ? Math.floor(videoTrack.startTime * 25) : 0; // Assuming 25 FPS
       
       // Calculate black frame padding based on timeline union
