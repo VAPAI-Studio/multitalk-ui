@@ -84,21 +84,29 @@ class WorkflowService:
             # Replace placeholders
             for key, value in parameters.items():
                 placeholder = f"{{{{{key}}}}}"
-                
+
                 # Handle different value types
                 if isinstance(value, bool):
                     # For boolean values - handle this FIRST before str check
+                    # Replace standalone placeholder (wrapped in quotes)
                     template_str = template_str.replace(f'"{placeholder}"', str(value).lower())
                 elif isinstance(value, str):
                     # For string values, ensure proper JSON escaping
                     escaped_value = value.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
+                    # First try standalone placeholder (wrapped in quotes)
                     template_str = template_str.replace(f'"{placeholder}"', f'"{escaped_value}"')
+                    # Also replace inline placeholders (within a larger string)
+                    template_str = template_str.replace(placeholder, escaped_value)
                 elif isinstance(value, (int, float)):
                     # For numeric values, replace without quotes
                     template_str = template_str.replace(f'"{placeholder}"', str(value))
+                    # Also replace inline placeholders
+                    template_str = template_str.replace(placeholder, str(value))
                 else:
                     # For other types, convert to string
                     template_str = template_str.replace(f'"{placeholder}"', f'"{str(value)}"')
+                    # Also replace inline placeholders
+                    template_str = template_str.replace(placeholder, str(value))
             
             # Additional safety: fix any remaining Python boolean literals
             template_str = template_str.replace(': True,', ': true,')

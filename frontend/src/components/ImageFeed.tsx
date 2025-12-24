@@ -55,6 +55,7 @@ interface ImageItem {
   status: string
   preview_url: string
   result_url?: string
+  all_result_urls?: string[] // All output images (for grid jobs with multiple outputs)
   processing_time?: number
   source_image_url: string
   prompt: string
@@ -86,6 +87,7 @@ export default function ImageFeed({ config }: ImageFeedProps) {
   const [loadingMore, setLoadingMore] = useState(false)
   const [showFilteredOnly, setShowFilteredOnly] = useState(false) // Toggle between "Show All" and "Show Mine"
   const [selectedImage, setSelectedImage] = useState<ImageItem | null>(null)
+  const [focusedImageIndex, setFocusedImageIndex] = useState<number | undefined>(undefined) // For multi-image modal navigation
   const [currentOffset, setCurrentOffset] = useState(0)
   const [hasMore, setHasMore] = useState(true)
 
@@ -127,6 +129,11 @@ export default function ImageFeed({ config }: ImageFeedProps) {
             const validResultUrl = getValidImageUrl(job.output_image_urls?.[0])
             const validSourceUrl = getValidImageUrl(job.input_image_urls?.[0])
 
+            // Get all valid result URLs for multi-image outputs (like image-grid)
+            const allValidResultUrls = (job.output_image_urls || [])
+              .map((url: string) => getValidImageUrl(url))
+              .filter((url: string | undefined): url is string => !!url)
+
             items.push({
               id: job.id,
               type: job.workflow_name === 'style-transfer' ? 'style-transfer' : 'edited-image',
@@ -135,6 +142,7 @@ export default function ImageFeed({ config }: ImageFeedProps) {
               status: job.status,
               preview_url: validResultUrl || validSourceUrl || '',
               result_url: validResultUrl,
+              all_result_urls: allValidResultUrls.length > 0 ? allValidResultUrls : undefined,
               processing_time: undefined, // Not stored in new schema
               source_image_url: job.input_image_urls?.[0] || '',
               prompt: job.prompt || '',
@@ -347,49 +355,85 @@ export default function ImageFeed({ config }: ImageFeedProps) {
             }
             
             // Full view for completed/processing items
+            const hasMultipleImages = item.all_result_urls && item.all_result_urls.length > 1
+
             return (
               <div key={item.id} className="border border-gray-200 rounded-2xl p-3 bg-white">
-                {/* Image content */}
-                <div 
-                  className="aspect-video bg-gray-100 rounded-xl mb-3 relative overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
-                  onClick={() => setSelectedImage(item)}
-                >
-                  {item.preview_url ? (
-                    <img 
-                      src={item.preview_url} 
-                      alt={`${item.title} | Source: ${item.preview_url.startsWith('data:') ? 'Data URL' : item.preview_url.startsWith('blob:') ? 'Blob URL (may fail)' : item.preview_url.includes('supabase') ? 'Supabase' : 'External'}`}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        console.error(`Failed to load image: ${item.preview_url}`)
-                        const target = e.target as HTMLImageElement
-                        target.alt = `Failed to load: ${item.preview_url.startsWith('blob:') ? 'Blob URL expired' : 'Image not accessible'}`
-                      }}
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <div className="text-center">
-                        <div className="text-4xl mb-2">
-                          {item.type === 'style-transfer' ? '🎨' : '🖼️'}
-                        </div>
-                        <p className="text-gray-400 text-sm">No preview</p>
+                {/* Show all images for multi-image jobs (like image-grid) */}
+                {hasMultipleImages && item.status === 'completed' ? (
+                  <div className="mb-3">
+                    {/* 3x3 grid of individual images (skip first which is the stitched full grid) */}
+                    <div className="grid grid-cols-3 gap-1 relative">
+                      {/* Status badge on top-right corner of grid */}
+                      <div className="absolute top-1 right-1 z-10">
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(item.status)}`}>
+                          {getStatusText(item.status)}
+                        </span>
                       </div>
+                      {item.all_result_urls!.slice(1, 10).map((url, index) => (
+                        <div
+                          key={index}
+                          className="aspect-square bg-gray-100 rounded-lg relative overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() => {
+                            setSelectedImage(item)
+                            setFocusedImageIndex(index + 1) // +1 because index 0 is full grid, individual images start at 1
+                          }}
+                        >
+                          <img
+                            src={url}
+                            alt={`Image ${index + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute bottom-0.5 left-0.5 bg-black/70 text-white text-[10px] px-1 rounded">
+                            {index + 1}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  )}
-                  
-                  {/* Status badge */}
-                  <div className="absolute top-2 right-2">
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(item.status)}`}>
-                      {getStatusText(item.status)}
-                    </span>
                   </div>
+                ) : (
+                  /* Single image display */
+                  <div
+                    className="aspect-video bg-gray-100 rounded-xl mb-3 relative overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
+                    onClick={() => setSelectedImage(item)}
+                  >
+                    {item.preview_url ? (
+                      <img
+                        src={item.preview_url}
+                        alt={`${item.title} | Source: ${item.preview_url.startsWith('data:') ? 'Data URL' : item.preview_url.startsWith('blob:') ? 'Blob URL (may fail)' : item.preview_url.includes('supabase') ? 'Supabase' : 'External'}`}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          console.error(`Failed to load image: ${item.preview_url}`)
+                          const target = e.target as HTMLImageElement
+                          target.alt = `Failed to load: ${item.preview_url.startsWith('blob:') ? 'Blob URL expired' : 'Image not accessible'}`
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <div className="text-center">
+                          <div className="text-4xl mb-2">
+                            {item.type === 'style-transfer' ? '🎨' : '🖼️'}
+                          </div>
+                          <p className="text-gray-400 text-sm">No preview</p>
+                        </div>
+                      </div>
+                    )}
 
-                  {/* Type badge */}
-                  <div className="absolute top-2 left-2">
-                    <span className="px-2 py-1 text-xs font-medium rounded-full bg-black/70 text-white">
-                      {item.type === 'style-transfer' ? 'Style' : 'Edit'}
-                    </span>
+                    {/* Status badge */}
+                    <div className="absolute top-2 right-2">
+                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(item.status)}`}>
+                        {getStatusText(item.status)}
+                      </span>
+                    </div>
+
+                    {/* Type badge */}
+                    <div className="absolute top-2 left-2">
+                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-black/70 text-white">
+                        {item.type === 'style-transfer' ? 'Style' : 'Edit'}
+                      </span>
+                    </div>
                   </div>
-                </div>
+                )}
                 
                 {/* Content info */}
                 <div className="space-y-2">
@@ -451,7 +495,11 @@ export default function ImageFeed({ config }: ImageFeedProps) {
         <ImageModal
           image={selectedImage}
           isOpen={!!selectedImage}
-          onClose={() => setSelectedImage(null)}
+          onClose={() => {
+            setSelectedImage(null)
+            setFocusedImageIndex(undefined)
+          }}
+          focusedImageIndex={focusedImageIndex}
         />
       )}
     </div>
