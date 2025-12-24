@@ -63,7 +63,7 @@ pytest tests/test_comfyui_api.py       # API integration
 pytest tests/workflows/                # Workflow contracts
 ```
 
-**See [TESTING.md](TESTING.md) for complete testing guide.**
+**See [docs/reference/TESTING.md](docs/reference/TESTING.md) for complete testing guide.**
 
 ### Running Full Stack
 
@@ -184,14 +184,16 @@ Create feature branches from dev, merge back to dev for testing, then dev to mai
 
 ## Related Documentation
 
-For specialized topics, see these additional guides:
+Essential guides (auto-included in context):
+- **[new_feature_guide.md](new_feature_guide.md)** - Guide for creating new AI workflow features
+- **[WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md)** - Workflow system documentation
 
-- **[new_feature_guide.md](new_feature_guide.md)** - Comprehensive guide for creating new AI workflow features with step-by-step instructions, component patterns, and integration requirements
-- **[WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md)** - Complete documentation on the centralized workflow system, including template creation, parameter substitution, API usage, and migration guide
-- **[TESTING.md](TESTING.md)** - Comprehensive testing guide covering all test layers, running tests, writing tests, workflow testing, and CI/CD integration
-- **[api_doc.md](api_doc.md)** - Complete ComfyUI server API reference documenting all REST endpoints, WebSocket integration, and workflow execution patterns
-- **[backend/setup_supabase_auth.md](backend/setup_supabase_auth.md)** - Supabase authentication setup instructions including provider configuration and troubleshooting
-- **[TODO.md](TODO.md)** - Project roadmap and planned improvements across security, testing, performance, and features
+Additional reference docs (in `docs/` folder, read on-demand):
+- `docs/reference/TESTING.md` - Testing guide
+- `docs/api/api_doc.md` - ComfyUI API reference
+- `docs/architecture/` - Architecture decision docs
+- `docs/migration/` - Migration guides
+- `backend/setup_supabase_auth.md` - Supabase auth setup
 
 ### Current Features
 
@@ -213,7 +215,3 @@ Use context7 to check for up-to-date documentation when needed for implementing 
 
 @new_feature_guide.md
 @WORKFLOW_SYSTEM.md
-@TESTING.md
-@api_doc.md
-@backend/setup_supabase_auth.md
-@TODO.md
