@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import { Label, Field, Section } from "./components/UI";
-import { apiClient } from "./lib/apiClient";
-import ImageFeed from "./components/ImageFeed";
-import { useSmartResolution } from "./hooks/useSmartResolution";
+import { Label, Field, Section } from "../components/UI";
+import { apiClient } from "../lib/apiClient";
+import ImageFeed from "../components/ImageFeed";
+import { useSmartResolution } from "../hooks/useSmartResolution";
 
 interface Props {
   comfyUrl?: string;

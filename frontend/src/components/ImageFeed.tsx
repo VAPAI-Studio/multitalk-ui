@@ -1,68 +1,15 @@
 import { useState, useEffect, useCallback } from 'react'
 import { apiClient } from '../lib/apiClient'
 import ImageModal from './ImageModal'
+import type { ImageItem, StyleTransfer } from '../types/ui'
+import type { EditedImagesResponse } from '../types/api'
 
-// Define interfaces
-interface EditedImage {
-  id: string
-  created_at: string
-  source_image_url: string
-  prompt: string
-  result_image_url?: string
-  workflow_name: string
-  model_used?: string
-  processing_time_seconds?: number
-  user_ip?: string
-  status: 'pending' | 'processing' | 'completed' | 'failed'
-}
-
-interface EditedImagesResponse {
-  success: boolean
-  edited_images: EditedImage[]
-  total_count: number
-  error?: string
-}
-
-interface StyleTransfer {
-  id: string
-  created_at: string
-  source_image_url: string
-  style_image_url: string
-  prompt: string
-  result_image_url?: string
-  workflow_name: string
-  model_used?: string
-  processing_time_seconds?: number
-  user_ip?: string
-  status: string
-  comfyui_prompt_id?: string
-  error_message?: string
-  updated_at?: string
-}
-
+// Response type for style transfers API
 interface StyleTransfersResponse {
   success: boolean
   style_transfers: StyleTransfer[]
   total_count: number
   error?: string
-}
-
-interface ImageItem {
-  id: string
-  type: 'edited-image' | 'style-transfer'
-  created_at: string
-  title: string
-  status: string
-  preview_url: string
-  result_url?: string
-  all_result_urls?: string[] // All output images (for grid jobs with multiple outputs)
-  processing_time?: number
-  source_image_url: string
-  prompt: string
-  workflow_name: string
-  model_used?: string
-  user_ip?: string
-  metadata: EditedImage | StyleTransfer
 }
 
 // Feed configuration

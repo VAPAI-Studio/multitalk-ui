@@ -1,13 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Label, Field, Section } from "./components/UI";
-import { Button, Badge } from "./components/DesignSystem";
-import { Timeline } from "./components/Timeline";
-import type { Mask, AudioTrack } from "./components/types";
-import { fileToBase64, uploadMediaToComfy, joinAudiosForMask, groupAudiosByMask, generateId, startJobMonitoring, checkComfyUIHealth } from "./components/utils";
-import VideoFeed from "./components/VideoFeed";
-import { useSmartResolution } from "./hooks/useSmartResolution";
-import { MaskEditor } from "./components/MaskEditor";
-import { apiClient } from "./lib/apiClient";
+import { Label, Field, Section } from "../components/UI";
+import { Button, Badge } from "../components/DesignSystem";
+import { Timeline } from "../components/Timeline";
+import type { Mask, AudioTrack } from "../components/types";
+import { fileToBase64, uploadMediaToComfy, joinAudiosForMask, groupAudiosByMask, generateId, startJobMonitoring, checkComfyUIHealth } from "../components/utils";
+import VideoFeed from "../components/VideoFeed";
+import { useSmartResolution } from "../hooks/useSmartResolution";
+import { MaskEditor } from "../components/MaskEditor";
+import { apiClient } from "../lib/apiClient";
 
 interface Props {
   comfyUrl: string;

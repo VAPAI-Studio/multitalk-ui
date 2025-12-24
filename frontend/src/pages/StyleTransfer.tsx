@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
-import { apiClient } from "./lib/apiClient";
-import ImageFeed from "./components/ImageFeed";
-import { useSmartResolution } from "./hooks/useSmartResolution";
+import { apiClient } from "../lib/apiClient";
+import ImageFeed from "../components/ImageFeed";
+import { useSmartResolution } from "../hooks/useSmartResolution";
 
 // UI Components
 function Label({ children, className }: { children: React.ReactNode; className?: string }) {
