@@ -1,6 +1,6 @@
 
 interface Props {
-  onNavigate: (page: "multitalk-one" | "multitalk-multiple" | "video-lipsync" | "image-edit" | "character-caption" | "wan-i2v" | "style-transfer" | "create-image" | "lora-trainer" | "img2img") => void;
+  onNavigate: (page: "multitalk-one" | "multitalk-multiple" | "video-lipsync" | "image-edit" | "character-caption" | "wan-i2v" | "style-transfer" | "create-image" | "lora-trainer" | "image-grid" | "img2img") => void;
 }
 
 export default function Homepage({ onNavigate }: Props) {
@@ -76,6 +76,14 @@ export default function Homepage({ onNavigate }: Props) {
       icon: "🧠",
       gradient: "from-amber-500 to-orange-600",
       features: ["Custom LoRA training", "Dataset-based", "Advanced parameters", "Model: QWEN Image via Musubi Tuner"]
+    },
+    {
+      id: "image-grid" as const,
+      title: "Image Grid",
+      description: "Generate a 3×3 grid of unique image variations from a single reference. Perfect for product photography and creative exploration.",
+      icon: "🖼️",
+      gradient: "from-teal-500 to-cyan-600",
+      features: ["9 unique angles", "Subject-aware prompts", "Model: Gemini Pro Image"]
     }
     // Hidden: Image to Image
     // {

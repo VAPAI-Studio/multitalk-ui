@@ -1,3 +1,4 @@
+import os
 from fastapi import APIRouter, Query, UploadFile, File, HTTPException
 from typing import Optional, Dict, Any
 from pydantic import BaseModel
@@ -32,6 +33,7 @@ class WorkflowSubmitRequest(BaseModel):
     parameters: Dict[str, Any]
     client_id: str
     base_url: str
+    comfyui_api_key: Optional[str] = None  # ComfyUI API key for paid nodes (Gemini, etc.)
 
 class WorkflowSubmitResponse(BaseModel):
     success: bool
@@ -228,6 +230,14 @@ async def submit_workflow(request: WorkflowSubmitRequest):
             "prompt": workflow,
             "client_id": request.client_id
         }
+
+        # Add ComfyUI API key if provided (required for paid API nodes like Gemini)
+        # First check request, then fall back to environment variable
+        api_key = request.comfyui_api_key or os.getenv("COMFY_API_KEY")
+        if api_key:
+            payload["extra_data"] = {
+                "api_key_comfy_org": api_key
+            }
 
         success, prompt_id, error = await comfyui_service.submit_prompt(
             request.base_url,

@@ -233,15 +233,22 @@ class ApiClient {
     }
   }
 
-  async submitWorkflow(workflowName: string, parameters: any, baseUrl: string, clientId: string) {
+  async submitWorkflow(workflowName: string, parameters: any, baseUrl: string, clientId: string, comfyuiApiKey?: string) {
+    const payload: any = {
+      workflow_name: workflowName,
+      parameters: parameters,
+      base_url: baseUrl,
+      client_id: clientId,
+    }
+
+    // Add ComfyUI API key if provided (required for paid API nodes like Gemini)
+    if (comfyuiApiKey) {
+      payload.comfyui_api_key = comfyuiApiKey
+    }
+
     return this.request('/comfyui/submit-workflow', {
       method: 'POST',
-      body: JSON.stringify({
-        workflow_name: workflowName,
-        parameters: parameters,
-        base_url: baseUrl,
-        client_id: clientId,
-      }),
+      body: JSON.stringify(payload),
     })
   }
 
