@@ -1,22 +1,5 @@
 import { useState, useEffect } from 'react'
-
-// Define interface locally to avoid import issues
-interface ImageItem {
-  id: string
-  type: 'edited-image' | 'style-transfer'
-  created_at: string
-  title: string
-  status: string
-  preview_url: string
-  result_url?: string
-  all_result_urls?: string[] // All output images for multi-image jobs
-  processing_time?: number
-  source_image_url: string
-  prompt: string
-  workflow_name: string
-  model_used?: string
-  user_ip?: string
-}
+import type { ImageItem } from '../types/ui'
 
 interface ImageModalProps {
   image: ImageItem

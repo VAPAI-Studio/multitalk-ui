@@ -1,17 +1,18 @@
 import { useState, useEffect } from "react";
-import Homepage from "./Homepage";
-import MultiTalkOnePerson from "./MultiTalkOnePerson";
-import MultiTalkMultiplePeople from "./MultiTalkMultiplePeople";
-import VideoLipsync from "./VideoLipsync";
-import ImageEdit from "./ImageEdit";
-import GenerationFeed from "./GenerationFeed";
-import CharacterCaption from "./CharacterCaption";
-import WANI2V from "./WANI2V";
-import StyleTransfer from "./StyleTransfer";
-import CreateImage from "./CreateImage";
-import LoRATrainer from "./LoRATrainer";
-import ImageGrid from "./ImageGrid";
-// import Img2Img from "./Img2Img"; // Hidden: Image to Image page
+// Page components (moved to pages/ folder)
+import Homepage from "./pages/Homepage";
+import MultiTalkOnePerson from "./pages/MultiTalkOnePerson";
+import MultiTalkMultiplePeople from "./pages/MultiTalkMultiplePeople";
+import VideoLipsync from "./pages/VideoLipsync";
+import ImageEdit from "./pages/ImageEdit";
+import GenerationFeed from "./pages/GenerationFeed";
+import CharacterCaption from "./pages/CharacterCaption";
+import WANI2V from "./pages/WANI2V";
+import StyleTransfer from "./pages/StyleTransfer";
+import CreateImage from "./pages/CreateImage";
+import LoRATrainer from "./pages/LoraTrainer";
+import ImageGrid from "./pages/ImageGrid";
+// import Img2Img from "./pages/Img2Img"; // Hidden: Image to Image page
 import ComfyUIStatus from "./components/ComfyUIStatus";
 import ConsoleToggle from "./components/ConsoleToggle";
 import AuthPage from "./components/AuthPage";

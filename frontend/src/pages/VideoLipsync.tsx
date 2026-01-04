@@ -1,12 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Label, Field, Section } from "./components/UI";
-import { Timeline } from "./components/Timeline";
-import type { VideoTrack, AudioTrackSimple } from "./components/types";
-import { uploadMediaToComfy, generateId, startJobMonitoring, checkComfyUIHealth } from "./components/utils";
-import { useSmartResolution } from "./hooks/useSmartResolution";
-import { AVPlayerWithPadding } from "./components/AVPlayerWithPadding";
-import VideoFeed from "./components/VideoFeed";
-import { apiClient } from "./lib/apiClient";
+import { Label, Field, Section } from "../components/UI";
+import { Timeline } from "../components/Timeline";
+import type { VideoTrack, AudioTrackSimple } from "../components/types";
+import { uploadMediaToComfy, generateId, startJobMonitoring, checkComfyUIHealth } from "../components/utils";
+import { useSmartResolution } from "../hooks/useSmartResolution";
+import { AVPlayerWithPadding } from "../components/AVPlayerWithPadding";
+import VideoFeed from "../components/VideoFeed";
+import { apiClient } from "../lib/apiClient";
 
 interface Props {
   comfyUrl: string;

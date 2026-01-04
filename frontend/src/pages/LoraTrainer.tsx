@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { apiClient } from "./lib/apiClient";
+import { apiClient } from "../lib/apiClient";
 
 // UI Components (reuse these patterns)
 function Label({ children, className }: { children: React.ReactNode; className?: string }) {

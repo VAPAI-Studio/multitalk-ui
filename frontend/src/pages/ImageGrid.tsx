@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { Label, Field, Section } from "./components/UI";
-import { apiClient } from "./lib/apiClient";
-import ImageFeed from "./components/ImageFeed";
+import { Label, Field, Section } from "../components/UI";
+import { apiClient } from "../lib/apiClient";
+import ImageFeed from "../components/ImageFeed";
 
 const SUBJECT_OPTIONS = [
   { value: "person", label: "Person" },

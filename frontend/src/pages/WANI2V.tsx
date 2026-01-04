@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { startJobMonitoring, checkComfyUIHealth } from "./components/utils";
-import VideoFeed from "./components/VideoFeed";
-import { useSmartResolution } from "./hooks/useSmartResolution";
-import { apiClient } from "./lib/apiClient";
+import { startJobMonitoring, checkComfyUIHealth } from "../components/utils";
+import VideoFeed from "../components/VideoFeed";
+import { useSmartResolution } from "../hooks/useSmartResolution";
+import { apiClient } from "../lib/apiClient";
 
 // UI Components
 function Label({ children, className }: { children: React.ReactNode; className?: string }) {

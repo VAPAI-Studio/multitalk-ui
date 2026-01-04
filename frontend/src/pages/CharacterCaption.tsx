@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { saveDataset, loadDataset, getAllDatasets, type WorkflowSettings, type ImageWithCaption as DatasetImage, type Dataset } from './lib/datasetUtils';
-import { processImageWithWorkflow } from './lib/workflowUtils';
-import { exportAsZip } from './lib/exportUtils';
+import { saveDataset, loadDataset, getAllDatasets, type WorkflowSettings, type ImageWithCaption as DatasetImage, type Dataset } from '../lib/datasetUtils';
+import { processImageWithWorkflow } from '../lib/workflowUtils';
+import { exportAsZip } from '../lib/exportUtils';
 
 interface ImageWithCaption {
   id: string;

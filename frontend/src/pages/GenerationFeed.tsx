@@ -1,5 +1,5 @@
-import ImageFeed from './components/ImageFeed'
-import VideoFeed from './components/VideoFeed'
+import ImageFeed from '../components/ImageFeed'
+import VideoFeed from '../components/VideoFeed'
 
 export default function GenerationFeed() {
   return (
