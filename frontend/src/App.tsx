@@ -1,9 +1,7 @@
 import { useState, useEffect } from "react";
 // Page components (moved to pages/ folder)
 import Homepage from "./pages/Homepage";
-import MultiTalkOnePerson from "./pages/MultiTalkOnePerson";
-import MultiTalkMultiplePeople from "./pages/MultiTalkMultiplePeople";
-import VideoLipsync from "./pages/VideoLipsync";
+import Lipsync from "./pages/Lipsync";
 import ImageEdit from "./pages/ImageEdit";
 import GenerationFeed from "./pages/GenerationFeed";
 import CharacterCaption from "./pages/CharacterCaption";
@@ -20,7 +18,7 @@ import { useAuth } from "./contexts/AuthContext";
 
 export default function App() {
   const { isAuthenticated, loading, user, logout } = useAuth();
-  const [currentPage, setCurrentPage] = useState<"home" | "multitalk-one" | "multitalk-multiple" | "video-lipsync" | "image-edit" | "generation-feed" | "character-caption" | "wan-i2v" | "style-transfer" | "create-image" | "lora-trainer" | "image-grid" | "img2img">("home");
+  const [currentPage, setCurrentPage] = useState<"home" | "lipsync" | "image-edit" | "generation-feed" | "character-caption" | "wan-i2v" | "style-transfer" | "create-image" | "lora-trainer" | "image-grid" | "img2img">("home");
   const [comfyUrl, setComfyUrl] = useState<string>("https://comfy.vapai.studio");
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
   const [userMenuOpen, setUserMenuOpen] = useState<boolean>(false);
@@ -30,8 +28,13 @@ export default function App() {
     const savedPage = localStorage.getItem('vapai-current-page') as typeof currentPage;
     const savedComfyUrl = localStorage.getItem('vapai-comfy-url');
     
-    if (savedPage && ['home', 'multitalk-one', 'multitalk-multiple', 'video-lipsync', 'image-edit', 'generation-feed', 'character-caption', 'wan-i2v', 'style-transfer', 'create-image', 'lora-trainer', 'image-grid', 'img2img'].includes(savedPage)) {
+    if (savedPage && ['home', 'lipsync', 'image-edit', 'generation-feed', 'character-caption', 'wan-i2v', 'style-transfer', 'create-image', 'lora-trainer', 'image-grid', 'img2img'].includes(savedPage)) {
       setCurrentPage(savedPage);
+    }
+    // Migrate old page names to new unified lipsync page
+    if (savedPage && ['multitalk-one', 'multitalk-multiple', 'video-lipsync'].includes(savedPage)) {
+      setCurrentPage('lipsync');
+      localStorage.setItem('vapai-current-page', 'lipsync');
     }
     
     if (savedComfyUrl) {
@@ -220,37 +223,15 @@ export default function App() {
                 <span className="font-medium">Home</span>
               </button>
               <button
-                onClick={() => handlePageChange("multitalk-one")}
+                onClick={() => handlePageChange("lipsync")}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
-                  currentPage === "multitalk-one"
+                  currentPage === "lipsync"
                     ? "bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg"
                     : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
                 }`}
               >
-                <span className="text-lg">👤</span>
-                <span className="font-medium">Lipsync 1 Person</span>
-              </button>
-              <button
-                onClick={() => handlePageChange("multitalk-multiple")}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
-                  currentPage === "multitalk-multiple"
-                    ? "bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg"
-                    : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
-                }`}
-              >
-                <span className="text-lg">🎵</span>
-                <span className="font-medium">Lipsync Multi Person</span>
-              </button>
-              <button
-                onClick={() => handlePageChange("video-lipsync")}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
-                  currentPage === "video-lipsync"
-                    ? "bg-gradient-to-r from-green-500 to-blue-600 text-white shadow-lg"
-                    : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
-                }`}
-              >
-                <span className="text-lg">🎬</span>
-                <span className="font-medium">Video Lipsync</span>
+                <span className="text-lg">🎤</span>
+                <span className="font-medium">Lipsync Studio</span>
               </button>
               <button
                 onClick={() => handlePageChange("image-edit")}
@@ -407,19 +388,9 @@ export default function App() {
           {currentPage === "home" && (
             <Homepage onNavigate={(page) => handlePageChange(page)} />
           )}
-          {currentPage === "multitalk-one" && (
+          {currentPage === "lipsync" && (
             <div className="w-full max-w-6xl mx-auto p-6">
-              <MultiTalkOnePerson comfyUrl={comfyUrl} />
-            </div>
-          )}
-          {currentPage === "multitalk-multiple" && (
-            <div className="w-full max-w-6xl mx-auto p-6">
-              <MultiTalkMultiplePeople comfyUrl={comfyUrl} />
-            </div>
-          )}
-          {currentPage === "video-lipsync" && (
-            <div className="w-full max-w-6xl mx-auto p-6">
-              <VideoLipsync comfyUrl={comfyUrl} />
+              <Lipsync comfyUrl={comfyUrl} />
             </div>
           )}
           {currentPage === "image-edit" && (

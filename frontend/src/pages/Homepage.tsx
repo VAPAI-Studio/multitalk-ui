@@ -1,33 +1,17 @@
 
 interface Props {
-  onNavigate: (page: "multitalk-one" | "multitalk-multiple" | "video-lipsync" | "image-edit" | "character-caption" | "wan-i2v" | "style-transfer" | "create-image" | "lora-trainer" | "image-grid" | "img2img") => void;
+  onNavigate: (page: "lipsync" | "image-edit" | "character-caption" | "wan-i2v" | "style-transfer" | "create-image" | "lora-trainer" | "image-grid" | "img2img") => void;
 }
 
 export default function Homepage({ onNavigate }: Props) {
   const apps = [
     {
-      id: "multitalk-one" as const,
-      title: "Lipsync 1 Person",
-      description: "Generate realistic talking videos from a single person image with custom audio.",
-      icon: "👤",
+      id: "lipsync" as const,
+      title: "Lipsync Studio",
+      description: "Generate realistic talking videos from images or sync audio to existing videos. Supports single person, multi-person, and video lipsync modes.",
+      icon: "🎤",
       gradient: "from-blue-500 to-purple-600",
-      features: ["Single person avatar", "Model: Multitalk and Infinite Talk with WAN 2.1"]
-    },
-    {
-      id: "multitalk-multiple" as const,
-      title: "Lipsync Multi Person",
-      description: "Create conversations between multiple people with synchronized audio and video.",
-      icon: "🎵",
-      gradient: "from-emerald-500 to-teal-600",
-      features: ["Multiple avatars", "Masked characters", "Model: Multitalk and Infinite Talk with WAN 2.1"]
-    },
-    {
-      id: "video-lipsync" as const,
-      title: "Video Lipsync",
-      description: "Add perfect lip-synchronization to existing videos with new audio tracks.",
-      icon: "🎬",
-      gradient: "from-green-500 to-blue-600",
-      features: ["Multiple masked avatars", "Video and audio timeline", "Model: Infinite Talk with WAN 2.1"]
+      features: ["1 Person & Multi Person modes", "Video lipsync with timeline", "Model: Multitalk / Infinite Talk with WAN 2.1"]
     },
     {
       id: "image-edit" as const,
