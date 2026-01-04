@@ -452,6 +452,7 @@ export default function ImageGrid({ comfyUrl }: Props) {
                 showProgress: false,
                 pageContext: "image-grid"
               }}
+              comfyUrl={comfyUrl}
             />
           </div>
         </div>

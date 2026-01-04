@@ -26,9 +26,10 @@ export interface ImageFeedConfig {
 
 interface ImageFeedProps {
   config: ImageFeedConfig
+  comfyUrl?: string // ComfyUI server URL for upscaling operations
 }
 
-export default function ImageFeed({ config }: ImageFeedProps) {
+export default function ImageFeed({ config, comfyUrl }: ImageFeedProps) {
   const [feedItems, setFeedItems] = useState<ImageItem[]>([])
   const [loading, setLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -447,6 +448,8 @@ export default function ImageFeed({ config }: ImageFeedProps) {
             setFocusedImageIndex(undefined)
           }}
           focusedImageIndex={focusedImageIndex}
+          comfyUrl={comfyUrl}
+          onUpscaleComplete={() => loadFeed()}
         />
       )}
     </div>
