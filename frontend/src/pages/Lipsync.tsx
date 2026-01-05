@@ -4,7 +4,7 @@ import { Button, Badge } from "../components/DesignSystem";
 import { Timeline } from "../components/Timeline";
 import type { Mask, AudioTrack, VideoTrack, AudioTrackSimple } from "../components/types";
 import { fileToBase64, uploadMediaToComfy, joinAudiosForMask, groupAudiosByMask, generateId, startJobMonitoring, checkComfyUIHealth } from "../components/utils";
-import VideoFeed from "../components/VideoFeed";
+import GenerationFeed from "../components/GenerationFeed";
 import { useSmartResolution } from "../hooks/useSmartResolution";
 import { MaskEditor } from "../components/MaskEditor";
 import { AVPlayerWithPadding } from "../components/AVPlayerWithPadding";
@@ -1795,16 +1795,16 @@ export default function Lipsync({ comfyUrl, initialMode = 'one-person' }: Props)
         {/* Right Sidebar - Video Feed */}
         <div className="w-96 space-y-6">
           <div className="sticky top-6 h-[calc(100vh-3rem)]">
-            <VideoFeed
-              comfyUrl={comfyUrl}
+            <GenerationFeed
               config={{
-                useNewJobSystem: true,
-                workflowName: getWorkflowName(),
+                mediaType: 'video',
+                workflowNames: [getWorkflowName()],
+                pageContext: getWorkflowName(),
                 showCompletedOnly: false,
                 maxItems: 10,
                 showFixButton: true,
                 showProgress: true,
-                pageContext: getWorkflowName()
+                comfyUrl: comfyUrl
               }}
             />
           </div>

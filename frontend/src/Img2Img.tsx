@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { createJob, updateJobToProcessing, completeJob } from "./lib/jobTracking";
 import { findImageFromHistory } from "./components/utils";
-import UnifiedFeed from "./components/UnifiedFeed";
+import GenerationFeed from "./components/GenerationFeed";
 import { apiClient } from "./lib/apiClient";
 
 // UI Components
@@ -341,16 +341,16 @@ export default function Img2Img({ comfyUrl }: Props) {
         {/* Right Sidebar - UnifiedFeed */}
         <div className="w-96 space-y-6">
           <div className="sticky top-6 h-[calc(100vh-3rem)]">
-            <UnifiedFeed
-              comfyUrl={comfyUrl}
+            <GenerationFeed
               config={{
-                type: 'image',
-                title: 'Image to Image',
+                mediaType: 'image',
+                workflowNames: ['img2img'],
+                pageContext: 'img2img',
                 showCompletedOnly: false,
                 maxItems: 10,
                 showFixButton: true,
                 showProgress: true,
-                pageContext: 'img2img'
+                comfyUrl: comfyUrl
               }}
             />
           </div>
