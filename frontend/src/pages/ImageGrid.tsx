@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Label, Field, Section } from "../components/UI";
 import { apiClient } from "../lib/apiClient";
-import ImageFeed from "../components/ImageFeed";
+import GenerationFeed from "../components/GenerationFeed";
 
 const SUBJECT_OPTIONS = [
   { value: "person", label: "Person" },
@@ -442,15 +442,15 @@ export default function ImageGrid({ comfyUrl }: Props) {
         {/* Right Sidebar - ImageFeed */}
         <div className="w-96 space-y-6">
           <div className="sticky top-6 h-[calc(100vh-3rem)]">
-            <ImageFeed
+            <GenerationFeed
               config={{
-                useNewJobSystem: true,
-                workflowName: 'image-grid',
+                mediaType: 'all',
+                pageContext: 'image-grid',
                 showCompletedOnly: false,
                 maxItems: 10,
-                showFixButton: false,
-                showProgress: false,
-                pageContext: "image-grid"
+                showFixButton: true,
+                showProgress: true,
+                comfyUrl: comfyUrl
               }}
             />
           </div>

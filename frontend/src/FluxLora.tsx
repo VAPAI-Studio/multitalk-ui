@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Label, Field, Section } from "./components/UI";
 import { apiClient } from "./lib/apiClient";
-import ImageFeed from "./components/ImageFeed";
+import GenerationFeed from "./components/GenerationFeed";
 import { useSmartResolution } from "./hooks/useSmartResolution";
 
 interface Props {
@@ -589,15 +589,15 @@ export default function FluxLora({ comfyUrl = "" }: Props) {
         {/* Right Sidebar - Image Feed */}
         <div className="w-96 space-y-6">
           <div className="sticky top-6 h-[calc(100vh-3rem)]">
-            <ImageFeed
+            <GenerationFeed
               config={{
-                useNewJobSystem: true,
-                workflowName: 'flux-lora',
+                mediaType: 'all',
+                pageContext: 'flux-lora',
                 showCompletedOnly: false,
                 maxItems: 10,
-                showFixButton: false,
-                showProgress: false,
-                pageContext: "flux-lora"
+                showFixButton: true,
+                showProgress: true,
+                comfyUrl: comfyUrl
               }}
             />
           </div>

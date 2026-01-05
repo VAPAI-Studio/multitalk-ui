@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { startJobMonitoring, checkComfyUIHealth } from "../components/utils";
-import VideoFeed from "../components/VideoFeed";
+import GenerationFeed from "../components/GenerationFeed";
 import { useSmartResolution } from "../hooks/useSmartResolution";
 import { apiClient } from "../lib/apiClient";
 
@@ -520,15 +520,15 @@ export default function WANI2V({ comfyUrl }: Props) {
         {/* Right Sidebar - Video Feed */}
         <div className="w-96 space-y-6">
           <div className="sticky top-6 h-[calc(100vh-3rem)]">
-            <VideoFeed
-              comfyUrl={comfyUrl}
+            <GenerationFeed
               config={{
-                useNewJobSystem: true,
-                workflowName: 'wan-i2v',
+                mediaType: 'all',
+                pageContext: 'wan-i2v',
                 showCompletedOnly: false,
                 maxItems: 10,
                 showFixButton: true,
-                showProgress: true
+                showProgress: true,
+                comfyUrl: comfyUrl
               }}
             />
           </div>
