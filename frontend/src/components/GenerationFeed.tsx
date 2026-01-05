@@ -47,6 +47,7 @@ export interface GenerationFeedConfig {
   maxItems?: number
   showFixButton?: boolean
   showProgress?: boolean
+  showMediaTypeToggle?: boolean  // Whether to show the media type toggle (default: true)
 
   // ComfyUI integration
   comfyUrl?: string
@@ -363,39 +364,41 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
 
         {/* Filter controls */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Media type toggle */}
-          <div className="flex rounded-lg border border-gray-300 overflow-hidden text-xs">
-            <button
-              onClick={() => setMediaTypeFilter('all')}
-              className={`px-2 py-1 transition-colors ${
-                mediaTypeFilter === 'all'
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-white text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              All
-            </button>
-            <button
-              onClick={() => setMediaTypeFilter('video')}
-              className={`px-2 py-1 border-l border-gray-300 transition-colors ${
-                mediaTypeFilter === 'video'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              Videos
-            </button>
-            <button
-              onClick={() => setMediaTypeFilter('image')}
-              className={`px-2 py-1 border-l border-gray-300 transition-colors ${
-                mediaTypeFilter === 'image'
-                  ? 'bg-pink-600 text-white'
-                  : 'bg-white text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              Images
-            </button>
-          </div>
+          {/* Media type toggle - only show if showMediaTypeToggle is true (default) */}
+          {(config.showMediaTypeToggle !== false) && (
+            <div className="flex rounded-lg border border-gray-300 overflow-hidden text-xs">
+              <button
+                onClick={() => setMediaTypeFilter('all')}
+                className={`px-2 py-1 transition-colors ${
+                  mediaTypeFilter === 'all'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-white text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                All
+              </button>
+              <button
+                onClick={() => setMediaTypeFilter('video')}
+                className={`px-2 py-1 border-l border-gray-300 transition-colors ${
+                  mediaTypeFilter === 'video'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                Videos
+              </button>
+              <button
+                onClick={() => setMediaTypeFilter('image')}
+                className={`px-2 py-1 border-l border-gray-300 transition-colors ${
+                  mediaTypeFilter === 'image'
+                    ? 'bg-pink-600 text-white'
+                    : 'bg-white text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                Images
+              </button>
+            </div>
+          )}
 
           {/* Show Mine toggle - only show if pageContext is set */}
           {config.pageContext && (

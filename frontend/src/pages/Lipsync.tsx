@@ -1804,6 +1804,7 @@ export default function Lipsync({ comfyUrl, initialMode = 'one-person' }: Props)
                 maxItems: 10,
                 showFixButton: true,
                 showProgress: true,
+                showMediaTypeToggle: false,
                 comfyUrl: comfyUrl
               }}
             />

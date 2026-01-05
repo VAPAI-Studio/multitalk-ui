@@ -529,6 +529,7 @@ export default function WANI2V({ comfyUrl }: Props) {
                 maxItems: 10,
                 showFixButton: true,
                 showProgress: true,
+                showMediaTypeToggle: false,
                 comfyUrl: comfyUrl
               }}
             />

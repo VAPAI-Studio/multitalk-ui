@@ -597,7 +597,8 @@ export default function FluxLora({ comfyUrl = "" }: Props) {
                 showCompletedOnly: false,
                 maxItems: 10,
                 showFixButton: false,
-                showProgress: false
+                showProgress: false,
+                showMediaTypeToggle: false
               }}
             />
           </div>

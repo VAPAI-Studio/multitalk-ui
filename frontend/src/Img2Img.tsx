@@ -350,6 +350,7 @@ export default function Img2Img({ comfyUrl }: Props) {
                 maxItems: 10,
                 showFixButton: true,
                 showProgress: true,
+                showMediaTypeToggle: false,
                 comfyUrl: comfyUrl
               }}
             />

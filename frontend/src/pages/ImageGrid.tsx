@@ -451,6 +451,7 @@ export default function ImageGrid({ comfyUrl }: Props) {
                 maxItems: 10,
                 showFixButton: false,
                 showProgress: false,
+                showMediaTypeToggle: false,
                 comfyUrl: comfyUrl
               }}
             />
