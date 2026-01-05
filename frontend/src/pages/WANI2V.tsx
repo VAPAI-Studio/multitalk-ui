@@ -522,14 +522,12 @@ export default function WANI2V({ comfyUrl }: Props) {
           <div className="sticky top-6 h-[calc(100vh-3rem)]">
             <GenerationFeed
               config={{
-                mediaType: 'video',
-                workflowNames: ['wan-i2v'],
+                mediaType: 'all',
                 pageContext: 'wan-i2v',
                 showCompletedOnly: false,
                 maxItems: 10,
                 showFixButton: true,
                 showProgress: true,
-                showMediaTypeToggle: false,
                 comfyUrl: comfyUrl
               }}
             />

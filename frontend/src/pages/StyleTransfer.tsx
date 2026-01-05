@@ -449,14 +449,12 @@ export default function StyleTransfer({ comfyUrl }: Props) {
           <div className="sticky top-6 h-[calc(100vh-3rem)]">
             <GenerationFeed
               config={{
-                mediaType: 'image',
-                workflowNames: ['style-transfer'],
+                mediaType: 'all',
                 pageContext: 'style-transfer',
                 showCompletedOnly: false,
                 maxItems: 10,
-                showFixButton: false,
-                showProgress: false,
-                showMediaTypeToggle: false
+                showFixButton: true,
+                showProgress: true
               }}
             />
           </div>

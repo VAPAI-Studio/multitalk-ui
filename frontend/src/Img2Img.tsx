@@ -343,14 +343,12 @@ export default function Img2Img({ comfyUrl }: Props) {
           <div className="sticky top-6 h-[calc(100vh-3rem)]">
             <GenerationFeed
               config={{
-                mediaType: 'image',
-                workflowNames: ['img2img'],
+                mediaType: 'all',
                 pageContext: 'img2img',
                 showCompletedOnly: false,
                 maxItems: 10,
                 showFixButton: true,
                 showProgress: true,
-                showMediaTypeToggle: false,
                 comfyUrl: comfyUrl
               }}
             />

@@ -1797,14 +1797,12 @@ export default function Lipsync({ comfyUrl, initialMode = 'one-person' }: Props)
           <div className="sticky top-6 h-[calc(100vh-3rem)]">
             <GenerationFeed
               config={{
-                mediaType: 'video',
-                workflowNames: [getWorkflowName()],
+                mediaType: 'all',
                 pageContext: getWorkflowName(),
                 showCompletedOnly: false,
                 maxItems: 10,
                 showFixButton: true,
                 showProgress: true,
-                showMediaTypeToggle: false,
                 comfyUrl: comfyUrl
               }}
             />

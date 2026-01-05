@@ -444,14 +444,12 @@ export default function ImageGrid({ comfyUrl }: Props) {
           <div className="sticky top-6 h-[calc(100vh-3rem)]">
             <GenerationFeed
               config={{
-                mediaType: 'image',
-                workflowNames: ['image-grid'],
+                mediaType: 'all',
                 pageContext: 'image-grid',
                 showCompletedOnly: false,
                 maxItems: 10,
-                showFixButton: false,
-                showProgress: false,
-                showMediaTypeToggle: false,
+                showFixButton: true,
+                showProgress: true,
                 comfyUrl: comfyUrl
               }}
             />
