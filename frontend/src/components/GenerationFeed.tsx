@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { apiClient } from '../lib/apiClient'
 import { useComfyUIProgress } from '../hooks/useComfyUIProgress'
 import { fixStuckJob } from '../lib/fixStuckJob'
@@ -639,8 +640,8 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
         )}
       </div>
 
-      {/* Image Modal */}
-      {selectedImage && (
+      {/* Image Modal - rendered in portal to escape container constraints */}
+      {selectedImage && createPortal(
         <ImageModal
           image={selectedImage}
           isOpen={!!selectedImage}
@@ -654,7 +655,8 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
             loadFeed(true)
             if (onUpscaleComplete) onUpscaleComplete()
           }}
-        />
+        />,
+        document.body
       )}
     </div>
   )
