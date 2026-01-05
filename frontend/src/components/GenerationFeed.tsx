@@ -157,7 +157,7 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
               }
 
               // Build video URL
-              let videoUrl: string | undefined = job.output_video_urls?.[0]
+              const videoUrl: string | undefined = job.output_video_urls?.[0]
 
               items.push({
                 id: job.id || job.comfy_job_id,
