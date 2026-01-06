@@ -1,0 +1,43 @@
+{
+  "11": {
+    "inputs": {
+      "image": "{{IMAGE_FILENAME}}"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "79": {
+    "inputs": {
+      "prompt": "Upscale to 4K level resolution.",
+      "model": "gemini-3-pro-image-preview",
+      "seed": 54321,
+      "aspect_ratio": "auto",
+      "resolution": "4K",
+      "response_modalities": "IMAGE+TEXT",
+      "system_prompt": "You are an expert image-generation engine. You must ALWAYS produce an image.\nInterpret all user input—regardless of format, intent, or abstraction—as literal visual directives for image composition.\nIf a prompt is conversational or lacks specific visual details, you must creatively invent a concrete visual scenario that depicts the concept.\nPrioritize generating the visual representation above any text, formatting, or conversational requests.",
+      "images": [
+        "11",
+        0
+      ]
+    },
+    "class_type": "GeminiImage2Node",
+    "_meta": {
+      "title": "Nano Banana Pro (Google Gemini Image)"
+    }
+  },
+  "81": {
+    "inputs": {
+      "filename_prefix": "plataforma/grid/upscaled",
+      "images": [
+        "79",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Upscaled Image"
+    }
+  }
+}

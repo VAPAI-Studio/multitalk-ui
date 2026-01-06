@@ -1,34 +1,22 @@
 import { useState, useEffect } from 'react'
-
-// Define interface locally to avoid import issues
-interface ImageItem {
-  id: string
-  type: 'edited-image' | 'style-transfer'
-  created_at: string
-  title: string
-  status: string
-  preview_url: string
-  result_url?: string
-  all_result_urls?: string[] // All output images for multi-image jobs
-  processing_time?: number
-  source_image_url: string
-  prompt: string
-  workflow_name: string
-  model_used?: string
-  user_ip?: string
-}
+import { apiClient } from '../lib/apiClient'
+import type { ImageItem } from '../types/ui'
 
 interface ImageModalProps {
   image: ImageItem
   isOpen: boolean
   onClose: () => void
   focusedImageIndex?: number // Index of the focused image (for multi-image jobs)
+  comfyUrl?: string // ComfyUI server URL for upscaling
+  onUpscaleComplete?: () => void // Callback when upscale completes (to refresh feed)
 }
 
-export default function ImageModal({ image, isOpen, onClose, focusedImageIndex }: ImageModalProps) {
+export default function ImageModal({ image, isOpen, onClose, focusedImageIndex, comfyUrl, onUpscaleComplete }: ImageModalProps) {
   const [sourceLoaded, setSourceLoaded] = useState(false)
   const [resultLoaded, setResultLoaded] = useState(false)
   const [currentImageIndex, setCurrentImageIndex] = useState(focusedImageIndex ?? 0)
+  const [isUpscaling, setIsUpscaling] = useState(false)
+  const [upscaleStatus, setUpscaleStatus] = useState<string>('')
 
   // Reset current image index when modal opens or focused index changes
   useEffect(() => {
@@ -93,6 +81,195 @@ export default function ImageModal({ image, isOpen, onClose, focusedImageIndex }
     document.body.removeChild(link)
   }
 
+  // Upscale the current image to 4K using Nanobanana workflow
+  const handleUpscale = async () => {
+    if (!comfyUrl || !currentImageUrl) {
+      setUpscaleStatus('ComfyUI URL or image not available')
+      return
+    }
+
+    setIsUpscaling(true)
+    setUpscaleStatus('Preparing image...')
+
+    let databaseJobId: string | null = null
+
+    try {
+      // 1. Fetch the image and convert to File for upload
+      setUpscaleStatus('Downloading image...')
+      const response = await fetch(currentImageUrl)
+      if (!response.ok) {
+        throw new Error('Failed to fetch image')
+      }
+      const blob = await response.blob()
+      const filename = `upscale-source-${Date.now()}.png`
+      const file = new File([blob], filename, { type: 'image/png' })
+
+      // 2. Upload image to ComfyUI
+      setUpscaleStatus('Uploading to ComfyUI...')
+      const uploadFormData = new FormData()
+      uploadFormData.append('image', file)
+      const uploadResponse = await fetch(`${comfyUrl}/upload/image`, {
+        method: 'POST',
+        body: uploadFormData,
+      })
+
+      if (!uploadResponse.ok) {
+        throw new Error(`Failed to upload image to ComfyUI: ${uploadResponse.status}`)
+      }
+
+      const uploadData = await uploadResponse.json()
+      const uploadedFilename = uploadData.name || filename
+
+      // 3. Submit the Nanobanana_4K_Upscale workflow
+      setUpscaleStatus('Submitting upscale workflow...')
+      const clientId = `upscale-4k-${Math.random().toString(36).slice(2)}`
+      const workflowResponse = await apiClient.submitWorkflow(
+        'Nanobanana_4K_Upscale',
+        {
+          IMAGE_FILENAME: uploadedFilename
+        },
+        comfyUrl,
+        clientId
+      ) as { success: boolean; prompt_id?: string; error?: string }
+
+      if (!workflowResponse.success || !workflowResponse.prompt_id) {
+        throw new Error(workflowResponse.error || 'Failed to submit upscale workflow')
+      }
+
+      const promptId = workflowResponse.prompt_id
+
+      // 4. Create image job in database
+      setUpscaleStatus('Creating job record...')
+      const jobCreationResponse = await apiClient.createImageJob({
+        comfy_job_id: promptId,
+        workflow_name: 'nanobanana-upscale',
+        comfy_url: comfyUrl,
+        input_image_urls: [currentImageUrl],
+        parameters: {
+          source_image_id: image.id,
+          source_workflow: image.workflow_name || 'unknown'
+        }
+      }) as any
+
+      if (!jobCreationResponse.success || !jobCreationResponse.image_job?.id) {
+        throw new Error('Failed to create job record in database')
+      }
+
+      databaseJobId = jobCreationResponse.image_job.id
+
+      // 5. Poll for completion
+      setUpscaleStatus('Upscaling in progress...')
+      const startTime = Date.now()
+      const maxWaitTime = 300000 // 5 minutes
+
+      const pollForResult = async (): Promise<void> => {
+        const elapsed = Date.now() - startTime
+        if (elapsed > maxWaitTime) {
+          throw new Error('Upscale timeout after 5 minutes')
+        }
+
+        try {
+          const historyResponse = await apiClient.getComfyUIHistory(comfyUrl, promptId) as {
+            success: boolean;
+            history?: any;
+            error?: string;
+          }
+
+          if (!historyResponse.success) {
+            throw new Error(historyResponse.error || 'Failed to get ComfyUI history')
+          }
+
+          const history = historyResponse.history
+          const historyEntry = history?.[promptId]
+
+          // Check for errors
+          if (historyEntry?.status?.status_str === "error" || historyEntry?.status?.error) {
+            const errorMsg = historyEntry.status?.error?.message ||
+                            historyEntry.status?.error ||
+                            "Unknown error in ComfyUI"
+            throw new Error(`ComfyUI error: ${errorMsg}`)
+          }
+
+          // Check if completed
+          if (historyEntry?.status?.status_str === "success" || historyEntry?.outputs) {
+            const outputs = historyEntry.outputs
+
+            // Extract upscaled image from SaveImage node (node 81)
+            const outputNode = outputs['81']
+            if (!outputNode?.images || outputNode.images.length === 0) {
+              throw new Error('No upscaled image found in output')
+            }
+
+            const imageInfo = outputNode.images[0]
+            const comfyImageUrl = imageInfo.subfolder
+              ? `${comfyUrl.replace(/\/$/, '')}/view?filename=${encodeURIComponent(imageInfo.filename)}&subfolder=${encodeURIComponent(imageInfo.subfolder)}&type=output`
+              : `${comfyUrl.replace(/\/$/, '')}/view?filename=${encodeURIComponent(imageInfo.filename)}&type=output`
+
+            // 6. Complete job with upscaled image URL
+            setUpscaleStatus('Saving upscaled image...')
+            if (!databaseJobId) {
+              throw new Error('Database job ID is missing')
+            }
+
+            const completionResult = await apiClient.completeImageJob(databaseJobId, {
+              job_id: databaseJobId,
+              status: 'completed',
+              output_image_urls: [comfyImageUrl]
+            }) as any
+
+            if (!completionResult.success) {
+              throw new Error('Failed to save upscaled image')
+            }
+
+            setUpscaleStatus('Upscale complete!')
+            setIsUpscaling(false)
+
+            // Trigger feed refresh
+            if (onUpscaleComplete) {
+              onUpscaleComplete()
+            }
+
+            // Clear status after a delay
+            setTimeout(() => setUpscaleStatus(''), 3000)
+            return
+          }
+
+          // Still processing, poll again
+          const elapsedSeconds = Math.floor(elapsed / 1000)
+          setUpscaleStatus(`Upscaling in progress... (${elapsedSeconds}s)`)
+          await new Promise(resolve => setTimeout(resolve, 3000))
+          return pollForResult()
+
+        } catch (pollError: any) {
+          if (pollError.message.includes('timeout') || pollError.message.includes('save')) {
+            throw pollError
+          }
+          await new Promise(resolve => setTimeout(resolve, 3000))
+          return pollForResult()
+        }
+      }
+
+      await pollForResult()
+
+    } catch (err: any) {
+      console.error('Upscale error:', err)
+      setUpscaleStatus(`Error: ${err.message || 'Unknown error'}`)
+      setIsUpscaling(false)
+
+      // Mark job as failed if it was created
+      if (databaseJobId) {
+        await apiClient.completeImageJob(databaseJobId, {
+          job_id: databaseJobId,
+          status: 'error',
+          error_message: err.message || 'Unknown error'
+        }).catch(() => {})
+      }
+
+      // Clear error status after a delay
+      setTimeout(() => setUpscaleStatus(''), 5000)
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
@@ -138,17 +315,53 @@ export default function ImageModal({ image, isOpen, onClose, focusedImageIndex }
                     </span>
                   </h3>
                   {currentImageUrl && (
-                    <button
-                      onClick={() => downloadImage(currentImageUrl, `grid-image-${currentImageIndex === 0 ? 'full' : currentImageIndex}-${image.id}.png`)}
-                      className="px-3 py-1 text-sm bg-green-100 hover:bg-green-200 text-green-800 rounded-lg transition-colors flex items-center gap-2"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                      Download
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => downloadImage(currentImageUrl, `grid-image-${currentImageIndex === 0 ? 'full' : currentImageIndex}-${image.id}.png`)}
+                        className="px-3 py-1 text-sm bg-green-100 hover:bg-green-200 text-green-800 rounded-lg transition-colors flex items-center gap-2"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        Download
+                      </button>
+                      {comfyUrl && (
+                        <button
+                          onClick={handleUpscale}
+                          disabled={isUpscaling}
+                          className="px-3 py-1 text-sm bg-purple-100 hover:bg-purple-200 text-purple-800 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isUpscaling ? (
+                            <>
+                              <div className="w-3 h-3 border-2 border-purple-600/30 border-t-purple-600 rounded-full animate-spin" />
+                              Upscaling...
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                              </svg>
+                              Upres to 4K
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
+
+                {/* Upscale Status */}
+                {upscaleStatus && (
+                  <div className={`mt-2 p-2 rounded-lg text-sm ${
+                    upscaleStatus.includes('Error')
+                      ? 'bg-red-50 text-red-700 border border-red-200'
+                      : upscaleStatus.includes('complete')
+                        ? 'bg-green-50 text-green-700 border border-green-200'
+                        : 'bg-purple-50 text-purple-700 border border-purple-200'
+                  }`}>
+                    {upscaleStatus}
+                  </div>
+                )}
 
                 {/* Main Image with Navigation Arrows */}
                 <div className="relative bg-gray-50 dark:bg-gray-900 rounded-2xl overflow-hidden">
@@ -281,17 +494,52 @@ export default function ImageModal({ image, isOpen, onClose, focusedImageIndex }
                     Generated Result
                   </h3>
                   {image.result_url && (
-                    <button
-                      onClick={() => downloadImage(image.result_url!, `generated-${image.id}.png`)}
-                      className="px-3 py-1 text-sm bg-green-100 hover:bg-green-200 text-green-800 rounded-lg transition-colors flex items-center gap-2"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                      Download
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => downloadImage(image.result_url!, `generated-${image.id}.png`)}
+                        className="px-3 py-1 text-sm bg-green-100 hover:bg-green-200 text-green-800 rounded-lg transition-colors flex items-center gap-2"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        Download
+                      </button>
+                      {comfyUrl && (
+                        <button
+                          onClick={handleUpscale}
+                          disabled={isUpscaling}
+                          className="px-3 py-1 text-sm bg-purple-100 hover:bg-purple-200 text-purple-800 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isUpscaling ? (
+                            <>
+                              <div className="w-3 h-3 border-2 border-purple-600/30 border-t-purple-600 rounded-full animate-spin" />
+                              Upscaling...
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                              </svg>
+                              Upres to 4K
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
+                {/* Upscale Status for single image */}
+                {upscaleStatus && !isMultiImageJob && (
+                  <div className={`p-2 rounded-lg text-sm ${
+                    upscaleStatus.includes('Error')
+                      ? 'bg-red-50 text-red-700 border border-red-200'
+                      : upscaleStatus.includes('complete')
+                        ? 'bg-green-50 text-green-700 border border-green-200'
+                        : 'bg-purple-50 text-purple-700 border border-purple-200'
+                  }`}>
+                    {upscaleStatus}
+                  </div>
+                )}
                 <div className="relative bg-gray-50 dark:bg-gray-900 rounded-2xl overflow-hidden">
                   {image.result_url ? (
                     <>

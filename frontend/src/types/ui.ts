@@ -1,4 +1,55 @@
 // UI-related types
+import type { EditedImage } from './api'
+
+// Style transfer data from backend
+export interface StyleTransfer {
+  id: string
+  created_at: string
+  source_image_url: string
+  style_image_url: string
+  prompt: string
+  result_image_url?: string
+  workflow_name: string
+  model_used?: string
+  processing_time_seconds?: number
+  user_ip?: string
+  status: string
+  comfyui_prompt_id?: string
+  error_message?: string
+  updated_at?: string
+}
+
+// Unified image item for feeds (combines edited images and style transfers)
+export interface ImageItem {
+  id: string
+  type: 'edited-image' | 'style-transfer'
+  created_at: string
+  title: string
+  status: string
+  preview_url: string
+  result_url?: string
+  all_result_urls?: string[] // All output images for multi-image jobs (like image-grid)
+  processing_time?: number
+  source_image_url: string
+  prompt: string
+  workflow_name: string
+  model_used?: string
+  user_ip?: string
+  metadata?: EditedImage | StyleTransfer // Original data from backend
+}
+
+// Feed configuration
+export interface FeedConfig {
+  useNewJobSystem?: boolean
+  workflowName?: string
+  showCompletedOnly?: boolean
+  maxItems?: number
+  showFixButton?: boolean
+  showProgress?: boolean
+  pageContext?: string
+  title?: string
+}
+
 export interface LoadingState {
   isLoading: boolean
   message?: string
@@ -29,14 +80,18 @@ export interface FilterProps {
 }
 
 // Navigation types
-export type PageType = 
-  | "home" 
-  | "multitalk-one" 
-  | "multitalk-multiple" 
-  | "video-lipsync" 
-  | "image-edit" 
+export type PageType =
+  | "home"
+  | "multitalk-one"
+  | "multitalk-multiple"
+  | "video-lipsync"
+  | "image-edit"
+  | "image-grid"
   | "generation-feed"
   | "character-caption"
+  | "wan-i2v"
+  | "style-transfer"
+  | "lora-trainer"
 
 export interface NavigationProps {
   onNavigate: (page: PageType) => void

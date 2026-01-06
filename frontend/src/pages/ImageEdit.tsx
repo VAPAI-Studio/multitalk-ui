@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { Label, Field, Section } from "./components/UI";
-import { apiClient } from "./lib/apiClient";
-import ImageFeed from "./components/ImageFeed";
-import { useSmartResolution } from "./hooks/useSmartResolution";
+import { Label, Field, Section } from "../components/UI";
+import { apiClient } from "../lib/apiClient";
+import GenerationFeed from "../components/GenerationFeed";
+import { useSmartResolution } from "../hooks/useSmartResolution";
 
 type Tab = "edit" | "camera-angle";
 
@@ -690,15 +690,15 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
         {/* Right Sidebar - Image Feed */}
         <div className="w-96 space-y-6">
           <div className="sticky top-6 h-[calc(100vh-3rem)]">
-            <ImageFeed
+            <GenerationFeed
               config={{
-                useNewJobSystem: true, // Both tabs use new system
-                workflowName: undefined, // Show all image jobs (both image-edit and camera-angle)
+                mediaType: 'all',
+                pageContext: 'image-edit',
                 showCompletedOnly: false,
                 maxItems: 10,
-                showFixButton: false,
-                showProgress: false,
-                pageContext: "image-edit" // Single context for the whole page
+                showFixButton: true,
+                showProgress: true,
+                comfyUrl: comfyUrl
               }}
             />
           </div>

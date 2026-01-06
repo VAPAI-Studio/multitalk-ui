@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
-import { apiClient } from "./lib/apiClient";
-import ImageFeed from "./components/ImageFeed";
-import { useSmartResolution } from "./hooks/useSmartResolution";
+import { apiClient } from "../lib/apiClient";
+import GenerationFeed from "../components/GenerationFeed";
+import { useSmartResolution } from "../hooks/useSmartResolution";
 
 // UI Components
 function Label({ children, className }: { children: React.ReactNode; className?: string }) {
@@ -447,15 +447,14 @@ export default function StyleTransfer({ comfyUrl }: Props) {
         {/* Right Sidebar - UnifiedFeed */}
         <div className="w-96 space-y-6">
           <div className="sticky top-6 h-[calc(100vh-3rem)]">
-            <ImageFeed
+            <GenerationFeed
               config={{
-                useNewJobSystem: true,
-                workflowName: 'style-transfer',
+                mediaType: 'all',
+                pageContext: 'style-transfer',
                 showCompletedOnly: false,
                 maxItems: 10,
-                showFixButton: false, // Image editing doesn't need the fix button
-                showProgress: false,   // Image editing uses different progress tracking
-                pageContext: 'style-transfer'
+                showFixButton: true,
+                showProgress: true
               }}
             />
           </div>
