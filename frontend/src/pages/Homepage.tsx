@@ -1,6 +1,6 @@
 
 interface Props {
-  onNavigate: (page: "lipsync" | "image-edit" | "character-caption" | "wan-i2v" | "style-transfer" | "create-image" | "lora-trainer" | "image-grid" | "img2img" | "generation-feed") => void;
+  onNavigate: (page: "lipsync" | "image-edit" | "character-caption" | "wan-i2v" | "wan-move" | "style-transfer" | "create-image" | "lora-trainer" | "image-grid" | "img2img" | "generation-feed") => void;
 }
 
 export default function Homepage({ onNavigate }: Props) {
@@ -36,6 +36,14 @@ export default function Homepage({ onNavigate }: Props) {
       icon: "🎬",
       gradient: "from-purple-600 to-pink-600",
       features: ["Image to video generation", "Custom prompts", "Model: WAN I2V"]
+    },
+    {
+      id: "wan-move" as const,
+      title: "WAN Move",
+      description: "Animate objects in your images with custom motion paths. Draw paths to guide movement and add static anchors for stabilization.",
+      icon: "🎯",
+      gradient: "from-cyan-500 to-blue-600",
+      features: ["Custom motion paths", "Static anchors", "Animation preview", "Model: WAN Move"]
     },
     {
       id: "style-transfer" as const,
