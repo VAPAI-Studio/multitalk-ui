@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { Label, Field, Section } from "../components/UI";
 import { apiClient } from "../lib/apiClient";
 import GenerationFeed from "../components/GenerationFeed";
@@ -31,7 +31,7 @@ const DISTANCE_OPTIONS = [
   { value: 1.8, label: "wide shot", shortLabel: "Wide", description: "Shows context" },
 ];
 
-// 3D Camera Angle Selector Component
+// 3D Camera Angle Selector Component with Draggable Handles
 interface CameraAngleSelectorProps {
   azimuth: number;
   elevation: number;
@@ -49,16 +49,44 @@ function CameraAngleSelector({
   onElevationChange,
   onDistanceChange,
 }: CameraAngleSelectorProps) {
-  // Calculate camera position for the 3D visualization
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [isDraggingAzimuth, setIsDraggingAzimuth] = useState(false);
+  const [isDraggingElevation, setIsDraggingElevation] = useState(false);
+  const [hoverAzimuth, setHoverAzimuth] = useState<number | null>(null);
+  const [hoverElevation, setHoverElevation] = useState<number | null>(null);
+
+  // SVG center and dimensions
+  const CENTER = 100;
+  const AZIMUTH_RING_RADIUS = 75;
+  const ELEVATION_ARC_X = 15; // Left side of visualization
+
+  // Calculate azimuth handle position (green handle on circular ring)
+  const azimuthHandlePosition = useMemo(() => {
+    const angle = ((azimuth - 90) * Math.PI) / 180;
+    return {
+      x: CENTER + AZIMUTH_RING_RADIUS * Math.cos(angle),
+      y: CENTER + AZIMUTH_RING_RADIUS * Math.sin(angle),
+    };
+  }, [azimuth]);
+
+  // Calculate elevation handle position (pink handle on left arc)
+  const elevationHandlePosition = useMemo(() => {
+    // Map elevation (-30 to 60) to y position (140 to 40)
+    const normalizedElevation = (elevation + 30) / 90; // 0 to 1
+    const y = 140 - normalizedElevation * 100;
+    return { x: ELEVATION_ARC_X, y };
+  }, [elevation]);
+
+  // Calculate camera position for visualization
   const cameraPosition = useMemo(() => {
-    const radius = 80 * distance;
+    const radius = 50 * (distance === 0.6 ? 0.7 : distance === 1.8 ? 1.3 : 1);
     const elevationRad = (elevation * Math.PI) / 180;
-    const azimuthRad = ((azimuth - 90) * Math.PI) / 180; // Offset so 0 is front
+    const azimuthRad = ((azimuth - 90) * Math.PI) / 180;
 
-    const x = 100 + radius * Math.cos(elevationRad) * Math.cos(azimuthRad);
-    const y = 100 - radius * Math.sin(elevationRad);
+    const x = CENTER + radius * Math.cos(elevationRad) * Math.cos(azimuthRad);
+    const y = CENTER - radius * Math.sin(elevationRad) * 0.5; // Compressed vertical for 2D view
 
-    return { x, y, radius };
+    return { x, y };
   }, [azimuth, elevation, distance]);
 
   // Get current labels
@@ -66,14 +94,113 @@ function CameraAngleSelector({
   const currentElevation = ELEVATION_OPTIONS.find(e => e.value === elevation);
   const currentDistance = DISTANCE_OPTIONS.find(d => d.value === distance);
 
+  // Snap to nearest valid azimuth value
+  const snapToAzimuth = useCallback((angle: number) => {
+    const normalized = ((angle % 360) + 360) % 360;
+    const snapped = Math.round(normalized / 45) * 45;
+    return snapped === 360 ? 0 : snapped;
+  }, []);
+
+  // Snap to nearest valid elevation value
+  const snapToElevation = useCallback((value: number) => {
+    const elevations = [-30, 0, 30, 60];
+    return elevations.reduce((prev, curr) =>
+      Math.abs(curr - value) < Math.abs(prev - value) ? curr : prev
+    );
+  }, []);
+
+  // Handle mouse move for azimuth dragging
+  const handleAzimuthDrag = useCallback((clientX: number, clientY: number) => {
+    if (!svgRef.current) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const scaleX = 200 / rect.width;
+    const scaleY = 200 / rect.height;
+
+    const x = (clientX - rect.left) * scaleX - CENTER;
+    const y = (clientY - rect.top) * scaleY - CENTER;
+
+    let angle = Math.atan2(y, x) * (180 / Math.PI) + 90;
+    if (angle < 0) angle += 360;
+
+    const snapped = snapToAzimuth(angle);
+    onAzimuthChange(snapped);
+  }, [onAzimuthChange, snapToAzimuth]);
+
+  // Handle mouse move for elevation dragging
+  const handleElevationDrag = useCallback((clientY: number) => {
+    if (!svgRef.current) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const scaleY = 200 / rect.height;
+
+    const y = (clientY - rect.top) * scaleY;
+    // Map y position (40 to 140) to elevation (60 to -30)
+    const elevation = 60 - ((y - 40) / 100) * 90;
+    const clamped = Math.max(-30, Math.min(60, elevation));
+    const snapped = snapToElevation(clamped);
+    onElevationChange(snapped);
+  }, [onElevationChange, snapToElevation]);
+
+  // Mouse event handlers
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isDraggingAzimuth) {
+        handleAzimuthDrag(e.clientX, e.clientY);
+      } else if (isDraggingElevation) {
+        handleElevationDrag(e.clientY);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsDraggingAzimuth(false);
+      setIsDraggingElevation(false);
+    };
+
+    if (isDraggingAzimuth || isDraggingElevation) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDraggingAzimuth, isDraggingElevation, handleAzimuthDrag, handleElevationDrag]);
+
+  // Touch event handlers
+  useEffect(() => {
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return;
+      const touch = e.touches[0];
+      if (isDraggingAzimuth) {
+        handleAzimuthDrag(touch.clientX, touch.clientY);
+      } else if (isDraggingElevation) {
+        handleElevationDrag(touch.clientY);
+      }
+    };
+
+    const handleTouchEnd = () => {
+      setIsDraggingAzimuth(false);
+      setIsDraggingElevation(false);
+    };
+
+    if (isDraggingAzimuth || isDraggingElevation) {
+      window.addEventListener('touchmove', handleTouchMove, { passive: false });
+      window.addEventListener('touchend', handleTouchEnd);
+    }
+
+    return () => {
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [isDraggingAzimuth, isDraggingElevation, handleAzimuthDrag, handleElevationDrag]);
+
   return (
     <div className="space-y-6">
-      {/* 3D Visualization */}
-      <div className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-3xl p-6 overflow-hidden">
+      {/* 3D Visualization with Draggable Handles */}
+      <div className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-3xl p-6 overflow-hidden select-none">
         {/* Background grid */}
         <div className="absolute inset-0 opacity-10">
           <svg className="w-full h-full" viewBox="0 0 200 200">
-            {/* Grid lines */}
             {[...Array(10)].map((_, i) => (
               <g key={i}>
                 <line x1={i * 20 + 20} y1="0" x2={i * 20 + 20} y2="200" stroke="white" strokeWidth="0.5" />
@@ -83,71 +210,101 @@ function CameraAngleSelector({
           </svg>
         </div>
 
-        <svg viewBox="0 0 200 200" className="w-full max-w-md mx-auto relative z-10">
-          {/* Outer reference circle */}
+        {/* Instructions */}
+        <div className="text-center mb-2 text-xs text-white/50">
+          Drag the <span className="text-green-400">green</span> handle to rotate • Drag the <span className="text-pink-400">pink</span> handle for vertical angle
+        </div>
+
+        <svg
+          ref={svgRef}
+          viewBox="0 0 200 200"
+          className="w-full max-w-md mx-auto relative z-10 cursor-crosshair"
+        >
+          {/* Azimuth ring (green) */}
           <circle
-            cx="100"
-            cy="100"
-            r="85"
+            cx={CENTER}
+            cy={CENTER}
+            r={AZIMUTH_RING_RADIUS}
             fill="none"
-            stroke="rgba(255,255,255,0.1)"
-            strokeWidth="1"
-            strokeDasharray="4 4"
+            stroke="rgba(74, 222, 128, 0.3)"
+            strokeWidth="3"
           />
 
-          {/* Middle reference circle */}
-          <circle
-            cx="100"
-            cy="100"
-            r="60"
-            fill="none"
-            stroke="rgba(255,255,255,0.1)"
-            strokeWidth="1"
-            strokeDasharray="4 4"
+          {/* Elevation arc on left side (pink) */}
+          <line
+            x1={ELEVATION_ARC_X}
+            y1="40"
+            x2={ELEVATION_ARC_X}
+            y2="140"
+            stroke="rgba(244, 114, 182, 0.3)"
+            strokeWidth="3"
+            strokeLinecap="round"
           />
 
-          {/* Inner reference circle */}
-          <circle
-            cx="100"
-            cy="100"
-            r="35"
-            fill="none"
-            stroke="rgba(255,255,255,0.1)"
-            strokeWidth="1"
-          />
+          {/* Elevation tick marks and labels */}
+          {ELEVATION_OPTIONS.map((opt) => {
+            const normalizedElevation = (opt.value + 30) / 90;
+            const y = 140 - normalizedElevation * 100;
+            const isSelected = opt.value === elevation;
+            const isHovered = opt.value === hoverElevation;
 
-          {/* Center object (person silhouette) */}
-          <g transform="translate(100, 100)">
-            {/* Head */}
-            <circle cx="0" cy="-12" r="8" fill="url(#objectGradient)" />
-            {/* Body */}
-            <ellipse cx="0" cy="6" rx="10" ry="14" fill="url(#objectGradient)" />
-          </g>
+            return (
+              <g key={opt.value}>
+                <line
+                  x1={ELEVATION_ARC_X - 5}
+                  y1={y}
+                  x2={ELEVATION_ARC_X + 5}
+                  y2={y}
+                  stroke={isSelected ? "#f472b6" : "rgba(255,255,255,0.3)"}
+                  strokeWidth="2"
+                />
+                <circle
+                  cx={ELEVATION_ARC_X}
+                  cy={y}
+                  r={isSelected || isHovered ? 6 : 4}
+                  fill={isSelected ? "#f472b6" : isHovered ? "rgba(244, 114, 182, 0.6)" : "rgba(255,255,255,0.2)"}
+                  className="cursor-pointer transition-all duration-150"
+                  onClick={() => onElevationChange(opt.value)}
+                  onMouseEnter={() => setHoverElevation(opt.value)}
+                  onMouseLeave={() => setHoverElevation(null)}
+                />
+                <text
+                  x={ELEVATION_ARC_X + 12}
+                  y={y + 3}
+                  className={`text-[7px] ${isSelected ? "fill-pink-400" : "fill-white/40"}`}
+                >
+                  {opt.shortLabel}
+                </text>
+              </g>
+            );
+          })}
 
-          {/* Azimuth markers */}
+          {/* Azimuth markers around the ring (clickable) */}
           {AZIMUTH_OPTIONS.map((option) => {
             const angle = ((option.value - 90) * Math.PI) / 180;
-            const markerRadius = 90;
-            const x = 100 + markerRadius * Math.cos(angle);
-            const y = 100 + markerRadius * Math.sin(angle);
+            const x = CENTER + AZIMUTH_RING_RADIUS * Math.cos(angle);
+            const y = CENTER + AZIMUTH_RING_RADIUS * Math.sin(angle);
             const isSelected = option.value === azimuth;
+            const isHovered = option.value === hoverAzimuth;
 
             return (
               <g key={option.value}>
                 <circle
                   cx={x}
                   cy={y}
-                  r={isSelected ? 8 : 5}
-                  fill={isSelected ? "#3b82f6" : "rgba(255,255,255,0.3)"}
-                  className="cursor-pointer transition-all duration-200 hover:fill-blue-400"
+                  r={isSelected || isHovered ? 7 : 4}
+                  fill={isSelected ? "#4ade80" : isHovered ? "rgba(74, 222, 128, 0.6)" : "rgba(255,255,255,0.2)"}
+                  className="cursor-pointer transition-all duration-150"
                   onClick={() => onAzimuthChange(option.value)}
+                  onMouseEnter={() => setHoverAzimuth(option.value)}
+                  onMouseLeave={() => setHoverAzimuth(null)}
                 />
                 {isSelected && (
                   <text
-                    x={x}
-                    y={y + 18}
-                    textAnchor="middle"
-                    className="fill-blue-400 text-[8px] font-medium"
+                    x={x + (x > CENTER ? 12 : -12)}
+                    y={y + 3}
+                    textAnchor={x > CENTER ? "start" : "end"}
+                    className="fill-green-400 text-[7px] font-medium"
                   >
                     {option.shortLabel}
                   </text>
@@ -156,34 +313,103 @@ function CameraAngleSelector({
             );
           })}
 
-          {/* Camera position indicator */}
+          {/* Center object (person silhouette) */}
+          <g transform={`translate(${CENTER}, ${CENTER})`}>
+            <circle cx="0" cy="-10" r="7" fill="url(#objectGradient)" />
+            <ellipse cx="0" cy="5" rx="8" ry="12" fill="url(#objectGradient)" />
+          </g>
+
+          {/* Camera position indicator (shows combined azimuth + elevation) */}
           <g>
-            {/* Line from center to camera */}
             <line
-              x1="100"
-              y1="100"
+              x1={CENTER}
+              y1={CENTER}
               x2={cameraPosition.x}
               y2={cameraPosition.y}
               stroke="url(#lineGradient)"
               strokeWidth="2"
               strokeDasharray="4 2"
+              opacity="0.6"
             />
+            <circle
+              cx={cameraPosition.x}
+              cy={cameraPosition.y}
+              r="10"
+              fill="url(#cameraGradient)"
+              opacity="0.8"
+            />
+            <text
+              x={cameraPosition.x}
+              y={cameraPosition.y + 4}
+              textAnchor="middle"
+              className="text-[8px]"
+            >
+              📷
+            </text>
+          </g>
 
-            {/* Camera icon */}
-            <g transform={`translate(${cameraPosition.x}, ${cameraPosition.y})`}>
-              <circle
-                r="12"
-                fill="url(#cameraGradient)"
-                className="drop-shadow-lg"
-              />
-              <text
-                textAnchor="middle"
-                dominantBaseline="middle"
-                className="text-[10px]"
-              >
-                📷
-              </text>
-            </g>
+          {/* Draggable Azimuth Handle (green, larger) */}
+          <g
+            className="cursor-grab active:cursor-grabbing"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              setIsDraggingAzimuth(true);
+            }}
+            onTouchStart={(e) => {
+              e.preventDefault();
+              setIsDraggingAzimuth(true);
+            }}
+          >
+            <circle
+              cx={azimuthHandlePosition.x}
+              cy={azimuthHandlePosition.y}
+              r={isDraggingAzimuth ? 14 : 10}
+              fill="url(#azimuthHandleGradient)"
+              stroke="white"
+              strokeWidth="2"
+              className="transition-all duration-150 drop-shadow-lg"
+              style={{ filter: isDraggingAzimuth ? 'drop-shadow(0 0 8px rgba(74, 222, 128, 0.8))' : undefined }}
+            />
+            <text
+              x={azimuthHandlePosition.x}
+              y={azimuthHandlePosition.y + 4}
+              textAnchor="middle"
+              className="text-[10px] fill-white font-bold pointer-events-none"
+            >
+              ↻
+            </text>
+          </g>
+
+          {/* Draggable Elevation Handle (pink) */}
+          <g
+            className="cursor-ns-resize"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              setIsDraggingElevation(true);
+            }}
+            onTouchStart={(e) => {
+              e.preventDefault();
+              setIsDraggingElevation(true);
+            }}
+          >
+            <circle
+              cx={elevationHandlePosition.x}
+              cy={elevationHandlePosition.y}
+              r={isDraggingElevation ? 12 : 8}
+              fill="url(#elevationHandleGradient)"
+              stroke="white"
+              strokeWidth="2"
+              className="transition-all duration-150 drop-shadow-lg"
+              style={{ filter: isDraggingElevation ? 'drop-shadow(0 0 8px rgba(244, 114, 182, 0.8))' : undefined }}
+            />
+            <text
+              x={elevationHandlePosition.x}
+              y={elevationHandlePosition.y + 3}
+              textAnchor="middle"
+              className="text-[8px] fill-white font-bold pointer-events-none"
+            >
+              ↕
+            </text>
           </g>
 
           {/* Gradients */}
@@ -200,109 +426,57 @@ function CameraAngleSelector({
               <stop offset="0%" stopColor="#3b82f6" />
               <stop offset="100%" stopColor="#8b5cf6" />
             </linearGradient>
+            <linearGradient id="azimuthHandleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#4ade80" />
+              <stop offset="100%" stopColor="#22c55e" />
+            </linearGradient>
+            <linearGradient id="elevationHandleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#f472b6" />
+              <stop offset="100%" stopColor="#ec4899" />
+            </linearGradient>
           </defs>
         </svg>
 
         {/* Current values display */}
-        <div className="mt-4 flex justify-center gap-4 text-xs text-white/70">
-          <span className="bg-white/10 px-3 py-1 rounded-full">
+        <div className="mt-4 flex justify-center gap-3 text-xs">
+          <span className="bg-green-500/20 text-green-400 px-3 py-1 rounded-full border border-green-500/30">
             {currentAzimuth?.shortLabel || "Front"}
           </span>
-          <span className="bg-white/10 px-3 py-1 rounded-full">
+          <span className="bg-pink-500/20 text-pink-400 px-3 py-1 rounded-full border border-pink-500/30">
             {currentElevation?.shortLabel || "Eye Level"}
           </span>
-          <span className="bg-white/10 px-3 py-1 rounded-full">
+          <span className="bg-orange-500/20 text-orange-400 px-3 py-1 rounded-full border border-orange-500/30">
             {currentDistance?.shortLabel || "Medium"}
           </span>
         </div>
       </div>
 
-      {/* Controls */}
-      <div className="grid gap-6">
-        {/* Azimuth Control */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-gradient-to-r from-green-400 to-emerald-500"></span>
-              Horizontal Rotation
-            </Label>
-            <span className="text-sm font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
-              {currentAzimuth?.label || "front view"}
-            </span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {AZIMUTH_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                onClick={() => onAzimuthChange(option.value)}
-                className={`px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
-                  azimuth === option.value
-                    ? "bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-md scale-105"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
-              >
-                {option.shortLabel}
-              </button>
-            ))}
-          </div>
+      {/* Shot Type Buttons (ONLY buttons in the UI) */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+            <span className="w-3 h-3 rounded-full bg-gradient-to-r from-orange-400 to-amber-500"></span>
+            Shot Type
+          </Label>
+          <span className="text-sm font-medium text-orange-600 bg-orange-50 px-3 py-1 rounded-full">
+            {currentDistance?.label || "medium shot"}
+          </span>
         </div>
-
-        {/* Elevation Control */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-gradient-to-r from-pink-400 to-rose-500"></span>
-              Vertical Angle
-            </Label>
-            <span className="text-sm font-medium text-purple-600 bg-purple-50 px-3 py-1 rounded-full">
-              {currentElevation?.label || "eye-level shot"}
-            </span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {ELEVATION_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                onClick={() => onElevationChange(option.value)}
-                className={`flex-1 min-w-[100px] px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
-                  elevation === option.value
-                    ? "bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-md scale-105"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
-              >
-                <div className="font-semibold">{option.shortLabel}</div>
-                <div className="text-xs opacity-75">{option.description}</div>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Distance Control */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-gradient-to-r from-orange-400 to-amber-500"></span>
-              Shot Type
-            </Label>
-            <span className="text-sm font-medium text-orange-600 bg-orange-50 px-3 py-1 rounded-full">
-              {currentDistance?.label || "medium shot"}
-            </span>
-          </div>
-          <div className="flex gap-2">
-            {DISTANCE_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                onClick={() => onDistanceChange(option.value)}
-                className={`flex-1 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
-                  distance === option.value
-                    ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md scale-105"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
-              >
-                <div className="font-semibold">{option.shortLabel}</div>
-                <div className="text-xs opacity-75">{option.description}</div>
-              </button>
-            ))}
-          </div>
+        <div className="flex gap-2">
+          {DISTANCE_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              onClick={() => onDistanceChange(option.value)}
+              className={`flex-1 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
+                distance === option.value
+                  ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md scale-105"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              <div className="font-semibold">{option.shortLabel}</div>
+              <div className="text-xs opacity-75">{option.description}</div>
+            </button>
+          ))}
         </div>
       </div>
     </div>
