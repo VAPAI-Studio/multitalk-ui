@@ -266,7 +266,8 @@ export default function GenerationFeed() {
               showCompletedOnly: false,
               maxItems: 25,
               showFixButton: false,
-              showProgress: true
+              showProgress: true,
+              showMediaTypeToggle: false
             }}
           />
         </div>

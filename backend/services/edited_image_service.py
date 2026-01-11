@@ -1,5 +1,5 @@
 import os
-from typing import Tuple, Optional, List
+from typing import Tuple, Optional, List, Dict
 from datetime import datetime
 from supabase import create_client, Client
 
@@ -78,54 +78,82 @@ class EditedImageService:
     async def get_recent_edited_images(self, limit: int = 20, offset: int = 0) -> Tuple[bool, List[EditedImage], int, Optional[str]]:
         """Get recent edited images for the generation feed"""
         try:
-            # Get total count
-            count_result = self.supabase.table("edited_images").select("*", count="exact").execute()
-            total_count = count_result.count if count_result.count else 0
-            
-            # Get paginated results
+            # Single query with count - more efficient than separate queries
             result = self.supabase.table("edited_images")\
-                .select("*")\
+                .select("*", count="exact")\
                 .order("created_at", desc=True)\
                 .range(offset, offset + limit - 1)\
                 .execute()
-            
+
+            total_count = result.count if result.count else 0
+
             if result.data:
                 edited_images = [EditedImage(**item) for item in result.data]
                 return True, edited_images, total_count, None
             else:
                 return True, [], total_count, None
-                
+
         except Exception as e:
             return False, [], 0, str(e)
 
     async def get_completed_edited_images(self, limit: int = 20, offset: int = 0) -> Tuple[bool, List[EditedImage], int, Optional[str]]:
         """Get only completed edited images with result images"""
         try:
-            # Get total count of completed images
-            count_result = self.supabase.table("edited_images")\
-                .select("*", count="exact")\
-                .eq("status", ImageEditStatus.COMPLETED.value)\
-                .not_.is_("result_image_url", "null")\
-                .execute()
-            total_count = count_result.count if count_result.count else 0
-            
-            # Get paginated results
+            # Single query with count and filters - more efficient
             result = self.supabase.table("edited_images")\
-                .select("*")\
+                .select("*", count="exact")\
                 .eq("status", ImageEditStatus.COMPLETED.value)\
                 .not_.is_("result_image_url", "null")\
                 .order("created_at", desc=True)\
                 .range(offset, offset + limit - 1)\
                 .execute()
-            
+
+            total_count = result.count if result.count else 0
+
             if result.data:
                 edited_images = [EditedImage(**item) for item in result.data]
                 return True, edited_images, total_count, None
             else:
                 return True, [], total_count, None
-                
+
         except Exception as e:
             return False, [], 0, str(e)
+
+    async def get_recent_edited_images_feed(self, limit: int = 20, offset: int = 0) -> Tuple[List[Dict], Optional[str]]:
+        """Get recent edited images for feed display (optimized - no count, minimal columns)."""
+        try:
+            # Select only columns needed for feed display
+            feed_columns = "id, status, created_at, workflow_name, result_image_url, source_image_url, prompt"
+
+            result = self.supabase.table("edited_images")\
+                .select(feed_columns)\
+                .order("created_at", desc=True)\
+                .range(offset, offset + limit - 1)\
+                .execute()
+
+            return result.data or [], None
+
+        except Exception as e:
+            return [], str(e)
+
+    async def get_completed_edited_images_feed(self, limit: int = 20, offset: int = 0) -> Tuple[List[Dict], Optional[str]]:
+        """Get completed edited images for feed display (optimized - no count, minimal columns)."""
+        try:
+            # Select only columns needed for feed display
+            feed_columns = "id, status, created_at, workflow_name, result_image_url, source_image_url, prompt"
+
+            result = self.supabase.table("edited_images")\
+                .select(feed_columns)\
+                .eq("status", ImageEditStatus.COMPLETED.value)\
+                .not_.is_("result_image_url", "null")\
+                .order("created_at", desc=True)\
+                .range(offset, offset + limit - 1)\
+                .execute()
+
+            return result.data or [], None
+
+        except Exception as e:
+            return [], str(e)
 
     async def update_to_processing(self, image_id: str) -> Tuple[bool, Optional[str]]:
         """Update an image status to processing"""

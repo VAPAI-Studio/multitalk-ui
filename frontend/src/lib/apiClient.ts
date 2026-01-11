@@ -1,11 +1,42 @@
 /* eslint-disable react-refresh/only-export-components */
 import { config } from '../config/environment'
 
+// Simple cache for API responses
+interface CacheEntry<T> {
+  data: T
+  timestamp: number
+}
+
 class ApiClient {
   private baseURL: string
+  private cache: Map<string, CacheEntry<any>> = new Map()
+  private readonly CACHE_TTL = 30000 // 30 seconds cache for feed data (matches polling interval)
 
   constructor() {
     this.baseURL = config.apiBaseUrl
+  }
+
+  // Get cached response if still valid
+  private getCached<T>(key: string): T | null {
+    const entry = this.cache.get(key)
+    if (entry && Date.now() - entry.timestamp < this.CACHE_TTL) {
+      return entry.data as T
+    }
+    return null
+  }
+
+  // Set cache entry
+  private setCache<T>(key: string, data: T): void {
+    this.cache.set(key, { data, timestamp: Date.now() })
+  }
+
+  // Clear specific cache entry or all cache
+  clearCache(key?: string): void {
+    if (key) {
+      this.cache.delete(key)
+    } else {
+      this.cache.clear()
+    }
   }
 
   private getAuthToken(): string | null {
@@ -17,11 +48,11 @@ class ApiClient {
     const token = this.getAuthToken()
 
     for (let attempt = 1; attempt <= retries; attempt++) {
-      try {
-        // Add timeout to prevent hanging requests
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
+      // Create timeout controller for each attempt
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 60000) // 60 second timeout (increased for slow Supabase)
 
+      try {
         const response = await fetch(url, {
           headers: {
             'Content-Type': 'application/json',
@@ -44,16 +75,24 @@ class ApiClient {
 
         return response.json()
       } catch (error) {
-        console.warn(`API request attempt ${attempt}/${retries} failed:`, error)
-        
+        clearTimeout(timeoutId)
+
+        // AbortError = intentional cancellation (React cleanup or timeout) - don't retry
+        if (error instanceof Error && error.name === 'AbortError') {
+          // Just re-throw silently - this is expected during component unmount
+          throw error
+        }
+
+        // Log non-abort errors
+        if (attempt < retries) {
+          console.warn(`API request attempt ${attempt}/${retries} failed:`, error)
+        }
+
         // If this is the last attempt, throw the error
         if (attempt === retries) {
           // Provide more user-friendly error messages
           if (error instanceof Error) {
-            if (error.name === 'AbortError') {
-              throw new Error('Request timed out. Please check your connection and try again.')
-            }
-            if (error.message.includes('Resource temporarily unavailable') || 
+            if (error.message.includes('Resource temporarily unavailable') ||
                 error.message.includes('ECONNREFUSED') ||
                 error.message.includes('ENOTFOUND')) {
               throw new Error('Unable to connect to the server. Please check your connection and try again.')
@@ -61,13 +100,13 @@ class ApiClient {
           }
           throw error
         }
-        
+
         // Wait before retrying (exponential backoff)
         const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000)
         await new Promise(resolve => setTimeout(resolve, delay))
       }
     }
-    
+
     throw new Error('All retry attempts failed')
   }
 
@@ -93,7 +132,13 @@ class ApiClient {
   }
 
   async getRecentJobs(limit: number = 50, offset: number = 0) {
-    return this.request(`/jobs/recent?limit=${limit}&offset=${offset}`)
+    const cacheKey = `jobs-recent-${limit}-${offset}`
+    const cached = this.getCached(cacheKey)
+    if (cached) return cached
+
+    const result = await this.request(`/jobs/recent?limit=${limit}&offset=${offset}`)
+    this.setCache(cacheKey, result)
+    return result
   }
 
   async getJob(jobId: string) {
@@ -101,7 +146,13 @@ class ApiClient {
   }
 
   async getCompletedJobsWithVideos(limit: number = 20, offset: number = 0) {
-    return this.request(`/jobs/completed/with-videos?limit=${limit}&offset=${offset}`)
+    const cacheKey = `jobs-completed-videos-${limit}-${offset}`
+    const cached = this.getCached(cacheKey)
+    if (cached) return cached
+
+    const result = await this.request(`/jobs/completed/with-videos?limit=${limit}&offset=${offset}`)
+    this.setCache(cacheKey, result)
+    return result
   }
 
   // Storage endpoints
@@ -351,12 +402,18 @@ class ApiClient {
   }
 
   async getRecentEditedImages(limit: number = 20, offset: number = 0, completedOnly: boolean = false) {
+    const cacheKey = `edited-images-${limit}-${offset}-${completedOnly}`
+    const cached = this.getCached(cacheKey)
+    if (cached) return cached
+
     const params = new URLSearchParams({
       limit: limit.toString(),
       offset: offset.toString(),
       completed_only: completedOnly.toString()
     })
-    return this.request(`/edited-images?${params.toString()}`)
+    const result = await this.request(`/edited-images?${params.toString()}`)
+    this.setCache(cacheKey, result)
+    return result
   }
 
   // Style Transfer endpoints
@@ -405,12 +462,18 @@ class ApiClient {
   }
 
   async getRecentStyleTransfers(limit: number = 20, offset: number = 0, completedOnly: boolean = false) {
+    const cacheKey = `style-transfers-${limit}-${offset}-${completedOnly}`
+    const cached = this.getCached(cacheKey)
+    if (cached) return cached
+
     const queryParams = new URLSearchParams({
       limit: limit.toString(),
       offset: offset.toString(),
       completed_only: completedOnly.toString()
     })
-    return this.request(`/style-transfers?${queryParams}`)
+    const result = await this.request(`/style-transfers?${queryParams}`)
+    this.setCache(cacheKey, result)
+    return result
   }
 
   async submitStyleTransferToComfyUI(comfyUrl: string, transferId: string, promptJson: any) {
@@ -464,6 +527,91 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify({ result_url: resultUrl }),
     })
+  }
+
+  // Unified Feed endpoints (optimized - single request for all feed types)
+  async getUnifiedFeed(params?: {
+    limit?: number;
+    offset?: number;
+    completedOnly?: boolean;
+    types?: string; // Comma-separated: 'video,edited_image,style_transfer'
+  }) {
+    const queryParams = new URLSearchParams()
+    if (params?.limit) queryParams.append('limit', params.limit.toString())
+    if (params?.offset) queryParams.append('offset', params.offset.toString())
+    if (params?.completedOnly) queryParams.append('completed_only', 'true')
+    if (params?.types) queryParams.append('types', params.types)
+
+    const query = queryParams.toString()
+    const cacheKey = `unified-feed-${query}`
+    const cached = this.getCached(cacheKey)
+    if (cached) return cached
+
+    const result = await this.request(`/feed/unified${query ? `?${query}` : ''}`)
+    this.setCache(cacheKey, result)
+    return result
+  }
+
+  async getVideoFeed(params?: {
+    limit?: number;
+    offset?: number;
+    completedOnly?: boolean;
+    workflowName?: string;
+  }) {
+    const queryParams = new URLSearchParams()
+    if (params?.limit) queryParams.append('limit', params.limit.toString())
+    if (params?.offset) queryParams.append('offset', params.offset.toString())
+    if (params?.completedOnly) queryParams.append('completed_only', 'true')
+    if (params?.workflowName) queryParams.append('workflow_name', params.workflowName)
+
+    const query = queryParams.toString()
+    const cacheKey = `video-feed-${query}`
+    const cached = this.getCached(cacheKey)
+    if (cached) return cached
+
+    const result = await this.request(`/feed/videos${query ? `?${query}` : ''}`)
+    this.setCache(cacheKey, result)
+    return result
+  }
+
+  async getImagesFeed(params?: {
+    limit?: number;
+    offset?: number;
+    completedOnly?: boolean;
+  }) {
+    const queryParams = new URLSearchParams()
+    if (params?.limit) queryParams.append('limit', params.limit.toString())
+    if (params?.offset) queryParams.append('offset', params.offset.toString())
+    if (params?.completedOnly) queryParams.append('completed_only', 'true')
+
+    const query = queryParams.toString()
+    const cacheKey = `images-feed-${query}`
+    const cached = this.getCached(cacheKey)
+    if (cached) return cached
+
+    const result = await this.request(`/feed/images${query ? `?${query}` : ''}`)
+    this.setCache(cacheKey, result)
+    return result
+  }
+
+  async getStyleTransfersFeed(params?: {
+    limit?: number;
+    offset?: number;
+    completedOnly?: boolean;
+  }) {
+    const queryParams = new URLSearchParams()
+    if (params?.limit) queryParams.append('limit', params.limit.toString())
+    if (params?.offset) queryParams.append('offset', params.offset.toString())
+    if (params?.completedOnly) queryParams.append('completed_only', 'true')
+
+    const query = queryParams.toString()
+    const cacheKey = `style-transfers-feed-${query}`
+    const cached = this.getCached(cacheKey)
+    if (cached) return cached
+
+    const result = await this.request(`/feed/style-transfers${query ? `?${query}` : ''}`)
+    this.setCache(cacheKey, result)
+    return result
   }
 
   // MultiTalk endpoints
@@ -526,7 +674,13 @@ class ApiClient {
     if (params?.user_id) queryParams.append('user_id', params.user_id)
 
     const query = queryParams.toString()
-    return this.request(`/video-jobs${query ? `?${query}` : ''}`)
+    const cacheKey = `video-jobs-${query}`
+    const cached = this.getCached(cacheKey)
+    if (cached) return cached
+
+    const result = await this.request(`/video-jobs/${query ? `?${query}` : ''}`)
+    this.setCache(cacheKey, result)
+    return result
   }
 
   async getCompletedVideoJobs(params?: {
@@ -542,7 +696,13 @@ class ApiClient {
     if (params?.user_id) queryParams.append('user_id', params.user_id)
 
     const query = queryParams.toString()
-    return this.request(`/video-jobs/completed/recent${query ? `?${query}` : ''}`)
+    const cacheKey = `video-jobs-completed-${query}`
+    const cached = this.getCached(cacheKey)
+    if (cached) return cached
+
+    const result = await this.request(`/video-jobs/completed/recent/${query ? `?${query}` : ''}`)
+    this.setCache(cacheKey, result)
+    return result
   }
 
   async getVideoJob(jobId: string) {
@@ -594,7 +754,13 @@ class ApiClient {
     if (params?.user_id) queryParams.append('user_id', params.user_id)
 
     const query = queryParams.toString()
-    return this.request(`/image-jobs/${query ? `?${query}` : ''}`)
+    const cacheKey = `image-jobs-${query}`
+    const cached = this.getCached(cacheKey)
+    if (cached) return cached
+
+    const result = await this.request(`/image-jobs/${query ? `?${query}` : ''}`)
+    this.setCache(cacheKey, result)
+    return result
   }
 
   async getCompletedImageJobs(params?: {
@@ -610,7 +776,13 @@ class ApiClient {
     if (params?.user_id) queryParams.append('user_id', params.user_id)
 
     const query = queryParams.toString()
-    return this.request(`/image-jobs/completed/recent${query ? `?${query}` : ''}`)
+    const cacheKey = `image-jobs-completed-${query}`
+    const cached = this.getCached(cacheKey)
+    if (cached) return cached
+
+    const result = await this.request(`/image-jobs/completed/recent${query ? `?${query}` : ''}`)
+    this.setCache(cacheKey, result)
+    return result
   }
 
   async getImageJob(jobId: string) {

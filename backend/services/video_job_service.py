@@ -126,6 +126,8 @@ class VideoJobService:
                 update_data["error_message"] = payload.error_message
             if payload.duration_seconds is not None:
                 update_data["duration_seconds"] = payload.duration_seconds
+            if payload.thumbnail_url:
+                update_data["thumbnail_url"] = payload.thumbnail_url
 
             result = self.supabase.table("video_jobs") \
                 .update(update_data) \
@@ -251,3 +253,72 @@ class VideoJobService:
 
         except Exception as e:
             return [], 0, str(e)
+
+    async def get_recent_jobs_feed(
+        self,
+        limit: int = 50,
+        offset: int = 0,
+        workflow_name: Optional[str] = None,
+        user_id: Optional[str] = None
+    ) -> Tuple[List[Dict], Optional[str]]:
+        """
+        Get recent video jobs for feed display (optimized - no count, minimal columns).
+        Returns: (jobs_dict_list, error_message)
+        """
+        try:
+            # Select only columns needed for feed display
+            feed_columns = "id, status, created_at, workflow_name, output_video_urls, width, height, comfy_job_id, error_message, thumbnail_url"
+
+            query = self.supabase.table("video_jobs").select(feed_columns)  # No count
+
+            # Apply filters
+            if workflow_name:
+                query = query.eq("workflow_name", workflow_name)
+            if user_id:
+                query = query.eq("user_id", user_id)
+
+            # Order and paginate
+            query = query.order("created_at", desc=True).range(offset, offset + limit - 1)
+
+            result = query.execute()
+
+            return result.data or [], None
+
+        except Exception as e:
+            return [], str(e)
+
+    async def get_completed_jobs_feed(
+        self,
+        limit: int = 50,
+        offset: int = 0,
+        workflow_name: Optional[str] = None,
+        user_id: Optional[str] = None
+    ) -> Tuple[List[Dict], Optional[str]]:
+        """
+        Get completed video jobs for feed display (optimized - no count, minimal columns).
+        Returns: (jobs_dict_list, error_message)
+        """
+        try:
+            # Select only columns needed for feed display
+            feed_columns = "id, status, created_at, workflow_name, output_video_urls, width, height, comfy_job_id, error_message, thumbnail_url"
+
+            query = self.supabase.table("video_jobs").select(feed_columns)  # No count
+
+            # Filter for completed jobs only
+            query = query.eq("status", "completed")
+
+            # Apply additional filters
+            if workflow_name:
+                query = query.eq("workflow_name", workflow_name)
+            if user_id:
+                query = query.eq("user_id", user_id)
+
+            # Order and paginate
+            query = query.order("created_at", desc=True).range(offset, offset + limit - 1)
+
+            result = query.execute()
+
+            return result.data or [], None
+
+        except Exception as e:
+            return [], str(e)

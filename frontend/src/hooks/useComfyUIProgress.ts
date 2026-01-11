@@ -206,17 +206,23 @@ export function useComfyUIProgress(comfyUrl: string, enabled: boolean = true) {
         }
       };
       
-      ws.onerror = (error) => {
-        console.error('ComfyUI WebSocket error:', error);
+      ws.onerror = () => {
+        // Only log if connection was actually established (not during cleanup)
+        if (ws.readyState !== WebSocket.CLOSING && ws.readyState !== WebSocket.CLOSED) {
+          console.error('ComfyUI WebSocket error');
+        }
         setProgress(prev => ({ ...prev, is_connected: false }));
       };
-      
+
       ws.onclose = () => {
         setProgress(prev => ({ ...prev, is_connected: false }));
-        console.log('🔌 ComfyUI WebSocket disconnected');
-        
-        // Auto-reconnect after 3 seconds
-        if (enabled) {
+        // Only log if connection was actually established
+        if (wsRef.current === ws) {
+          console.log('🔌 ComfyUI WebSocket disconnected');
+        }
+
+        // Auto-reconnect after 3 seconds (only if still enabled and this is our current ws)
+        if (enabled && wsRef.current === ws) {
           reconnectTimeoutRef.current = setTimeout(() => {
             connectWebSocket();
           }, 3000);
@@ -233,12 +239,17 @@ export function useComfyUIProgress(comfyUrl: string, enabled: boolean = true) {
       clearTimeout(reconnectTimeoutRef.current);
       reconnectTimeoutRef.current = null;
     }
-    
+
     if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
+      const ws = wsRef.current;
+      wsRef.current = null; // Clear ref before closing to signal intentional disconnect
+
+      // Only close if not already closing/closed
+      if (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN) {
+        ws.close();
+      }
     }
-    
+
     setProgress(prev => ({ ...prev, is_connected: false }));
   }, []);
 
