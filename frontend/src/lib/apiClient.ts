@@ -11,9 +11,36 @@ class ApiClient {
   private baseURL: string
   private cache: Map<string, CacheEntry<any>> = new Map()
   private readonly CACHE_TTL = 30000 // 30 seconds cache for feed data (matches polling interval)
+  private refreshTokenCallback: (() => Promise<string | null>) | null = null
+  private isRefreshing = false
+  private refreshPromise: Promise<string | null> | null = null
 
   constructor() {
     this.baseURL = config.apiBaseUrl
+  }
+
+  // Set the callback for refreshing tokens (called from AuthContext)
+  setRefreshTokenCallback(callback: () => Promise<string | null>) {
+    this.refreshTokenCallback = callback
+  }
+
+  // Attempt to refresh the token, ensuring only one refresh happens at a time
+  private async attemptTokenRefresh(): Promise<string | null> {
+    if (!this.refreshTokenCallback) return null
+
+    // If already refreshing, wait for that to complete
+    if (this.isRefreshing && this.refreshPromise) {
+      return this.refreshPromise
+    }
+
+    this.isRefreshing = true
+    this.refreshPromise = this.refreshTokenCallback()
+      .finally(() => {
+        this.isRefreshing = false
+        this.refreshPromise = null
+      })
+
+    return this.refreshPromise
   }
 
   // Get cached response if still valid
@@ -66,6 +93,28 @@ class ApiClient {
         clearTimeout(timeoutId)
 
         if (!response.ok) {
+          // Handle 401 Unauthorized - attempt token refresh
+          if (response.status === 401 && this.refreshTokenCallback) {
+            const newToken = await this.attemptTokenRefresh()
+            if (newToken) {
+              // Retry the request with the new token (only once)
+              if (attempt === 1) {
+                const retryResponse = await fetch(url, {
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${newToken}`,
+                    ...options.headers,
+                  },
+                  ...options,
+                })
+                if (retryResponse.ok) {
+                  return retryResponse.json()
+                }
+              }
+            }
+            throw new Error('Session expired. Please log in again.')
+          }
+
           // Don't retry on client errors (4xx), only on server errors (5xx) and network issues
           if (response.status >= 400 && response.status < 500) {
             throw new Error(`API request failed: ${response.status} ${response.statusText}`)
