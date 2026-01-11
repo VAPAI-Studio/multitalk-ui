@@ -31,11 +31,15 @@ const DISTANCE_OPTIONS = [
   { value: 1.8, label: "wide shot", shortLabel: "Wide", description: "Shows context" },
 ];
 
-// 3D Camera Angle Selector Component with Draggable Handles
+// Declare THREE as a global (loaded via CDN in index.html)
+declare const THREE: any;
+
+// 3D Camera Angle Selector Component with Three.js WebGL
 interface CameraAngleSelectorProps {
   azimuth: number;
   elevation: number;
   distance: number;
+  imageUrl?: string;
   onAzimuthChange: (value: number) => void;
   onElevationChange: (value: number) => void;
   onDistanceChange: (value: number) => void;
@@ -45,413 +49,579 @@ function CameraAngleSelector({
   azimuth,
   elevation,
   distance,
+  imageUrl,
   onAzimuthChange,
   onElevationChange,
   onDistanceChange,
 }: CameraAngleSelectorProps) {
-  const svgRef = useRef<SVGSVGElement>(null);
-  const [isDraggingAzimuth, setIsDraggingAzimuth] = useState(false);
-  const [isDraggingElevation, setIsDraggingElevation] = useState(false);
-  const [hoverAzimuth, setHoverAzimuth] = useState<number | null>(null);
-  const [hoverElevation, setHoverElevation] = useState<number | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const sceneRef = useRef<any>(null);
+  const rendererRef = useRef<any>(null);
+  const cameraRef = useRef<any>(null);
+  const animationFrameRef = useRef<number>(0);
 
-  // SVG center and dimensions
-  const CENTER = 100;
-  const AZIMUTH_RING_RADIUS = 75;
-  const ELEVATION_ARC_X = 15; // Left side of visualization
+  // 3D objects refs
+  const cameraModelRef = useRef<any>(null);
+  const azimuthHandleRef = useRef<any>(null);
+  const elevationHandleRef = useRef<any>(null);
+  const distanceHandleRef = useRef<any>(null);
+  const distanceLineRef = useRef<any>(null);
+  const imagePlaneRef = useRef<any>(null);
 
-  // Calculate azimuth handle position (green handle on circular ring)
-  const azimuthHandlePosition = useMemo(() => {
-    const angle = ((azimuth - 90) * Math.PI) / 180;
-    return {
-      x: CENTER + AZIMUTH_RING_RADIUS * Math.cos(angle),
-      y: CENTER + AZIMUTH_RING_RADIUS * Math.sin(angle),
-    };
-  }, [azimuth]);
+  // Drag state
+  const [isDragging, setIsDragging] = useState<'azimuth' | 'elevation' | 'distance' | null>(null);
+  const dragStartRef = useRef<{ x: number; y: number } | null>(null);
+  const raycasterRef = useRef<any>(null);
+  const mouseRef = useRef<any>(null);
 
-  // Calculate elevation handle position (pink handle on left arc)
-  const elevationHandlePosition = useMemo(() => {
-    // Map elevation (-30 to 60) to y position (140 to 40)
-    const normalizedElevation = (elevation + 30) / 90; // 0 to 1
-    const y = 140 - normalizedElevation * 100;
-    return { x: ELEVATION_ARC_X, y };
-  }, [elevation]);
-
-  // Calculate camera position for visualization
-  const cameraPosition = useMemo(() => {
-    const radius = 50 * (distance === 0.6 ? 0.7 : distance === 1.8 ? 1.3 : 1);
-    const elevationRad = (elevation * Math.PI) / 180;
-    const azimuthRad = ((azimuth - 90) * Math.PI) / 180;
-
-    const x = CENTER + radius * Math.cos(elevationRad) * Math.cos(azimuthRad);
-    const y = CENTER - radius * Math.sin(elevationRad) * 0.5; // Compressed vertical for 2D view
-
-    return { x, y };
-  }, [azimuth, elevation, distance]);
+  // Snap values
+  const AZIMUTH_VALUES = [0, 45, 90, 135, 180, 225, 270, 315];
+  const ELEVATION_VALUES = [-30, 0, 30, 60];
+  const DISTANCE_VALUES = [0.6, 1.0, 1.4];
 
   // Get current labels
   const currentAzimuth = AZIMUTH_OPTIONS.find(a => a.value === azimuth);
   const currentElevation = ELEVATION_OPTIONS.find(e => e.value === elevation);
   const currentDistance = DISTANCE_OPTIONS.find(d => d.value === distance);
 
-  // Snap to nearest valid azimuth value
-  const snapToAzimuth = useCallback((angle: number) => {
-    const normalized = ((angle % 360) + 360) % 360;
-    const snapped = Math.round(normalized / 45) * 45;
-    return snapped === 360 ? 0 : snapped;
+  // Helper: convert azimuth degrees to radians (adjust for Three.js coordinate system)
+  const azimuthToRadians = useCallback((deg: number) => {
+    return (deg * Math.PI) / 180;
   }, []);
 
-  // Snap to nearest valid elevation value
+  // Helper: convert elevation degrees to radians
+  const elevationToRadians = useCallback((deg: number) => {
+    return (deg * Math.PI) / 180;
+  }, []);
+
+  // Snap to nearest azimuth value
+  const snapToAzimuth = useCallback((angle: number) => {
+    const normalized = ((angle % 360) + 360) % 360;
+    return AZIMUTH_VALUES.reduce((prev, curr) =>
+      Math.abs(curr - normalized) < Math.abs(prev - normalized) ? curr : prev
+    );
+  }, []);
+
+  // Snap to nearest elevation value
   const snapToElevation = useCallback((value: number) => {
-    const elevations = [-30, 0, 30, 60];
-    return elevations.reduce((prev, curr) =>
+    return ELEVATION_VALUES.reduce((prev, curr) =>
       Math.abs(curr - value) < Math.abs(prev - value) ? curr : prev
     );
   }, []);
 
-  // Handle mouse move for azimuth dragging
-  const handleAzimuthDrag = useCallback((clientX: number, clientY: number) => {
-    if (!svgRef.current) return;
-    const rect = svgRef.current.getBoundingClientRect();
-    const scaleX = 200 / rect.width;
-    const scaleY = 200 / rect.height;
+  // Snap to nearest distance value
+  const snapToDistance = useCallback((value: number) => {
+    return DISTANCE_VALUES.reduce((prev, curr) =>
+      Math.abs(curr - value) < Math.abs(prev - value) ? curr : prev
+    );
+  }, []);
 
-    const x = (clientX - rect.left) * scaleX - CENTER;
-    const y = (clientY - rect.top) * scaleY - CENTER;
-
-    let angle = Math.atan2(y, x) * (180 / Math.PI) + 90;
-    if (angle < 0) angle += 360;
-
-    const snapped = snapToAzimuth(angle);
-    onAzimuthChange(snapped);
-  }, [onAzimuthChange, snapToAzimuth]);
-
-  // Handle mouse move for elevation dragging
-  const handleElevationDrag = useCallback((clientY: number) => {
-    if (!svgRef.current) return;
-    const rect = svgRef.current.getBoundingClientRect();
-    const scaleY = 200 / rect.height;
-
-    const y = (clientY - rect.top) * scaleY;
-    // Map y position (40 to 140) to elevation (60 to -30)
-    const elevation = 60 - ((y - 40) / 100) * 90;
-    const clamped = Math.max(-30, Math.min(60, elevation));
-    const snapped = snapToElevation(clamped);
-    onElevationChange(snapped);
-  }, [onElevationChange, snapToElevation]);
-
-  // Mouse event handlers
+  // Initialize Three.js scene
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (isDraggingAzimuth) {
-        handleAzimuthDrag(e.clientX, e.clientY);
-      } else if (isDraggingElevation) {
-        handleElevationDrag(e.clientY);
+    if (!containerRef.current || typeof THREE === 'undefined') return;
+
+    const container = containerRef.current;
+    const width = container.clientWidth;
+    const height = 450;
+
+    // Scene
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a1a2e);
+    sceneRef.current = scene;
+
+    // Camera (viewing from above-front angle)
+    const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
+    camera.position.set(0, 6, 8);
+    camera.lookAt(0, 0, 0);
+    cameraRef.current = camera;
+
+    // Renderer
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(width, height);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    container.appendChild(renderer.domElement);
+    rendererRef.current = renderer;
+
+    // Raycaster and mouse
+    raycasterRef.current = new THREE.Raycaster();
+    mouseRef.current = new THREE.Vector2();
+
+    // Lights
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambientLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(5, 10, 7.5);
+    scene.add(directionalLight);
+
+    // Grid floor
+    const gridHelper = new THREE.GridHelper(8, 16, 0x444466, 0x333355);
+    scene.add(gridHelper);
+
+    // Target plane (image display or placeholder)
+    const planeGeometry = new THREE.PlaneGeometry(2, 2);
+    const planeMaterial = new THREE.MeshBasicMaterial({
+      color: 0x4444ff,
+      side: THREE.DoubleSide,
+    });
+    const imagePlane = new THREE.Mesh(planeGeometry, planeMaterial);
+    imagePlane.rotation.x = -Math.PI / 2;
+    imagePlane.position.y = 0.01;
+    scene.add(imagePlane);
+    imagePlaneRef.current = imagePlane;
+
+    // Create placeholder smiley face texture
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.fillStyle = '#ffeb3b';
+      ctx.beginPath();
+      ctx.arc(128, 128, 100, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#333';
+      ctx.beginPath();
+      ctx.arc(90, 100, 15, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(166, 100, 15, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(128, 130, 50, 0.1 * Math.PI, 0.9 * Math.PI, false);
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 8;
+      ctx.stroke();
+    }
+    const placeholderTexture = new THREE.CanvasTexture(canvas);
+    planeMaterial.map = placeholderTexture;
+    planeMaterial.color = new THREE.Color(0xffffff);
+    planeMaterial.needsUpdate = true;
+
+    // Azimuth ring (green torus)
+    const azimuthRingGeometry = new THREE.TorusGeometry(2.4, 0.03, 16, 100);
+    const azimuthRingMaterial = new THREE.MeshBasicMaterial({ color: 0x22c55e, transparent: true, opacity: 0.6 });
+    const azimuthRing = new THREE.Mesh(azimuthRingGeometry, azimuthRingMaterial);
+    azimuthRing.rotation.x = Math.PI / 2;
+    azimuthRing.position.y = 0.05;
+    scene.add(azimuthRing);
+
+    // Elevation arc (pink tube on the left, from -30° to 60°)
+    const arcRadius = 2.4;
+    const arcPoints = [];
+    for (let i = 0; i <= 32; i++) {
+      const angle = (-30 + (90 * i) / 32) * (Math.PI / 180);
+      const y = arcRadius * Math.sin(angle);
+      const z = arcRadius * Math.cos(angle);
+      arcPoints.push(new THREE.Vector3(-2.6, y, z));
+    }
+    const elevationCurve = new THREE.CatmullRomCurve3(arcPoints);
+    const elevationTubeGeometry = new THREE.TubeGeometry(elevationCurve, 32, 0.03, 8, false);
+    const elevationTubeMaterial = new THREE.MeshBasicMaterial({ color: 0xec4899, transparent: true, opacity: 0.6 });
+    const elevationTube = new THREE.Mesh(elevationTubeGeometry, elevationTubeMaterial);
+    scene.add(elevationTube);
+
+    // Camera model (blue box + cylinder lens)
+    const cameraGroup = new THREE.Group();
+
+    const cameraBodyGeometry = new THREE.BoxGeometry(0.3, 0.2, 0.15);
+    const cameraBodyMaterial = new THREE.MeshPhongMaterial({ color: 0x3b82f6 });
+    const cameraBody = new THREE.Mesh(cameraBodyGeometry, cameraBodyMaterial);
+    cameraGroup.add(cameraBody);
+
+    const cameraLensGeometry = new THREE.CylinderGeometry(0.06, 0.08, 0.1, 16);
+    const cameraLensMaterial = new THREE.MeshPhongMaterial({ color: 0x1e40af });
+    const cameraLens = new THREE.Mesh(cameraLensGeometry, cameraLensMaterial);
+    cameraLens.rotation.x = Math.PI / 2;
+    cameraLens.position.z = 0.12;
+    cameraGroup.add(cameraLens);
+
+    scene.add(cameraGroup);
+    cameraModelRef.current = cameraGroup;
+
+    // Distance line (orange)
+    const distanceLineGeometry = new THREE.BufferGeometry();
+    const distanceLineMaterial = new THREE.LineBasicMaterial({ color: 0xf97316 });
+    const distanceLine = new THREE.Line(distanceLineGeometry, distanceLineMaterial);
+    scene.add(distanceLine);
+    distanceLineRef.current = distanceLine;
+
+    // Azimuth handle (green sphere)
+    const azimuthHandleGeometry = new THREE.SphereGeometry(0.15, 32, 32);
+    const azimuthHandleMaterial = new THREE.MeshPhongMaterial({
+      color: 0x22c55e,
+      emissive: 0x115522,
+    });
+    const azimuthHandle = new THREE.Mesh(azimuthHandleGeometry, azimuthHandleMaterial);
+    azimuthHandle.userData = { type: 'azimuth' };
+    scene.add(azimuthHandle);
+    azimuthHandleRef.current = azimuthHandle;
+
+    // Elevation handle (pink sphere)
+    const elevationHandleGeometry = new THREE.SphereGeometry(0.12, 32, 32);
+    const elevationHandleMaterial = new THREE.MeshPhongMaterial({
+      color: 0xec4899,
+      emissive: 0x661144,
+    });
+    const elevationHandle = new THREE.Mesh(elevationHandleGeometry, elevationHandleMaterial);
+    elevationHandle.userData = { type: 'elevation' };
+    scene.add(elevationHandle);
+    elevationHandleRef.current = elevationHandle;
+
+    // Distance handle (orange sphere)
+    const distanceHandleGeometry = new THREE.SphereGeometry(0.1, 32, 32);
+    const distanceHandleMaterial = new THREE.MeshPhongMaterial({
+      color: 0xf97316,
+      emissive: 0x663311,
+    });
+    const distanceHandle = new THREE.Mesh(distanceHandleGeometry, distanceHandleMaterial);
+    distanceHandle.userData = { type: 'distance' };
+    scene.add(distanceHandle);
+    distanceHandleRef.current = distanceHandle;
+
+    // Animation loop
+    const animate = () => {
+      animationFrameRef.current = requestAnimationFrame(animate);
+      renderer.render(scene, camera);
+    };
+    animate();
+
+    // Handle window resize
+    const handleResize = () => {
+      if (!containerRef.current) return;
+      const newWidth = containerRef.current.clientWidth;
+      camera.aspect = newWidth / height;
+      camera.updateProjectionMatrix();
+      renderer.setSize(newWidth, height);
+    };
+    window.addEventListener('resize', handleResize);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      cancelAnimationFrame(animationFrameRef.current);
+      if (renderer.domElement && container.contains(renderer.domElement)) {
+        container.removeChild(renderer.domElement);
       }
+      renderer.dispose();
     };
+  }, []);
 
-    const handleMouseUp = () => {
-      setIsDraggingAzimuth(false);
-      setIsDraggingElevation(false);
-    };
+  // Update camera model and handles positions when values change
+  useEffect(() => {
+    if (!cameraModelRef.current || !azimuthHandleRef.current || !elevationHandleRef.current || !distanceHandleRef.current) return;
 
-    if (isDraggingAzimuth || isDraggingElevation) {
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
+    const azimuthRad = azimuthToRadians(azimuth);
+    const elevationRad = elevationToRadians(elevation);
+    const distanceVal = distance * 2; // Scale for visibility
+
+    // Position camera model
+    const camX = distanceVal * Math.cos(elevationRad) * Math.sin(azimuthRad);
+    const camY = distanceVal * Math.sin(elevationRad);
+    const camZ = distanceVal * Math.cos(elevationRad) * Math.cos(azimuthRad);
+
+    cameraModelRef.current.position.set(camX, camY, camZ);
+    cameraModelRef.current.lookAt(0, 0, 0);
+
+    // Position azimuth handle on the torus ring
+    const azimuthHandleX = 2.4 * Math.sin(azimuthRad);
+    const azimuthHandleZ = 2.4 * Math.cos(azimuthRad);
+    azimuthHandleRef.current.position.set(azimuthHandleX, 0.05, azimuthHandleZ);
+
+    // Position elevation handle on the arc
+    const elevationHandleY = 2.4 * Math.sin(elevationRad);
+    const elevationHandleZ = 2.4 * Math.cos(elevationRad);
+    elevationHandleRef.current.position.set(-2.6, elevationHandleY, elevationHandleZ);
+
+    // Position distance handle on the line between camera and center
+    const distanceHandleX = camX * 0.5;
+    const distanceHandleY = camY * 0.5;
+    const distanceHandleZ = camZ * 0.5;
+    distanceHandleRef.current.position.set(distanceHandleX, distanceHandleY, distanceHandleZ);
+
+    // Update distance line
+    if (distanceLineRef.current) {
+      const positions = new Float32Array([
+        0, 0, 0,
+        camX, camY, camZ
+      ]);
+      distanceLineRef.current.geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      distanceLineRef.current.geometry.attributes.position.needsUpdate = true;
+    }
+  }, [azimuth, elevation, distance, azimuthToRadians, elevationToRadians]);
+
+  // Update image texture when imageUrl changes
+  useEffect(() => {
+    if (!imagePlaneRef.current || !imageUrl) return;
+
+    const textureLoader = new THREE.TextureLoader();
+    textureLoader.load(imageUrl, (texture: any) => {
+      imagePlaneRef.current.material.map = texture;
+      imagePlaneRef.current.material.needsUpdate = true;
+
+      // Adjust plane aspect ratio
+      const aspect = texture.image.width / texture.image.height;
+      if (aspect > 1) {
+        imagePlaneRef.current.scale.set(2, 2 / aspect, 1);
+      } else {
+        imagePlaneRef.current.scale.set(2 * aspect, 2, 1);
+      }
+    });
+  }, [imageUrl]);
+
+  // Mouse/touch event handlers
+  const getIntersects = useCallback((event: MouseEvent | TouchEvent) => {
+    if (!containerRef.current || !raycasterRef.current || !cameraRef.current) return [];
+
+    const rect = containerRef.current.getBoundingClientRect();
+    let clientX, clientY;
+
+    if ('touches' in event) {
+      clientX = event.touches[0].clientX;
+      clientY = event.touches[0].clientY;
+    } else {
+      clientX = event.clientX;
+      clientY = event.clientY;
     }
 
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isDraggingAzimuth, isDraggingElevation, handleAzimuthDrag, handleElevationDrag]);
+    mouseRef.current.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    mouseRef.current.y = -((clientY - rect.top) / rect.height) * 2 + 1;
 
-  // Touch event handlers
-  useEffect(() => {
-    const handleTouchMove = (e: TouchEvent) => {
-      if (e.touches.length !== 1) return;
-      const touch = e.touches[0];
-      if (isDraggingAzimuth) {
-        handleAzimuthDrag(touch.clientX, touch.clientY);
-      } else if (isDraggingElevation) {
-        handleElevationDrag(touch.clientY);
+    raycasterRef.current.setFromCamera(mouseRef.current, cameraRef.current);
+
+    const handles = [azimuthHandleRef.current, elevationHandleRef.current, distanceHandleRef.current].filter(Boolean);
+    return raycasterRef.current.intersectObjects(handles);
+  }, []);
+
+  const handlePointerDown = useCallback((event: React.MouseEvent | React.TouchEvent) => {
+    const nativeEvent = event.nativeEvent as MouseEvent | TouchEvent;
+    const intersects = getIntersects(nativeEvent);
+
+    if (intersects.length > 0) {
+      const handle = intersects[0].object;
+      const handleType = handle.userData.type;
+
+      setIsDragging(handleType);
+
+      // Scale up handle
+      handle.scale.set(1.3, 1.3, 1.3);
+      handle.material.emissiveIntensity = 2;
+
+      let clientX, clientY;
+      if ('touches' in nativeEvent) {
+        clientX = nativeEvent.touches[0].clientX;
+        clientY = nativeEvent.touches[0].clientY;
+      } else {
+        clientX = nativeEvent.clientX;
+        clientY = nativeEvent.clientY;
       }
-    };
+      dragStartRef.current = { x: clientX, y: clientY };
+    }
+  }, [getIntersects]);
 
-    const handleTouchEnd = () => {
-      setIsDraggingAzimuth(false);
-      setIsDraggingElevation(false);
-    };
+  const handlePointerMove = useCallback((event: React.MouseEvent | React.TouchEvent) => {
+    if (!isDragging || !containerRef.current) return;
 
-    if (isDraggingAzimuth || isDraggingElevation) {
-      window.addEventListener('touchmove', handleTouchMove, { passive: false });
-      window.addEventListener('touchend', handleTouchEnd);
+    const rect = containerRef.current.getBoundingClientRect();
+    let clientX, clientY;
+
+    const nativeEvent = event.nativeEvent as MouseEvent | TouchEvent;
+    if ('touches' in nativeEvent) {
+      clientX = nativeEvent.touches[0].clientX;
+      clientY = nativeEvent.touches[0].clientY;
+    } else {
+      clientX = nativeEvent.clientX;
+      clientY = nativeEvent.clientY;
     }
 
-    return () => {
-      window.removeEventListener('touchmove', handleTouchMove);
-      window.removeEventListener('touchend', handleTouchEnd);
-    };
-  }, [isDraggingAzimuth, isDraggingElevation, handleAzimuthDrag, handleElevationDrag]);
+    const x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    const y = -((clientY - rect.top) / rect.height) * 2 + 1;
+
+    if (isDragging === 'azimuth') {
+      // Map x position to azimuth angle
+      let newAzimuth = ((x + 1) / 2) * 360;
+      newAzimuth = ((newAzimuth % 360) + 360) % 360;
+      // Don't snap while dragging, just update smoothly
+      onAzimuthChange(Math.round(newAzimuth / 45) * 45);
+    } else if (isDragging === 'elevation') {
+      // Map y position to elevation angle
+      const newElevation = y * 45 + 15; // Range roughly -30 to 60
+      const clamped = Math.max(-30, Math.min(60, newElevation));
+      onElevationChange(snapToElevation(clamped));
+    } else if (isDragging === 'distance') {
+      // Map position to distance
+      const dist = Math.sqrt(x * x + y * y) * 1.4;
+      const newDistance = Math.max(0.6, Math.min(1.4, dist));
+      onDistanceChange(snapToDistance(newDistance));
+    }
+  }, [isDragging, onAzimuthChange, onElevationChange, onDistanceChange, snapToElevation, snapToDistance]);
+
+  const handlePointerUp = useCallback(() => {
+    if (isDragging) {
+      // Reset handle scale
+      const handleRef = isDragging === 'azimuth' ? azimuthHandleRef :
+                        isDragging === 'elevation' ? elevationHandleRef :
+                        distanceHandleRef;
+
+      if (handleRef.current) {
+        handleRef.current.scale.set(1, 1, 1);
+        handleRef.current.material.emissiveIntensity = 1;
+      }
+
+      // Snap to nearest value
+      if (isDragging === 'azimuth') {
+        onAzimuthChange(snapToAzimuth(azimuth));
+      } else if (isDragging === 'elevation') {
+        onElevationChange(snapToElevation(elevation));
+      } else if (isDragging === 'distance') {
+        onDistanceChange(snapToDistance(distance));
+      }
+    }
+
+    setIsDragging(null);
+    dragStartRef.current = null;
+  }, [isDragging, azimuth, elevation, distance, onAzimuthChange, onElevationChange, onDistanceChange, snapToAzimuth, snapToElevation, snapToDistance]);
+
+  // Add window event listeners for drag
+  useEffect(() => {
+    if (isDragging) {
+      const handleWindowPointerMove = (e: MouseEvent | TouchEvent) => {
+        handlePointerMove({ nativeEvent: e } as any);
+      };
+      const handleWindowPointerUp = () => {
+        handlePointerUp();
+      };
+
+      window.addEventListener('mousemove', handleWindowPointerMove);
+      window.addEventListener('mouseup', handleWindowPointerUp);
+      window.addEventListener('touchmove', handleWindowPointerMove);
+      window.addEventListener('touchend', handleWindowPointerUp);
+
+      return () => {
+        window.removeEventListener('mousemove', handleWindowPointerMove);
+        window.removeEventListener('mouseup', handleWindowPointerUp);
+        window.removeEventListener('touchmove', handleWindowPointerMove);
+        window.removeEventListener('touchend', handleWindowPointerUp);
+      };
+    }
+  }, [isDragging, handlePointerMove, handlePointerUp]);
 
   return (
     <div className="space-y-6">
-      {/* 3D Visualization with Draggable Handles */}
-      <div className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-3xl p-6 overflow-hidden select-none">
-        {/* Background grid */}
-        <div className="absolute inset-0 opacity-10">
-          <svg className="w-full h-full" viewBox="0 0 200 200">
-            {[...Array(10)].map((_, i) => (
-              <g key={i}>
-                <line x1={i * 20 + 20} y1="0" x2={i * 20 + 20} y2="200" stroke="white" strokeWidth="0.5" />
-                <line x1="0" y1={i * 20 + 20} x2="200" y2={i * 20 + 20} stroke="white" strokeWidth="0.5" />
-              </g>
-            ))}
-          </svg>
+      {/* Three.js 3D Visualization */}
+      <div
+        ref={containerRef}
+        className="relative rounded-3xl overflow-hidden select-none cursor-grab active:cursor-grabbing"
+        style={{ height: '450px' }}
+        onMouseDown={handlePointerDown}
+        onTouchStart={handlePointerDown}
+      >
+        {/* Overlay instructions */}
+        <div className="absolute top-4 left-4 right-4 z-10 text-center text-xs text-white/70 pointer-events-none">
+          Drag the <span className="text-green-400 font-semibold">green</span> handle for rotation •{' '}
+          <span className="text-pink-400 font-semibold">pink</span> for elevation •{' '}
+          <span className="text-orange-400 font-semibold">orange</span> for distance
         </div>
-
-        {/* Instructions */}
-        <div className="text-center mb-2 text-xs text-white/50">
-          Drag the <span className="text-green-400">green</span> handle to rotate • Drag the <span className="text-pink-400">pink</span> handle for vertical angle
-        </div>
-
-        <svg
-          ref={svgRef}
-          viewBox="0 0 200 200"
-          className="w-full max-w-md mx-auto relative z-10 cursor-crosshair"
-        >
-          {/* Azimuth ring (green) */}
-          <circle
-            cx={CENTER}
-            cy={CENTER}
-            r={AZIMUTH_RING_RADIUS}
-            fill="none"
-            stroke="rgba(74, 222, 128, 0.3)"
-            strokeWidth="3"
-          />
-
-          {/* Elevation arc on left side (pink) */}
-          <line
-            x1={ELEVATION_ARC_X}
-            y1="40"
-            x2={ELEVATION_ARC_X}
-            y2="140"
-            stroke="rgba(244, 114, 182, 0.3)"
-            strokeWidth="3"
-            strokeLinecap="round"
-          />
-
-          {/* Elevation tick marks and labels */}
-          {ELEVATION_OPTIONS.map((opt) => {
-            const normalizedElevation = (opt.value + 30) / 90;
-            const y = 140 - normalizedElevation * 100;
-            const isSelected = opt.value === elevation;
-            const isHovered = opt.value === hoverElevation;
-
-            return (
-              <g key={opt.value}>
-                <line
-                  x1={ELEVATION_ARC_X - 5}
-                  y1={y}
-                  x2={ELEVATION_ARC_X + 5}
-                  y2={y}
-                  stroke={isSelected ? "#f472b6" : "rgba(255,255,255,0.3)"}
-                  strokeWidth="2"
-                />
-                <circle
-                  cx={ELEVATION_ARC_X}
-                  cy={y}
-                  r={isSelected || isHovered ? 6 : 4}
-                  fill={isSelected ? "#f472b6" : isHovered ? "rgba(244, 114, 182, 0.6)" : "rgba(255,255,255,0.2)"}
-                  className="cursor-pointer transition-all duration-150"
-                  onClick={() => onElevationChange(opt.value)}
-                  onMouseEnter={() => setHoverElevation(opt.value)}
-                  onMouseLeave={() => setHoverElevation(null)}
-                />
-                <text
-                  x={ELEVATION_ARC_X + 12}
-                  y={y + 3}
-                  className={`text-[7px] ${isSelected ? "fill-pink-400" : "fill-white/40"}`}
-                >
-                  {opt.shortLabel}
-                </text>
-              </g>
-            );
-          })}
-
-          {/* Azimuth markers around the ring (clickable) */}
-          {AZIMUTH_OPTIONS.map((option) => {
-            const angle = ((option.value - 90) * Math.PI) / 180;
-            const x = CENTER + AZIMUTH_RING_RADIUS * Math.cos(angle);
-            const y = CENTER + AZIMUTH_RING_RADIUS * Math.sin(angle);
-            const isSelected = option.value === azimuth;
-            const isHovered = option.value === hoverAzimuth;
-
-            return (
-              <g key={option.value}>
-                <circle
-                  cx={x}
-                  cy={y}
-                  r={isSelected || isHovered ? 7 : 4}
-                  fill={isSelected ? "#4ade80" : isHovered ? "rgba(74, 222, 128, 0.6)" : "rgba(255,255,255,0.2)"}
-                  className="cursor-pointer transition-all duration-150"
-                  onClick={() => onAzimuthChange(option.value)}
-                  onMouseEnter={() => setHoverAzimuth(option.value)}
-                  onMouseLeave={() => setHoverAzimuth(null)}
-                />
-                {isSelected && (
-                  <text
-                    x={x + (x > CENTER ? 12 : -12)}
-                    y={y + 3}
-                    textAnchor={x > CENTER ? "start" : "end"}
-                    className="fill-green-400 text-[7px] font-medium"
-                  >
-                    {option.shortLabel}
-                  </text>
-                )}
-              </g>
-            );
-          })}
-
-          {/* Center object (person silhouette) */}
-          <g transform={`translate(${CENTER}, ${CENTER})`}>
-            <circle cx="0" cy="-10" r="7" fill="url(#objectGradient)" />
-            <ellipse cx="0" cy="5" rx="8" ry="12" fill="url(#objectGradient)" />
-          </g>
-
-          {/* Camera position indicator (shows combined azimuth + elevation) */}
-          <g>
-            <line
-              x1={CENTER}
-              y1={CENTER}
-              x2={cameraPosition.x}
-              y2={cameraPosition.y}
-              stroke="url(#lineGradient)"
-              strokeWidth="2"
-              strokeDasharray="4 2"
-              opacity="0.6"
-            />
-            <circle
-              cx={cameraPosition.x}
-              cy={cameraPosition.y}
-              r="10"
-              fill="url(#cameraGradient)"
-              opacity="0.8"
-            />
-            <text
-              x={cameraPosition.x}
-              y={cameraPosition.y + 4}
-              textAnchor="middle"
-              className="text-[8px]"
-            >
-              📷
-            </text>
-          </g>
-
-          {/* Draggable Azimuth Handle (green, larger) */}
-          <g
-            className="cursor-grab active:cursor-grabbing"
-            onMouseDown={(e) => {
-              e.preventDefault();
-              setIsDraggingAzimuth(true);
-            }}
-            onTouchStart={(e) => {
-              e.preventDefault();
-              setIsDraggingAzimuth(true);
-            }}
-          >
-            <circle
-              cx={azimuthHandlePosition.x}
-              cy={azimuthHandlePosition.y}
-              r={isDraggingAzimuth ? 14 : 10}
-              fill="url(#azimuthHandleGradient)"
-              stroke="white"
-              strokeWidth="2"
-              className="transition-all duration-150 drop-shadow-lg"
-              style={{ filter: isDraggingAzimuth ? 'drop-shadow(0 0 8px rgba(74, 222, 128, 0.8))' : undefined }}
-            />
-            <text
-              x={azimuthHandlePosition.x}
-              y={azimuthHandlePosition.y + 4}
-              textAnchor="middle"
-              className="text-[10px] fill-white font-bold pointer-events-none"
-            >
-              ↻
-            </text>
-          </g>
-
-          {/* Draggable Elevation Handle (pink) */}
-          <g
-            className="cursor-ns-resize"
-            onMouseDown={(e) => {
-              e.preventDefault();
-              setIsDraggingElevation(true);
-            }}
-            onTouchStart={(e) => {
-              e.preventDefault();
-              setIsDraggingElevation(true);
-            }}
-          >
-            <circle
-              cx={elevationHandlePosition.x}
-              cy={elevationHandlePosition.y}
-              r={isDraggingElevation ? 12 : 8}
-              fill="url(#elevationHandleGradient)"
-              stroke="white"
-              strokeWidth="2"
-              className="transition-all duration-150 drop-shadow-lg"
-              style={{ filter: isDraggingElevation ? 'drop-shadow(0 0 8px rgba(244, 114, 182, 0.8))' : undefined }}
-            />
-            <text
-              x={elevationHandlePosition.x}
-              y={elevationHandlePosition.y + 3}
-              textAnchor="middle"
-              className="text-[8px] fill-white font-bold pointer-events-none"
-            >
-              ↕
-            </text>
-          </g>
-
-          {/* Gradients */}
-          <defs>
-            <linearGradient id="objectGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#6366f1" />
-              <stop offset="100%" stopColor="#4f46e5" />
-            </linearGradient>
-            <linearGradient id="cameraGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#3b82f6" />
-              <stop offset="100%" stopColor="#8b5cf6" />
-            </linearGradient>
-            <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#3b82f6" />
-              <stop offset="100%" stopColor="#8b5cf6" />
-            </linearGradient>
-            <linearGradient id="azimuthHandleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#4ade80" />
-              <stop offset="100%" stopColor="#22c55e" />
-            </linearGradient>
-            <linearGradient id="elevationHandleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#f472b6" />
-              <stop offset="100%" stopColor="#ec4899" />
-            </linearGradient>
-          </defs>
-        </svg>
 
         {/* Current values display */}
-        <div className="mt-4 flex justify-center gap-3 text-xs">
-          <span className="bg-green-500/20 text-green-400 px-3 py-1 rounded-full border border-green-500/30">
+        <div className="absolute bottom-4 left-4 right-4 z-10 flex justify-center gap-3 text-xs pointer-events-none">
+          <span className="bg-green-500/30 text-green-300 px-3 py-1 rounded-full border border-green-500/50 backdrop-blur-sm">
             {currentAzimuth?.shortLabel || "Front"}
           </span>
-          <span className="bg-pink-500/20 text-pink-400 px-3 py-1 rounded-full border border-pink-500/30">
+          <span className="bg-pink-500/30 text-pink-300 px-3 py-1 rounded-full border border-pink-500/50 backdrop-blur-sm">
             {currentElevation?.shortLabel || "Eye Level"}
           </span>
-          <span className="bg-orange-500/20 text-orange-400 px-3 py-1 rounded-full border border-orange-500/30">
+          <span className="bg-orange-500/30 text-orange-300 px-3 py-1 rounded-full border border-orange-500/50 backdrop-blur-sm">
             {currentDistance?.shortLabel || "Medium"}
           </span>
         </div>
       </div>
 
-      {/* Shot Type Buttons (ONLY buttons in the UI) */}
+      {/* Sliders */}
+      <div className="grid md:grid-cols-3 gap-4">
+        {/* Azimuth Slider */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-green-500"></span>
+              Azimuth
+            </Label>
+            <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+              {azimuth}°
+            </span>
+          </div>
+          <input
+            type="range"
+            min="0"
+            max="315"
+            step="45"
+            value={azimuth}
+            onChange={(e) => onAzimuthChange(parseInt(e.target.value))}
+            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-500"
+          />
+          <div className="flex justify-between text-[10px] text-gray-400">
+            <span>0°</span>
+            <span>180°</span>
+            <span>315°</span>
+          </div>
+        </div>
+
+        {/* Elevation Slider */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-pink-500"></span>
+              Elevation
+            </Label>
+            <span className="text-xs text-pink-600 bg-pink-50 px-2 py-0.5 rounded-full">
+              {elevation}°
+            </span>
+          </div>
+          <input
+            type="range"
+            min="-30"
+            max="60"
+            step="30"
+            value={elevation}
+            onChange={(e) => onElevationChange(parseInt(e.target.value))}
+            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-pink-500"
+          />
+          <div className="flex justify-between text-[10px] text-gray-400">
+            <span>-30°</span>
+            <span>15°</span>
+            <span>60°</span>
+          </div>
+        </div>
+
+        {/* Distance Slider */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-orange-500"></span>
+              Distance
+            </Label>
+            <span className="text-xs text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">
+              {distance.toFixed(1)}
+            </span>
+          </div>
+          <input
+            type="range"
+            min="0.6"
+            max="1.4"
+            step="0.4"
+            value={distance}
+            onChange={(e) => onDistanceChange(parseFloat(e.target.value))}
+            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-orange-500"
+          />
+          <div className="flex justify-between text-[10px] text-gray-400">
+            <span>Close</span>
+            <span>Medium</span>
+            <span>Wide</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Shot Type Buttons */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
@@ -1076,6 +1246,7 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
                   azimuth={azimuth}
                   elevation={elevation}
                   distance={distance}
+                  imageUrl={cameraImagePreview}
                   onAzimuthChange={setAzimuth}
                   onElevationChange={setElevation}
                   onDistanceChange={setDistance}
