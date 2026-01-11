@@ -1,10 +1,313 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Label, Field, Section } from "../components/UI";
 import { apiClient } from "../lib/apiClient";
 import GenerationFeed from "../components/GenerationFeed";
 import { useSmartResolution } from "../hooks/useSmartResolution";
 
 type Tab = "edit" | "camera-angle";
+
+// Camera Angle Definitions based on the Qwen-Image-Edit-2511-Multiple-Angles-LoRA model
+const AZIMUTH_OPTIONS = [
+  { value: 0, label: "front view", shortLabel: "Front" },
+  { value: 45, label: "front-right quarter view", shortLabel: "Front-Right" },
+  { value: 90, label: "right side view", shortLabel: "Right" },
+  { value: 135, label: "back-right quarter view", shortLabel: "Back-Right" },
+  { value: 180, label: "back view", shortLabel: "Back" },
+  { value: 225, label: "back-left quarter view", shortLabel: "Back-Left" },
+  { value: 270, label: "left side view", shortLabel: "Left" },
+  { value: 315, label: "front-left quarter view", shortLabel: "Front-Left" },
+];
+
+const ELEVATION_OPTIONS = [
+  { value: -30, label: "low-angle shot", shortLabel: "Low", description: "Camera below, looking up" },
+  { value: 0, label: "eye-level shot", shortLabel: "Eye Level", description: "At object level" },
+  { value: 30, label: "elevated shot", shortLabel: "Elevated", description: "Slightly above" },
+  { value: 60, label: "high-angle shot", shortLabel: "High", description: "High, looking down" },
+];
+
+const DISTANCE_OPTIONS = [
+  { value: 0.6, label: "close-up", shortLabel: "Close-up", description: "Emphasizes details" },
+  { value: 1.0, label: "medium shot", shortLabel: "Medium", description: "Balanced framing" },
+  { value: 1.8, label: "wide shot", shortLabel: "Wide", description: "Shows context" },
+];
+
+// 3D Camera Angle Selector Component
+interface CameraAngleSelectorProps {
+  azimuth: number;
+  elevation: number;
+  distance: number;
+  onAzimuthChange: (value: number) => void;
+  onElevationChange: (value: number) => void;
+  onDistanceChange: (value: number) => void;
+}
+
+function CameraAngleSelector({
+  azimuth,
+  elevation,
+  distance,
+  onAzimuthChange,
+  onElevationChange,
+  onDistanceChange,
+}: CameraAngleSelectorProps) {
+  // Calculate camera position for the 3D visualization
+  const cameraPosition = useMemo(() => {
+    const radius = 80 * distance;
+    const elevationRad = (elevation * Math.PI) / 180;
+    const azimuthRad = ((azimuth - 90) * Math.PI) / 180; // Offset so 0 is front
+
+    const x = 100 + radius * Math.cos(elevationRad) * Math.cos(azimuthRad);
+    const y = 100 - radius * Math.sin(elevationRad);
+
+    return { x, y, radius };
+  }, [azimuth, elevation, distance]);
+
+  // Get current labels
+  const currentAzimuth = AZIMUTH_OPTIONS.find(a => a.value === azimuth);
+  const currentElevation = ELEVATION_OPTIONS.find(e => e.value === elevation);
+  const currentDistance = DISTANCE_OPTIONS.find(d => d.value === distance);
+
+  return (
+    <div className="space-y-6">
+      {/* 3D Visualization */}
+      <div className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-3xl p-6 overflow-hidden">
+        {/* Background grid */}
+        <div className="absolute inset-0 opacity-10">
+          <svg className="w-full h-full" viewBox="0 0 200 200">
+            {/* Grid lines */}
+            {[...Array(10)].map((_, i) => (
+              <g key={i}>
+                <line x1={i * 20 + 20} y1="0" x2={i * 20 + 20} y2="200" stroke="white" strokeWidth="0.5" />
+                <line x1="0" y1={i * 20 + 20} x2="200" y2={i * 20 + 20} stroke="white" strokeWidth="0.5" />
+              </g>
+            ))}
+          </svg>
+        </div>
+
+        <svg viewBox="0 0 200 200" className="w-full max-w-md mx-auto relative z-10">
+          {/* Outer reference circle */}
+          <circle
+            cx="100"
+            cy="100"
+            r="85"
+            fill="none"
+            stroke="rgba(255,255,255,0.1)"
+            strokeWidth="1"
+            strokeDasharray="4 4"
+          />
+
+          {/* Middle reference circle */}
+          <circle
+            cx="100"
+            cy="100"
+            r="60"
+            fill="none"
+            stroke="rgba(255,255,255,0.1)"
+            strokeWidth="1"
+            strokeDasharray="4 4"
+          />
+
+          {/* Inner reference circle */}
+          <circle
+            cx="100"
+            cy="100"
+            r="35"
+            fill="none"
+            stroke="rgba(255,255,255,0.1)"
+            strokeWidth="1"
+          />
+
+          {/* Center object (person silhouette) */}
+          <g transform="translate(100, 100)">
+            {/* Head */}
+            <circle cx="0" cy="-12" r="8" fill="url(#objectGradient)" />
+            {/* Body */}
+            <ellipse cx="0" cy="6" rx="10" ry="14" fill="url(#objectGradient)" />
+          </g>
+
+          {/* Azimuth markers */}
+          {AZIMUTH_OPTIONS.map((option) => {
+            const angle = ((option.value - 90) * Math.PI) / 180;
+            const markerRadius = 90;
+            const x = 100 + markerRadius * Math.cos(angle);
+            const y = 100 + markerRadius * Math.sin(angle);
+            const isSelected = option.value === azimuth;
+
+            return (
+              <g key={option.value}>
+                <circle
+                  cx={x}
+                  cy={y}
+                  r={isSelected ? 8 : 5}
+                  fill={isSelected ? "#3b82f6" : "rgba(255,255,255,0.3)"}
+                  className="cursor-pointer transition-all duration-200 hover:fill-blue-400"
+                  onClick={() => onAzimuthChange(option.value)}
+                />
+                {isSelected && (
+                  <text
+                    x={x}
+                    y={y + 18}
+                    textAnchor="middle"
+                    className="fill-blue-400 text-[8px] font-medium"
+                  >
+                    {option.shortLabel}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+
+          {/* Camera position indicator */}
+          <g>
+            {/* Line from center to camera */}
+            <line
+              x1="100"
+              y1="100"
+              x2={cameraPosition.x}
+              y2={cameraPosition.y}
+              stroke="url(#lineGradient)"
+              strokeWidth="2"
+              strokeDasharray="4 2"
+            />
+
+            {/* Camera icon */}
+            <g transform={`translate(${cameraPosition.x}, ${cameraPosition.y})`}>
+              <circle
+                r="12"
+                fill="url(#cameraGradient)"
+                className="drop-shadow-lg"
+              />
+              <text
+                textAnchor="middle"
+                dominantBaseline="middle"
+                className="text-[10px]"
+              >
+                📷
+              </text>
+            </g>
+          </g>
+
+          {/* Gradients */}
+          <defs>
+            <linearGradient id="objectGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#6366f1" />
+              <stop offset="100%" stopColor="#4f46e5" />
+            </linearGradient>
+            <linearGradient id="cameraGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#3b82f6" />
+              <stop offset="100%" stopColor="#8b5cf6" />
+            </linearGradient>
+            <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#3b82f6" />
+              <stop offset="100%" stopColor="#8b5cf6" />
+            </linearGradient>
+          </defs>
+        </svg>
+
+        {/* Current values display */}
+        <div className="mt-4 flex justify-center gap-4 text-xs text-white/70">
+          <span className="bg-white/10 px-3 py-1 rounded-full">
+            {currentAzimuth?.shortLabel || "Front"}
+          </span>
+          <span className="bg-white/10 px-3 py-1 rounded-full">
+            {currentElevation?.shortLabel || "Eye Level"}
+          </span>
+          <span className="bg-white/10 px-3 py-1 rounded-full">
+            {currentDistance?.shortLabel || "Medium"}
+          </span>
+        </div>
+      </div>
+
+      {/* Controls */}
+      <div className="grid gap-6">
+        {/* Azimuth Control */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-gradient-to-r from-green-400 to-emerald-500"></span>
+              Horizontal Rotation
+            </Label>
+            <span className="text-sm font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
+              {currentAzimuth?.label || "front view"}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {AZIMUTH_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                onClick={() => onAzimuthChange(option.value)}
+                className={`px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
+                  azimuth === option.value
+                    ? "bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-md scale-105"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                {option.shortLabel}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Elevation Control */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-gradient-to-r from-pink-400 to-rose-500"></span>
+              Vertical Angle
+            </Label>
+            <span className="text-sm font-medium text-purple-600 bg-purple-50 px-3 py-1 rounded-full">
+              {currentElevation?.label || "eye-level shot"}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {ELEVATION_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                onClick={() => onElevationChange(option.value)}
+                className={`flex-1 min-w-[100px] px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
+                  elevation === option.value
+                    ? "bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-md scale-105"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                <div className="font-semibold">{option.shortLabel}</div>
+                <div className="text-xs opacity-75">{option.description}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Distance Control */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-gradient-to-r from-orange-400 to-amber-500"></span>
+              Shot Type
+            </Label>
+            <span className="text-sm font-medium text-orange-600 bg-orange-50 px-3 py-1 rounded-full">
+              {currentDistance?.label || "medium shot"}
+            </span>
+          </div>
+          <div className="flex gap-2">
+            {DISTANCE_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                onClick={() => onDistanceChange(option.value)}
+                className={`flex-1 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
+                  distance === option.value
+                    ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md scale-105"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                <div className="font-semibold">{option.shortLabel}</div>
+                <div className="text-xs opacity-75">{option.description}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface Props {
   comfyUrl?: string;
@@ -22,13 +325,30 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
   const [isConfigured, setIsConfigured] = useState<boolean>(false);
 
   // Camera Angle State
-  const [cameraPrompt, setCameraPrompt] = useState<string>("Turn the camera to a top-down view, the person face up, eye look at camera view.");
   const [cameraImage, setCameraImage] = useState<File | null>(null);
   const [cameraImagePreview, setCameraImagePreview] = useState<string>("");
   const [isCameraGenerating, setIsCameraGenerating] = useState<boolean>(false);
   const [cameraStatus, setCameraStatus] = useState<string>("");
   const [cameraResultUrl, setCameraResultUrl] = useState<string>("");
   const [cameraJobId, setCameraJobId] = useState<string>("");
+
+  // Camera Angle Selector State (new 3D UI)
+  const [azimuth, setAzimuth] = useState<number>(0); // 0 = front view
+  const [elevation, setElevation] = useState<number>(0); // 0 = eye level
+  const [distance, setDistance] = useState<number>(1.0); // 1.0 = medium shot
+
+  // Build the camera angle prompt from selector values
+  const buildCameraPrompt = useMemo(() => {
+    const azimuthOption = AZIMUTH_OPTIONS.find(a => a.value === azimuth);
+    const elevationOption = ELEVATION_OPTIONS.find(e => e.value === elevation);
+    const distanceOption = DISTANCE_OPTIONS.find(d => d.value === distance);
+
+    const azimuthLabel = azimuthOption?.label || "front view";
+    const elevationLabel = elevationOption?.label || "eye-level shot";
+    const distanceLabel = distanceOption?.label || "medium shot";
+
+    return `<sks> ${azimuthLabel} ${elevationLabel} ${distanceLabel}`;
+  }, [azimuth, elevation, distance]);
 
   const {
     width,
@@ -188,31 +508,27 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
 
   const generateCameraAngle = async () => {
     if (!cameraImage) {
-      setCameraStatus("❌ Please upload an image");
-      return;
-    }
-
-    if (!cameraPrompt.trim()) {
-      setCameraStatus("❌ Please enter a camera angle prompt");
+      setCameraStatus("Please upload an image");
       return;
     }
 
     if (!comfyUrl) {
-      setCameraStatus("❌ ComfyUI URL is not configured");
+      setCameraStatus("ComfyUI URL is not configured");
       return;
     }
 
+    // Generate a random seed
+    const seed = Math.floor(Math.random() * 9999999999999);
+
     setIsCameraGenerating(true);
-    setCameraStatus("📤 Converting image...");
+    setCameraStatus("Uploading image...");
     setCameraResultUrl("");
     setCameraJobId("");
 
     let databaseJobId: string | null = null;
 
     try {
-      setCameraStatus("☁️ Uploading to ComfyUI...");
-
-      // 2. Upload image to ComfyUI
+      // Upload image to ComfyUI
       const uploadFormData = new FormData();
       uploadFormData.append('image', cameraImage);
       const uploadResponse = await fetch(`${comfyUrl}/upload/image`, {
@@ -227,17 +543,16 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
       const uploadData = await uploadResponse.json();
       const uploadedFilename = uploadData.name || cameraImage.name;
 
-      setCameraStatus("🔨 Building workflow...");
+      setCameraStatus("Building workflow...");
 
-      // 3. Build workflow using backend template
+      // Build workflow using the new QwenMultipleAngles2511 template
       const clientId = `camera-angle-${Math.random().toString(36).slice(2)}`;
       const workflowResponse = await apiClient.submitWorkflow(
-        'QwenCameraAngle',
+        'QwenMultipleAngles2511',
         {
           IMAGE_FILENAME: uploadedFilename,
-          PROMPT: cameraPrompt,
-          WIDTH: width,
-          HEIGHT: height
+          PROMPT: buildCameraPrompt,
+          SEED: seed
         },
         comfyUrl,
         clientId
@@ -250,18 +565,22 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
       const promptId = workflowResponse.prompt_id;
       setCameraJobId(promptId);
 
-      setCameraStatus("💾 Creating job record...");
+      setCameraStatus("Creating job record...");
 
-      // 4. Create image job in database
+      // Create image job in database
       const jobCreationResponse = await apiClient.createImageJob({
         comfy_job_id: promptId,
-        workflow_name: 'camera-angle',
+        workflow_name: 'multi-camera-angle',
         comfy_url: comfyUrl,
         input_image_urls: [uploadedFilename],
         width,
         height,
         parameters: {
-          prompt: cameraPrompt
+          prompt: buildCameraPrompt,
+          azimuth,
+          elevation,
+          distance,
+          seed
         }
       }) as any;
 
@@ -578,20 +897,23 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
                 </Field>
               </Section>
 
-              <Section title="Settings">
-                <Field>
-                  <Label>Camera Angle Prompt</Label>
-                  <textarea
-                    rows={3}
-                    className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all duration-200 bg-white/80 resize-vertical"
-                    value={cameraPrompt}
-                    onChange={(e) => setCameraPrompt(e.target.value)}
-                    placeholder="Describe the desired camera angle... (e.g., 'Turn the camera to a top-down view')"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Describe how you want the camera angle to change
-                  </p>
-                </Field>
+              <Section title="Camera Angle">
+                <CameraAngleSelector
+                  azimuth={azimuth}
+                  elevation={elevation}
+                  distance={distance}
+                  onAzimuthChange={setAzimuth}
+                  onElevationChange={setElevation}
+                  onDistanceChange={setDistance}
+                />
+
+                {/* Generated Prompt Preview */}
+                <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl border border-blue-200/50">
+                  <Label className="text-sm font-semibold text-gray-700 mb-2">Generated Prompt</Label>
+                  <code className="block text-sm font-mono text-purple-700 bg-white/80 px-4 py-2 rounded-xl">
+                    {buildCameraPrompt}
+                  </code>
+                </div>
               </Section>
 
               <Section title="Resolution">
