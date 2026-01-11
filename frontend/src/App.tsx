@@ -6,6 +6,7 @@ import ImageEdit from "./pages/ImageEdit";
 import GenerationFeed from "./pages/GenerationFeed";
 import CharacterCaption from "./pages/CharacterCaption";
 import WANI2V from "./pages/WANI2V";
+import WANMove from "./pages/WANMove";
 import StyleTransfer from "./pages/StyleTransfer";
 import CreateImage from "./pages/CreateImage";
 import LoRATrainer from "./pages/LoraTrainer";
@@ -18,7 +19,7 @@ import { useAuth } from "./contexts/AuthContext";
 
 export default function App() {
   const { isAuthenticated, loading, user, logout } = useAuth();
-  const [currentPage, setCurrentPage] = useState<"home" | "lipsync" | "image-edit" | "generation-feed" | "character-caption" | "wan-i2v" | "style-transfer" | "create-image" | "lora-trainer" | "image-grid" | "img2img">("home");
+  const [currentPage, setCurrentPage] = useState<"home" | "lipsync" | "image-edit" | "generation-feed" | "character-caption" | "wan-i2v" | "wan-move" | "style-transfer" | "create-image" | "lora-trainer" | "image-grid" | "img2img">("home");
   const [comfyUrl, setComfyUrl] = useState<string>("https://comfy.vapai.studio");
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
   const [userMenuOpen, setUserMenuOpen] = useState<boolean>(false);
@@ -28,7 +29,7 @@ export default function App() {
     const savedPage = localStorage.getItem('vapai-current-page') as typeof currentPage;
     const savedComfyUrl = localStorage.getItem('vapai-comfy-url');
     
-    if (savedPage && ['home', 'lipsync', 'image-edit', 'generation-feed', 'character-caption', 'wan-i2v', 'style-transfer', 'create-image', 'lora-trainer', 'image-grid', 'img2img'].includes(savedPage)) {
+    if (savedPage && ['home', 'lipsync', 'image-edit', 'generation-feed', 'character-caption', 'wan-i2v', 'wan-move', 'style-transfer', 'create-image', 'lora-trainer', 'image-grid', 'img2img'].includes(savedPage)) {
       setCurrentPage(savedPage);
     }
     // Migrate old page names to new unified lipsync page
@@ -267,6 +268,17 @@ export default function App() {
                 <span className="font-medium">WAN I2V</span>
               </button>
               <button
+                onClick={() => handlePageChange("wan-move")}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
+                  currentPage === "wan-move"
+                    ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg"
+                    : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                }`}
+              >
+                <span className="text-lg">🎯</span>
+                <span className="font-medium">WAN Move</span>
+              </button>
+              <button
                 onClick={() => handlePageChange("style-transfer")}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
                   currentPage === "style-transfer"
@@ -408,6 +420,9 @@ export default function App() {
           )}
           {currentPage === "wan-i2v" && (
             <WANI2V comfyUrl={comfyUrl} />
+          )}
+          {currentPage === "wan-move" && (
+            <WANMove comfyUrl={comfyUrl} />
           )}
           {currentPage === "style-transfer" && (
             <StyleTransfer comfyUrl={comfyUrl} />
