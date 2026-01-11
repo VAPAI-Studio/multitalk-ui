@@ -158,15 +158,15 @@ function CameraAngleSelector({
     const gridHelper = new THREE.GridHelper(8, 16, 0x444466, 0x333355);
     scene.add(gridHelper);
 
-    // Target plane (image display or placeholder)
+    // Target plane (image display or placeholder) - standing upright
     const planeGeometry = new THREE.PlaneGeometry(2, 2);
     const planeMaterial = new THREE.MeshBasicMaterial({
       color: 0x4444ff,
       side: THREE.DoubleSide,
     });
     const imagePlane = new THREE.Mesh(planeGeometry, planeMaterial);
-    imagePlane.rotation.x = -Math.PI / 2;
-    imagePlane.position.y = 0.01;
+    // No rotation - plane stands upright facing the camera (default orientation)
+    imagePlane.position.y = 1; // Center it vertically
     scene.add(imagePlane);
     imagePlaneRef.current = imagePlane;
 
@@ -420,7 +420,7 @@ function CameraAngleSelector({
   }, [getIntersects]);
 
   const handlePointerMove = useCallback((event: React.MouseEvent | React.TouchEvent) => {
-    if (!isDragging || !containerRef.current) return;
+    if (!isDragging || !containerRef.current || !raycasterRef.current || !cameraRef.current) return;
 
     const rect = containerRef.current.getBoundingClientRect();
     let clientX, clientY;
@@ -434,25 +434,43 @@ function CameraAngleSelector({
       clientY = nativeEvent.clientY;
     }
 
-    const x = ((clientX - rect.left) / rect.width) * 2 - 1;
-    const y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    // Update mouse coordinates for raycasting
+    mouseRef.current.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    mouseRef.current.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+
+    raycasterRef.current.setFromCamera(mouseRef.current, cameraRef.current);
 
     if (isDragging === 'azimuth') {
-      // Map x position to azimuth angle
-      let newAzimuth = ((x + 1) / 2) * 360;
-      newAzimuth = ((newAzimuth % 360) + 360) % 360;
-      // Don't snap while dragging, just update smoothly
-      onAzimuthChange(Math.round(newAzimuth / 45) * 45);
+      // Raycast against horizontal plane at y=0.05 (where azimuth ring is)
+      const horizontalPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.05);
+      const intersectPoint = new THREE.Vector3();
+      raycasterRef.current.ray.intersectPlane(horizontalPlane, intersectPoint);
+
+      if (intersectPoint) {
+        // Calculate angle from intersect point
+        let angle = Math.atan2(intersectPoint.x, intersectPoint.z) * (180 / Math.PI);
+        angle = ((angle % 360) + 360) % 360;
+        onAzimuthChange(Math.round(angle / 45) * 45);
+      }
     } else if (isDragging === 'elevation') {
-      // Map y position to elevation angle
-      const newElevation = y * 45 + 15; // Range roughly -30 to 60
-      const clamped = Math.max(-30, Math.min(60, newElevation));
-      onElevationChange(snapToElevation(clamped));
+      // Raycast against vertical plane at x=-2.6 (where elevation arc is)
+      const verticalPlane = new THREE.Plane(new THREE.Vector3(1, 0, 0), 2.6);
+      const intersectPoint = new THREE.Vector3();
+      raycasterRef.current.ray.intersectPlane(verticalPlane, intersectPoint);
+
+      if (intersectPoint) {
+        // Calculate elevation from y and z coordinates
+        const angle = Math.atan2(intersectPoint.y, intersectPoint.z) * (180 / Math.PI);
+        const clamped = Math.max(-30, Math.min(60, angle));
+        onElevationChange(snapToElevation(clamped));
+      }
     } else if (isDragging === 'distance') {
-      // Map position to distance
-      const dist = Math.sqrt(x * x + y * y) * 1.4;
-      const newDistance = Math.max(0.6, Math.min(1.4, dist));
-      onDistanceChange(snapToDistance(newDistance));
+      // Use screen Y position to control distance (simpler and more intuitive)
+      const y = mouseRef.current.y;
+      // Map y from [-1, 1] to distance [1.4, 0.6] (inverted - dragging up = closer)
+      const newDistance = 1.0 - (y * 0.4);
+      const clamped = Math.max(0.6, Math.min(1.4, newDistance));
+      onDistanceChange(snapToDistance(clamped));
     }
   }, [isDragging, onAzimuthChange, onElevationChange, onDistanceChange, snapToElevation, snapToDistance]);
 
