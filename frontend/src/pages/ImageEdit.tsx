@@ -28,7 +28,7 @@ const ELEVATION_OPTIONS = [
 const DISTANCE_OPTIONS = [
   { value: 0.6, label: "close-up", shortLabel: "Close-up", description: "Emphasizes details" },
   { value: 1.0, label: "medium shot", shortLabel: "Medium", description: "Balanced framing" },
-  { value: 1.8, label: "wide shot", shortLabel: "Wide", description: "Shows context" },
+  { value: 1.4, label: "wide shot", shortLabel: "Wide", description: "Shows context" },
 ];
 
 // Declare THREE as a global (loaded via CDN in index.html)
@@ -59,6 +59,7 @@ function CameraAngleSelector({
   const rendererRef = useRef<any>(null);
   const cameraRef = useRef<any>(null);
   const animationFrameRef = useRef<number>(0);
+  const orbitControlsRef = useRef<any>(null);
 
   // 3D objects refs
   const cameraModelRef = useRef<any>(null);
@@ -74,10 +75,20 @@ function CameraAngleSelector({
   const raycasterRef = useRef<any>(null);
   const mouseRef = useRef<any>(null);
 
+  // Reset view function
+  const resetView = useCallback(() => {
+    if (cameraRef.current && orbitControlsRef.current) {
+      cameraRef.current.position.set(0, 6, 8);
+      cameraRef.current.lookAt(0, 0, 0);
+      orbitControlsRef.current.target.set(0, 0, 0);
+      orbitControlsRef.current.update();
+    }
+  }, []);
+
   // Snap values
   const AZIMUTH_VALUES = [0, 45, 90, 135, 180, 225, 270, 315];
   const ELEVATION_VALUES = [-30, 0, 30, 60];
-  const DISTANCE_VALUES = [0.6, 1.0, 1.4];
+  const DISTANCE_VALUES = [0.6, 1.0, 1.4]; // Must match DISTANCE_OPTIONS values
 
   // Get current labels
   const currentAzimuth = AZIMUTH_OPTIONS.find(a => a.value === azimuth);
@@ -142,6 +153,16 @@ function CameraAngleSelector({
     container.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
+    // Orbit Controls - allows rotating the view by dragging
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.minDistance = 3;
+    controls.maxDistance = 20;
+    controls.maxPolarAngle = Math.PI * 0.9; // Prevent going below ground
+    controls.target.set(0, 0, 0);
+    orbitControlsRef.current = controls;
+
     // Raycaster and mouse
     raycasterRef.current = new THREE.Raycaster();
     mouseRef.current = new THREE.Vector2();
@@ -166,7 +187,7 @@ function CameraAngleSelector({
     });
     const imagePlane = new THREE.Mesh(planeGeometry, planeMaterial);
     // No rotation - plane stands upright facing the camera (default orientation)
-    imagePlane.position.y = 1; // Center it vertically
+    imagePlane.position.y = 0; // Centered on Y axis
     scene.add(imagePlane);
     imagePlaneRef.current = imagePlane;
 
@@ -282,6 +303,7 @@ function CameraAngleSelector({
     // Animation loop
     const animate = () => {
       animationFrameRef.current = requestAnimationFrame(animate);
+      controls.update(); // Update orbit controls for damping
       renderer.render(scene, camera);
     };
     animate();
@@ -296,10 +318,86 @@ function CameraAngleSelector({
     };
     window.addEventListener('resize', handleResize);
 
+    // Track currently hovered handle for visual feedback
+    let hoveredHandle: any = null;
+
+    // Native pointer down handler (capturing phase - runs BEFORE OrbitControls)
+    // This disables OrbitControls when clicking on handles, before OrbitControls processes the event
+    const handleNativePointerDown = (event: PointerEvent) => {
+      const rect = container.getBoundingClientRect();
+      const mouse = new THREE.Vector2(
+        ((event.clientX - rect.left) / rect.width) * 2 - 1,
+        -((event.clientY - rect.top) / rect.height) * 2 + 1
+      );
+
+      const raycaster = new THREE.Raycaster();
+      raycaster.setFromCamera(mouse, camera);
+
+      // Only check azimuth and elevation handles (distance is controlled via overlay slider)
+      const handles = [azimuthHandle, elevationHandle];
+      const intersects = raycaster.intersectObjects(handles);
+
+      if (intersects.length > 0) {
+        // We hit a handle! Disable OrbitControls before it can start dragging
+        controls.enabled = false;
+      } else {
+        // Not on a handle - make sure OrbitControls is enabled for orbiting
+        controls.enabled = true;
+      }
+    };
+
+    // Hover detection for visual feedback
+    const handleMouseMove = (event: MouseEvent) => {
+      const rect = container.getBoundingClientRect();
+      const mouse = new THREE.Vector2(
+        ((event.clientX - rect.left) / rect.width) * 2 - 1,
+        -((event.clientY - rect.top) / rect.height) * 2 + 1
+      );
+
+      const raycaster = new THREE.Raycaster();
+      raycaster.setFromCamera(mouse, camera);
+
+      // Only check azimuth and elevation handles
+      const handles = [azimuthHandle, elevationHandle];
+      const intersects = raycaster.intersectObjects(handles);
+
+      // Reset previous hovered handle
+      if (hoveredHandle && (!intersects.length || intersects[0].object !== hoveredHandle)) {
+        hoveredHandle.scale.set(1, 1, 1);
+        hoveredHandle.material.emissive.setHex(
+          hoveredHandle === azimuthHandle ? 0x115522 : 0x661144
+        );
+        hoveredHandle = null;
+        renderer.domElement.style.cursor = 'grab';
+      }
+
+      // Set new hovered handle
+      if (intersects.length > 0) {
+        const handle = intersects[0].object;
+        if (handle !== hoveredHandle) {
+          hoveredHandle = handle;
+          handle.scale.set(1.3, 1.3, 1.3);
+          handle.material.emissive.setHex(
+            handle === azimuthHandle ? 0x33ff66 : 0xff66aa
+          );
+          renderer.domElement.style.cursor = 'pointer';
+        }
+      }
+    };
+
+    // Add listener in capturing phase (runs before OrbitControls' bubbling listener)
+    renderer.domElement.addEventListener('pointerdown', handleNativePointerDown, { capture: true });
+    renderer.domElement.addEventListener('mousemove', handleMouseMove);
+
     // Cleanup
     return () => {
       window.removeEventListener('resize', handleResize);
+      renderer.domElement.removeEventListener('pointerdown', handleNativePointerDown, { capture: true });
+      renderer.domElement.removeEventListener('mousemove', handleMouseMove);
       cancelAnimationFrame(animationFrameRef.current);
+      if (orbitControlsRef.current) {
+        orbitControlsRef.current.dispose();
+      }
       if (renderer.domElement && container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);
       }
@@ -309,13 +407,13 @@ function CameraAngleSelector({
 
   // Update camera model and handles positions when values change
   useEffect(() => {
-    if (!cameraModelRef.current || !azimuthHandleRef.current || !elevationHandleRef.current || !distanceHandleRef.current) return;
+    if (!cameraModelRef.current || !azimuthHandleRef.current || !elevationHandleRef.current) return;
 
     const azimuthRad = azimuthToRadians(azimuth);
     const elevationRad = elevationToRadians(elevation);
-    const distanceVal = distance * 2; // Scale for visibility
+    const distanceVal = distance * 2; // Scale for visibility - camera MOVES with distance
 
-    // Position camera model
+    // Position camera model based on azimuth, elevation, AND distance
     const camX = distanceVal * Math.cos(elevationRad) * Math.sin(azimuthRad);
     const camY = distanceVal * Math.sin(elevationRad);
     const camZ = distanceVal * Math.cos(elevationRad) * Math.cos(azimuthRad);
@@ -333,20 +431,12 @@ function CameraAngleSelector({
     const elevationHandleZ = 2.4 * Math.cos(elevationRad);
     elevationHandleRef.current.position.set(-2.6, elevationHandleY, elevationHandleZ);
 
-    // Position distance handle on the line between camera and center
-    const distanceHandleX = camX * 0.5;
-    const distanceHandleY = camY * 0.5;
-    const distanceHandleZ = camZ * 0.5;
-    distanceHandleRef.current.position.set(distanceHandleX, distanceHandleY, distanceHandleZ);
-
-    // Update distance line
+    // Hide the distance handle and line (distance is now controlled via overlay slider)
+    if (distanceHandleRef.current) {
+      distanceHandleRef.current.visible = false;
+    }
     if (distanceLineRef.current) {
-      const positions = new Float32Array([
-        0, 0, 0,
-        camX, camY, camZ
-      ]);
-      distanceLineRef.current.geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-      distanceLineRef.current.geometry.attributes.position.needsUpdate = true;
+      distanceLineRef.current.visible = false;
     }
   }, [azimuth, elevation, distance, azimuthToRadians, elevationToRadians]);
 
@@ -402,6 +492,11 @@ function CameraAngleSelector({
       const handleType = handle.userData.type;
 
       setIsDragging(handleType);
+
+      // Disable orbit controls while dragging handles
+      if (orbitControlsRef.current) {
+        orbitControlsRef.current.enabled = false;
+      }
 
       // Scale up handle
       handle.scale.set(1.3, 1.3, 1.3);
@@ -464,13 +559,52 @@ function CameraAngleSelector({
         const clamped = Math.max(-30, Math.min(60, angle));
         onElevationChange(snapToElevation(clamped));
       }
-    } else if (isDragging === 'distance') {
-      // Use screen Y position to control distance (simpler and more intuitive)
-      const y = mouseRef.current.y;
-      // Map y from [-1, 1] to distance [1.4, 0.6] (inverted - dragging up = closer)
-      const newDistance = 1.0 - (y * 0.4);
-      const clamped = Math.max(0.6, Math.min(1.4, newDistance));
-      onDistanceChange(snapToDistance(clamped));
+    } else if (isDragging === 'distance' && cameraModelRef.current) {
+      // Get camera model position (the direction from center)
+      const cameraPos = cameraModelRef.current.position.clone();
+      const cameraDir = cameraPos.clone().normalize();
+      const cameraLength = cameraPos.length(); // This is 2.8 (fixed max distance)
+
+      // Create a plane that contains the distance line and faces the view camera
+      // The plane normal is perpendicular to both the camera direction and the view direction
+      const viewDir = new THREE.Vector3();
+      cameraRef.current.getWorldDirection(viewDir);
+
+      // Cross product gives us a vector perpendicular to both
+      const planeNormal = new THREE.Vector3().crossVectors(cameraDir, viewDir).normalize();
+
+      // If the cross product is too small (camera looking along the line), use a fallback
+      if (planeNormal.length() < 0.1) {
+        planeNormal.set(0, 1, 0).cross(cameraDir).normalize();
+      }
+
+      // Create plane through origin with this normal
+      const dragPlane = new THREE.Plane(planeNormal, 0);
+      const intersectPoint = new THREE.Vector3();
+      raycasterRef.current.ray.intersectPlane(dragPlane, intersectPoint);
+
+      if (intersectPoint) {
+        // Project the intersection point onto the camera direction line
+        // dot product gives us how far along the line the point is
+        const projectedDistance = intersectPoint.dot(cameraDir);
+
+        // Convert to percentage along the line (0 to 1)
+        const percentAlongLine = projectedDistance / cameraLength;
+
+        // Snap to one of 3 positions:
+        // < 0.44 = close-up (0.6)
+        // 0.44 - 0.66 = medium (1.0)
+        // > 0.66 = wide (1.4)
+        let newDistance: number;
+        if (percentAlongLine < 0.44) {
+          newDistance = 0.6;
+        } else if (percentAlongLine < 0.66) {
+          newDistance = 1.0;
+        } else {
+          newDistance = 1.4;
+        }
+        onDistanceChange(newDistance);
+      }
     }
   }, [isDragging, onAzimuthChange, onElevationChange, onDistanceChange, snapToElevation, snapToDistance]);
 
@@ -494,6 +628,11 @@ function CameraAngleSelector({
       } else if (isDragging === 'distance') {
         onDistanceChange(snapToDistance(distance));
       }
+    }
+
+    // Re-enable orbit controls
+    if (orbitControlsRef.current) {
+      orbitControlsRef.current.enabled = true;
     }
 
     setIsDragging(null);
@@ -534,11 +673,45 @@ function CameraAngleSelector({
         onMouseDown={handlePointerDown}
         onTouchStart={handlePointerDown}
       >
-        {/* Overlay instructions */}
-        <div className="absolute top-4 left-4 right-4 z-10 text-center text-xs text-white/70 pointer-events-none">
-          Drag the <span className="text-green-400 font-semibold">green</span> handle for rotation •{' '}
-          <span className="text-pink-400 font-semibold">pink</span> for elevation •{' '}
-          <span className="text-orange-400 font-semibold">orange</span> for distance
+        {/* Overlay instructions and reset button */}
+        <div className="absolute top-4 left-4 right-4 z-10 flex items-start justify-between pointer-events-none">
+          <div className="text-xs text-white/70 flex-1">
+            Drag handles: <span className="text-green-400 font-semibold">green</span> = rotation •{' '}
+            <span className="text-pink-400 font-semibold">pink</span> = elevation
+            <br />
+            <span className="text-white/50">Drag empty space to orbit the view</span>
+          </div>
+          <button
+            onClick={resetView}
+            className="pointer-events-auto px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white/80 hover:text-white text-xs font-medium transition-all duration-200 backdrop-blur-sm border border-white/20"
+          >
+            Reset View
+          </button>
+        </div>
+
+        {/* Shot Type Slider Overlay */}
+        <div className="absolute bottom-16 left-4 right-4 z-10 pointer-events-auto">
+          <div className="bg-black/40 backdrop-blur-md rounded-2xl px-4 py-3 border border-white/10">
+            <div className="flex items-center gap-4">
+              <span className="text-orange-400 text-xs font-semibold whitespace-nowrap">Shot Type</span>
+              <div className="flex-1 flex items-center gap-2">
+                <span className="text-white/60 text-[10px]">Close</span>
+                <input
+                  type="range"
+                  min="0.6"
+                  max="1.4"
+                  step="0.4"
+                  value={distance}
+                  onChange={(e) => onDistanceChange(parseFloat(e.target.value))}
+                  className="flex-1 h-2 bg-white/20 rounded-lg appearance-none cursor-pointer accent-orange-500"
+                />
+                <span className="text-white/60 text-[10px]">Wide</span>
+              </div>
+              <span className="text-orange-300 text-xs bg-orange-500/30 px-2 py-0.5 rounded-full border border-orange-500/50 min-w-[70px] text-center">
+                {currentDistance?.shortLabel || "Medium"}
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* Current values display */}
@@ -552,90 +725,6 @@ function CameraAngleSelector({
           <span className="bg-orange-500/30 text-orange-300 px-3 py-1 rounded-full border border-orange-500/50 backdrop-blur-sm">
             {currentDistance?.shortLabel || "Medium"}
           </span>
-        </div>
-      </div>
-
-      {/* Sliders */}
-      <div className="grid md:grid-cols-3 gap-4">
-        {/* Azimuth Slider */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-green-500"></span>
-              Azimuth
-            </Label>
-            <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
-              {azimuth}°
-            </span>
-          </div>
-          <input
-            type="range"
-            min="0"
-            max="315"
-            step="45"
-            value={azimuth}
-            onChange={(e) => onAzimuthChange(parseInt(e.target.value))}
-            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-500"
-          />
-          <div className="flex justify-between text-[10px] text-gray-400">
-            <span>0°</span>
-            <span>180°</span>
-            <span>315°</span>
-          </div>
-        </div>
-
-        {/* Elevation Slider */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-pink-500"></span>
-              Elevation
-            </Label>
-            <span className="text-xs text-pink-600 bg-pink-50 px-2 py-0.5 rounded-full">
-              {elevation}°
-            </span>
-          </div>
-          <input
-            type="range"
-            min="-30"
-            max="60"
-            step="30"
-            value={elevation}
-            onChange={(e) => onElevationChange(parseInt(e.target.value))}
-            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-pink-500"
-          />
-          <div className="flex justify-between text-[10px] text-gray-400">
-            <span>-30°</span>
-            <span>15°</span>
-            <span>60°</span>
-          </div>
-        </div>
-
-        {/* Distance Slider */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-orange-500"></span>
-              Distance
-            </Label>
-            <span className="text-xs text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">
-              {distance.toFixed(1)}
-            </span>
-          </div>
-          <input
-            type="range"
-            min="0.6"
-            max="1.4"
-            step="0.4"
-            value={distance}
-            onChange={(e) => onDistanceChange(parseFloat(e.target.value))}
-            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-orange-500"
-          />
-          <div className="flex justify-between text-[10px] text-gray-400">
-            <span>Close</span>
-            <span>Medium</span>
-            <span>Wide</span>
-          </div>
         </div>
       </div>
 
