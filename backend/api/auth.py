@@ -8,7 +8,8 @@ from models.user import (
     TokenResponse,
     UserResponse,
     PasswordReset,
-    PasswordUpdate
+    PasswordUpdate,
+    RefreshTokenRequest
 )
 from supabase import Client
 from typing import Dict
@@ -188,14 +189,14 @@ async def get_current_user_info(
 
 @router.post("/auth/refresh", response_model=TokenResponse)
 async def refresh_token(
-    refresh_token: str,
+    request: RefreshTokenRequest,
     supabase: Client = Depends(get_supabase)
 ):
     """
     Refresh access token using refresh token.
 
     Args:
-        refresh_token: Refresh token
+        request: RefreshTokenRequest containing the refresh token
         supabase: Supabase client instance
 
     Returns:
@@ -205,7 +206,7 @@ async def refresh_token(
         HTTPException: If refresh fails
     """
     try:
-        auth_response = supabase.auth.refresh_session(refresh_token)
+        auth_response = supabase.auth.refresh_session(request.refresh_token)
 
         if not auth_response.session:
             raise HTTPException(
