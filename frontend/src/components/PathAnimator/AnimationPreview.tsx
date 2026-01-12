@@ -137,7 +137,7 @@ export default function AnimationPreview({
 
     const animate = (currentTime: number) => {
       const elapsed = currentTime - startTime;
-      let newProgress = (elapsed % duration) / duration;
+      const newProgress = (elapsed % duration) / duration;
 
       setProgress(newProgress);
       drawFrame(newProgress);
