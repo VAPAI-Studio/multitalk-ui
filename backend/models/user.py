@@ -71,3 +71,8 @@ class EmailVerification(BaseModel):
     """Schema for email verification."""
     token: str
     type: str = "signup"
+
+
+class RefreshTokenRequest(BaseModel):
+    """Schema for token refresh request."""
+    refresh_token: str

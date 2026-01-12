@@ -1,6 +1,6 @@
 
 interface Props {
-  onNavigate: (page: "lipsync" | "image-edit" | "character-caption" | "wan-i2v" | "style-transfer" | "create-image" | "lora-trainer" | "image-grid" | "img2img") => void;
+  onNavigate: (page: "lipsync" | "image-edit" | "character-caption" | "wan-i2v" | "wan-move" | "style-transfer" | "create-image" | "lora-trainer" | "image-grid" | "img2img" | "generation-feed") => void;
 }
 
 export default function Homepage({ onNavigate }: Props) {
@@ -38,6 +38,14 @@ export default function Homepage({ onNavigate }: Props) {
       features: ["Image to video generation", "Custom prompts", "Model: WAN I2V"]
     },
     {
+      id: "wan-move" as const,
+      title: "WAN Move",
+      description: "Animate objects in your images with custom motion paths. Draw paths to guide movement and add static anchors for stabilization.",
+      icon: "🎯",
+      gradient: "from-cyan-500 to-blue-600",
+      features: ["Custom motion paths", "Static anchors", "Animation preview", "Model: WAN Move"]
+    },
+    {
       id: "style-transfer" as const,
       title: "Style Transfer",
       description: "Transfer artistic styles between images using AI. Combine subject and style reference images to create unique artistic combinations.",
@@ -68,6 +76,14 @@ export default function Homepage({ onNavigate }: Props) {
       icon: "🖼️",
       gradient: "from-teal-500 to-cyan-600",
       features: ["9 unique angles", "Subject-aware prompts", "Model: Gemini Pro Image"]
+    },
+    {
+      id: "generation-feed" as const,
+      title: "Generation Feed",
+      description: "View and manage all your AI generations in one place. Browse videos, images, and style transfers with real-time updates.",
+      icon: "📋",
+      gradient: "from-gray-600 to-slate-700",
+      features: ["All generations in one view", "Filter by type", "Real-time progress tracking"]
     }
     // Hidden: Image to Image
     // {

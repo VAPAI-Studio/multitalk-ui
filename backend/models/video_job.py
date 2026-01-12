@@ -44,6 +44,9 @@ class VideoJob(BaseModel):
     # Error handling
     error_message: Optional[str] = Field(None, description="Error message if failed")
 
+    # Thumbnail for feed display
+    thumbnail_url: Optional[str] = Field(None, description="Pre-generated thumbnail URL (first frame)")
+
     # Metadata
     updated_at: Optional[datetime] = Field(None, description="Last update timestamp")
 
@@ -113,6 +116,9 @@ class CompleteVideoJobPayload(BaseModel):
     width: Optional[int] = None
     height: Optional[int] = None
     duration_seconds: Optional[float] = None
+
+    # Thumbnail URL (first frame)
+    thumbnail_url: Optional[str] = None
 
     # Error if failed
     error_message: Optional[str] = None

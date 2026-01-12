@@ -9,6 +9,8 @@ from models.video_job import (
     VideoJob
 )
 from services.video_job_service import VideoJobService
+from services.storage_service import StorageService
+from services.thumbnail_service import ThumbnailService
 
 router = APIRouter(prefix="/video-jobs", tags=["video-jobs"])
 
@@ -165,6 +167,52 @@ async def complete_video_job(job_id: str, payload: CompleteVideoJobPayload):
     payload.job_id = job_id
 
     service = get_service()
+    storage_service = StorageService()
+    thumbnail_service = ThumbnailService()
+
+    # If completing successfully with output URLs, download from ComfyUI and upload to Supabase
+    if payload.status == 'completed' and payload.output_video_urls:
+        supabase_urls = []
+        for comfy_url in payload.output_video_urls:
+            print(f"[VIDEO_JOBS] Downloading video from ComfyUI: {comfy_url}")
+
+            # Download from ComfyUI and upload to Supabase
+            success_upload, supabase_url, upload_error = await storage_service.upload_video_from_url(
+                comfy_url,
+                'video-results'
+            )
+
+            if success_upload and supabase_url:
+                print(f"[VIDEO_JOBS] Successfully uploaded to Supabase: {supabase_url}")
+                supabase_urls.append(supabase_url)
+            else:
+                # If upload fails, log error and keep the ComfyUI URL (fallback)
+                print(f"[VIDEO_JOBS] Failed to upload to Supabase: {upload_error}")
+                supabase_urls.append(comfy_url)
+
+        # Replace ComfyUI URLs with Supabase URLs
+        payload.output_video_urls = supabase_urls
+
+        # Generate thumbnail from the first video (non-blocking - errors don't fail the job)
+        if supabase_urls:
+            try:
+                print(f"[VIDEO_JOBS] Generating thumbnail for job {job_id}...")
+                thumb_success, thumb_url, thumb_error = await thumbnail_service.generate_thumbnail_from_url(
+                    supabase_urls[0],
+                    job_id,
+                    width=400,
+                    height=400
+                )
+
+                if thumb_success and thumb_url:
+                    print(f"[VIDEO_JOBS] Thumbnail generated: {thumb_url}")
+                    payload.thumbnail_url = thumb_url
+                else:
+                    print(f"[VIDEO_JOBS] Thumbnail generation failed (non-blocking): {thumb_error}")
+            except Exception as e:
+                # Thumbnail generation is non-blocking - log error but continue
+                print(f"[VIDEO_JOBS] Thumbnail generation exception (non-blocking): {str(e)}")
+
     success, job, error = await service.complete_job(payload)
 
     if not success:

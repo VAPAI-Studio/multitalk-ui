@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { apiClient } from "../lib/apiClient";
-import GenerationFeed from "../components/GenerationFeed";
+import ResizableFeedSidebar from "../components/ResizableFeedSidebar";
 import { useSmartResolution } from "../hooks/useSmartResolution";
 
 // UI Components
@@ -444,21 +444,18 @@ export default function StyleTransfer({ comfyUrl }: Props) {
           </Section>
         </div>
 
-        {/* Right Sidebar - UnifiedFeed */}
-        <div className="w-96 space-y-6">
-          <div className="sticky top-6 h-[calc(100vh-3rem)]">
-            <GenerationFeed
-              config={{
-                mediaType: 'all',
-                pageContext: 'style-transfer',
-                showCompletedOnly: false,
-                maxItems: 10,
-                showFixButton: true,
-                showProgress: true
-              }}
-            />
-          </div>
-        </div>
+        {/* Right Sidebar - ResizableFeed */}
+        <ResizableFeedSidebar
+          storageKey="style-transfer"
+          config={{
+            mediaType: 'all',
+            pageContext: 'style-transfer',
+            showCompletedOnly: false,
+            maxItems: 10,
+            showFixButton: true,
+            showProgress: true
+          }}
+        />
       </div>
     </div>
   );

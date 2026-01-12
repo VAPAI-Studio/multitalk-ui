@@ -1,5 +1,5 @@
 import os
-from typing import Tuple, Optional, List
+from typing import Tuple, Optional, List, Dict
 from datetime import datetime
 from supabase import create_client, Client
 
@@ -86,56 +86,82 @@ class StyleTransferService:
     async def get_recent_style_transfers(self, limit: int = 20, offset: int = 0) -> Tuple[bool, List[StyleTransfer], int, Optional[str]]:
         """Get recent style transfers"""
         try:
-            # Get total count
-            count_result = self.supabase.table("style_transfers")\
-                .select("*", count="exact")\
-                .execute()
-            total_count = count_result.count if count_result.count else 0
-            
-            # Get paginated results
+            # Single query with count - more efficient than separate queries
             result = self.supabase.table("style_transfers")\
-                .select("*")\
+                .select("*", count="exact")\
                 .order("created_at", desc=True)\
                 .range(offset, offset + limit - 1)\
                 .execute()
-            
+
+            total_count = result.count if result.count else 0
+
             if result.data:
                 style_transfers = [StyleTransfer(**item) for item in result.data]
                 return True, style_transfers, total_count, None
             else:
                 return True, [], total_count, None
-                
+
         except Exception as e:
             return False, [], 0, str(e)
 
     async def get_completed_style_transfers(self, limit: int = 20, offset: int = 0) -> Tuple[bool, List[StyleTransfer], int, Optional[str]]:
         """Get only completed style transfers with result images"""
         try:
-            # Get total count of completed transfers
-            count_result = self.supabase.table("style_transfers")\
-                .select("*", count="exact")\
-                .eq("status", StyleTransferStatus.COMPLETED.value)\
-                .not_.is_("result_image_url", "null")\
-                .execute()
-            total_count = count_result.count if count_result.count else 0
-            
-            # Get paginated results
+            # Single query with count and filters - more efficient
             result = self.supabase.table("style_transfers")\
-                .select("*")\
+                .select("*", count="exact")\
                 .eq("status", StyleTransferStatus.COMPLETED.value)\
                 .not_.is_("result_image_url", "null")\
                 .order("created_at", desc=True)\
                 .range(offset, offset + limit - 1)\
                 .execute()
-            
+
+            total_count = result.count if result.count else 0
+
             if result.data:
                 style_transfers = [StyleTransfer(**item) for item in result.data]
                 return True, style_transfers, total_count, None
             else:
                 return True, [], total_count, None
-                
+
         except Exception as e:
             return False, [], 0, str(e)
+
+    async def get_recent_style_transfers_feed(self, limit: int = 20, offset: int = 0) -> Tuple[List[Dict], Optional[str]]:
+        """Get recent style transfers for feed display (optimized - no count, minimal columns)."""
+        try:
+            # Select only columns needed for feed display
+            feed_columns = "id, status, created_at, workflow_name, result_image_url, source_image_url, prompt"
+
+            result = self.supabase.table("style_transfers")\
+                .select(feed_columns)\
+                .order("created_at", desc=True)\
+                .range(offset, offset + limit - 1)\
+                .execute()
+
+            return result.data or [], None
+
+        except Exception as e:
+            return [], str(e)
+
+    async def get_completed_style_transfers_feed(self, limit: int = 20, offset: int = 0) -> Tuple[List[Dict], Optional[str]]:
+        """Get completed style transfers for feed display (optimized - no count, minimal columns)."""
+        try:
+            # Select only columns needed for feed display
+            feed_columns = "id, status, created_at, workflow_name, result_image_url, source_image_url, prompt"
+
+            result = self.supabase.table("style_transfers")\
+                .select(feed_columns)\
+                .eq("status", StyleTransferStatus.COMPLETED.value)\
+                .not_.is_("result_image_url", "null")\
+                .order("created_at", desc=True)\
+                .range(offset, offset + limit - 1)\
+                .execute()
+
+            return result.data or [], None
+
+        except Exception as e:
+            return [], str(e)
 
     async def update_to_processing(self, transfer_id: str) -> Tuple[bool, Optional[str]]:
         """Update a style transfer status to processing"""

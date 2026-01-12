@@ -1,11 +1,16 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { apiClient } from '../lib/apiClient'
 import { useComfyUIProgress } from '../hooks/useComfyUIProgress'
+import { useFeedDisplaySettings } from '../hooks/useFeedDisplaySettings'
 import { fixStuckJob } from '../lib/fixStuckJob'
-import VideoThumbnail from './VideoThumbnail'
 import ImageModal from './ImageModal'
+import DisplaySettingsControls from './DisplaySettingsControls'
+import FeedListItem from './FeedListItem'
+import FeedGridItem from './FeedGridItem'
 import type { ImageItem } from '../types/ui'
+import type { FeedDisplaySettings } from '../types/feedDisplay'
+import { GRID_MIN_ITEM_WIDTH } from '../types/feedDisplay'
 
 // Unified item type that can be video or image
 interface GenerationItem {
@@ -22,6 +27,8 @@ interface GenerationItem {
     total_nodes: number
     current_node?: string
   }
+  // Video-specific fields
+  thumbnail_url?: string  // Pre-generated thumbnail for videos
   // Image-specific fields
   all_result_urls?: string[]
   source_image_url?: string
@@ -41,7 +48,7 @@ export interface GenerationFeedConfig {
   workflowNames?: string[]  // Filter to specific workflows (multi-select)
 
   // Page context for "Show Mine" toggle
-  pageContext?: string      // Current page's workflow name
+  pageContext?: string | string[]  // Current page's workflow name(s) - can be array for multi-workflow pages
 
   // Display options
   showCompletedOnly?: boolean
@@ -49,6 +56,10 @@ export interface GenerationFeedConfig {
   showFixButton?: boolean
   showProgress?: boolean
   showMediaTypeToggle?: boolean  // Whether to show the media type toggle (default: true)
+
+  // NEW: Display settings
+  displaySettings?: Partial<FeedDisplaySettings>  // Override default display settings
+  showDisplayControls?: boolean  // Whether to show view/size/column controls (default: true)
 
   // ComfyUI integration
   comfyUrl?: string
@@ -59,54 +70,34 @@ interface GenerationFeedProps {
   onUpscaleComplete?: () => void
 }
 
-// Lazy Video Component with thumbnail support
-const LazyVideo = ({ item, onError }: { item: GenerationItem; onError: (error: any) => void }) => {
-  const [shouldLoad, setShouldLoad] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const container = containerRef.current
-    if (!container) return
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const [entry] = entries
-        if (entry.isIntersecting) {
-          setTimeout(() => setShouldLoad(true), 100)
-        } else {
-          setShouldLoad(false)
-        }
-      },
-      { threshold: 0.1 }
-    )
-
-    observer.observe(container)
-    return () => observer.disconnect()
-  }, [])
-
-  return (
-    <div ref={containerRef} className="w-full">
-      <VideoThumbnail
-        videoUrl={item.result_url || ''}
-        className="w-full rounded-xl shadow-lg"
-        style={{ maxHeight: '200px' }}
-        onError={onError}
-        showPlayButton={shouldLoad}
-      />
-    </div>
-  )
-}
+// Progressive loading constants (defaults)
+const DEFAULT_MAX_ITEMS = 50       // Default max items for main feed page
+const DEFAULT_INITIAL_BATCH = 10   // Fast first paint
+const BATCH_SIZE = 10              // Load 10 at a time
+const MIN_VISIBLE = 10             // Minimum items to show after filtering
+const POLL_INTERVAL = 30000        // 30 seconds polling (cache-friendly)
 
 export default function GenerationFeed({ config, onUpscaleComplete }: GenerationFeedProps) {
-  const [displayedItems, setDisplayedItems] = useState<GenerationItem[]>([])
+  // Compute max items from config (internal pages may want fewer items)
+  const maxItems = config.maxItems ?? DEFAULT_MAX_ITEMS
+  // For smaller feeds, use smaller initial batch for faster first paint
+  const initialBatch = Math.min(DEFAULT_INITIAL_BATCH, maxItems)
+
+  const [allItems, setAllItems] = useState<GenerationItem[]>([]) // All loaded items (both videos and images)
   const [loading, setLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [fixingJobs, setFixingJobs] = useState<Set<string>>(new Set())
   const [showMineOnly, setShowMineOnly] = useState(true) // Default to showing current page's items
   const [mediaTypeFilter, setMediaTypeFilter] = useState<'video' | 'image' | 'all'>(config.mediaType)
-  const [currentOffset, setCurrentOffset] = useState(0)
-  const [hasMore, setHasMore] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // Progressive loading state
+  const [loadingPhase, setLoadingPhase] = useState<'initial' | 'progressive' | 'complete'>('initial')
+  const [videoOffset, setVideoOffset] = useState(0)
+  const [imageOffset, setImageOffset] = useState(0)
+  const [hasMoreVideos, setHasMoreVideos] = useState(true)
+  const [hasMoreImages, setHasMoreImages] = useState(true)
+  const [isBackfilling, setIsBackfilling] = useState(false)
 
   // For image modal
   const [selectedImage, setSelectedImage] = useState<ImageItem | null>(null)
@@ -115,158 +106,335 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
   // Use ComfyUI progress tracking
   const { progress } = useComfyUIProgress(config.comfyUrl || '', !!config.comfyUrl)
 
-  const getShortJobId = (jobId: string) => jobId.slice(-8)
+  // Display settings (persisted to localStorage)
+  // Normalize pageContext to array for internal use
+  const pageContexts = useMemo(() => {
+    if (!config.pageContext) return undefined
+    return Array.isArray(config.pageContext) ? config.pageContext : [config.pageContext]
+  }, [config.pageContext])
 
-  const loadFeed = useCallback(async (reset = true) => {
-    if (reset) {
-      setLoading(true)
-      setCurrentOffset(0)
-      setHasMore(true)
-      setError(null)
-    } else {
-      setLoadingMore(true)
+  // Use first context for storage key
+  const storageKeyContext = Array.isArray(config.pageContext)
+    ? config.pageContext[0]
+    : config.pageContext
+
+  const {
+    settings: displaySettings,
+    setViewMode,
+    setThumbnailSize,
+    setColumnCount,
+  } = useFeedDisplaySettings({
+    storageKey: storageKeyContext || 'default',
+    defaults: config.displaySettings,
+  })
+
+  // Compute grid style based on column count and thumbnail size
+  const gridStyle = useMemo(() => {
+    if (displaySettings.viewMode !== 'grid') return {}
+    const minWidth = GRID_MIN_ITEM_WIDTH[displaySettings.thumbnailSize]
+    if (displaySettings.columnCount === 'auto') {
+      return {
+        gridTemplateColumns: `repeat(auto-fill, minmax(${minWidth}px, 1fr))`,
+      }
+    }
+    return {
+      gridTemplateColumns: `repeat(${displaySettings.columnCount}, 1fr)`,
+    }
+  }, [displaySettings.viewMode, displaySettings.columnCount, displaySettings.thumbnailSize])
+
+  // Sync mediaTypeFilter when config.mediaType changes from parent
+  useEffect(() => {
+    setMediaTypeFilter(config.mediaType)
+  }, [config.mediaType])
+
+  // Compute effective media type (from parent config or internal state)
+  const effectiveMediaType = config.showMediaTypeToggle === false
+    ? config.mediaType
+    : mediaTypeFilter
+
+  // Client-side filtering of already loaded items (instant)
+  const displayedItems = useMemo(() => {
+    if (effectiveMediaType === 'all') {
+      return allItems
+    }
+    return allItems.filter(item => item.type === effectiveMediaType)
+  }, [allItems, effectiveMediaType])
+
+  // Helper to convert API response to GenerationItem
+  const videoJobToItem = (job: any): GenerationItem => ({
+    id: job.id || job.comfy_job_id,
+    type: 'video',
+    created_at: job.created_at,
+    title: `${job.input_image_urls?.[0]?.split('/').pop() || 'Video'} + Audio`,
+    status: job.status,
+    result_url: job.output_video_urls?.[0],
+    thumbnail_url: job.thumbnail_url,
+    workflow_name: job.workflow_name,
+    metadata: job
+  })
+
+  const imageJobToItem = (job: any): GenerationItem => {
+    const getValidImageUrl = (url?: string) => {
+      if (!url || url.startsWith('blob:')) return undefined
+      return url
+    }
+    const validResultUrl = getValidImageUrl(job.output_image_urls?.[0])
+    const validSourceUrl = getValidImageUrl(job.input_image_urls?.[0])
+    const allValidResultUrls = (job.output_image_urls || [])
+      .map((url: string) => getValidImageUrl(url))
+      .filter((url: string | undefined): url is string => !!url)
+
+    return {
+      id: job.id,
+      type: 'image',
+      created_at: job.created_at,
+      title: job.prompt || job.workflow_name || 'Image',
+      status: job.status,
+      preview_url: validResultUrl || validSourceUrl || '',
+      result_url: validResultUrl,
+      all_result_urls: allValidResultUrls.length > 0 ? allValidResultUrls : undefined,
+      source_image_url: job.input_image_urls?.[0] || '',
+      prompt: job.prompt || '',
+      workflow_name: job.workflow_name,
+      model_used: job.model_used,
+      metadata: job
+    }
+  }
+
+  // Get effective workflow filter
+  const getEffectiveWorkflows = useCallback(() => {
+    return showMineOnly && pageContexts
+      ? pageContexts
+      : config.workflowNames
+  }, [showMineOnly, pageContexts, config.workflowNames])
+
+  // Load a batch of items (progressive loading)
+  const loadBatch = useCallback(async (
+    type: 'video' | 'image' | 'both',
+    batchSize: number,
+    vOffset: number,
+    iOffset: number
+  ): Promise<{ videos: GenerationItem[], images: GenerationItem[], hasMoreV: boolean, hasMoreI: boolean }> => {
+    const effectiveWorkflows = getEffectiveWorkflows()
+    const videos: GenerationItem[] = []
+    const images: GenerationItem[] = []
+    let hasMoreV = true
+    let hasMoreI = true
+
+    // Load videos
+    if (type === 'video' || type === 'both') {
+      try {
+        const videoParams = {
+          limit: batchSize,
+          offset: vOffset,
+          workflow_name: effectiveWorkflows?.length === 1 ? effectiveWorkflows[0] : undefined
+        }
+        const videoResponse = config.showCompletedOnly
+          ? await apiClient.getCompletedVideoJobs(videoParams) as any
+          : await apiClient.getVideoJobs(videoParams) as any
+
+        if (videoResponse?.success && videoResponse.video_jobs) {
+          for (const job of videoResponse.video_jobs) {
+            if (effectiveWorkflows && effectiveWorkflows.length > 1 &&
+                !effectiveWorkflows.includes(job.workflow_name)) {
+              continue
+            }
+            videos.push(videoJobToItem(job))
+          }
+          hasMoreV = videoResponse.video_jobs.length === batchSize
+        } else {
+          hasMoreV = false
+        }
+      } catch (err: any) {
+        if (err?.name !== 'AbortError') console.error('Error loading videos:', err)
+        hasMoreV = false
+      }
     }
 
+    // Load images
+    if (type === 'image' || type === 'both') {
+      try {
+        const imageParams = {
+          limit: batchSize,
+          offset: iOffset,
+          workflow_name: effectiveWorkflows?.length === 1 ? effectiveWorkflows[0] : undefined
+        }
+        const imageResponse = config.showCompletedOnly
+          ? await apiClient.getCompletedImageJobs(imageParams) as any
+          : await apiClient.getImageJobs(imageParams) as any
+
+        if (imageResponse?.success && imageResponse.image_jobs) {
+          for (const job of imageResponse.image_jobs) {
+            if (effectiveWorkflows && effectiveWorkflows.length > 1 &&
+                !effectiveWorkflows.includes(job.workflow_name)) {
+              continue
+            }
+            images.push(imageJobToItem(job))
+          }
+          hasMoreI = imageResponse.image_jobs.length === batchSize
+        } else {
+          hasMoreI = false
+        }
+      } catch (err: any) {
+        if (err?.name !== 'AbortError') console.error('Error loading images:', err)
+        hasMoreI = false
+      }
+    }
+
+    return { videos, images, hasMoreV, hasMoreI }
+  }, [config.showCompletedOnly, getEffectiveWorkflows])
+
+  // Initial load - load first batch quickly
+  const loadInitial = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    setLoadingPhase('initial')
+    setVideoOffset(0)
+    setImageOffset(0)
+
     try {
-      const items: GenerationItem[] = []
-      const limit = config.maxItems || 10
+      const { videos, images, hasMoreV, hasMoreI } = await loadBatch('both', initialBatch, 0, 0)
 
-      // Determine which workflows to fetch based on filters
-      const effectiveWorkflows = showMineOnly && config.pageContext
-        ? [config.pageContext]
-        : config.workflowNames
-
-      // Load videos if needed
-      if (mediaTypeFilter === 'video' || mediaTypeFilter === 'all') {
-        try {
-          const videoParams = {
-            limit: limit * 2,
-            offset: 0,
-            workflow_name: effectiveWorkflows?.length === 1 ? effectiveWorkflows[0] : undefined
-          }
-
-          const videoResponse = config.showCompletedOnly
-            ? await apiClient.getCompletedVideoJobs(videoParams) as any
-            : await apiClient.getVideoJobs(videoParams) as any
-
-          if (videoResponse?.success && videoResponse.video_jobs) {
-            for (const job of videoResponse.video_jobs) {
-              // Skip if filtering by workflows and this one isn't included
-              if (effectiveWorkflows && effectiveWorkflows.length > 1 &&
-                  !effectiveWorkflows.includes(job.workflow_name)) {
-                continue
-              }
-
-              // Build video URL
-              const videoUrl: string | undefined = job.output_video_urls?.[0]
-
-              items.push({
-                id: job.id || job.comfy_job_id,
-                type: 'video',
-                created_at: job.created_at,
-                title: `${job.input_image_urls?.[0]?.split('/').pop() || 'Video'} + Audio`,
-                status: job.status,
-                result_url: videoUrl,
-                workflow_name: job.workflow_name,
-                metadata: job
-              })
-            }
-          }
-        } catch (err) {
-          console.error('Error loading videos:', err)
-        }
-      }
-
-      // Load images if needed
-      if (mediaTypeFilter === 'image' || mediaTypeFilter === 'all') {
-        try {
-          const imageParams = {
-            limit: limit * 2,
-            offset: 0,
-            workflow_name: effectiveWorkflows?.length === 1 ? effectiveWorkflows[0] : undefined
-          }
-
-          const imageResponse = config.showCompletedOnly
-            ? await apiClient.getCompletedImageJobs(imageParams) as any
-            : await apiClient.getImageJobs(imageParams) as any
-
-          if (imageResponse?.success && imageResponse.image_jobs) {
-            for (const job of imageResponse.image_jobs) {
-              // Skip if filtering by workflows and this one isn't included
-              if (effectiveWorkflows && effectiveWorkflows.length > 1 &&
-                  !effectiveWorkflows.includes(job.workflow_name)) {
-                continue
-              }
-
-              // Filter out blob URLs
-              const getValidImageUrl = (url?: string) => {
-                if (!url || url.startsWith('blob:')) return undefined
-                return url
-              }
-
-              const validResultUrl = getValidImageUrl(job.output_image_urls?.[0])
-              const validSourceUrl = getValidImageUrl(job.input_image_urls?.[0])
-
-              // Get all valid result URLs for multi-image outputs
-              const allValidResultUrls = (job.output_image_urls || [])
-                .map((url: string) => getValidImageUrl(url))
-                .filter((url: string | undefined): url is string => !!url)
-
-              items.push({
-                id: job.id,
-                type: 'image',
-                created_at: job.created_at,
-                title: job.prompt || job.workflow_name || 'Image',
-                status: job.status,
-                preview_url: validResultUrl || validSourceUrl || '',
-                result_url: validResultUrl,
-                all_result_urls: allValidResultUrls.length > 0 ? allValidResultUrls : undefined,
-                source_image_url: job.input_image_urls?.[0] || '',
-                prompt: job.prompt || '',
-                workflow_name: job.workflow_name,
-                model_used: job.model_used,
-                metadata: job
-              })
-            }
-          }
-        } catch (err) {
-          console.error('Error loading images:', err)
-        }
-      }
-
-      // Sort by creation date (newest first)
+      // Merge and sort
+      const items = [...videos, ...images]
       items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
-      // Apply pagination
-      const paginatedItems = items.slice(0, reset ? limit : currentOffset + limit)
+      setAllItems(items)
+      setVideoOffset(videos.length)
+      setImageOffset(images.length)
+      setHasMoreVideos(hasMoreV)
+      setHasMoreImages(hasMoreI)
 
-      if (reset) {
-        setDisplayedItems(paginatedItems)
+      // Start progressive loading if we have more
+      if ((hasMoreV || hasMoreI) && items.length < maxItems) {
+        setLoadingPhase('progressive')
       } else {
-        setDisplayedItems(paginatedItems)
+        setLoadingPhase('complete')
       }
-
-      setCurrentOffset((reset ? 0 : currentOffset) + limit)
-      setHasMore(paginatedItems.length < items.length)
-
     } catch (err) {
       console.error('Error loading feed:', err)
       setError(err instanceof Error ? err.message : 'An unexpected error occurred')
-      if (reset) {
-        setDisplayedItems([])
-      }
     } finally {
       setLoading(false)
+    }
+  }, [loadBatch, initialBatch, maxItems])
+
+  // Progressive loading - load more batches in background
+  const loadNextBatch = useCallback(async () => {
+    if (loadingPhase !== 'progressive' || loadingMore) return
+    if (allItems.length >= maxItems) {
+      setLoadingPhase('complete')
+      return
+    }
+    if (!hasMoreVideos && !hasMoreImages) {
+      setLoadingPhase('complete')
+      return
+    }
+
+    setLoadingMore(true)
+
+    try {
+      const { videos, images, hasMoreV, hasMoreI } = await loadBatch(
+        'both', BATCH_SIZE, videoOffset, imageOffset
+      )
+
+      if (videos.length > 0 || images.length > 0) {
+        setAllItems(prev => {
+          const newItems = [...prev, ...videos, ...images]
+          // Remove duplicates by id
+          const seen = new Set<string>()
+          const unique = newItems.filter(item => {
+            if (seen.has(item.id)) return false
+            seen.add(item.id)
+            return true
+          })
+          // Sort by date
+          unique.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+          return unique.slice(0, maxItems)
+        })
+        setVideoOffset(prev => prev + videos.length)
+        setImageOffset(prev => prev + images.length)
+      }
+
+      setHasMoreVideos(hasMoreV)
+      setHasMoreImages(hasMoreI)
+
+      if (!hasMoreV && !hasMoreI) {
+        setLoadingPhase('complete')
+      }
+    } finally {
       setLoadingMore(false)
     }
-  }, [config.maxItems, config.showCompletedOnly, config.workflowNames, config.pageContext,
-      mediaTypeFilter, showMineOnly, currentOffset])
+  }, [loadingPhase, loadingMore, allItems.length, hasMoreVideos, hasMoreImages, videoOffset, imageOffset, loadBatch, maxItems])
 
-  const loadMore = () => {
-    if (!loadingMore && hasMore) {
-      loadFeed(false)
+  // Backfill - fetch more of a specific type when filter reduces visible items
+  const backfillType = useCallback(async (type: 'video' | 'image') => {
+    if (isBackfilling) return
+
+    setIsBackfilling(true)
+    try {
+      const currentOffset = type === 'video' ? videoOffset : imageOffset
+      const { videos, images, hasMoreV, hasMoreI } = await loadBatch(type, BATCH_SIZE * 2, currentOffset, currentOffset)
+
+      const newItems = type === 'video' ? videos : images
+      if (newItems.length > 0) {
+        setAllItems(prev => {
+          const merged = [...prev, ...newItems]
+          const seen = new Set<string>()
+          const unique = merged.filter(item => {
+            if (seen.has(item.id)) return false
+            seen.add(item.id)
+            return true
+          })
+          unique.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+          return unique
+        })
+
+        if (type === 'video') {
+          setVideoOffset(prev => prev + videos.length)
+          setHasMoreVideos(hasMoreV)
+        } else {
+          setImageOffset(prev => prev + images.length)
+          setHasMoreImages(hasMoreI)
+        }
+      }
+    } finally {
+      setIsBackfilling(false)
     }
-  }
+  }, [isBackfilling, videoOffset, imageOffset, loadBatch])
+
+  // Refresh - reload from beginning (for polling)
+  const refreshFeed = useCallback(async () => {
+    // Don't show loading spinner for refresh (keeps existing items visible)
+    try {
+      const { videos, images } = await loadBatch('both', initialBatch, 0, 0)
+
+      // Merge new items with existing, keeping newest
+      setAllItems(prev => {
+        const newItems = [...videos, ...images]
+        const merged = [...newItems, ...prev]
+        const seen = new Set<string>()
+        const unique = merged.filter(item => {
+          if (seen.has(item.id)) return false
+          seen.add(item.id)
+          return true
+        })
+        unique.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        return unique.slice(0, maxItems)
+      })
+    } catch (err) {
+      // Silently fail refresh - don't clear existing items
+      console.error('Error refreshing feed:', err)
+    }
+  }, [loadBatch, initialBatch, maxItems])
+
+  // Manual load more (user-triggered)
+  const loadMore = useCallback(() => {
+    if (loadingPhase === 'complete' && (hasMoreVideos || hasMoreImages)) {
+      setLoadingPhase('progressive')
+    }
+    loadNextBatch()
+  }, [loadingPhase, hasMoreVideos, hasMoreImages, loadNextBatch])
 
   // Fix stuck video job manually
   const handleFixStuckJob = async (jobId: string, comfyUrl: string) => {
@@ -277,7 +445,7 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
     try {
       const result = await fixStuckJob(jobId, comfyUrl)
       if (result.success) {
-        await loadFeed()
+        await loadInitial()
       } else {
         alert(`Failed to fix job: ${result.error}`)
       }
@@ -309,40 +477,46 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
     metadata: item.metadata
   })
 
+  // Initial load on mount + polling
   useEffect(() => {
-    loadFeed(true)
+    loadInitial()
 
-    // Refresh every 15 seconds
-    const interval = setInterval(() => loadFeed(true), 15000)
+    // Refresh every 30 seconds (cache-friendly)
+    const interval = setInterval(() => refreshFeed(), POLL_INTERVAL)
     return () => clearInterval(interval)
-  }, [mediaTypeFilter, showMineOnly])
+  }, [loadInitial, refreshFeed])
 
-  // Re-run effect when config changes
+  // Re-run initial load when config/filters change
   useEffect(() => {
-    loadFeed(true)
-  }, [config.showCompletedOnly, config.workflowNames, config.pageContext])
+    loadInitial()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showMineOnly, config.showCompletedOnly, config.workflowNames, pageContexts])
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed': return 'text-green-600 bg-green-100'
-      case 'processing': return 'text-blue-600 bg-blue-100'
-      case 'failed': return 'text-red-600 bg-red-100'
-      case 'pending': return 'text-yellow-600 bg-yellow-100'
-      case 'error': return 'text-red-600 bg-red-100'
-      default: return 'text-gray-600 bg-gray-100'
+  // Progressive loading - continue loading in background after initial batch
+  useEffect(() => {
+    if (loadingPhase === 'progressive') {
+      const timer = setTimeout(() => loadNextBatch(), 300)
+      return () => clearTimeout(timer)
     }
-  }
+    // loadNextBatch is stable via useCallback
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadingPhase])
 
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'completed': return 'Completed'
-      case 'processing': return 'Processing'
-      case 'failed': return 'Failed'
-      case 'pending': return 'Pending'
-      case 'error': return 'Error'
-      default: return status
+  // Hybrid filtering - backfill when filter reduces visible items below threshold
+  useEffect(() => {
+    if (loadingPhase !== 'complete' || isBackfilling) return
+
+    // Only backfill if we're filtering by type and have few results
+    if (effectiveMediaType !== 'all' && displayedItems.length < MIN_VISIBLE) {
+      const hasMore = effectiveMediaType === 'video' ? hasMoreVideos : hasMoreImages
+      if (hasMore) {
+        backfillType(effectiveMediaType)
+      }
     }
-  }
+    // Note: backfillType is intentionally excluded to prevent infinite loops
+    // The function is stable and doesn't need to trigger re-runs
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveMediaType, displayedItems.length, loadingPhase, isBackfilling, hasMoreVideos, hasMoreImages])
 
   return (
     <div className="h-full flex flex-col bg-white rounded-2xl shadow-lg border border-gray-200">
@@ -355,7 +529,7 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
           </h2>
 
           <button
-            onClick={() => loadFeed(true)}
+            onClick={() => loadInitial()}
             disabled={loading}
             className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded-full border border-blue-300 hover:bg-blue-200 disabled:opacity-50"
           >
@@ -402,19 +576,46 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
           )}
 
           {/* Show Mine toggle - only show if pageContext is set */}
-          {config.pageContext && (
-            <button
-              onClick={() => setShowMineOnly(!showMineOnly)}
-              className={`px-2 py-1 text-xs rounded-full transition-colors ${
-                showMineOnly
-                  ? 'bg-purple-100 text-purple-700 border border-purple-300'
-                  : 'bg-gray-100 text-gray-600 border border-gray-300'
-              }`}
-            >
-              {showMineOnly ? 'This Page' : 'Show All'}
-            </button>
+          {pageContexts && (
+            <div className="flex items-center bg-gray-100 rounded-full p-0.5">
+              <button
+                onClick={() => setShowMineOnly(true)}
+                className={`px-2 py-1 text-xs rounded-full transition-all ${
+                  showMineOnly
+                    ? 'bg-white text-purple-700 shadow-sm font-medium'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                This Page
+              </button>
+              <button
+                onClick={() => setShowMineOnly(false)}
+                className={`px-2 py-1 text-xs rounded-full transition-all ${
+                  !showMineOnly
+                    ? 'bg-white text-purple-700 shadow-sm font-medium'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                All
+              </button>
+            </div>
           )}
         </div>
+
+        {/* Display settings controls */}
+        {(config.showDisplayControls !== false) && (
+          <div className="mt-2 pt-2 border-t border-gray-100">
+            <DisplaySettingsControls
+              viewMode={displaySettings.viewMode}
+              thumbnailSize={displaySettings.thumbnailSize}
+              columnCount={displaySettings.columnCount}
+              onViewModeChange={setViewMode}
+              onThumbnailSizeChange={setThumbnailSize}
+              onColumnCountChange={setColumnCount}
+              compact={true}
+            />
+          </div>
+        )}
       </div>
 
       {/* Scrollable Content */}
@@ -424,7 +625,7 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
             <div className="bg-red-50 border border-red-200 rounded-lg p-3">
               <p className="text-red-700 text-sm mb-2">{error}</p>
               <button
-                onClick={() => loadFeed(true)}
+                onClick={() => loadInitial()}
                 className="px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm"
               >
                 Retry
@@ -444,181 +645,55 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
             <p className="text-gray-500 text-sm">No generations found</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {displayedItems.map((item) => {
-              // Compact view for failed/error items
-              if (item.status === 'failed' || item.status === 'error') {
-                return (
-                  <div key={item.id} className="border border-yellow-200 rounded-lg p-2 bg-yellow-50">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm">{item.type === 'video' ? '🎬' : '🖼️'}</span>
-                        <span className="text-xs font-mono text-gray-600">
-                          {getShortJobId(item.id)}
-                        </span>
-                      </div>
-                      <span className={`text-xs px-2 py-0.5 rounded ${getStatusColor(item.status)}`}>
-                        {getStatusText(item.status)}
-                      </span>
-                    </div>
-                  </div>
-                )
-              }
-
-              // Video item
-              if (item.type === 'video') {
-                return (
-                  <div key={item.id} className="border border-gray-200 rounded-xl p-3 bg-white">
-                    {item.result_url && item.status === 'completed' ? (
-                      <LazyVideo
-                        item={item}
-                        onError={() => {
-                          console.error('Video load failed:', item.id)
-                        }}
-                      />
-                    ) : item.status === 'processing' || item.status === 'submitted' ? (
-                      <div className="w-full h-16 bg-blue-50 rounded-lg flex items-center justify-center">
-                        <div className="flex items-center gap-2">
-                          <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full"></div>
-                          <span className="text-blue-600 text-sm">
-                            {config.showProgress && progress.total_nodes > 0
-                              ? `${Math.round((progress.completed_nodes / progress.total_nodes) * 100)}%`
-                              : 'Processing...'}
-                          </span>
-                          {config.showFixButton && config.comfyUrl && (
-                            <button
-                              onClick={() => handleFixStuckJob(item.id, config.comfyUrl!)}
-                              disabled={fixingJobs.has(item.id)}
-                              className="px-2 py-1 text-xs bg-orange-100 hover:bg-orange-200 text-orange-700 rounded border border-orange-300 disabled:opacity-50"
-                            >
-                              {fixingJobs.has(item.id) ? '...' : 'Fix'}
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="w-full h-16 bg-gray-100 rounded-lg flex items-center justify-center">
-                        <span className="text-2xl">🎬</span>
-                      </div>
-                    )}
-
-                    <div className="mt-2 space-y-1">
-                      <div className="flex items-center justify-between">
-                        <h3 className="font-medium text-gray-900 text-sm truncate flex-1">{item.title}</h3>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ml-2 ${getStatusColor(item.status)}`}>
-                          {getStatusText(item.status)}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs text-gray-500">
-                        <span>{new Date(item.created_at).toLocaleDateString()}</span>
-                        {item.workflow_name && (
-                          <span className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">
-                            {item.workflow_name}
-                          </span>
-                        )}
-                      </div>
-                      {item.status === 'completed' && item.result_url && (
-                        <a
-                          href={item.result_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="block w-full bg-blue-600 text-white text-center py-1.5 rounded-lg hover:bg-blue-700 text-sm mt-2"
-                        >
-                          View Video
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                )
-              }
-
-              // Image item
-              const hasMultipleImages = item.all_result_urls && item.all_result_urls.length > 1
-
-              return (
-                <div key={item.id} className="border border-gray-200 rounded-xl p-3 bg-white">
-                  {/* Multi-image grid (for image-grid workflow) */}
-                  {hasMultipleImages && item.status === 'completed' ? (
-                    <div className="mb-2">
-                      <div className="grid grid-cols-3 gap-1 relative">
-                        <div className="absolute top-1 right-1 z-10">
-                          <span className={`px-1.5 py-0.5 text-xs font-medium rounded-full ${getStatusColor(item.status)}`}>
-                            {getStatusText(item.status)}
-                          </span>
-                        </div>
-                        {item.all_result_urls!.slice(1, 10).map((url, index) => (
-                          <div
-                            key={index}
-                            className="aspect-square bg-gray-100 rounded-lg relative overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
-                            onClick={() => {
-                              setSelectedImage(toImageItem(item))
-                              setFocusedImageIndex(index + 1)
-                            }}
-                          >
-                            <img
-                              src={url}
-                              alt={`Image ${index + 1}`}
-                              className="w-full h-full object-cover"
-                            />
-                            <div className="absolute bottom-0.5 left-0.5 bg-black/70 text-white text-[10px] px-1 rounded">
-                              {index + 1}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    /* Single image display */
-                    <div
-                      className="aspect-video bg-gray-100 rounded-lg mb-2 relative overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
-                      onClick={() => setSelectedImage(toImageItem(item))}
-                    >
-                      {item.preview_url ? (
-                        <img
-                          src={item.preview_url}
-                          alt={item.title}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <span className="text-3xl">🖼️</span>
-                        </div>
-                      )}
-                      <div className="absolute top-1 right-1">
-                        <span className={`px-1.5 py-0.5 text-xs font-medium rounded-full ${getStatusColor(item.status)}`}>
-                          {getStatusText(item.status)}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="space-y-1">
-                    <h3 className="font-medium text-gray-900 text-sm truncate">{item.title}</h3>
-                    <div className="flex items-center justify-between text-xs text-gray-500">
-                      <span>{new Date(item.created_at).toLocaleDateString()}</span>
-                      {item.workflow_name && (
-                        <span className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">
-                          {item.workflow_name}
-                        </span>
-                      )}
-                    </div>
-                    {item.status === 'completed' && item.result_url && (
-                      <a
-                        href={item.result_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block w-full bg-purple-600 text-white text-center py-1.5 rounded-lg hover:bg-purple-700 text-sm mt-2"
-                      >
-                        View Result
-                      </a>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
+          <>
+            {/* Grid View */}
+            {displaySettings.viewMode === 'grid' ? (
+              <div className="grid gap-2" style={gridStyle}>
+                {displayedItems.map((item) => (
+                  <FeedGridItem
+                    key={item.id}
+                    item={item}
+                    thumbnailSize={displaySettings.thumbnailSize}
+                    onClick={() => {
+                      if (item.type === 'image') {
+                        setSelectedImage(toImageItem(item))
+                      } else if (item.result_url) {
+                        window.open(item.result_url, '_blank')
+                      }
+                    }}
+                  />
+                ))}
+              </div>
+            ) : (
+              /* List View */
+              <div className="space-y-3">
+                {displayedItems.map((item) => (
+                  <FeedListItem
+                    key={item.id}
+                    item={item}
+                    thumbnailSize={displaySettings.thumbnailSize}
+                    comfyUrl={config.comfyUrl}
+                    showProgress={config.showProgress}
+                    showFixButton={config.showFixButton}
+                    fixingJobs={fixingJobs}
+                    onFix={(jobId) => handleFixStuckJob(jobId, config.comfyUrl!)}
+                    onImageClick={() => {
+                      if (item.type === 'image') {
+                        setSelectedImage(toImageItem(item))
+                      }
+                    }}
+                    progressValue={
+                      config.showProgress && progress.total_nodes > 0
+                        ? Math.round((progress.completed_nodes / progress.total_nodes) * 100)
+                        : undefined
+                    }
+                  />
+                ))}
+              </div>
+            )}
 
             {/* Load More */}
-            {hasMore && displayedItems.length > 0 && (
+            {(hasMoreVideos || hasMoreImages) && displayedItems.length > 0 && (
               <div className="flex justify-center pt-2">
                 <button
                   onClick={loadMore}
@@ -636,7 +711,7 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
                 </button>
               </div>
             )}
-          </div>
+          </>
         )}
       </div>
 
@@ -652,7 +727,7 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
           focusedImageIndex={focusedImageIndex}
           comfyUrl={config.comfyUrl}
           onUpscaleComplete={() => {
-            loadFeed(true)
+            loadInitial()
             if (onUpscaleComplete) onUpscaleComplete()
           }}
         />,

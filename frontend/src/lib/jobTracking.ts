@@ -92,14 +92,18 @@ export async function completeJob(payload: CompleteJobPayload): Promise<{ succes
 export async function getRecentJobs(limit: number = 50, offset: number = 0): Promise<{ jobs: MultiTalkJob[]; error?: string }> {
   try {
     const response = await apiClient.getRecentJobs(limit, offset) as JobsListResponse
-    
+
     if (response.success) {
       return { jobs: response.jobs || [], error: response.error }
     } else {
       console.error('Error fetching jobs:', response.error)
       return { jobs: [], error: response.error }
     }
-  } catch (error) {
+  } catch (error: any) {
+    // Silently handle AbortError (happens during component cleanup)
+    if (error.name === 'AbortError') {
+      return { jobs: [] }
+    }
     console.error('Error fetching jobs:', error)
     return { jobs: [], error: String(error) }
   }
@@ -130,7 +134,7 @@ export async function getJob(jobId: string): Promise<{ job: MultiTalkJob | null;
 export async function getCompletedJobsWithVideos(limit: number = 20, offset: number = 0): Promise<{ jobs: MultiTalkJob[]; error?: string }> {
   try {
     const response = await apiClient.getCompletedJobsWithVideos(limit, offset) as JobsListResponse
-    
+
     if (response.success) {
       return { jobs: response.jobs || [], error: response.error }
     } else {
@@ -138,17 +142,22 @@ export async function getCompletedJobsWithVideos(limit: number = 20, offset: num
       return { jobs: [], error: response.error }
     }
   } catch (error: any) {
+    // Silently handle AbortError (happens during component cleanup)
+    if (error.name === 'AbortError') {
+      return { jobs: [] }
+    }
+
     console.error('Error fetching completed jobs:', error)
-    
+
     // Handle specific error types more gracefully
     if (error.name === 'TypeError' || error.message?.includes('fetch')) {
       return { jobs: [], error: 'Network error - check connection' }
     }
-    
+
     if (error.message?.includes('timeout')) {
       return { jobs: [], error: 'Request timeout - using offline mode' }
     }
-    
+
     // Return empty array for any other errors to keep UI functional
     return { jobs: [], error: String(error) }
   }
