@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { startJobMonitoring, checkComfyUIHealth } from "../components/utils";
-import GenerationFeed from "../components/GenerationFeed";
+import ResizableFeedSidebar from "../components/ResizableFeedSidebar";
 import { useSmartResolution } from "../hooks/useSmartResolution";
 import { apiClient } from "../lib/apiClient";
 
@@ -517,22 +517,19 @@ export default function WANI2V({ comfyUrl }: Props) {
           </Section>
         </div>
 
-        {/* Right Sidebar - Video Feed */}
-        <div className="w-96 space-y-6">
-          <div className="sticky top-6 h-[calc(100vh-3rem)]">
-            <GenerationFeed
-              config={{
-                mediaType: 'all',
-                pageContext: 'wan-i2v',
-                showCompletedOnly: false,
-                maxItems: 10,
-                showFixButton: true,
-                showProgress: true,
-                comfyUrl: comfyUrl
-              }}
-            />
-          </div>
-        </div>
+        {/* Right Sidebar - Resizable Feed */}
+        <ResizableFeedSidebar
+          storageKey="wan-i2v"
+          config={{
+            mediaType: 'all',
+            pageContext: 'wan-i2v',
+            showCompletedOnly: false,
+            maxItems: 10,
+            showFixButton: true,
+            showProgress: true,
+            comfyUrl: comfyUrl
+          }}
+        />
       </div>
     </div>
   );

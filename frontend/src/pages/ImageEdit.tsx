@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { Label, Field, Section } from "../components/UI";
 import { apiClient } from "../lib/apiClient";
-import GenerationFeed from "../components/GenerationFeed";
+import ResizableFeedSidebar from "../components/ResizableFeedSidebar";
 import { useSmartResolution } from "../hooks/useSmartResolution";
 
 type Tab = "edit" | "camera-angle";
@@ -1461,22 +1461,19 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
           )}
         </div>
 
-        {/* Right Sidebar - Image Feed */}
-        <div className="w-96 space-y-6">
-          <div className="sticky top-6 h-[calc(100vh-3rem)]">
-            <GenerationFeed
-              config={{
-                mediaType: 'all',
-                pageContext: 'image-edit',
-                showCompletedOnly: false,
-                maxItems: 10,
-                showFixButton: true,
-                showProgress: true,
-                comfyUrl: comfyUrl
-              }}
-            />
-          </div>
-        </div>
+        {/* Right Sidebar - Resizable Feed */}
+        <ResizableFeedSidebar
+          storageKey="image-edit"
+          config={{
+            mediaType: 'all',
+            pageContext: ['image-edit', 'multi-camera-angle'],
+            showCompletedOnly: false,
+            maxItems: 10,
+            showFixButton: true,
+            showProgress: true,
+            comfyUrl: comfyUrl
+          }}
+        />
       </div>
     </div>
   );

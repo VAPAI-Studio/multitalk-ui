@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { startJobMonitoring, checkComfyUIHealth } from "../components/utils";
-import GenerationFeed from "../components/GenerationFeed";
+import ResizableFeedSidebar from "../components/ResizableFeedSidebar";
 import { apiClient } from "../lib/apiClient";
 import type { Path, DrawingTool } from "../components/PathAnimator";
 import {
@@ -444,21 +444,18 @@ export default function WANMove({ comfyUrl }: Props) {
         </div>
 
         {/* Right Sidebar - Generation Feed */}
-        <div className="w-96 space-y-6">
-          <div className="sticky top-6 h-[calc(100vh-3rem)]">
-            <GenerationFeed
-              config={{
-                mediaType: 'all',
-                pageContext: 'wan-move',
-                showCompletedOnly: false,
-                maxItems: 10,
-                showFixButton: true,
-                showProgress: true,
-                comfyUrl: comfyUrl
-              }}
-            />
-          </div>
-        </div>
+        <ResizableFeedSidebar
+          storageKey="wan-move"
+          config={{
+            mediaType: 'all',
+            pageContext: 'wan-move',
+            showCompletedOnly: false,
+            maxItems: 10,
+            showFixButton: true,
+            showProgress: true,
+            comfyUrl: comfyUrl
+          }}
+        />
       </div>
     </div>
   );

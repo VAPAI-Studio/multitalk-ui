@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Label, Field, Section } from "../components/UI";
 import { apiClient } from "../lib/apiClient";
-import GenerationFeed from "../components/GenerationFeed";
+import ResizableFeedSidebar from "../components/ResizableFeedSidebar";
 
 const SUBJECT_OPTIONS = [
   { value: "person", label: "Person" },
@@ -439,22 +439,19 @@ export default function ImageGrid({ comfyUrl }: Props) {
           )}
         </div>
 
-        {/* Right Sidebar - ImageFeed */}
-        <div className="w-96 space-y-6">
-          <div className="sticky top-6 h-[calc(100vh-3rem)]">
-            <GenerationFeed
-              config={{
-                mediaType: 'all',
-                pageContext: 'image-grid',
-                showCompletedOnly: false,
-                maxItems: 10,
-                showFixButton: true,
-                showProgress: true,
-                comfyUrl: comfyUrl
-              }}
-            />
-          </div>
-        </div>
+        {/* Right Sidebar - Resizable Feed */}
+        <ResizableFeedSidebar
+          storageKey="image-grid"
+          config={{
+            mediaType: 'all',
+            pageContext: 'image-grid',
+            showCompletedOnly: false,
+            maxItems: 10,
+            showFixButton: true,
+            showProgress: true,
+            comfyUrl: comfyUrl
+          }}
+        />
       </div>
     </div>
   );

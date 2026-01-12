@@ -1,49 +1,16 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { apiClient } from '../lib/apiClient'
 import { useComfyUIProgress } from '../hooks/useComfyUIProgress'
+import { useFeedDisplaySettings } from '../hooks/useFeedDisplaySettings'
 import { fixStuckJob } from '../lib/fixStuckJob'
-import { getFeedThumbnailUrl } from '../lib/imageUtils'
-import VideoThumbnail from './VideoThumbnail'
 import ImageModal from './ImageModal'
+import DisplaySettingsControls from './DisplaySettingsControls'
+import FeedListItem from './FeedListItem'
+import FeedGridItem from './FeedGridItem'
 import type { ImageItem } from '../types/ui'
-
-// Lazy loading image component - shows placeholder first, fades in when loaded
-interface LazyImageProps {
-  src: string
-  alt: string
-  className?: string
-  placeholderIcon?: string
-  placeholderClassName?: string
-}
-
-function LazyImage({ src, alt, className = '', placeholderIcon = '🖼️', placeholderClassName = '' }: LazyImageProps) {
-  const [loaded, setLoaded] = useState(false)
-  const [error, setError] = useState(false)
-
-  return (
-    <div className="relative w-full h-full">
-      {/* Placeholder - always visible until image loads */}
-      <div className={`absolute inset-0 flex items-center justify-center bg-gray-100 ${placeholderClassName} ${loaded ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}>
-        <span className="text-2xl">{error ? '⚠️' : placeholderIcon}</span>
-      </div>
-      {/* Actual image - positioned absolute, fades in when loaded */}
-      {!error && (
-        <img
-          src={src}
-          alt={alt}
-          className={`absolute inset-0 ${className} ${loaded ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300`}
-          loading="lazy"
-          onLoad={() => setLoaded(true)}
-          onError={() => {
-            setError(true)
-            setLoaded(false)
-          }}
-        />
-      )}
-    </div>
-  )
-}
+import type { FeedDisplaySettings } from '../types/feedDisplay'
+import { GRID_MIN_ITEM_WIDTH } from '../types/feedDisplay'
 
 // Unified item type that can be video or image
 interface GenerationItem {
@@ -81,7 +48,7 @@ export interface GenerationFeedConfig {
   workflowNames?: string[]  // Filter to specific workflows (multi-select)
 
   // Page context for "Show Mine" toggle
-  pageContext?: string      // Current page's workflow name
+  pageContext?: string | string[]  // Current page's workflow name(s) - can be array for multi-workflow pages
 
   // Display options
   showCompletedOnly?: boolean
@@ -90,6 +57,10 @@ export interface GenerationFeedConfig {
   showProgress?: boolean
   showMediaTypeToggle?: boolean  // Whether to show the media type toggle (default: true)
 
+  // NEW: Display settings
+  displaySettings?: Partial<FeedDisplaySettings>  // Override default display settings
+  showDisplayControls?: boolean  // Whether to show view/size/column controls (default: true)
+
   // ComfyUI integration
   comfyUrl?: string
 }
@@ -97,44 +68,6 @@ export interface GenerationFeedConfig {
 interface GenerationFeedProps {
   config: GenerationFeedConfig
   onUpscaleComplete?: () => void
-}
-
-// Lazy Video Component with thumbnail support
-const LazyVideo = ({ item, onError }: { item: GenerationItem; onError: (error: any) => void }) => {
-  const [shouldLoad, setShouldLoad] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const container = containerRef.current
-    if (!container) return
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const [entry] = entries
-        if (entry.isIntersecting) {
-          setTimeout(() => setShouldLoad(true), 100)
-        } else {
-          setShouldLoad(false)
-        }
-      },
-      { threshold: 0.1 }
-    )
-
-    observer.observe(container)
-    return () => observer.disconnect()
-  }, [])
-
-  return (
-    <div ref={containerRef} className="w-full">
-      <VideoThumbnail
-        videoUrl={item.result_url || ''}
-        className="w-full rounded-xl shadow-lg"
-        style={{ maxHeight: '200px' }}
-        onError={onError}
-        showPlayButton={shouldLoad}
-      />
-    </div>
-  )
 }
 
 // Progressive loading constants (defaults)
@@ -173,6 +106,42 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
   // Use ComfyUI progress tracking
   const { progress } = useComfyUIProgress(config.comfyUrl || '', !!config.comfyUrl)
 
+  // Display settings (persisted to localStorage)
+  // Normalize pageContext to array for internal use
+  const pageContexts = useMemo(() => {
+    if (!config.pageContext) return undefined
+    return Array.isArray(config.pageContext) ? config.pageContext : [config.pageContext]
+  }, [config.pageContext])
+
+  // Use first context for storage key
+  const storageKeyContext = Array.isArray(config.pageContext)
+    ? config.pageContext[0]
+    : config.pageContext
+
+  const {
+    settings: displaySettings,
+    setViewMode,
+    setThumbnailSize,
+    setColumnCount,
+  } = useFeedDisplaySettings({
+    storageKey: storageKeyContext || 'default',
+    defaults: config.displaySettings,
+  })
+
+  // Compute grid style based on column count and thumbnail size
+  const gridStyle = useMemo(() => {
+    if (displaySettings.viewMode !== 'grid') return {}
+    const minWidth = GRID_MIN_ITEM_WIDTH[displaySettings.thumbnailSize]
+    if (displaySettings.columnCount === 'auto') {
+      return {
+        gridTemplateColumns: `repeat(auto-fill, minmax(${minWidth}px, 1fr))`,
+      }
+    }
+    return {
+      gridTemplateColumns: `repeat(${displaySettings.columnCount}, 1fr)`,
+    }
+  }, [displaySettings.viewMode, displaySettings.columnCount, displaySettings.thumbnailSize])
+
   // Sync mediaTypeFilter when config.mediaType changes from parent
   useEffect(() => {
     setMediaTypeFilter(config.mediaType)
@@ -190,8 +159,6 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
     }
     return allItems.filter(item => item.type === effectiveMediaType)
   }, [allItems, effectiveMediaType])
-
-  const getShortJobId = (jobId: string) => jobId.slice(-8)
 
   // Helper to convert API response to GenerationItem
   const videoJobToItem = (job: any): GenerationItem => ({
@@ -236,10 +203,10 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
 
   // Get effective workflow filter
   const getEffectiveWorkflows = useCallback(() => {
-    return showMineOnly && config.pageContext
-      ? [config.pageContext]
+    return showMineOnly && pageContexts
+      ? pageContexts
       : config.workflowNames
-  }, [showMineOnly, config.pageContext, config.workflowNames])
+  }, [showMineOnly, pageContexts, config.workflowNames])
 
   // Load a batch of items (progressive loading)
   const loadBatch = useCallback(async (
@@ -523,7 +490,7 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
   useEffect(() => {
     loadInitial()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showMineOnly, config.showCompletedOnly, config.workflowNames, config.pageContext])
+  }, [showMineOnly, config.showCompletedOnly, config.workflowNames, pageContexts])
 
   // Progressive loading - continue loading in background after initial batch
   useEffect(() => {
@@ -550,28 +517,6 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
     // The function is stable and doesn't need to trigger re-runs
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveMediaType, displayedItems.length, loadingPhase, isBackfilling, hasMoreVideos, hasMoreImages])
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed': return 'text-green-600 bg-green-100'
-      case 'processing': return 'text-blue-600 bg-blue-100'
-      case 'failed': return 'text-red-600 bg-red-100'
-      case 'pending': return 'text-yellow-600 bg-yellow-100'
-      case 'error': return 'text-red-600 bg-red-100'
-      default: return 'text-gray-600 bg-gray-100'
-    }
-  }
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'completed': return 'Completed'
-      case 'processing': return 'Processing'
-      case 'failed': return 'Failed'
-      case 'pending': return 'Pending'
-      case 'error': return 'Error'
-      default: return status
-    }
-  }
 
   return (
     <div className="h-full flex flex-col bg-white rounded-2xl shadow-lg border border-gray-200">
@@ -631,7 +576,7 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
           )}
 
           {/* Show Mine toggle - only show if pageContext is set */}
-          {config.pageContext && (
+          {pageContexts && (
             <div className="flex items-center bg-gray-100 rounded-full p-0.5">
               <button
                 onClick={() => setShowMineOnly(true)}
@@ -656,6 +601,21 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
             </div>
           )}
         </div>
+
+        {/* Display settings controls */}
+        {(config.showDisplayControls !== false) && (
+          <div className="mt-2 pt-2 border-t border-gray-100">
+            <DisplaySettingsControls
+              viewMode={displaySettings.viewMode}
+              thumbnailSize={displaySettings.thumbnailSize}
+              columnCount={displaySettings.columnCount}
+              onViewModeChange={setViewMode}
+              onThumbnailSizeChange={setThumbnailSize}
+              onColumnCountChange={setColumnCount}
+              compact={true}
+            />
+          </div>
+        )}
       </div>
 
       {/* Scrollable Content */}
@@ -685,202 +645,52 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
             <p className="text-gray-500 text-sm">No generations found</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {displayedItems.map((item) => {
-              // Compact view for failed/error items
-              if (item.status === 'failed' || item.status === 'error') {
-                return (
-                  <div key={item.id} className="border border-yellow-200 rounded-lg p-2 bg-yellow-50">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm">{item.type === 'video' ? '🎬' : '🖼️'}</span>
-                        <span className="text-xs font-mono text-gray-600">
-                          {getShortJobId(item.id)}
-                        </span>
-                      </div>
-                      <span className={`text-xs px-2 py-0.5 rounded ${getStatusColor(item.status)}`}>
-                        {getStatusText(item.status)}
-                      </span>
-                    </div>
-                  </div>
-                )
-              }
-
-              // Video item
-              if (item.type === 'video') {
-                return (
-                  <div key={item.id} className="border border-gray-200 rounded-xl p-3 bg-white">
-                    {item.result_url && item.status === 'completed' ? (
-                      // Use pre-generated thumbnail if available, otherwise use LazyVideo
-                      item.thumbnail_url ? (
-                        <a
-                          href={item.result_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="block relative w-full aspect-video rounded-xl overflow-hidden shadow-lg group"
-                        >
-                          <LazyImage
-                            src={item.thumbnail_url}
-                            alt="Video thumbnail"
-                            className="w-full h-full object-cover"
-                            placeholderIcon="🎬"
-                          />
-                          <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
-                            <div className="w-12 h-12 bg-white/90 rounded-full flex items-center justify-center">
-                              <span className="text-2xl ml-1">▶</span>
-                            </div>
-                          </div>
-                        </a>
-                      ) : (
-                        <LazyVideo
-                          item={item}
-                          onError={() => {
-                            console.error('Video load failed:', item.id)
-                          }}
-                        />
-                      )
-                    ) : item.status === 'processing' || item.status === 'submitted' ? (
-                      <div className="w-full h-16 bg-blue-50 rounded-lg flex items-center justify-center">
-                        <div className="flex items-center gap-2">
-                          <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full"></div>
-                          <span className="text-blue-600 text-sm">
-                            {config.showProgress && progress.total_nodes > 0
-                              ? `${Math.round((progress.completed_nodes / progress.total_nodes) * 100)}%`
-                              : 'Processing...'}
-                          </span>
-                          {config.showFixButton && config.comfyUrl && (
-                            <button
-                              onClick={() => handleFixStuckJob(item.id, config.comfyUrl!)}
-                              disabled={fixingJobs.has(item.id)}
-                              className="px-2 py-1 text-xs bg-orange-100 hover:bg-orange-200 text-orange-700 rounded border border-orange-300 disabled:opacity-50"
-                            >
-                              {fixingJobs.has(item.id) ? '...' : 'Fix'}
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="w-full h-16 bg-gray-100 rounded-lg flex items-center justify-center">
-                        <span className="text-2xl">🎬</span>
-                      </div>
-                    )}
-
-                    <div className="mt-2 space-y-1">
-                      <div className="flex items-center justify-between">
-                        <h3 className="font-medium text-gray-900 text-sm truncate flex-1">{item.title}</h3>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ml-2 ${getStatusColor(item.status)}`}>
-                          {getStatusText(item.status)}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs text-gray-500">
-                        <span>{new Date(item.created_at).toLocaleDateString()}</span>
-                        {item.workflow_name && (
-                          <span className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">
-                            {item.workflow_name}
-                          </span>
-                        )}
-                      </div>
-                      {item.status === 'completed' && item.result_url && (
-                        <a
-                          href={item.result_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="block w-full bg-blue-600 text-white text-center py-1.5 rounded-lg hover:bg-blue-700 text-sm mt-2"
-                        >
-                          View Video
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                )
-              }
-
-              // Image item
-              const hasMultipleImages = item.all_result_urls && item.all_result_urls.length > 1
-
-              return (
-                <div key={item.id} className="border border-gray-200 rounded-xl p-3 bg-white">
-                  {/* Multi-image grid (for image-grid workflow) */}
-                  {hasMultipleImages && item.status === 'completed' ? (
-                    <div className="mb-2">
-                      <div className="grid grid-cols-3 gap-1 relative">
-                        <div className="absolute top-1 right-1 z-10">
-                          <span className={`px-1.5 py-0.5 text-xs font-medium rounded-full ${getStatusColor(item.status)}`}>
-                            {getStatusText(item.status)}
-                          </span>
-                        </div>
-                        {item.all_result_urls!.slice(1, 10).map((url, index) => (
-                          <div
-                            key={index}
-                            className="aspect-square rounded-lg relative overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
-                            onClick={() => {
-                              setSelectedImage(toImageItem(item))
-                              setFocusedImageIndex(index + 1)
-                            }}
-                          >
-                            <LazyImage
-                              src={getFeedThumbnailUrl(url)}
-                              alt={`Image ${index + 1}`}
-                              className="w-full h-full object-cover"
-                              placeholderIcon="🖼️"
-                            />
-                            <div className="absolute bottom-0.5 left-0.5 bg-black/70 text-white text-[10px] px-1 rounded z-10">
-                              {index + 1}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    /* Single image display */
-                    <div
-                      className="aspect-video rounded-lg mb-2 relative overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
-                      onClick={() => setSelectedImage(toImageItem(item))}
-                    >
-                      {item.preview_url ? (
-                        <LazyImage
-                          src={getFeedThumbnailUrl(item.preview_url)}
-                          alt={item.title}
-                          className="w-full h-full object-cover"
-                          placeholderIcon="🖼️"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                          <span className="text-3xl">🖼️</span>
-                        </div>
-                      )}
-                      <div className="absolute top-1 right-1">
-                        <span className={`px-1.5 py-0.5 text-xs font-medium rounded-full ${getStatusColor(item.status)}`}>
-                          {getStatusText(item.status)}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="space-y-1">
-                    <h3 className="font-medium text-gray-900 text-sm truncate">{item.title}</h3>
-                    <div className="flex items-center justify-between text-xs text-gray-500">
-                      <span>{new Date(item.created_at).toLocaleDateString()}</span>
-                      {item.workflow_name && (
-                        <span className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">
-                          {item.workflow_name}
-                        </span>
-                      )}
-                    </div>
-                    {item.status === 'completed' && item.result_url && (
-                      <a
-                        href={item.result_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block w-full bg-purple-600 text-white text-center py-1.5 rounded-lg hover:bg-purple-700 text-sm mt-2"
-                      >
-                        View Result
-                      </a>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
+          <>
+            {/* Grid View */}
+            {displaySettings.viewMode === 'grid' ? (
+              <div className="grid gap-2" style={gridStyle}>
+                {displayedItems.map((item) => (
+                  <FeedGridItem
+                    key={item.id}
+                    item={item}
+                    thumbnailSize={displaySettings.thumbnailSize}
+                    onClick={() => {
+                      if (item.type === 'image') {
+                        setSelectedImage(toImageItem(item))
+                      } else if (item.result_url) {
+                        window.open(item.result_url, '_blank')
+                      }
+                    }}
+                  />
+                ))}
+              </div>
+            ) : (
+              /* List View */
+              <div className="space-y-3">
+                {displayedItems.map((item) => (
+                  <FeedListItem
+                    key={item.id}
+                    item={item}
+                    thumbnailSize={displaySettings.thumbnailSize}
+                    comfyUrl={config.comfyUrl}
+                    showProgress={config.showProgress}
+                    showFixButton={config.showFixButton}
+                    fixingJobs={fixingJobs}
+                    onFix={(jobId) => handleFixStuckJob(jobId, config.comfyUrl!)}
+                    onImageClick={() => {
+                      if (item.type === 'image') {
+                        setSelectedImage(toImageItem(item))
+                      }
+                    }}
+                    progressValue={
+                      config.showProgress && progress.total_nodes > 0
+                        ? Math.round((progress.completed_nodes / progress.total_nodes) * 100)
+                        : undefined
+                    }
+                  />
+                ))}
+              </div>
+            )}
 
             {/* Load More */}
             {(hasMoreVideos || hasMoreImages) && displayedItems.length > 0 && (
@@ -901,7 +711,7 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
                 </button>
               </div>
             )}
-          </div>
+          </>
         )}
       </div>
 

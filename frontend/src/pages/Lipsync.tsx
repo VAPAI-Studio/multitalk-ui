@@ -4,7 +4,7 @@ import { Button, Badge } from "../components/DesignSystem";
 import { Timeline } from "../components/Timeline";
 import type { Mask, AudioTrack, VideoTrack, AudioTrackSimple } from "../components/types";
 import { fileToBase64, uploadMediaToComfy, joinAudiosForMask, groupAudiosByMask, generateId, startJobMonitoring, checkComfyUIHealth } from "../components/utils";
-import GenerationFeed from "../components/GenerationFeed";
+import ResizableFeedSidebar from "../components/ResizableFeedSidebar";
 import { useSmartResolution } from "../hooks/useSmartResolution";
 import { MaskEditor } from "../components/MaskEditor";
 import { AVPlayerWithPadding } from "../components/AVPlayerWithPadding";
@@ -1792,22 +1792,19 @@ export default function Lipsync({ comfyUrl, initialMode = 'one-person' }: Props)
           </Section>
         </div>
 
-        {/* Right Sidebar - Video Feed */}
-        <div className="w-96 space-y-6">
-          <div className="sticky top-6 h-[calc(100vh-3rem)]">
-            <GenerationFeed
-              config={{
-                mediaType: 'all',
-                pageContext: getWorkflowName(),
-                showCompletedOnly: false,
-                maxItems: 10,
-                showFixButton: true,
-                showProgress: true,
-                comfyUrl: comfyUrl
-              }}
-            />
-          </div>
-        </div>
+        {/* Right Sidebar - Resizable Feed */}
+        <ResizableFeedSidebar
+          storageKey={getWorkflowName()}
+          config={{
+            mediaType: 'all',
+            pageContext: getWorkflowName(),
+            showCompletedOnly: false,
+            maxItems: 10,
+            showFixButton: true,
+            showProgress: true,
+            comfyUrl: comfyUrl
+          }}
+        />
       </div>
 
       {/* Multi-Person Mask Editing Modal */}
