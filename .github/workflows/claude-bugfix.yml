@@ -1,0 +1,57 @@
+name: Claude Auto Bug Fix
+
+on:
+  issues:
+    types: [opened, labeled]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  auto-fix-bug:
+    if: contains(github.event.issue.body, '@claude')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: dev  # ← Parte desde dev
+          fetch-depth: 0
+
+      - name: Claude Code Action
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            IMPORTANTE: Primero lee el archivo CLAUDE.md en la raíz del repositorio para entender las convenciones del proyecto.
+
+            Analiza este issue y crea un PR con la solución:
+
+            **Issue #${{ github.event.issue.number }}**
+            **Título:** ${{ github.event.issue.title }}
+            
+            **Descripción:**
+            ${{ github.event.issue.body }}
+
+            Instrucciones:
+            1. Lee CLAUDE.md para entender el proyecto
+            2. Crea una nueva branch desde dev con nombre: fix/issue-${{ github.event.issue.number }}-descripcion-corta
+            3. Implementa la solución siguiendo las convenciones de CLAUDE.md
+            4. Haz commits descriptivos
+            5. Crea un PR hacia la branch dev (NO hacia main)
+            6. En el PR, menciona "Closes #${{ github.event.issue.number }}"
+          claude_args: "--max-turns 20"
+
+      - name: Comment on issue
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: '🤖 Claude está trabajando en este issue. Creará un PR hacia `dev` cuando termine.'
+            });
