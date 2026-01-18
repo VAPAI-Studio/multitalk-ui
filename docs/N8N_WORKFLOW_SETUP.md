@@ -278,6 +278,86 @@ If you continue to have issues:
 3. Test expressions in n8n's expression editor
 4. Use GitHub issue templates instead of automation for complex cases
 
+## Automated Issue Validation (Optional)
+
+Repository admins can add automated validation to detect malformed issues. Create `.github/workflows/validate-issues.yml`:
+
+```yaml
+name: Validate Issues
+
+on:
+  issues:
+    types: [opened, edited]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Check for unresolved template variables
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const body = issue.body || '';
+            const title = issue.title || '';
+
+            // Check for common template variable patterns
+            const templatePatterns = [
+              /\{\{.*?\}\}/g,                    // {{ any content }}
+              /\$node\[/g,                       // $node[ pattern from n8n
+              /JSON\.parse\(/g,                  // JSON.parse( pattern
+              /\$json\./g,                       // $json. pattern from n8n
+            ];
+
+            let foundTemplates = false;
+            let templateExamples = [];
+
+            // Check title
+            for (const pattern of templatePatterns) {
+              const matches = title.match(pattern);
+              if (matches) {
+                foundTemplates = true;
+                templateExamples.push(...matches.slice(0, 3));
+              }
+            }
+
+            // Check body
+            for (const pattern of templatePatterns) {
+              const matches = body.match(pattern);
+              if (matches) {
+                foundTemplates = true;
+                templateExamples.push(...matches.slice(0, 3));
+              }
+            }
+
+            if (foundTemplates) {
+              const uniqueExamples = [...new Set(templateExamples)].slice(0, 5);
+              const comment = `⚠️ **Unresolved Template Variables Detected**
+
+This issue appears to contain unresolved template variables:
+
+${uniqueExamples.map(ex => `- \`${ex}\``).join('\n')}
+
+This usually happens when an n8n workflow didn't properly parse template variables.
+
+**To fix this:** See the [N8N Workflow Setup Guide](https://github.com/VAPAI-Studio/multitalk-ui/blob/main/docs/N8N_WORKFLOW_SETUP.md)`;
+
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: issue.number,
+                body: comment
+              });
+
+              await github.rest.issues.addLabels({
+                ...context.repo,
+                issue_number: issue.number,
+                labels: ['invalid-template', 'needs-attention']
+              });
+            }
+```
+
 ## Related Files
 
 - `.github/ISSUE_TEMPLATE/bug_report.yml` - Structured bug report template
