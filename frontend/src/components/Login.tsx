@@ -41,7 +41,7 @@ export default function Login({ onSwitchToRegister }: LoginProps) {
           <h2 className="text-3xl font-black text-center mb-2 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
             Welcome Back
           </h2>
-          <p className="text-gray-600 text-center mb-8">Sign in to VAPAI Studio</p>
+          <p className="text-gray-600 text-center mb-8">Sign in to sideOUTsticks</p>
 
           {/* Error Message */}
           {error && (
