@@ -90,11 +90,18 @@ export default function ImageGrid({ comfyUrl }: Props) {
 
       // 3. Submit workflow using backend template
       const clientId = `image-grid-${Math.random().toString(36).slice(2)}`;
+
+      // Generate random seeds for each generation
+      const seed1 = Math.floor(Math.random() * 1000000000000);
+      const seed2 = Math.floor(Math.random() * 1000000000000);
+
       const workflowResponse = await apiClient.submitWorkflow(
         'ImageGrid',
         {
           IMAGE_FILENAME: uploadedFilename,
-          SUBJECT_PROMPT_PREFIX: subjectPromptPrefix
+          SUBJECT_PROMPT_PREFIX: subjectPromptPrefix,
+          SEED_1: seed1,
+          SEED_2: seed2
         },
         comfyUrl,
         clientId
