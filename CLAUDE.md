@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-VAPAI Studio is a full-stack application for AI-powered video and audio processing with multi-character conversations. The application integrates with ComfyUI for workflow execution and Supabase for authentication and data storage.
+sideOUTsticks is a full-stack application for AI-powered video and audio processing with multi-character conversations. The application integrates with ComfyUI for workflow execution and Supabase for authentication and data storage.
 
 ## Development Commands
 

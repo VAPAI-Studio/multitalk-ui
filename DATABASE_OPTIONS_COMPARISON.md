@@ -2,7 +2,7 @@
 
 ## Context
 
-MultiTalk is **one feature** of the VAPAI Studio platform, which offers multiple AI workflow tools. We need a database structure that:
+MultiTalk is **one feature** of the sideOUTsticks platform, which offers multiple AI workflow tools. We need a database structure that:
 - Scales as we add new features
 - Makes sense from a product perspective
 - Is easy to query and maintain
@@ -410,7 +410,7 @@ INSERT INTO video_jobs VALUES (
 
 ---
 
-## Recommendation Based on VAPAI Studio Context
+## Recommendation Based on sideOUTsticks Context
 
 Looking at your current features:
 
@@ -518,4 +518,4 @@ const allJobs = [...imageJobs, ...videoJobs].sort(...)
    - Add workflow_name field
    - Keep old tables for rollback
 
-What do you think? Which option feels right for VAPAI Studio?
+What do you think? Which option feels right for sideOUTsticks?

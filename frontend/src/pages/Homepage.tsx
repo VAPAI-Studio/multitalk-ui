@@ -107,7 +107,7 @@ export default function Homepage({ onNavigate }: Props) {
             </div>
           </div>
           <h1 className="text-5xl md:text-7xl font-black bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
-            VAPAI Studio
+            sideOUTsticks
           </h1>
           <p className="text-xl md:text-2xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
             Your complete AI-powered media creation suite.

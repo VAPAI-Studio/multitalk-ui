@@ -2,7 +2,7 @@
 
 ## Overview
 
-The LoRA Trainer is a new feature that allows users to train custom QWEN Image LoRA models using datasets stored in Supabase. Unlike other features in VAPAI Studio, this trainer integrates with the Musubi Tuner API instead of ComfyUI.
+The LoRA Trainer is a new feature that allows users to train custom QWEN Image LoRA models using datasets stored in Supabase. Unlike other features in sideOUTsticks, this trainer integrates with the Musubi Tuner API instead of ComfyUI.
 
 ## Key Differences from Other Features
 
