@@ -101,5 +101,10 @@ See `.env.example` files in both frontend and backend directories for required c
 - **[api_doc.md](api_doc.md)** - ComfyUI server API reference
 - **[backend/setup_supabase_auth.md](backend/setup_supabase_auth.md)** - Supabase authentication setup
 - **[TODO.md](TODO.md)** - Project roadmap and planned improvements
+- **[docs/N8N_WORKFLOW_SETUP.md](docs/N8N_WORKFLOW_SETUP.md)** - Guide for setting up n8n workflow automation
 
 For detailed information about the architecture, development setup, and contributing guidelines, see [CLAUDE.md](CLAUDE.md).
+
+## Contributing
+
+When reporting issues, please use our [issue templates](.github/ISSUE_TEMPLATE/) to ensure all necessary information is provided. This helps us understand and fix problems more quickly.
