@@ -13,8 +13,27 @@ from models.user import (
 )
 from supabase import Client
 from typing import Dict
+from config.settings import settings
 
 router = APIRouter(tags=["Authentication"])
+
+
+def validate_email_domain(email: str) -> bool:
+    """
+    Validate if email domain is in the allowed list.
+
+    Args:
+        email: Email address to validate
+
+    Returns:
+        True if domain is allowed, False otherwise
+    """
+    if not email or "@" not in email:
+        return False
+
+    domain = email.split("@")[1].lower()
+    allowed_domains = [d.lower() for d in settings.ALLOWED_EMAIL_DOMAINS]
+    return domain in allowed_domains
 
 
 @router.post("/auth/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
@@ -33,9 +52,17 @@ async def register(
         TokenResponse with access token and user data
 
     Raises:
-        HTTPException: If registration fails
+        HTTPException: If registration fails or email domain not allowed
     """
     try:
+        # Validate email domain
+        if not validate_email_domain(user_data.email):
+            allowed_domains_str = ", ".join(f"@{d}" for d in settings.ALLOWED_EMAIL_DOMAINS)
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Registration is restricted to users with email addresses from: {allowed_domains_str}"
+            )
+
         # Register user with Supabase Auth
         auth_response = supabase.auth.sign_up({
             "email": user_data.email,
