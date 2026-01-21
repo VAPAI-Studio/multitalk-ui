@@ -2,13 +2,49 @@
 
 /* Custom CSS variables for consistent theming */
 :root {
+  /* Light mode variables */
+  --color-background: #ffffff;
+  --color-surface: #f9fafb;
+  --color-text-primary: #111827;
+  --color-text-secondary: #6b7280;
+  --color-border: #e5e7eb;
+
+  /* Gradients */
   --primary-gradient: linear-gradient(135deg, #10b981 0%, #059669 100%);
   --surface-gradient: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
+
+  /* Shadows */
   --shadow-soft: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
   --shadow-medium: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   --shadow-large: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+
+  /* Transitions */
   --transition-smooth: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-bounce: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.dark {
+  /* Dark mode overrides */
+  --color-background: #0f172a;
+  --color-surface: #1e293b;
+  --color-text-primary: #f1f5f9;
+  --color-text-secondary: #cbd5e1;
+  --color-border: #475569;
+
+  /* Gradients keep same vibrant colors for brand consistency */
+  --surface-gradient: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+}
+
+/* Smooth theme transitions */
+* {
+  transition: background-color 0.2s ease-in-out,
+              border-color 0.2s ease-in-out,
+              color 0.2s ease-in-out;
+}
+
+/* Disable transitions during initial load to prevent flash */
+.preload * {
+  transition: none !important;
 }
 
 /* Smooth scrolling for better UX */
