@@ -1,3 +1,4 @@
 #!/bin/bash
 cd "$(dirname "$0")/frontend"
-npm run dev
+# Use temporary cache to avoid permission issues
+npm run dev --cache /tmp/npm-cache
