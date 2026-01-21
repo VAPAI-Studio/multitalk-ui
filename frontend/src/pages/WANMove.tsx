@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { startJobMonitoring, checkComfyUIHealth } from "../components/utils";
 import ResizableFeedSidebar from "../components/ResizableFeedSidebar";
 import { apiClient } from "../lib/apiClient";
+import { useAuth } from "../contexts/AuthContext";
 import type { Path, DrawingTool } from "../components/PathAnimator";
 import {
   PathCanvas,
@@ -37,6 +38,9 @@ interface Props {
 }
 
 export default function WANMove({ comfyUrl }: Props) {
+  // Auth context
+  const { user } = useAuth();
+
   // Image state
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
@@ -218,6 +222,7 @@ export default function WANMove({ comfyUrl }: Props) {
 
       // Create job record
       await apiClient.createVideoJob({
+        user_id: user?.id || null,
         comfy_job_id: id,
         workflow_name: 'wan-move',
         comfy_url: comfyUrl,

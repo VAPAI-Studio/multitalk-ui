@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Label, Field, Section } from "../components/UI";
 import { apiClient } from "../lib/apiClient";
 import ResizableFeedSidebar from "../components/ResizableFeedSidebar";
+import { useAuth } from "../contexts/AuthContext";
 
 const SUBJECT_OPTIONS = [
   { value: "person", label: "Person" },
@@ -17,6 +18,9 @@ interface Props {
 }
 
 export default function ImageGrid({ comfyUrl }: Props) {
+  // Auth context
+  const { user } = useAuth();
+
   // State
   const [inputImage, setInputImage] = useState<File | null>(null);
   const [inputImagePreview, setInputImagePreview] = useState<string>("");
@@ -110,7 +114,9 @@ export default function ImageGrid({ comfyUrl }: Props) {
       setStatus("Creating job record...");
 
       // 4. Create image job in database
+      console.log('Creating job with user_id:', user?.id || null);
       const jobCreationResponse = await apiClient.createImageJob({
+        user_id: user?.id || null,
         comfy_job_id: promptId,
         workflow_name: 'image-grid',
         comfy_url: comfyUrl,
@@ -120,8 +126,11 @@ export default function ImageGrid({ comfyUrl }: Props) {
         }
       }) as any;
 
+      console.log('Job creation response:', jobCreationResponse);
+
       if (!jobCreationResponse.success || !jobCreationResponse.image_job?.id) {
-        throw new Error('Failed to create job record in database');
+        const errorMsg = jobCreationResponse.error || 'Unknown database error';
+        throw new Error(`Failed to create job record in database: ${errorMsg}`);
       }
 
       databaseJobId = jobCreationResponse.image_job.id;
