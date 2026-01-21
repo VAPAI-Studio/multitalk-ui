@@ -115,35 +115,44 @@ class DatasetService:
             # Get datasets first
             response = await asyncio.to_thread(
                 lambda: self.supabase.table('datasets')
-                .select('*')
+                .select('id, name, character_trigger, settings, created_at, updated_at')
                 .order('updated_at', desc=True)
                 .execute()
             )
-            
+
             # Check if response has error attribute and if it contains an error
             if hasattr(response, 'error') and response.error:
                 raise Exception(f"Failed to load datasets: {response.error}")
-            
-            # Process datasets and add image count for each
+
+            if not response.data:
+                return [], None
+
+            # Get all dataset IDs
+            dataset_ids = [d['id'] for d in response.data]
+
+            # Get all data entries for these datasets in ONE query (only dataset_id needed for counting)
+            data_response = await asyncio.to_thread(
+                lambda: self.supabase.table('data')
+                .select('dataset_id')
+                .in_('dataset_id', dataset_ids)
+                .execute()
+            )
+
+            # Count entries per dataset_id in Python (much faster than N queries)
+            count_map = {}
+            if data_response.data:
+                for entry in data_response.data:
+                    did = entry['dataset_id']
+                    count_map[did] = count_map.get(did, 0) + 1
+
+            # Build datasets with counts
             datasets_with_counts = []
-            for dataset_data in (response.data or []):
-                # Get image count for this dataset
-                count_response = await asyncio.to_thread(
-                    lambda dataset_id=dataset_data['id']: self.supabase.table('data')
-                    .select('*', count='exact')
-                    .eq('dataset_id', dataset_id)
-                    .execute()
-                )
-                
-                # Get the count from the response
-                image_count = count_response.count if hasattr(count_response, 'count') else 0
-                
-                # Add image_count to dataset data
-                dataset_data['image_count'] = image_count
+            for dataset_data in response.data:
+                dataset_data['image_count'] = count_map.get(dataset_data['id'], 0)
                 datasets_with_counts.append(Dataset(**dataset_data))
-            
+
             return datasets_with_counts, None
-            
+
         except Exception as error:
             print(f"Error loading datasets: {error}")
             return [], str(error)

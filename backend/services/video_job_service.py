@@ -150,12 +150,13 @@ class VideoJobService:
         """
         try:
             result = self.supabase.table("video_jobs") \
-                .select("*") \
+                .select("id, user_id, workflow_name, status, comfy_url, comfy_job_id, input_image_urls, input_audio_urls, input_video_urls, output_video_urls, width, height, fps, duration_seconds, parameters, error_message, thumbnail_url, created_at, updated_at") \
                 .eq("id", job_id) \
+                .single() \
                 .execute()
 
-            if result.data and len(result.data) > 0:
-                job = VideoJob(**result.data[0])
+            if result.data:
+                job = VideoJob(**result.data)
                 return job, None
             else:
                 return None, "Job not found"
@@ -170,12 +171,13 @@ class VideoJobService:
         """
         try:
             result = self.supabase.table("video_jobs") \
-                .select("*") \
+                .select("id, user_id, workflow_name, status, comfy_url, comfy_job_id, input_image_urls, input_audio_urls, input_video_urls, output_video_urls, width, height, fps, duration_seconds, parameters, error_message, thumbnail_url, created_at, updated_at") \
                 .eq("comfy_job_id", comfy_job_id) \
+                .single() \
                 .execute()
 
-            if result.data and len(result.data) > 0:
-                job = VideoJob(**result.data[0])
+            if result.data:
+                job = VideoJob(**result.data)
                 return job, None
             else:
                 return None, "Job not found"
@@ -195,7 +197,9 @@ class VideoJobService:
         Returns: (jobs, total_count, error_message)
         """
         try:
-            query = self.supabase.table("video_jobs").select("*", count="exact")
+            # Use specific columns instead of * for better performance
+            columns = "id, user_id, workflow_name, status, comfy_url, comfy_job_id, input_image_urls, input_audio_urls, input_video_urls, output_video_urls, width, height, fps, duration_seconds, parameters, error_message, thumbnail_url, created_at, updated_at"
+            query = self.supabase.table("video_jobs").select(columns, count="exact")
 
             # Apply filters
             if workflow_name:
@@ -229,7 +233,9 @@ class VideoJobService:
         Returns: (jobs, total_count, error_message)
         """
         try:
-            query = self.supabase.table("video_jobs").select("*", count="exact")
+            # Use specific columns instead of * for better performance
+            columns = "id, user_id, workflow_name, status, comfy_url, comfy_job_id, input_image_urls, input_audio_urls, input_video_urls, output_video_urls, width, height, fps, duration_seconds, parameters, error_message, thumbnail_url, created_at, updated_at"
+            query = self.supabase.table("video_jobs").select(columns, count="exact")
 
             # Filter for completed jobs only
             query = query.eq("status", "completed")
