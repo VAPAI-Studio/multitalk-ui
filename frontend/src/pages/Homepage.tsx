@@ -1,6 +1,6 @@
 
 interface Props {
-  onNavigate: (page: "lipsync" | "image-edit" | "character-caption" | "wan-i2v" | "wan-move" | "style-transfer" | "create-image" | "lora-trainer" | "image-grid" | "img2img" | "generation-feed") => void;
+  onNavigate: (page: "lipsync" | "image-edit" | "character-caption" | "wan-i2v" | "wan-move" | "style-transfer" | "create-image" | "lora-trainer" | "image-grid" | "audio-stem-separator" | "img2img" | "generation-feed") => void;
 }
 
 export default function Homepage({ onNavigate }: Props) {
@@ -76,6 +76,14 @@ export default function Homepage({ onNavigate }: Props) {
       icon: "🖼️",
       gradient: "from-teal-500 to-cyan-600",
       features: ["9 unique angles", "Subject-aware prompts", "Model: Gemini Pro Image"]
+    },
+    {
+      id: "audio-stem-separator" as const,
+      title: "Audio Stem Separator",
+      description: "Separate any audio track into individual stems: vocals, drums, bass, and other instruments using AI-powered audio separation.",
+      icon: "🎵",
+      gradient: "from-green-500 to-emerald-600",
+      features: ["Vocal isolation", "Drum & bass extraction", "Download as ZIP or separate files", "Model: Open Unmix"]
     },
     {
       id: "generation-feed" as const,
