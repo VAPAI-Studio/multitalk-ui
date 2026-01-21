@@ -33,6 +33,7 @@ class UserResponse(BaseModel):
     id: str
     email: str
     full_name: Optional[str] = None
+    profile_picture_url: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -71,3 +72,8 @@ class EmailVerification(BaseModel):
     """Schema for email verification."""
     token: str
     type: str = "signup"
+
+
+class UserProfileUpdate(BaseModel):
+    """Schema for user profile update."""
+    full_name: Optional[str] = None

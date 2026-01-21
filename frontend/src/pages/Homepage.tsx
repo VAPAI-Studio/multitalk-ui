@@ -1,9 +1,11 @@
+import { type User } from '../contexts/AuthContext';
 
 interface Props {
   onNavigate: (page: "lipsync" | "image-edit" | "character-caption" | "wan-i2v" | "style-transfer" | "create-image" | "lora-trainer" | "image-grid" | "img2img") => void;
+  user: User | null;
 }
 
-export default function Homepage({ onNavigate }: Props) {
+export default function Homepage({ onNavigate, user }: Props) {
   const apps = [
     {
       id: "lipsync" as const,
@@ -96,6 +98,31 @@ export default function Homepage({ onNavigate }: Props) {
           <p className="text-xl md:text-2xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
             Your complete AI-powered media creation suite.
           </p>
+
+          {/* User Welcome Section */}
+          {user && (
+            <div className="flex items-center justify-center gap-4 mt-8">
+              <div className="flex items-center gap-3 px-6 py-3 bg-white/80 backdrop-blur-sm rounded-2xl border border-gray-200/50 shadow-md">
+                {user.profile_picture_url ? (
+                  <img
+                    src={user.profile_picture_url}
+                    alt="Profile"
+                    className="w-12 h-12 rounded-full object-cover border-2 border-purple-200"
+                  />
+                ) : (
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                    <span className="text-white text-lg font-bold">
+                      {(user.full_name?.[0] || user.email?.[0] || 'U').toUpperCase()}
+                    </span>
+                  </div>
+                )}
+                <div className="text-left">
+                  <p className="text-sm text-gray-500">Welcome back,</p>
+                  <p className="text-lg font-bold text-gray-900">{user.full_name || user.email}</p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Apps Grid */}
