@@ -11,6 +11,7 @@ import StyleTransfer from "./pages/StyleTransfer";
 import CreateImage from "./pages/CreateImage";
 import LoRATrainer from "./pages/LoraTrainer";
 import ImageGrid from "./pages/ImageGrid";
+import LTX2I2V from "./pages/LTX2I2V";
 // import Img2Img from "./pages/Img2Img"; // Hidden: Image to Image page
 import ComfyUIStatus from "./components/ComfyUIStatus";
 import ConsoleToggle from "./components/ConsoleToggle";
@@ -19,7 +20,7 @@ import { useAuth } from "./contexts/AuthContext";
 
 export default function App() {
   const { isAuthenticated, loading, user, logout } = useAuth();
-  const [currentPage, setCurrentPage] = useState<"home" | "lipsync" | "image-edit" | "generation-feed" | "character-caption" | "wan-i2v" | "wan-move" | "style-transfer" | "create-image" | "lora-trainer" | "image-grid" | "img2img">("home");
+  const [currentPage, setCurrentPage] = useState<"home" | "lipsync" | "image-edit" | "generation-feed" | "character-caption" | "wan-i2v" | "wan-move" | "style-transfer" | "create-image" | "lora-trainer" | "image-grid" | "ltx2-i2v" | "img2img">("home");
   const [comfyUrl, setComfyUrl] = useState<string>("https://comfy.vapai.studio");
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
   const [userMenuOpen, setUserMenuOpen] = useState<boolean>(false);
@@ -29,7 +30,7 @@ export default function App() {
     const savedPage = localStorage.getItem('vapai-current-page') as typeof currentPage;
     const savedComfyUrl = localStorage.getItem('vapai-comfy-url');
     
-    if (savedPage && ['home', 'lipsync', 'image-edit', 'generation-feed', 'character-caption', 'wan-i2v', 'wan-move', 'style-transfer', 'create-image', 'lora-trainer', 'image-grid', 'img2img'].includes(savedPage)) {
+    if (savedPage && ['home', 'lipsync', 'image-edit', 'generation-feed', 'character-caption', 'wan-i2v', 'wan-move', 'style-transfer', 'create-image', 'lora-trainer', 'image-grid', 'ltx2-i2v', 'img2img'].includes(savedPage)) {
       setCurrentPage(savedPage);
     }
     // Migrate old page names to new unified lipsync page
@@ -279,6 +280,17 @@ export default function App() {
                 <span className="font-medium">WAN Move</span>
               </button>
               <button
+                onClick={() => handlePageChange("ltx2-i2v")}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
+                  currentPage === "ltx2-i2v"
+                    ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg"
+                    : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                }`}
+              >
+                <span className="text-lg">🎥</span>
+                <span className="font-medium">LTX2 I2V</span>
+              </button>
+              <button
                 onClick={() => handlePageChange("style-transfer")}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
                   currentPage === "style-transfer"
@@ -435,6 +447,9 @@ export default function App() {
           )}
           {currentPage === "image-grid" && (
             <ImageGrid comfyUrl={comfyUrl} />
+          )}
+          {currentPage === "ltx2-i2v" && (
+            <LTX2I2V comfyUrl={comfyUrl} />
           )}
           {/* Hidden: Image to Image page */}
           {/* {currentPage === "img2img" && (
