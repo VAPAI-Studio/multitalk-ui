@@ -9,6 +9,7 @@ import { useSmartResolution } from "../hooks/useSmartResolution";
 import { MaskEditor } from "../components/MaskEditor";
 import { AVPlayerWithPadding } from "../components/AVPlayerWithPadding";
 import { apiClient } from "../lib/apiClient";
+import { useAuth } from "../contexts/AuthContext";
 
 // Types for different lipsync modes
 type LipsyncMode = 'one-person' | 'multi-person' | 'video-lipsync';
@@ -51,6 +52,9 @@ function TabButton({
 }
 
 export default function Lipsync({ comfyUrl, initialMode = 'one-person' }: Props) {
+  // Auth context
+  const { user } = useAuth();
+
   // Mode selection
   const [activeMode, setActiveMode] = useState<LipsyncMode>(initialMode);
 
@@ -503,6 +507,7 @@ export default function Lipsync({ comfyUrl, initialMode = 'one-person' }: Props)
       setJobId(id);
 
       await apiClient.createVideoJob({
+        user_id: user?.id || null,
         comfy_job_id: id,
         workflow_name: 'lipsync-one',
         comfy_url: comfyUrl,
@@ -645,6 +650,7 @@ export default function Lipsync({ comfyUrl, initialMode = 'one-person' }: Props)
       setJobId(id);
 
       await apiClient.createVideoJob({
+        user_id: user?.id || null,
         comfy_job_id: id,
         workflow_name: 'lipsync-multi',
         comfy_url: comfyUrl,
@@ -778,6 +784,7 @@ export default function Lipsync({ comfyUrl, initialMode = 'one-person' }: Props)
       setJobId(id);
 
       await apiClient.createVideoJob({
+        user_id: user?.id || null,
         comfy_job_id: id,
         workflow_name: 'video-lipsync',
         comfy_url: comfyUrl,

@@ -1,6 +1,6 @@
 
 interface Props {
-  onNavigate: (page: "lipsync" | "image-edit" | "character-caption" | "wan-i2v" | "wan-move" | "style-transfer" | "create-image" | "lora-trainer" | "image-grid" | "audio-stem-separator" | "img2img" | "generation-feed") => void;
+  onNavigate: (page: "lipsync" | "image-edit" | "character-caption" | "wan-i2v" | "wan-move" | "ltx2-i2v" | "style-transfer" | "create-image" | "lora-trainer" | "image-grid" | "audio-stem-separator" | "img2img" | "generation-feed") => void;
 }
 
 export default function Homepage({ onNavigate }: Props) {
@@ -44,6 +44,14 @@ export default function Homepage({ onNavigate }: Props) {
       icon: "🎯",
       gradient: "from-cyan-500 to-blue-600",
       features: ["Custom motion paths", "Static anchors", "Animation preview", "Model: WAN Move"]
+    },
+    {
+      id: "ltx2-i2v" as const,
+      title: "LTX2 I2V",
+      description: "Transform your images into high-quality videos with the LTX2 model. Adjustable strength and duration for precise control.",
+      icon: "🎥",
+      gradient: "from-cyan-500 to-blue-600",
+      features: ["Image to video generation", "Adjustable strength", "Duration presets (3s, 5s, 10s)", "Model: LTX2"]
     },
     {
       id: "style-transfer" as const,

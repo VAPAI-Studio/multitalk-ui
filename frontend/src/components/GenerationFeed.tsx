@@ -6,6 +6,7 @@ import { useFeedDisplaySettings } from '../hooks/useFeedDisplaySettings'
 import { fixStuckJob } from '../lib/fixStuckJob'
 import ImageModal from './ImageModal'
 import DisplaySettingsControls from './DisplaySettingsControls'
+import { useAuth } from '../contexts/AuthContext'
 import FeedListItem from './FeedListItem'
 import FeedGridItem from './FeedGridItem'
 import type { ImageItem } from '../types/ui'
@@ -78,6 +79,9 @@ const MIN_VISIBLE = 10             // Minimum items to show after filtering
 const POLL_INTERVAL = 30000        // 30 seconds polling (cache-friendly)
 
 export default function GenerationFeed({ config, onUpscaleComplete }: GenerationFeedProps) {
+  // Auth context for user filtering
+  const { user } = useAuth();
+
   // Compute max items from config (internal pages may want fewer items)
   const maxItems = config.maxItems ?? DEFAULT_MAX_ITEMS
   // For smaller feeds, use smaller initial batch for faster first paint
@@ -227,7 +231,8 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
         const videoParams = {
           limit: batchSize,
           offset: vOffset,
-          workflow_name: effectiveWorkflows?.length === 1 ? effectiveWorkflows[0] : undefined
+          workflow_name: effectiveWorkflows?.length === 1 ? effectiveWorkflows[0] : undefined,
+          user_id: showMineOnly ? user?.id : undefined
         }
         const videoResponse = config.showCompletedOnly
           ? await apiClient.getCompletedVideoJobs(videoParams) as any
@@ -257,7 +262,8 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
         const imageParams = {
           limit: batchSize,
           offset: iOffset,
-          workflow_name: effectiveWorkflows?.length === 1 ? effectiveWorkflows[0] : undefined
+          workflow_name: effectiveWorkflows?.length === 1 ? effectiveWorkflows[0] : undefined,
+          user_id: showMineOnly ? user?.id : undefined
         }
         const imageResponse = config.showCompletedOnly
           ? await apiClient.getCompletedImageJobs(imageParams) as any
@@ -586,7 +592,7 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
-                This Page
+                My Content
               </button>
               <button
                 onClick={() => setShowMineOnly(false)}
