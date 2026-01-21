@@ -465,3 +465,102 @@ class StorageService:
         except Exception as error:
             print(f"❌ Video upload error: {str(error)}")
             return False, None, str(error)
+
+    async def upload_user_avatar(self, user_id: str, image_bytes: bytes, content_type: str) -> Tuple[bool, Optional[str], Optional[str]]:
+        """Upload user profile picture to Supabase Storage"""
+        try:
+            # Get file extension from content type
+            extension_map = {
+                'image/png': 'png',
+                'image/jpeg': 'jpg',
+                'image/jpg': 'jpg',
+                'image/webp': 'webp'
+            }
+
+            extension = extension_map.get(content_type, 'png')
+
+            # Storage path: avatars/{user_id}/profile.{ext}
+            storage_path = f"avatars/{user_id}/profile.{extension}"
+
+            # Upload to Supabase Storage (user-avatars bucket)
+            print(f"[STORAGE] Uploading avatar to: {storage_path}")
+            upload_response = await asyncio.to_thread(
+                lambda: self.supabase.storage
+                .from_('user-avatars')
+                .upload(
+                    storage_path,
+                    image_bytes,
+                    file_options={
+                        'content-type': content_type,
+                        'upsert': 'true'  # Replace existing file
+                    }
+                )
+            )
+
+            # Check for upload errors
+            if hasattr(upload_response, 'error') and upload_response.error:
+                raise Exception(f"Failed to upload to Supabase Storage: {upload_response.error}")
+            elif hasattr(upload_response, 'status_code') and upload_response.status_code >= 400:
+                raise Exception(f"Failed to upload to Supabase Storage: HTTP {upload_response.status_code}")
+            elif not upload_response:
+                raise Exception("Upload failed: No response from Supabase Storage")
+
+            # Get signed URL (7 days expiry)
+            url_response = await asyncio.to_thread(
+                lambda: self.supabase.storage
+                .from_('user-avatars')
+                .create_signed_url(storage_path, 60 * 60 * 24 * 7)
+            )
+
+            # Extract signed URL from response
+            signed_url = None
+            if isinstance(url_response, dict):
+                signed_url = (url_response.get('signedUrl') or
+                            url_response.get('signed_url') or
+                            url_response.get('url'))
+            elif hasattr(url_response, 'signedUrl'):
+                signed_url = url_response.signedUrl
+            elif hasattr(url_response, 'signed_url'):
+                signed_url = url_response.signed_url
+            elif isinstance(url_response, str):
+                signed_url = url_response
+
+            if not signed_url:
+                raise Exception(f"No signed URL found in response")
+
+            print(f"[STORAGE] Avatar uploaded successfully: {signed_url}")
+            return True, signed_url, None
+
+        except Exception as error:
+            print(f"[STORAGE] Avatar upload error: {str(error)}")
+            return False, None, str(error)
+
+    async def delete_user_avatar(self, user_id: str) -> Tuple[bool, Optional[str]]:
+        """Delete user profile picture from Supabase Storage"""
+        try:
+            # Try to delete all possible extensions
+            extensions = ['png', 'jpg', 'jpeg', 'webp']
+            deleted = False
+
+            for ext in extensions:
+                storage_path = f"avatars/{user_id}/profile.{ext}"
+                try:
+                    response = await asyncio.to_thread(
+                        lambda: self.supabase.storage
+                        .from_('user-avatars')
+                        .remove([storage_path])
+                    )
+                    deleted = True
+                    print(f"[STORAGE] Deleted avatar: {storage_path}")
+                except:
+                    # File might not exist with this extension, continue
+                    pass
+
+            if not deleted:
+                print(f"[STORAGE] No avatar file found for user {user_id}")
+
+            return True, None
+
+        except Exception as error:
+            print(f"[STORAGE] Avatar delete error: {str(error)}")
+            return False, str(error)

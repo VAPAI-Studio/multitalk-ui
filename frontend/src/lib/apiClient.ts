@@ -928,6 +928,43 @@ class ApiClient {
   async checkMusubiHealth() {
     return this.request('/lora-trainer/health')
   }
+
+  // Profile picture methods
+  async uploadProfilePicture(file: File): Promise<{ success: boolean; profile_picture_url: string }> {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const token = this.getAuthToken()
+    const url = `${this.baseURL}/auth/upload-avatar`
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
+      body: formData,
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ detail: 'Upload failed' }))
+      throw new Error(errorData.detail || 'Failed to upload profile picture')
+    }
+
+    return response.json()
+  }
+
+  async deleteProfilePicture(): Promise<{ success: boolean; message: string }> {
+    return this.request('/auth/delete-avatar', {
+      method: 'DELETE',
+    })
+  }
+
+  async updateProfile(data: { full_name?: string }): Promise<any> {
+    return this.request('/auth/update-profile', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  }
 }
 
 export const apiClient = new ApiClient()

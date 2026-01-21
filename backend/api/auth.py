@@ -1,5 +1,5 @@
 """Authentication API endpoints."""
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, status, UploadFile, File
 from core.supabase import get_supabase
 from core.auth import get_current_user
 from models.user import (
@@ -9,8 +9,10 @@ from models.user import (
     UserResponse,
     PasswordReset,
     PasswordUpdate,
-    RefreshTokenRequest
+    RefreshTokenRequest,
+    UserProfileUpdate
 )
+from services.storage_service import StorageService
 from supabase import Client
 from typing import Dict
 from config.settings import settings
@@ -210,6 +212,7 @@ async def get_current_user_info(
         id=current_user.id,
         email=current_user.email,
         full_name=user_metadata.get("full_name"),
+        profile_picture_url=user_metadata.get("profile_picture_url"),
         created_at=current_user.created_at if hasattr(current_user, 'created_at') else None
     )
 
@@ -313,4 +316,181 @@ async def verify_email(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Email verification failed: {str(e)}"
+        )
+
+
+@router.post("/auth/upload-avatar")
+async def upload_avatar(
+    file: UploadFile = File(...),
+    current_user: Dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase)
+):
+    """
+    Upload user profile picture.
+    
+    Args:
+        file: Image file to upload (max 5MB, jpg/jpeg/png/webp)
+        current_user: Authenticated user from JWT token
+        supabase: Supabase client instance
+    
+    Returns:
+        Dict with profile_picture_url
+    
+    Raises:
+        HTTPException: If upload fails or validation fails
+    """
+    try:
+        # Validate file type
+        allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+        if file.content_type not in allowed_types:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid file type. Allowed: {', '.join(allowed_types)}"
+            )
+        
+        # Validate file size (5MB max)
+        content = await file.read()
+        if len(content) > 5 * 1024 * 1024:  # 5MB in bytes
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="File size exceeds 5MB limit"
+            )
+        
+        # Upload to Supabase Storage
+        storage_service = StorageService()
+        user_id = current_user.id
+        
+        success, signed_url, error = await storage_service.upload_user_avatar(
+            user_id=user_id,
+            image_bytes=content,
+            content_type=file.content_type
+        )
+        
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to upload avatar: {error}"
+            )
+
+        # Return the signed URL - frontend will update localStorage
+        # Note: We don't update Supabase Auth metadata here because it requires
+        # a service role key. The frontend handles persistence via localStorage.
+        return {
+            "success": True,
+            "profile_picture_url": signed_url
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Avatar upload failed: {str(e)}"
+        )
+
+
+@router.delete("/auth/delete-avatar")
+async def delete_avatar(
+    current_user: Dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase)
+):
+    """
+    Delete user profile picture.
+    
+    Args:
+        current_user: Authenticated user from JWT token
+        supabase: Supabase client instance
+    
+    Returns:
+        Success message
+    
+    Raises:
+        HTTPException: If delete fails
+    """
+    try:
+        # Delete from Supabase Storage
+        storage_service = StorageService()
+        user_id = current_user.id
+        
+        success, error = await storage_service.delete_user_avatar(user_id)
+        
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to delete avatar: {error}"
+            )
+
+        # Return success - frontend will update localStorage
+        # Note: We don't update Supabase Auth metadata here because it requires
+        # a service role key. The frontend handles persistence via localStorage.
+        return {
+            "success": True,
+            "message": "Profile picture deleted successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Avatar delete failed: {str(e)}"
+        )
+
+
+@router.put("/auth/update-profile")
+async def update_profile(
+    profile_data: UserProfileUpdate,
+    current_user: Dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase)
+):
+    """
+    Update user profile (full_name).
+    
+    Args:
+        profile_data: Profile update data
+        current_user: Authenticated user from JWT token
+        supabase: Supabase client instance
+    
+    Returns:
+        Updated UserResponse
+    
+    Raises:
+        HTTPException: If update fails
+    """
+    try:
+        # Get current user metadata
+        user_response = supabase.auth.get_user()
+        if not user_response.user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User not found"
+            )
+        
+        current_metadata = user_response.user.user_metadata or {}
+        
+        # Update only full_name (profile_picture_url handled by upload/delete)
+        if profile_data.full_name is not None:
+            current_metadata['full_name'] = profile_data.full_name
+        
+        # Update user metadata
+        supabase.auth.update_user({
+            "data": current_metadata
+        })
+        
+        # Return updated user data
+        return UserResponse(
+            id=user_response.user.id,
+            email=user_response.user.email,
+            full_name=current_metadata.get('full_name'),
+            profile_picture_url=current_metadata.get('profile_picture_url'),
+            created_at=user_response.user.created_at,
+            updated_at=user_response.user.updated_at
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Profile update failed: {str(e)}"
         )
