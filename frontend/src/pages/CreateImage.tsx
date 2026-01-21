@@ -3,6 +3,7 @@ import { Label, Field, Section } from "../components/UI";
 import { apiClient } from "../lib/apiClient";
 import ResizableFeedSidebar from "../components/ResizableFeedSidebar";
 import { useSmartResolution } from "../hooks/useSmartResolution";
+import { useAuth } from "../contexts/AuthContext";
 
 interface Props {
   comfyUrl?: string;
@@ -43,6 +44,12 @@ const MODEL_CONFIG = {
 };
 
 export default function CreateImage({ comfyUrl = "" }: Props) {
+  // Auth context
+  const { user } = useAuth();
+
+  // Debug: Log user info
+  console.log('CreateImage - User:', user ? `Authenticated (${user.id})` : 'NOT AUTHENTICATED');
+
   // Load saved settings from localStorage
   const loadSettings = () => {
     try {
@@ -318,6 +325,7 @@ export default function CreateImage({ comfyUrl = "" }: Props) {
       setStatus("💾 Creating job record...");
 
       const jobCreationResponse = await apiClient.createImageJob({
+        user_id: user?.id || null,
         comfy_job_id: promptId,
         workflow_name: `create-image-${selectedModel}`,
         comfy_url: comfyUrl,

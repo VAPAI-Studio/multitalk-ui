@@ -3,6 +3,7 @@ import { Label, Field, Section } from "../components/UI";
 import { apiClient } from "../lib/apiClient";
 import ResizableFeedSidebar from "../components/ResizableFeedSidebar";
 import { useSmartResolution } from "../hooks/useSmartResolution";
+import { useAuth } from "../contexts/AuthContext";
 
 type Tab = "edit" | "camera-angle";
 
@@ -765,6 +766,9 @@ interface Props {
 }
 
 export default function ImageEdit({ comfyUrl = "" }: Props) {
+  // Auth context
+  const { user } = useAuth();
+
   const [activeTab, setActiveTab] = useState<Tab>("edit");
 
   // Original Image Edit State
@@ -1020,6 +1024,7 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
 
       // Create image job in database
       const jobCreationResponse = await apiClient.createImageJob({
+        user_id: user?.id || null,
         comfy_job_id: promptId,
         workflow_name: 'multi-camera-angle',
         comfy_url: comfyUrl,

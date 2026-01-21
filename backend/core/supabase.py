@@ -9,13 +9,14 @@ class SupabaseClient:
     def get_client(cls) -> Client:
         if cls._instance is None:
             supabase_url = os.getenv("SUPABASE_URL")
-            supabase_key = os.getenv("SUPABASE_ANON_KEY")
-            
+            # Prefer SERVICE_ROLE_KEY to bypass RLS, fallback to ANON_KEY
+            supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY")
+
             if not supabase_url or not supabase_key:
-                raise ValueError("SUPABASE_URL and SUPABASE_ANON_KEY must be set in environment variables")
-            
+                raise ValueError("SUPABASE_URL and (SUPABASE_SERVICE_ROLE_KEY or SUPABASE_ANON_KEY) must be set in environment variables")
+
             cls._instance = create_client(supabase_url, supabase_key)
-        
+
         return cls._instance
 
 # Convenience function to get the client
