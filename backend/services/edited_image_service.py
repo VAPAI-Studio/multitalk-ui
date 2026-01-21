@@ -1,16 +1,13 @@
-import os
 from typing import Tuple, Optional, List, Dict
 from datetime import datetime
-from supabase import create_client, Client
 
+from core.supabase import get_supabase
 from models.edited_image import EditedImage, CreateEditedImagePayload, UpdateEditedImagePayload, ImageEditStatus
 
 class EditedImageService:
     def __init__(self):
-        self.supabase: Client = create_client(
-            os.getenv("SUPABASE_URL"),
-            os.getenv("SUPABASE_ANON_KEY")
-        )
+        # Use singleton Supabase client for connection reuse
+        self.supabase = get_supabase()
 
     async def create_edited_image(self, payload: CreateEditedImagePayload) -> Tuple[bool, Optional[str], Optional[str]]:
         """Create a new edited image record"""
@@ -64,23 +61,30 @@ class EditedImageService:
     async def get_edited_image(self, image_id: str) -> Tuple[bool, Optional[EditedImage], Optional[str]]:
         """Get a single edited image by ID"""
         try:
-            result = self.supabase.table("edited_images").select("*").eq("id", image_id).execute()
-            
-            if result.data and len(result.data) > 0:
-                edited_image = EditedImage(**result.data[0])
+            # Use specific columns and .single() for better performance
+            columns = "id, source_image_url, result_image_url, prompt, workflow_name, model_used, user_ip, status, processing_time_seconds, created_at, updated_at"
+            result = self.supabase.table("edited_images")\
+                .select(columns)\
+                .eq("id", image_id)\
+                .single()\
+                .execute()
+
+            if result.data:
+                edited_image = EditedImage(**result.data)
                 return True, edited_image, None
             else:
                 return False, None, "Edited image not found"
-                
+
         except Exception as e:
             return False, None, str(e)
 
     async def get_recent_edited_images(self, limit: int = 20, offset: int = 0) -> Tuple[bool, List[EditedImage], int, Optional[str]]:
         """Get recent edited images for the generation feed"""
         try:
-            # Single query with count - more efficient than separate queries
+            # Use specific columns instead of * for better performance
+            columns = "id, source_image_url, result_image_url, prompt, workflow_name, model_used, user_ip, status, processing_time_seconds, created_at, updated_at"
             result = self.supabase.table("edited_images")\
-                .select("*", count="exact")\
+                .select(columns, count="exact")\
                 .order("created_at", desc=True)\
                 .range(offset, offset + limit - 1)\
                 .execute()
@@ -99,9 +103,10 @@ class EditedImageService:
     async def get_completed_edited_images(self, limit: int = 20, offset: int = 0) -> Tuple[bool, List[EditedImage], int, Optional[str]]:
         """Get only completed edited images with result images"""
         try:
-            # Single query with count and filters - more efficient
+            # Use specific columns instead of * for better performance
+            columns = "id, source_image_url, result_image_url, prompt, workflow_name, model_used, user_ip, status, processing_time_seconds, created_at, updated_at"
             result = self.supabase.table("edited_images")\
-                .select("*", count="exact")\
+                .select(columns, count="exact")\
                 .eq("status", ImageEditStatus.COMPLETED.value)\
                 .not_.is_("result_image_url", "null")\
                 .order("created_at", desc=True)\
