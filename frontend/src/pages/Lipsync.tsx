@@ -162,6 +162,14 @@ export default function Lipsync({ comfyUrl, initialMode = 'one-person' }: Props)
     if (targetH !== height) setHeight(targetH);
   }, [width, onePersonImageAR, activeMode]);
 
+  // Auto-set resolution to 1248x640 when Infinite Talk is selected
+  useEffect(() => {
+    if (activeMode === 'one-person' && onePersonWorkflowMode === 'infinitetalk') {
+      setWidth(1248);
+      setHeight(640);
+    }
+  }, [onePersonWorkflowMode, activeMode]);
+
   // ===== MULTI-PERSON EFFECTS =====
   useEffect(() => {
     if (!multiPersonImageFile) { setMultiPersonImagePreview(''); setMultiPersonImageAR(null); return; }

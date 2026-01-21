@@ -1,16 +1,13 @@
-import os
 from typing import Tuple, Optional, List, Dict
 from datetime import datetime
-from supabase import create_client, Client
 
+from core.supabase import get_supabase
 from models.style_transfer import StyleTransfer, CreateStyleTransferPayload, UpdateStyleTransferPayload, StyleTransferStatus
 
 class StyleTransferService:
     def __init__(self):
-        self.supabase: Client = create_client(
-            os.getenv("SUPABASE_URL"),
-            os.getenv("SUPABASE_ANON_KEY")
-        )
+        # Use singleton Supabase client for connection reuse
+        self.supabase = get_supabase()
 
     async def create_style_transfer(self, payload: CreateStyleTransferPayload) -> Tuple[bool, Optional[str], Optional[str]]:
         """Create a new style transfer record"""
@@ -69,26 +66,30 @@ class StyleTransferService:
     async def get_style_transfer(self, transfer_id: str) -> Tuple[bool, Optional[StyleTransfer], Optional[str]]:
         """Get a style transfer by ID"""
         try:
+            # Use specific columns and .single() for better performance
+            columns = "id, source_image_url, style_image_url, result_image_url, prompt, workflow_name, user_ip, status, model_used, processing_time_seconds, comfyui_prompt_id, error_message, created_at, updated_at"
             result = self.supabase.table("style_transfers")\
-                .select("*")\
+                .select(columns)\
                 .eq("id", transfer_id)\
+                .single()\
                 .execute()
-            
-            if result.data and len(result.data) > 0:
-                style_transfer = StyleTransfer(**result.data[0])
+
+            if result.data:
+                style_transfer = StyleTransfer(**result.data)
                 return True, style_transfer, None
             else:
                 return False, None, "Style transfer not found"
-                
+
         except Exception as e:
             return False, None, str(e)
 
     async def get_recent_style_transfers(self, limit: int = 20, offset: int = 0) -> Tuple[bool, List[StyleTransfer], int, Optional[str]]:
         """Get recent style transfers"""
         try:
-            # Single query with count - more efficient than separate queries
+            # Use specific columns instead of * for better performance
+            columns = "id, source_image_url, style_image_url, result_image_url, prompt, workflow_name, user_ip, status, model_used, processing_time_seconds, comfyui_prompt_id, error_message, created_at, updated_at"
             result = self.supabase.table("style_transfers")\
-                .select("*", count="exact")\
+                .select(columns, count="exact")\
                 .order("created_at", desc=True)\
                 .range(offset, offset + limit - 1)\
                 .execute()
@@ -107,9 +108,10 @@ class StyleTransferService:
     async def get_completed_style_transfers(self, limit: int = 20, offset: int = 0) -> Tuple[bool, List[StyleTransfer], int, Optional[str]]:
         """Get only completed style transfers with result images"""
         try:
-            # Single query with count and filters - more efficient
+            # Use specific columns instead of * for better performance
+            columns = "id, source_image_url, style_image_url, result_image_url, prompt, workflow_name, user_ip, status, model_used, processing_time_seconds, comfyui_prompt_id, error_message, created_at, updated_at"
             result = self.supabase.table("style_transfers")\
-                .select("*", count="exact")\
+                .select(columns, count="exact")\
                 .eq("status", StyleTransferStatus.COMPLETED.value)\
                 .not_.is_("result_image_url", "null")\
                 .order("created_at", desc=True)\

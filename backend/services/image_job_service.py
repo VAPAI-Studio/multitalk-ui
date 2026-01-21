@@ -137,10 +137,16 @@ class ImageJobService:
     async def get_job(self, job_id: str) -> Tuple[Optional[ImageJob], Optional[str]]:
         """Get a single image job by ID"""
         try:
-            result = self.supabase.table("image_jobs").select("*").eq("id", job_id).execute()
+            # Use specific columns and .single() for better performance
+            columns = "id, user_id, workflow_name, status, comfy_url, comfy_job_id, input_image_urls, output_image_urls, prompt, width, height, parameters, model_used, user_ip, comfyui_output_filename, comfyui_output_subfolder, comfyui_output_type, error_message, started_at, completed_at, processing_time_seconds, created_at"
+            result = self.supabase.table("image_jobs") \
+                .select(columns) \
+                .eq("id", job_id) \
+                .single() \
+                .execute()
 
-            if result.data and len(result.data) > 0:
-                return ImageJob(**result.data[0]), None
+            if result.data:
+                return ImageJob(**result.data), None
             else:
                 return None, "Job not found"
 
@@ -150,10 +156,16 @@ class ImageJobService:
     async def get_job_by_comfy_id(self, comfy_job_id: str) -> Tuple[Optional[ImageJob], Optional[str]]:
         """Get a single image job by ComfyUI job ID"""
         try:
-            result = self.supabase.table("image_jobs").select("*").eq("comfy_job_id", comfy_job_id).execute()
+            # Use specific columns and .single() for better performance
+            columns = "id, user_id, workflow_name, status, comfy_url, comfy_job_id, input_image_urls, output_image_urls, prompt, width, height, parameters, model_used, user_ip, comfyui_output_filename, comfyui_output_subfolder, comfyui_output_type, error_message, started_at, completed_at, processing_time_seconds, created_at"
+            result = self.supabase.table("image_jobs") \
+                .select(columns) \
+                .eq("comfy_job_id", comfy_job_id) \
+                .single() \
+                .execute()
 
-            if result.data and len(result.data) > 0:
-                return ImageJob(**result.data[0]), None
+            if result.data:
+                return ImageJob(**result.data), None
             else:
                 return None, "Job not found"
 
@@ -169,8 +181,9 @@ class ImageJobService:
     ) -> Tuple[List[ImageJob], int, Optional[str]]:
         """Get recent image jobs with optional filtering"""
         try:
-            # Build query
-            query = self.supabase.table("image_jobs").select("*", count="exact")
+            # Use specific columns instead of * for better performance
+            columns = "id, user_id, workflow_name, status, comfy_url, comfy_job_id, input_image_urls, output_image_urls, prompt, width, height, parameters, model_used, user_ip, comfyui_output_filename, comfyui_output_subfolder, comfyui_output_type, error_message, started_at, completed_at, processing_time_seconds, created_at"
+            query = self.supabase.table("image_jobs").select(columns, count="exact")
 
             # Apply filters
             if workflow_name:
@@ -197,7 +210,9 @@ class ImageJobService:
     ) -> Tuple[List[ImageJob], Optional[str]]:
         """Get completed image jobs"""
         try:
-            query = self.supabase.table("image_jobs").select("*").eq("status", "completed")
+            # Use specific columns instead of * for better performance
+            columns = "id, user_id, workflow_name, status, comfy_url, comfy_job_id, input_image_urls, output_image_urls, prompt, width, height, parameters, model_used, user_ip, comfyui_output_filename, comfyui_output_subfolder, comfyui_output_type, error_message, started_at, completed_at, processing_time_seconds, created_at"
+            query = self.supabase.table("image_jobs").select(columns).eq("status", "completed")
 
             if workflow_name:
                 query = query.eq("workflow_name", workflow_name)
