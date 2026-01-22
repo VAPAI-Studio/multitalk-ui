@@ -18,6 +18,7 @@ import ProfileSettings from "./ProfileSettings";
 import ComfyUIStatus from "./components/ComfyUIStatus";
 import ConsoleToggle from "./components/ConsoleToggle";
 import AuthPage from "./components/AuthPage";
+import ThemeToggle from "./components/ThemeToggle";
 import { useAuth } from "./contexts/AuthContext";
 
 export default function App() {
@@ -62,12 +63,12 @@ export default function App() {
   // Show loading state while checking authentication
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
         <div className="text-center">
           <div className="w-16 h-16 bg-gradient-to-br from-blue-500 via-purple-600 to-pink-500 rounded-2xl flex items-center justify-center shadow-lg mx-auto mb-4 animate-pulse">
             <span className="text-white font-bold text-3xl">🎬</span>
           </div>
-          <p className="text-gray-600">Loading...</p>
+          <p className="text-gray-600 dark:text-gray-300">Loading...</p>
         </div>
       </div>
     );
@@ -108,10 +109,10 @@ export default function App() {
             {/* Right: ComfyUI Settings + User Menu */}
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
-                <label className="text-xs font-medium text-gray-700">ComfyUI</label>
+                <label className="text-xs font-medium text-gray-700 dark:text-gray-300">ComfyUI</label>
                 <input
                   type="text"
-                  className="rounded-xl border-2 border-gray-200 px-3 py-2 text-gray-800 placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all duration-200 bg-white/90 w-56 text-sm"
+                  className="rounded-xl border-2 border-gray-200 dark:border-dark-border-primary px-3 py-2 text-gray-800 dark:text-dark-text-primary placeholder-gray-400 dark:placeholder-gray-500 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/50 transition-all duration-200 bg-white/90 dark:bg-dark-surface-primary w-56 text-sm"
                   placeholder="https://comfy.vapai.studio"
                   value={comfyUrl}
                   onChange={(e) => handleComfyUrlChange(e.target.value)}
@@ -120,10 +121,10 @@ export default function App() {
               <ComfyUIStatus baseUrl={comfyUrl} />
 
               {/* User Menu */}
-              <div className="relative flex items-center gap-3 pl-3 border-l border-gray-200">
+              <div className="relative flex items-center gap-3 pl-3 border-l border-gray-200 dark:border-gray-700">
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-gray-100 transition-all duration-200"
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200"
                 >
                   {user?.profile_picture_url ? (
                     <img
@@ -139,10 +140,10 @@ export default function App() {
                     </div>
                   )}
                   <div className="text-left">
-                    <p className="text-sm font-medium text-gray-700">{user?.full_name || user?.email}</p>
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{user?.full_name || user?.email}</p>
                   </div>
                   <svg
-                    className={`w-4 h-4 text-gray-500 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`}
+                    className={`w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`}
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -161,10 +162,16 @@ export default function App() {
                     />
 
                     {/* Dropdown */}
-                    <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-200 py-2 z-40">
-                      <div className="px-4 py-3 border-b border-gray-100">
-                        <p className="text-sm font-medium text-gray-900">{user?.full_name || 'User'}</p>
-                        <p className="text-xs text-gray-500">{user?.email}</p>
+                    <div className="absolute right-0 top-full mt-2 w-80 bg-white dark:bg-dark-surface-primary rounded-xl shadow-xl border border-gray-200 dark:border-dark-border-primary py-2 z-40">
+                      <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+                        <p className="text-sm font-medium text-gray-900 dark:text-dark-text-primary">{user?.full_name || 'User'}</p>
+                        <p className="text-xs text-gray-500 dark:text-dark-text-tertiary">{user?.email}</p>
+                      </div>
+
+                      {/* Theme Toggle */}
+                      <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+                        <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Theme</p>
+                        <ThemeToggle />
                       </div>
 
                       {/* Profile Settings */}
@@ -189,7 +196,7 @@ export default function App() {
                             localStorage.clear();
                             window.location.reload();
                           }}
-                          className="w-full text-left px-4 py-2 text-sm text-yellow-700 hover:bg-yellow-50 transition-colors flex items-center gap-2"
+                          className="w-full text-left px-4 py-2 text-sm text-yellow-700 dark:text-yellow-400 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 transition-colors flex items-center gap-2"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -203,7 +210,7 @@ export default function App() {
                           logout();
                           setUserMenuOpen(false);
                         }}
-                        className="w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50 transition-colors flex items-center gap-2"
+                        className="w-full text-left px-4 py-2 text-sm text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors flex items-center gap-2"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -226,13 +233,13 @@ export default function App() {
         }`}>
           <div className="flex flex-col w-80 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border-r border-gray-200/50 dark:border-gray-700/50 shadow-2xl">
             {/* Sidebar Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200/50">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200/50 dark:border-gray-700/50">
               <span className="text-lg font-bold text-gray-800 dark:text-gray-200">Navigation</span>
               <button
                 onClick={() => setSidebarOpen(false)}
                 className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
               >
-                <span className="text-gray-500">✕</span>
+                <span className="text-gray-500 dark:text-gray-400">✕</span>
               </button>
             </div>
 
