@@ -137,3 +137,11 @@ class VideoJobListResponse(BaseModel):
     video_jobs: List[VideoJob] = []
     total_count: int = 0
     error: Optional[str] = None
+
+
+class VideoJobFeedResponse(BaseModel):
+    """Response for feed endpoint - lightweight job data for display"""
+    success: bool
+    video_jobs: List[Dict[str, Any]] = []  # Named video_jobs for frontend compatibility
+    total_count: int = 0
+    error: Optional[str] = None

@@ -715,19 +715,22 @@ class ApiClient {
     offset?: number;
     workflow_name?: string;
     user_id?: string;
+    status?: string;
   }) {
     const queryParams = new URLSearchParams()
     if (params?.limit) queryParams.append('limit', params.limit.toString())
     if (params?.offset) queryParams.append('offset', params.offset.toString())
     if (params?.workflow_name) queryParams.append('workflow_name', params.workflow_name)
     if (params?.user_id) queryParams.append('user_id', params.user_id)
+    if (params?.status) queryParams.append('status', params.status)
 
     const query = queryParams.toString()
-    const cacheKey = `video-jobs-${query}`
+    const cacheKey = `video-jobs-feed-${query}`
     const cached = this.getCached(cacheKey)
     if (cached) return cached
 
-    const result = await this.request(`/video-jobs/${query ? `?${query}` : ''}`)
+    // Use optimized /feed endpoint with server-side caching
+    const result = await this.request(`/video-jobs/feed${query ? `?${query}` : ''}`)
     this.setCache(cacheKey, result)
     return result
   }
@@ -795,19 +798,22 @@ class ApiClient {
     offset?: number;
     workflow_name?: string;
     user_id?: string;
+    status?: string;
   }) {
     const queryParams = new URLSearchParams()
     if (params?.limit) queryParams.append('limit', params.limit.toString())
     if (params?.offset) queryParams.append('offset', params.offset.toString())
     if (params?.workflow_name) queryParams.append('workflow_name', params.workflow_name)
     if (params?.user_id) queryParams.append('user_id', params.user_id)
+    if (params?.status) queryParams.append('status', params.status)
 
     const query = queryParams.toString()
-    const cacheKey = `image-jobs-${query}`
+    const cacheKey = `image-jobs-feed-${query}`
     const cached = this.getCached(cacheKey)
     if (cached) return cached
 
-    const result = await this.request(`/image-jobs/${query ? `?${query}` : ''}`)
+    // Use optimized /feed endpoint with server-side caching
+    const result = await this.request(`/image-jobs/feed${query ? `?${query}` : ''}`)
     this.setCache(cacheKey, result)
     return result
   }
