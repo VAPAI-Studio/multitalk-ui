@@ -115,7 +115,7 @@ export default function Homepage({ onNavigate, user }: Props) {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
       <div className="max-w-7xl mx-auto px-6 py-12">
         {/* Hero Section */}
         <div className="text-center space-y-6 mb-16">
@@ -127,7 +127,7 @@ export default function Homepage({ onNavigate, user }: Props) {
           <h1 className="text-5xl md:text-7xl font-black bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
             sideOUTsticks
           </h1>
-          <p className="text-xl md:text-2xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
+          <p className="text-xl md:text-2xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto leading-relaxed">
             Your complete AI-powered media creation suite.
           </p>
 
@@ -163,11 +163,11 @@ export default function Homepage({ onNavigate, user }: Props) {
             <div
               key={app.id}
               onClick={() => onNavigate(app.id)}
-              className="group relative p-8 rounded-3xl bg-white/80 backdrop-blur-sm border border-gray-200/50 shadow-lg hover:shadow-2xl transform hover:scale-[1.02] transition-all duration-300 cursor-pointer overflow-hidden"
+              className="group relative p-8 rounded-3xl bg-white/80 dark:bg-dark-surface-primary/80 backdrop-blur-sm border border-gray-300 dark:border-dark-border-primary/50 shadow-lg hover:shadow-2xl transform hover:scale-[1.02] transition-all duration-300 cursor-pointer overflow-hidden"
             >
               {/* Background Gradient */}
-              <div className={`absolute inset-0 bg-gradient-to-br ${app.gradient} opacity-0 group-hover:opacity-5 transition-opacity duration-300`}></div>
-              
+              <div className={`absolute inset-0 bg-gradient-to-br ${app.gradient} opacity-0 group-hover:opacity-5 dark:group-hover:opacity-10 transition-opacity duration-300`}></div>
+
               {/* Content */}
               <div className="relative z-10">
                 <div className="flex items-start justify-between mb-4">
@@ -175,17 +175,17 @@ export default function Homepage({ onNavigate, user }: Props) {
                     {app.icon}
                   </div>
                   <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
-                      <span className="text-gray-600">→</span>
+                    <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-dark-surface-secondary flex items-center justify-center">
+                      <span className="text-gray-600 dark:text-gray-300">→</span>
                     </div>
                   </div>
                 </div>
 
-                <h3 className="text-2xl font-bold text-gray-900 mb-3 group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:bg-clip-text group-hover:from-blue-600 group-hover:to-purple-600 transition-all duration-300">
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-dark-text-primary mb-3 group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:bg-clip-text group-hover:from-blue-600 group-hover:to-purple-600 transition-all duration-300">
                   {app.title}
                 </h3>
-                
-                <p className="text-gray-600 mb-6 leading-relaxed">
+
+                <p className="text-gray-600 dark:text-dark-text-secondary mb-6 leading-relaxed">
                   {app.description}
                 </p>
 
@@ -193,12 +193,12 @@ export default function Homepage({ onNavigate, user }: Props) {
                   {app.features.map((feature, index) => (
                     <div key={index} className="flex items-center gap-3 text-sm">
                       <div className={`w-1.5 h-1.5 bg-gradient-to-r ${app.gradient} rounded-full`}></div>
-                      <span className="text-gray-600">{feature}</span>
+                      <span className="text-gray-600 dark:text-dark-text-secondary">{feature}</span>
                     </div>
                   ))}
                 </div>
 
-                <div className="mt-6 pt-4 border-t border-gray-100">
+                <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-700">
                   <div className={`inline-flex items-center gap-2 text-sm font-medium bg-gradient-to-r ${app.gradient} bg-clip-text text-transparent`}>
                     <span>Launch App</span>
                     <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">→</span>
@@ -212,8 +212,8 @@ export default function Homepage({ onNavigate, user }: Props) {
         {/* External Tools Section */}
         <div className="mb-16">
           <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">External Tools</h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            <h2 className="text-3xl font-bold text-gray-900 dark:text-dark-text-primary mb-4">External Tools</h2>
+            <p className="text-lg text-gray-600 dark:text-dark-text-secondary max-w-2xl mx-auto">
               Access powerful development and workflow tools to enhance your AI media creation process.
             </p>
           </div>
@@ -221,22 +221,22 @@ export default function Homepage({ onNavigate, user }: Props) {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto">
             <button
               onClick={() => window.open('https://comfy.vapai.studio', '_blank')}
-              className="group p-6 rounded-3xl bg-white/80 backdrop-blur-sm border border-gray-200/50 shadow-lg hover:shadow-2xl transform hover:scale-[1.02] transition-all duration-300 cursor-pointer text-left"
+              className="group p-6 rounded-3xl bg-white/80 dark:bg-dark-surface-primary/80 backdrop-blur-sm border border-gray-300 dark:border-dark-border-primary/50 shadow-lg hover:shadow-2xl transform hover:scale-[1.02] transition-all duration-300 cursor-pointer text-left"
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="w-14 h-14 bg-gradient-to-br from-orange-500 to-red-600 rounded-2xl flex items-center justify-center text-2xl shadow-lg group-hover:scale-110 transition-transform duration-300">
                   🔧
                 </div>
                 <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
-                    <span className="text-gray-600">↗</span>
+                  <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-dark-surface-secondary flex items-center justify-center">
+                    <span className="text-gray-600 dark:text-gray-300">↗</span>
                   </div>
                 </div>
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-3 group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:bg-clip-text group-hover:from-orange-600 group-hover:to-red-600 transition-all duration-300">
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-dark-text-primary mb-3 group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:bg-clip-text group-hover:from-orange-600 group-hover:to-red-600 transition-all duration-300">
                 ComfyUI
               </h3>
-              <p className="text-gray-600 mb-4 leading-relaxed">
+              <p className="text-gray-600 dark:text-dark-text-secondary mb-4 leading-relaxed">
                 Advanced node-based workflow editor for AI image and video generation with custom pipelines.
               </p>
               <div className="inline-flex items-center gap-2 text-sm font-medium bg-gradient-to-r from-orange-500 to-red-600 bg-clip-text text-transparent">
@@ -244,25 +244,25 @@ export default function Homepage({ onNavigate, user }: Props) {
                 <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">→</span>
               </div>
             </button>
-            
+
             <button
               onClick={() => window.open('https://notebook.vapai.studio', '_blank')}
-              className="group p-6 rounded-3xl bg-white/80 backdrop-blur-sm border border-gray-200/50 shadow-lg hover:shadow-2xl transform hover:scale-[1.02] transition-all duration-300 cursor-pointer text-left"
+              className="group p-6 rounded-3xl bg-white/80 dark:bg-dark-surface-primary/80 backdrop-blur-sm border border-gray-300 dark:border-dark-border-primary/50 shadow-lg hover:shadow-2xl transform hover:scale-[1.02] transition-all duration-300 cursor-pointer text-left"
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-2xl flex items-center justify-center text-2xl shadow-lg group-hover:scale-110 transition-transform duration-300">
                   📓
                 </div>
                 <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
-                    <span className="text-gray-600">↗</span>
+                  <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-dark-surface-secondary flex items-center justify-center">
+                    <span className="text-gray-600 dark:text-gray-300">↗</span>
                   </div>
                 </div>
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-3 group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:bg-clip-text group-hover:from-blue-600 group-hover:to-cyan-600 transition-all duration-300">
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-dark-text-primary mb-3 group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:bg-clip-text group-hover:from-blue-600 group-hover:to-cyan-600 transition-all duration-300">
                 Jupyter Notebook
               </h3>
-              <p className="text-gray-600 mb-4 leading-relaxed">
+              <p className="text-gray-600 dark:text-dark-text-secondary mb-4 leading-relaxed">
                 Interactive development environment for data science, AI experiments, and custom model training.
               </p>
               <div className="inline-flex items-center gap-2 text-sm font-medium bg-gradient-to-r from-blue-500 to-cyan-600 bg-clip-text text-transparent">
@@ -273,22 +273,22 @@ export default function Homepage({ onNavigate, user }: Props) {
 
             <button
               onClick={() => window.open('https://n8n.vapai.studio', '_blank')}
-              className="group p-6 rounded-3xl bg-white/80 backdrop-blur-sm border border-gray-200/50 shadow-lg hover:shadow-2xl transform hover:scale-[1.02] transition-all duration-300 cursor-pointer text-left"
+              className="group p-6 rounded-3xl bg-white/80 dark:bg-dark-surface-primary/80 backdrop-blur-sm border border-gray-300 dark:border-dark-border-primary/50 shadow-lg hover:shadow-2xl transform hover:scale-[1.02] transition-all duration-300 cursor-pointer text-left"
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="w-14 h-14 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center text-2xl shadow-lg group-hover:scale-110 transition-transform duration-300">
                   ⚡
                 </div>
                 <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
-                    <span className="text-gray-600">↗</span>
+                  <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-dark-surface-secondary flex items-center justify-center">
+                    <span className="text-gray-600 dark:text-gray-300">↗</span>
                   </div>
                 </div>
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-3 group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:bg-clip-text group-hover:from-green-600 group-hover:to-emerald-600 transition-all duration-300">
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-dark-text-primary mb-3 group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:bg-clip-text group-hover:from-green-600 group-hover:to-emerald-600 transition-all duration-300">
                 n8n Automation
               </h3>
-              <p className="text-gray-600 mb-4 leading-relaxed">
+              <p className="text-gray-600 dark:text-dark-text-secondary mb-4 leading-relaxed">
                 Powerful workflow automation platform to connect apps and automate AI-powered media pipelines.
               </p>
               <div className="inline-flex items-center gap-2 text-sm font-medium bg-gradient-to-r from-green-500 to-emerald-600 bg-clip-text text-transparent">
@@ -301,7 +301,7 @@ export default function Homepage({ onNavigate, user }: Props) {
 
         {/* Footer Info */}
         <div className="text-center space-y-4">
-          <p className="text-xs text-gray-500 max-w-2xl mx-auto">
+          <p className="text-xs text-gray-500 dark:text-gray-400 max-w-2xl mx-auto">
             Configure your ComfyUI URL in the navigation bar to get started. All processing happens in real-time with professional-grade AI models.
           </p>
         </div>
