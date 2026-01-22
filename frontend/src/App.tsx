@@ -11,6 +11,9 @@ import StyleTransfer from "./pages/StyleTransfer";
 import CreateImage from "./pages/CreateImage";
 import LoRATrainer from "./pages/LoraTrainer";
 import ImageGrid from "./pages/ImageGrid";
+import AudioStemSeparator from "./pages/AudioStemSeparator";
+import LTX2I2V from "./pages/LTX2I2V";
+import ProfileSettings from "./ProfileSettings";
 // import Img2Img from "./pages/Img2Img"; // Hidden: Image to Image page
 import ComfyUIStatus from "./components/ComfyUIStatus";
 import ConsoleToggle from "./components/ConsoleToggle";
@@ -19,7 +22,7 @@ import { useAuth } from "./contexts/AuthContext";
 
 export default function App() {
   const { isAuthenticated, loading, user, logout } = useAuth();
-  const [currentPage, setCurrentPage] = useState<"home" | "lipsync" | "image-edit" | "generation-feed" | "character-caption" | "wan-i2v" | "wan-move" | "style-transfer" | "create-image" | "lora-trainer" | "image-grid" | "img2img">("home");
+  const [currentPage, setCurrentPage] = useState<"home" | "lipsync" | "image-edit" | "generation-feed" | "character-caption" | "wan-i2v" | "wan-move" | "style-transfer" | "create-image" | "lora-trainer" | "image-grid" | "audio-stem-separator" | "ltx2-i2v" | "img2img" | "profile-settings">("home");
   const [comfyUrl, setComfyUrl] = useState<string>("https://comfy.vapai.studio");
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
   const [userMenuOpen, setUserMenuOpen] = useState<boolean>(false);
@@ -29,7 +32,7 @@ export default function App() {
     const savedPage = localStorage.getItem('vapai-current-page') as typeof currentPage;
     const savedComfyUrl = localStorage.getItem('vapai-comfy-url');
     
-    if (savedPage && ['home', 'lipsync', 'image-edit', 'generation-feed', 'character-caption', 'wan-i2v', 'wan-move', 'style-transfer', 'create-image', 'lora-trainer', 'image-grid', 'img2img'].includes(savedPage)) {
+    if (savedPage && ['home', 'lipsync', 'image-edit', 'generation-feed', 'character-caption', 'wan-i2v', 'wan-move', 'style-transfer', 'create-image', 'lora-trainer', 'image-grid', 'audio-stem-separator', 'ltx2-i2v', 'img2img', 'profile-settings'].includes(savedPage)) {
       setCurrentPage(savedPage);
     }
     // Migrate old page names to new unified lipsync page
@@ -97,7 +100,7 @@ export default function App() {
                   <div className="w-10 h-10 bg-gradient-to-br from-blue-500 via-purple-600 to-pink-500 rounded-2xl flex items-center justify-center shadow-lg group-hover:shadow-xl group-hover:rotate-3 transition-all duration-200">
                     <span className="text-white font-bold text-lg">🎬</span>
                   </div>
-                  <span className="text-xl font-black bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent group-hover:from-purple-600 group-hover:to-pink-600 transition-all duration-200">VAPAI Studio</span>
+                  <span className="text-xl font-black bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent group-hover:from-purple-600 group-hover:to-pink-600 transition-all duration-200">sideOUTsticks</span>
                 </button>
               </div>
             </div>
@@ -122,11 +125,19 @@ export default function App() {
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
                   className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-gray-100 transition-all duration-200"
                 >
-                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                    <span className="text-white text-sm font-bold">
-                      {(user?.full_name?.[0] || user?.email?.[0] || 'U').toUpperCase()}
-                    </span>
-                  </div>
+                  {user?.profile_picture_url ? (
+                    <img
+                      src={user.profile_picture_url}
+                      alt="Profile"
+                      className="w-8 h-8 rounded-full object-cover border-2 border-gray-200"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                      <span className="text-white text-sm font-bold">
+                        {(user?.full_name?.[0] || user?.email?.[0] || 'U').toUpperCase()}
+                      </span>
+                    </div>
+                  )}
                   <div className="text-left">
                     <p className="text-sm font-medium text-gray-700">{user?.full_name || user?.email}</p>
                   </div>
@@ -155,6 +166,21 @@ export default function App() {
                         <p className="text-sm font-medium text-gray-900">{user?.full_name || 'User'}</p>
                         <p className="text-xs text-gray-500">{user?.email}</p>
                       </div>
+
+                      {/* Profile Settings */}
+                      <button
+                        onClick={() => {
+                          setCurrentPage("profile-settings");
+                          setUserMenuOpen(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        Editar Perfil
+                      </button>
 
                       {/* Dev-only: Clear session */}
                       {import.meta.env.DEV && (
@@ -279,6 +305,17 @@ export default function App() {
                 <span className="font-medium">WAN Move</span>
               </button>
               <button
+                onClick={() => handlePageChange("ltx2-i2v")}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
+                  currentPage === "ltx2-i2v"
+                    ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg"
+                    : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                }`}
+              >
+                <span className="text-lg">🎥</span>
+                <span className="font-medium">LTX2 I2V</span>
+              </button>
+              <button
                 onClick={() => handlePageChange("style-transfer")}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
                   currentPage === "style-transfer"
@@ -321,6 +358,17 @@ export default function App() {
               >
                 <span className="text-lg">🖼️</span>
                 <span className="font-medium">Image Grid</span>
+              </button>
+              <button
+                onClick={() => handlePageChange("audio-stem-separator")}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
+                  currentPage === "audio-stem-separator"
+                    ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg"
+                    : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                }`}
+              >
+                <span className="text-lg">🎵</span>
+                <span className="font-medium">Audio Stem Separator</span>
               </button>
               <button
                 onClick={() => handlePageChange("generation-feed")}
@@ -398,7 +446,10 @@ export default function App() {
         {/* Page Content */}
         <main className="flex-1 transition-all duration-300">
           {currentPage === "home" && (
-            <Homepage onNavigate={(page) => handlePageChange(page)} />
+            <Homepage
+              onNavigate={(page) => handlePageChange(page)}
+              user={user}
+            />
           )}
           {currentPage === "lipsync" && (
             <div className="w-full max-w-6xl mx-auto p-6">
@@ -412,6 +463,9 @@ export default function App() {
           )}
           {currentPage === "generation-feed" && (
             <GenerationFeed />
+          )}
+          {currentPage === "profile-settings" && (
+            <ProfileSettings onNavigateBack={() => setCurrentPage("home")} />
           )}
           {currentPage === "character-caption" && (
             <div className="w-full max-w-7xl mx-auto p-6">
@@ -435,6 +489,12 @@ export default function App() {
           )}
           {currentPage === "image-grid" && (
             <ImageGrid comfyUrl={comfyUrl} />
+          )}
+          {currentPage === "audio-stem-separator" && (
+            <AudioStemSeparator comfyUrl={comfyUrl} />
+          )}
+          {currentPage === "ltx2-i2v" && (
+            <LTX2I2V comfyUrl={comfyUrl} />
           )}
           {/* Hidden: Image to Image page */}
           {/* {currentPage === "img2img" && (

@@ -6,11 +6,13 @@ import { useFeedDisplaySettings } from '../hooks/useFeedDisplaySettings'
 import { fixStuckJob } from '../lib/fixStuckJob'
 import ImageModal from './ImageModal'
 import DisplaySettingsControls from './DisplaySettingsControls'
+import { useAuth } from '../contexts/AuthContext'
 import FeedListItem from './FeedListItem'
 import FeedGridItem from './FeedGridItem'
 import type { ImageItem } from '../types/ui'
 import type { FeedDisplaySettings } from '../types/feedDisplay'
 import { GRID_MIN_ITEM_WIDTH } from '../types/feedDisplay'
+import { getWorkflowDisplayName } from '../constants/workflowNames'
 
 // Unified item type that can be video or image
 interface GenerationItem {
@@ -78,16 +80,46 @@ const MIN_VISIBLE = 10             // Minimum items to show after filtering
 const POLL_INTERVAL = 30000        // 30 seconds polling (cache-friendly)
 
 export default function GenerationFeed({ config, onUpscaleComplete }: GenerationFeedProps) {
+  // Auth context for user filtering
+  const { user } = useAuth();
+
   // Compute max items from config (internal pages may want fewer items)
   const maxItems = config.maxItems ?? DEFAULT_MAX_ITEMS
   // For smaller feeds, use smaller initial batch for faster first paint
   const initialBatch = Math.min(DEFAULT_INITIAL_BATCH, maxItems)
 
+  // Normalize pageContext to array for internal use (moved up for localStorage key)
+  const pageContexts = useMemo(() => {
+    if (!config.pageContext) return undefined
+    return Array.isArray(config.pageContext) ? config.pageContext : [config.pageContext]
+  }, [config.pageContext])
+
+  // Use first context for storage key
+  const storageKeyContext = Array.isArray(config.pageContext)
+    ? config.pageContext[0]
+    : config.pageContext
+
+  // Helper to get localStorage key for this feed instance
+  const getStorageKey = useCallback((suffix: string) =>
+    `feed-${storageKeyContext || 'default'}-${suffix}`, [storageKeyContext])
+
   const [allItems, setAllItems] = useState<GenerationItem[]>([]) // All loaded items (both videos and images)
   const [loading, setLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [fixingJobs, setFixingJobs] = useState<Set<string>>(new Set())
-  const [showMineOnly, setShowMineOnly] = useState(true) // Default to showing current page's items
+
+  // Filter states with localStorage persistence
+  const [showMineOnly, setShowMineOnly] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return localStorage.getItem(getStorageKey('showMine')) === 'true'
+  })
+
+  const [showThisWorkflowOnly, setShowThisWorkflowOnly] = useState(() => {
+    if (typeof window === 'undefined') return true
+    const saved = localStorage.getItem(getStorageKey('showThisWorkflow'))
+    return saved === null ? true : saved === 'true' // Default: true (filter to current workflow)
+  })
+
   const [mediaTypeFilter, setMediaTypeFilter] = useState<'video' | 'image' | 'all'>(config.mediaType)
   const [error, setError] = useState<string | null>(null)
 
@@ -107,17 +139,6 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
   const { progress } = useComfyUIProgress(config.comfyUrl || '', !!config.comfyUrl)
 
   // Display settings (persisted to localStorage)
-  // Normalize pageContext to array for internal use
-  const pageContexts = useMemo(() => {
-    if (!config.pageContext) return undefined
-    return Array.isArray(config.pageContext) ? config.pageContext : [config.pageContext]
-  }, [config.pageContext])
-
-  // Use first context for storage key
-  const storageKeyContext = Array.isArray(config.pageContext)
-    ? config.pageContext[0]
-    : config.pageContext
-
   const {
     settings: displaySettings,
     setViewMode,
@@ -141,6 +162,27 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
       gridTemplateColumns: `repeat(${displaySettings.columnCount}, 1fr)`,
     }
   }, [displaySettings.viewMode, displaySettings.columnCount, displaySettings.thumbnailSize])
+
+  // Persist filter states to localStorage
+  useEffect(() => {
+    if (storageKeyContext) {
+      localStorage.setItem(getStorageKey('showMine'), String(showMineOnly))
+    }
+  }, [showMineOnly, storageKeyContext, getStorageKey])
+
+  useEffect(() => {
+    if (storageKeyContext) {
+      localStorage.setItem(getStorageKey('showThisWorkflow'), String(showThisWorkflowOnly))
+    }
+  }, [showThisWorkflowOnly, storageKeyContext, getStorageKey])
+
+  // Helper to get display label for pageContexts
+  const getWorkflowDisplayLabel = useCallback((contexts: string[]): string => {
+    if (contexts.length === 1) {
+      return getWorkflowDisplayName(contexts[0])
+    }
+    return `${contexts.length} Workflows`
+  }, [])
 
   // Sync mediaTypeFilter when config.mediaType changes from parent
   useEffect(() => {
@@ -201,12 +243,15 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
     }
   }
 
-  // Get effective workflow filter
+  // Get effective workflow filter (now independent of user filtering)
   const getEffectiveWorkflows = useCallback(() => {
-    return showMineOnly && pageContexts
-      ? pageContexts
-      : config.workflowNames
-  }, [showMineOnly, pageContexts, config.workflowNames])
+    // When "This Workflow" is selected and we have page context, filter to those workflows
+    if (showThisWorkflowOnly && pageContexts) {
+      return pageContexts
+    }
+    // Otherwise use config.workflowNames (undefined = all workflows)
+    return config.workflowNames
+  }, [showThisWorkflowOnly, pageContexts, config.workflowNames])
 
   // Load a batch of items (progressive loading)
   const loadBatch = useCallback(async (
@@ -227,26 +272,38 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
         const videoParams = {
           limit: batchSize,
           offset: vOffset,
-          workflow_name: effectiveWorkflows?.length === 1 ? effectiveWorkflows[0] : undefined
+          workflow_name: effectiveWorkflows?.length === 1 ? effectiveWorkflows[0] : undefined,
+          user_id: showMineOnly ? user?.id : undefined
         }
+        console.log('[GenerationFeed] Fetching videos with params:', videoParams)
         const videoResponse = config.showCompletedOnly
           ? await apiClient.getCompletedVideoJobs(videoParams) as any
           : await apiClient.getVideoJobs(videoParams) as any
+
+        console.log('[GenerationFeed] Video response:', {
+          success: videoResponse?.success,
+          jobCount: videoResponse?.video_jobs?.length ?? 0,
+          totalCount: videoResponse?.total_count,
+          error: videoResponse?.error
+        })
 
         if (videoResponse?.success && videoResponse.video_jobs) {
           for (const job of videoResponse.video_jobs) {
             if (effectiveWorkflows && effectiveWorkflows.length > 1 &&
                 !effectiveWorkflows.includes(job.workflow_name)) {
+              console.log('[GenerationFeed] Filtering out job:', job.id, 'workflow:', job.workflow_name)
               continue
             }
             videos.push(videoJobToItem(job))
           }
           hasMoreV = videoResponse.video_jobs.length === batchSize
+          console.log('[GenerationFeed] Processed videos:', videos.length)
         } else {
+          console.log('[GenerationFeed] No videos in response or success=false')
           hasMoreV = false
         }
       } catch (err: any) {
-        if (err?.name !== 'AbortError') console.error('Error loading videos:', err)
+        console.error('[GenerationFeed] Error loading videos:', err)
         hasMoreV = false
       }
     }
@@ -257,7 +314,8 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
         const imageParams = {
           limit: batchSize,
           offset: iOffset,
-          workflow_name: effectiveWorkflows?.length === 1 ? effectiveWorkflows[0] : undefined
+          workflow_name: effectiveWorkflows?.length === 1 ? effectiveWorkflows[0] : undefined,
+          user_id: showMineOnly ? user?.id : undefined
         }
         const imageResponse = config.showCompletedOnly
           ? await apiClient.getCompletedImageJobs(imageParams) as any
@@ -282,7 +340,7 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
     }
 
     return { videos, images, hasMoreV, hasMoreI }
-  }, [config.showCompletedOnly, getEffectiveWorkflows])
+  }, [config.showCompletedOnly, getEffectiveWorkflows, showMineOnly, user])
 
   // Initial load - load first batch quickly
   const loadInitial = useCallback(async () => {
@@ -479,6 +537,9 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
 
   // Initial load on mount + polling
   useEffect(() => {
+    // Clear API cache on mount to ensure fresh data
+    apiClient.clearCache()
+    console.log('[GenerationFeed] Component mounted, cache cleared')
     loadInitial()
 
     // Refresh every 30 seconds (cache-friendly)
@@ -490,7 +551,7 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
   useEffect(() => {
     loadInitial()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showMineOnly, config.showCompletedOnly, config.workflowNames, pageContexts])
+  }, [showMineOnly, showThisWorkflowOnly, config.showCompletedOnly, config.workflowNames, pageContexts])
 
   // Progressive loading - continue loading in background after initial batch
   useEffect(() => {
@@ -586,7 +647,7 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
-                This Page
+                My Content
               </button>
               <button
                 onClick={() => setShowMineOnly(false)}
@@ -597,6 +658,32 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
                 }`}
               >
                 All
+              </button>
+            </div>
+          )}
+
+          {/* Workflow filter toggle - only show if pageContext is set */}
+          {pageContexts && (
+            <div className="flex items-center bg-gray-100 rounded-full p-0.5">
+              <button
+                onClick={() => setShowThisWorkflowOnly(true)}
+                className={`px-2 py-1 text-xs rounded-full transition-all ${
+                  showThisWorkflowOnly
+                    ? 'bg-white text-blue-700 shadow-sm font-medium'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {getWorkflowDisplayLabel(pageContexts)}
+              </button>
+              <button
+                onClick={() => setShowThisWorkflowOnly(false)}
+                className={`px-2 py-1 text-xs rounded-full transition-all ${
+                  !showThisWorkflowOnly
+                    ? 'bg-white text-blue-700 shadow-sm font-medium'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                All Workflows
               </button>
             </div>
           )}

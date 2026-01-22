@@ -9,6 +9,7 @@ import { useSmartResolution } from "../hooks/useSmartResolution";
 import { MaskEditor } from "../components/MaskEditor";
 import { AVPlayerWithPadding } from "../components/AVPlayerWithPadding";
 import { apiClient } from "../lib/apiClient";
+import { useAuth } from "../contexts/AuthContext";
 
 // Types for different lipsync modes
 type LipsyncMode = 'one-person' | 'multi-person' | 'video-lipsync';
@@ -51,6 +52,9 @@ function TabButton({
 }
 
 export default function Lipsync({ comfyUrl, initialMode = 'one-person' }: Props) {
+  // Auth context
+  const { user } = useAuth();
+
   // Mode selection
   const [activeMode, setActiveMode] = useState<LipsyncMode>(initialMode);
 
@@ -157,6 +161,14 @@ export default function Lipsync({ comfyUrl, initialMode = 'one-person' }: Props)
     const targetH = Math.max(32, Math.round((width / onePersonImageAR) / 32) * 32);
     if (targetH !== height) setHeight(targetH);
   }, [width, onePersonImageAR, activeMode]);
+
+  // Auto-set resolution to 1248x640 when Infinite Talk is selected
+  useEffect(() => {
+    if (activeMode === 'one-person' && onePersonWorkflowMode === 'infinitetalk') {
+      setWidth(1248);
+      setHeight(640);
+    }
+  }, [onePersonWorkflowMode, activeMode]);
 
   // ===== MULTI-PERSON EFFECTS =====
   useEffect(() => {
@@ -495,6 +507,7 @@ export default function Lipsync({ comfyUrl, initialMode = 'one-person' }: Props)
       setJobId(id);
 
       await apiClient.createVideoJob({
+        user_id: user?.id || null,
         comfy_job_id: id,
         workflow_name: 'lipsync-one',
         comfy_url: comfyUrl,
@@ -637,6 +650,7 @@ export default function Lipsync({ comfyUrl, initialMode = 'one-person' }: Props)
       setJobId(id);
 
       await apiClient.createVideoJob({
+        user_id: user?.id || null,
         comfy_job_id: id,
         workflow_name: 'lipsync-multi',
         comfy_url: comfyUrl,
@@ -770,6 +784,7 @@ export default function Lipsync({ comfyUrl, initialMode = 'one-person' }: Props)
       setJobId(id);
 
       await apiClient.createVideoJob({
+        user_id: user?.id || null,
         comfy_job_id: id,
         workflow_name: 'video-lipsync',
         comfy_url: comfyUrl,

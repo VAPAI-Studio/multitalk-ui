@@ -1,6 +1,5 @@
-from pydantic import BaseSettings
-from typing import Optional, List
-import os
+from pydantic_settings import BaseSettings
+from typing import List
 
 class Settings(BaseSettings):
     """Application settings with environment variable support."""
@@ -16,11 +15,11 @@ class Settings(BaseSettings):
     PORT: int = 8000
     
     # Database - Supabase
-    SUPABASE_URL: str
-    SUPABASE_KEY: str
-    
+    SUPABASE_URL: str = ""
+    SUPABASE_KEY: str = ""
+
     # External APIs
-    OPENROUTER_API_KEY: str
+    OPENROUTER_API_KEY: str = ""
     
     # Storage Configuration
     STORAGE_BUCKET_VIDEOS: str = "multitalk-videos"
@@ -41,38 +40,23 @@ class Settings(BaseSettings):
     # CORS Settings
     ALLOWED_ORIGINS: List[str] = [
         "http://localhost:3000",
-        "http://localhost:5173", 
+        "http://localhost:5173",
         "http://127.0.0.1:3000",
         "http://127.0.0.1:5173"
     ]
-    
+
+    # Authentication Settings
+    ALLOWED_EMAIL_DOMAINS: List[str] = ["vapai.studio", "sideoutsticks.com"]
+
     # Pagination
     DEFAULT_PAGE_SIZE: int = 20
     MAX_PAGE_SIZE: int = 100
     
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
-        
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        # Validate required settings
-        self._validate_required_settings()
-    
-    def _validate_required_settings(self):
-        """Validate that all required settings are present."""
-        required_fields = ["SUPABASE_URL", "SUPABASE_KEY", "OPENROUTER_API_KEY"]
-        missing_fields = []
-        
-        for field in required_fields:
-            if not getattr(self, field, None):
-                missing_fields.append(field)
-        
-        if missing_fields:
-            raise ValueError(
-                f"Missing required environment variables: {', '.join(missing_fields)}\n"
-                f"Please check your .env file or environment variables."
-            )
+    model_config = {
+        "env_file": ".env",
+        "case_sensitive": True,
+        "extra": "ignore"
+    }
 
 # Global settings instance
 settings = Settings()

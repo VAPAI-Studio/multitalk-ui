@@ -1,10 +1,10 @@
-# VAPAI Studio
+# sideOUTsticks
 
 A full-stack application for AI-powered video and audio processing with multi-character conversations. Built with React, TypeScript, FastAPI, ComfyUI, and Supabase.
 
 ## Features
 
-VAPAI Studio offers a comprehensive suite of AI-powered media creation tools:
+sideOUTsticks offers a comprehensive suite of AI-powered media creation tools:
 
 - 🎬 **Lipsync 1 Person** - Generate realistic talking videos from single person images
 - 🎵 **Lipsync Multi Person** - Create multi-character conversations with synchronized audio

@@ -1,0 +1,90 @@
+{
+  "1": {
+    "inputs": {
+      "model": [
+        "2",
+        0
+      ],
+      "audio": [
+        "4",
+        0
+      ]
+    },
+    "class_type": "AudioSeparatorSimple",
+    "_meta": {
+      "title": "Audio Separator ⚡🅡🅞🅣🅘"
+    }
+  },
+  "2": {
+    "inputs": {
+      "model_name": "umxl"
+    },
+    "class_type": "DownloadOpenUnmixModel",
+    "_meta": {
+      "title": "Download Open Unmix Model ⚡🅡🅞🅣🅘"
+    }
+  },
+  "4": {
+    "inputs": {
+      "audio": "Nico Morano - Juno Love ft. Mehwy.mp3",
+      "start_time": 0,
+      "duration": 0
+    },
+    "class_type": "VHS_LoadAudioUpload",
+    "_meta": {
+      "title": "Load Audio (Upload)🎥🅥🅗🅢"
+    }
+  },
+  "5": {
+    "inputs": {
+      "audioUI": "",
+      "audio": [
+        "1",
+        1
+      ]
+    },
+    "class_type": "PreviewAudio",
+    "_meta": {
+      "title": "Drums"
+    }
+  },
+  "6": {
+    "inputs": {
+      "audioUI": "",
+      "audio": [
+        "1",
+        2
+      ]
+    },
+    "class_type": "PreviewAudio",
+    "_meta": {
+      "title": "Vocals"
+    }
+  },
+  "7": {
+    "inputs": {
+      "audioUI": "",
+      "audio": [
+        "1",
+        3
+      ]
+    },
+    "class_type": "PreviewAudio",
+    "_meta": {
+      "title": "Bass"
+    }
+  },
+  "8": {
+    "inputs": {
+      "audioUI": "",
+      "audio": [
+        "1",
+        4
+      ]
+    },
+    "class_type": "PreviewAudio",
+    "_meta": {
+      "title": "Instruments"
+    }
+  }
+}

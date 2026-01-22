@@ -33,6 +33,7 @@ class UserResponse(BaseModel):
     id: str
     email: str
     full_name: Optional[str] = None
+    profile_picture_url: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -76,3 +77,8 @@ class EmailVerification(BaseModel):
 class RefreshTokenRequest(BaseModel):
     """Schema for token refresh request."""
     refresh_token: str
+
+
+class UserProfileUpdate(BaseModel):
+    """Schema for user profile update."""
+    full_name: Optional[str] = None

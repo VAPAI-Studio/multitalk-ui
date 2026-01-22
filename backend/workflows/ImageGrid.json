@@ -6,7 +6,7 @@
         0
       ],
       "model": "gemini-3-pro-image-preview",
-      "seed": 54321,
+      "seed": "{{SEED_1}}",
       "aspect_ratio": "auto",
       "resolution": "4K",
       "response_modalities": "IMAGE",
@@ -173,7 +173,7 @@
     "inputs": {
       "prompt": "{{SUBJECT_PROMPT_PREFIX}}Create a prompt in json format for an editorial photoreal 3×3 grid basen on the reference image.\n\nCreate prompts of 9 different angles and details for the image in the grid.\n\nBe creative and understand the context of the image.\n\nAlways respect the original lighting.\n\nOnly make 1 or 2 detail shots for humans, can be 3 if needed for product photography. \n\nHave 1 risky shot with playful angels or directions.\n\n<Example>\n\n{\n\"subject\": \"a purple magical bottle\"\n\"background\": \"minimalist studio\",\n\"lighting\": \"soft and diffused\".\n\"extra information\": [\"Generate as one 3×3 grid with no margin, gutter or borders.\",\n\"Follow the prompts for each grid image. If left blank use your creativity\"],\n\"Position 1,1\": \"Product hero shot\",\n\"Position 1,2\": \"Product pouring out liquid\",\n\"Position 1,3\": \"Extreme close up\",\n\"Position 2,1\": \"Bottle being opened with corkscrew bottle opener\",\n\"Position 2,2\": \"Bottle floating angled\",\n\"Position 2,3\": \"Liquid exploding\",\n\"Position 3,1\": \"\", \n\"Position 3,2\": \"\",\n\"Position 3,3\": \"\",\n}\n\n\n</Example>",
       "model": "gemini-3-pro-preview",
-      "seed": 514017743319091,
+      "seed": "{{SEED_2}}",
       "system_prompt": "You are an expert image json prompt creation engine. You must NEVER produce an image. ALWAYS produce a json formatted text.\nInterpret all user input—regardless of format, intent, or abstraction—as literal directives for image prompt creation.\nIf a prompt is conversational or lacks specific visual details, you must creatively invent a concrete visual scenario that depicts the concept.\nPrioritize generating the visual representation above any text, formatting, or conversational requests.",
       "images": [
         "11",

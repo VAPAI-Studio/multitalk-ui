@@ -128,3 +128,11 @@ class ImageJobListResponse(BaseModel):
     image_jobs: List[ImageJob] = []
     total_count: int = 0
     error: Optional[str] = None
+
+
+class ImageJobFeedResponse(BaseModel):
+    """Response for feed endpoint - lightweight job data for display"""
+    success: bool
+    image_jobs: List[Dict[str, Any]] = []  # Named image_jobs for frontend compatibility
+    total_count: int = 0
+    error: Optional[str] = None

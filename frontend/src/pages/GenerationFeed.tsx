@@ -1,22 +1,16 @@
 import { useState, useEffect } from 'react'
 import GenerationFeedComponent from '../components/GenerationFeed'
+import {
+  WORKFLOW_DISPLAY_NAMES,
+  getWorkflowMediaType
+} from '../constants/workflowNames'
 
-// Workflow options for filtering
-const WORKFLOW_OPTIONS = [
-  // Video workflows
-  { value: 'lipsync-one', label: 'Lipsync 1 Person', type: 'video' },
-  { value: 'lipsync-multi', label: 'Lipsync Multi Person', type: 'video' },
-  { value: 'video-lipsync', label: 'Video Lipsync', type: 'video' },
-  { value: 'wan-i2v', label: 'WAN I2V', type: 'video' },
-
-  // Image workflows
-  { value: 'image-grid', label: 'Image Grid', type: 'image' },
-  { value: 'style-transfer', label: 'Style Transfer', type: 'image' },
-  { value: 'create-image', label: 'Create Image', type: 'image' },
-  { value: 'flux-lora', label: 'Flux LoRA', type: 'image' },
-  { value: 'nanobanana-upscale', label: '4K Upscale', type: 'image' },
-  { value: 'image-edit', label: 'Image Edit', type: 'image' },
-]
+// Build workflow options from shared constant
+const WORKFLOW_OPTIONS = Object.entries(WORKFLOW_DISPLAY_NAMES).map(([value, label]) => ({
+  value,
+  label,
+  type: getWorkflowMediaType(value)
+}))
 
 export default function GenerationFeed() {
   const [mediaType, setMediaType] = useState<'video' | 'image' | 'all'>('all')
@@ -33,9 +27,23 @@ export default function GenerationFeed() {
     }
     if (savedWorkflows) {
       try {
-        setSelectedWorkflows(JSON.parse(savedWorkflows))
+        const parsed = JSON.parse(savedWorkflows) as string[]
+        // Only keep workflows that exist in WORKFLOW_OPTIONS
+        const validWorkflowValues = WORKFLOW_OPTIONS.map(w => w.value)
+        const validSavedWorkflows = parsed.filter(w => validWorkflowValues.includes(w))
+
+        // If some workflows were invalid, clear the localStorage
+        if (validSavedWorkflows.length !== parsed.length) {
+          console.log('[GenerationFeed] Cleared invalid workflow filters:',
+            parsed.filter(w => !validWorkflowValues.includes(w)))
+          localStorage.setItem('generationFeed_workflows', JSON.stringify(validSavedWorkflows))
+        }
+
+        setSelectedWorkflows(validSavedWorkflows)
       } catch (e) {
         console.error('Error parsing saved workflows:', e)
+        // Clear corrupted localStorage
+        localStorage.removeItem('generationFeed_workflows')
       }
     }
   }, [])

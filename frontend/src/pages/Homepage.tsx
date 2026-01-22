@@ -1,9 +1,11 @@
+import { type User } from '../contexts/AuthContext';
 
 interface Props {
-  onNavigate: (page: "lipsync" | "image-edit" | "character-caption" | "wan-i2v" | "wan-move" | "style-transfer" | "create-image" | "lora-trainer" | "image-grid" | "img2img" | "generation-feed") => void;
+  onNavigate: (page: "lipsync" | "image-edit" | "character-caption" | "wan-i2v" | "wan-move" | "ltx2-i2v" | "style-transfer" | "create-image" | "lora-trainer" | "image-grid" | "audio-stem-separator" | "img2img" | "generation-feed") => void;
+  user: User | null;
 }
 
-export default function Homepage({ onNavigate }: Props) {
+export default function Homepage({ onNavigate, user }: Props) {
   const apps = [
     {
       id: "lipsync" as const,
@@ -46,6 +48,14 @@ export default function Homepage({ onNavigate }: Props) {
       features: ["Custom motion paths", "Static anchors", "Animation preview", "Model: WAN Move"]
     },
     {
+      id: "ltx2-i2v" as const,
+      title: "LTX2 I2V",
+      description: "Transform your images into high-quality videos with the LTX2 model. Adjustable strength and duration for precise control.",
+      icon: "🎥",
+      gradient: "from-cyan-500 to-blue-600",
+      features: ["Image to video generation", "Adjustable strength", "Duration presets (3s, 5s, 10s)", "Model: LTX2"]
+    },
+    {
       id: "style-transfer" as const,
       title: "Style Transfer",
       description: "Transfer artistic styles between images using AI. Combine subject and style reference images to create unique artistic combinations.",
@@ -78,6 +88,14 @@ export default function Homepage({ onNavigate }: Props) {
       features: ["9 unique angles", "Subject-aware prompts", "Model: Gemini Pro Image"]
     },
     {
+      id: "audio-stem-separator" as const,
+      title: "Audio Stem Separator",
+      description: "Separate any audio track into individual stems: vocals, drums, bass, and other instruments using AI-powered audio separation.",
+      icon: "🎵",
+      gradient: "from-green-500 to-emerald-600",
+      features: ["Vocal isolation", "Drum & bass extraction", "Download as ZIP or separate files", "Model: Open Unmix"]
+    },
+    {
       id: "generation-feed" as const,
       title: "Generation Feed",
       description: "View and manage all your AI generations in one place. Browse videos, images, and style transfers with real-time updates.",
@@ -107,11 +125,36 @@ export default function Homepage({ onNavigate }: Props) {
             </div>
           </div>
           <h1 className="text-5xl md:text-7xl font-black bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
-            VAPAI Studio
+            sideOUTsticks
           </h1>
           <p className="text-xl md:text-2xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
             Your complete AI-powered media creation suite.
           </p>
+
+          {/* User Welcome Section */}
+          {user && (
+            <div className="flex items-center justify-center gap-4 mt-8">
+              <div className="flex items-center gap-3 px-6 py-3 bg-white/80 backdrop-blur-sm rounded-2xl border border-gray-200/50 shadow-md">
+                {user.profile_picture_url ? (
+                  <img
+                    src={user.profile_picture_url}
+                    alt="Profile"
+                    className="w-12 h-12 rounded-full object-cover border-2 border-purple-200"
+                  />
+                ) : (
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                    <span className="text-white text-lg font-bold">
+                      {(user.full_name?.[0] || user.email?.[0] || 'U').toUpperCase()}
+                    </span>
+                  </div>
+                )}
+                <div className="text-left">
+                  <p className="text-sm text-gray-500">Welcome back,</p>
+                  <p className="text-lg font-bold text-gray-900">{user.full_name || user.email}</p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Apps Grid */}

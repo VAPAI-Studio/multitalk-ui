@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Header
 from typing import Optional
 
 from models.image_job import (
@@ -6,20 +6,35 @@ from models.image_job import (
     UpdateImageJobPayload,
     CompleteImageJobPayload,
     ImageJobResponse,
-    ImageJobListResponse
+    ImageJobListResponse,
+    ImageJobFeedResponse
 )
 from services.image_job_service import ImageJobService
 from services.storage_service import StorageService
+from core.supabase import get_supabase_for_token
 
 router = APIRouter(prefix="/image-jobs", tags=["image-jobs"])
 
-def get_service():
-    return ImageJobService()
+def _extract_bearer_token(authorization: Optional[str]) -> Optional[str]:
+    if not authorization:
+        return None
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not token:
+        return None
+    return token
+
+
+def get_service(access_token: Optional[str] = None):
+    supabase = get_supabase_for_token(access_token)
+    return ImageJobService(supabase)
 
 @router.post("/", response_model=ImageJobResponse)
-async def create_image_job(payload: CreateImageJobPayload):
+async def create_image_job(
+    payload: CreateImageJobPayload,
+    authorization: Optional[str] = Header(None)
+):
     """Create a new image job"""
-    service = get_service()
+    service = get_service(_extract_bearer_token(authorization))
     success, error = await service.create_job(payload)
 
     if success:
@@ -40,10 +55,11 @@ async def get_image_jobs(
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
     workflow_name: Optional[str] = Query(None, description="Filter by workflow name"),
-    user_id: Optional[str] = Query(None, description="Filter by user ID")
+    user_id: Optional[str] = Query(None, description="Filter by user ID"),
+    authorization: Optional[str] = Header(None)
 ):
-    """Get recent image jobs with optional filtering"""
-    service = get_service()
+    """Get recent image jobs with optional filtering."""
+    service = get_service(_extract_bearer_token(authorization))
     jobs, total_count, error = await service.get_recent_jobs(
         limit=limit,
         offset=offset,
@@ -58,10 +74,50 @@ async def get_image_jobs(
         error=error
     )
 
+
+@router.get("/feed", response_model=ImageJobFeedResponse)
+async def get_image_jobs_feed(
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    workflow_name: Optional[str] = Query(None, description="Filter by workflow name"),
+    user_id: Optional[str] = Query(None, description="Filter by user ID"),
+    status: Optional[str] = Query(None, description="Filter by status"),
+    authorization: Optional[str] = Header(None)
+):
+    """
+    Optimized feed endpoint - minimal data, server-side caching.
+    Returns only fields needed for feed display (no parameters, no comfyui details).
+    Cached for 10 seconds to reduce database load.
+
+    Query parameters:
+    - limit: Maximum number of jobs to return (1-100)
+    - offset: Number of jobs to skip (for pagination)
+    - workflow_name: Filter by workflow name
+    - user_id: Filter by user ID
+    - status: Filter by status (pending, processing, completed, failed)
+    """
+    service = get_service(_extract_bearer_token(authorization))
+
+    jobs, total_count, error = await service.get_feed_jobs(
+        limit=limit,
+        offset=offset,
+        workflow_name=workflow_name,
+        user_id=user_id,
+        status=status
+    )
+
+    return ImageJobFeedResponse(
+        success=error is None,
+        image_jobs=jobs,
+        total_count=total_count,
+        error=error
+    )
+
+
 @router.get("/{job_id}", response_model=ImageJobResponse)
-async def get_image_job(job_id: str):
+async def get_image_job(job_id: str, authorization: Optional[str] = Header(None)):
     """Get a specific image job by ID"""
-    service = get_service()
+    service = get_service(_extract_bearer_token(authorization))
     job, error = await service.get_job(job_id)
 
     return ImageJobResponse(
@@ -71,9 +127,13 @@ async def get_image_job(job_id: str):
     )
 
 @router.put("/{job_id}", response_model=ImageJobResponse)
-async def update_image_job(job_id: str, payload: UpdateImageJobPayload):
+async def update_image_job(
+    job_id: str,
+    payload: UpdateImageJobPayload,
+    authorization: Optional[str] = Header(None)
+):
     """Update an image job"""
-    service = get_service()
+    service = get_service(_extract_bearer_token(authorization))
     success, error = await service.update_job(job_id, payload)
 
     if success:
@@ -83,9 +143,9 @@ async def update_image_job(job_id: str, payload: UpdateImageJobPayload):
         return ImageJobResponse(success=False, error=error)
 
 @router.put("/{job_id}/processing", response_model=ImageJobResponse)
-async def update_to_processing(job_id: str):
+async def update_to_processing(job_id: str, authorization: Optional[str] = Header(None)):
     """Mark image job as processing"""
-    service = get_service()
+    service = get_service(_extract_bearer_token(authorization))
     success, error = await service.update_to_processing(job_id)
 
     if success:
@@ -95,12 +155,16 @@ async def update_to_processing(job_id: str):
         return ImageJobResponse(success=False, error=error)
 
 @router.put("/{job_id}/complete", response_model=ImageJobResponse)
-async def complete_image_job(job_id: str, payload: CompleteImageJobPayload):
+async def complete_image_job(
+    job_id: str,
+    payload: CompleteImageJobPayload,
+    authorization: Optional[str] = Header(None)
+):
     """Complete an image job (mark as completed or failed)"""
     if payload.job_id != job_id:
         raise HTTPException(status_code=400, detail="Job ID mismatch")
 
-    service = get_service()
+    service = get_service(_extract_bearer_token(authorization))
     storage_service = StorageService()
 
     # If completing successfully with output URLs, download from ComfyUI and upload to Supabase
@@ -138,10 +202,11 @@ async def complete_image_job(job_id: str, payload: CompleteImageJobPayload):
 async def get_completed_image_jobs(
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
-    workflow_name: Optional[str] = Query(None, description="Filter by workflow name")
+    workflow_name: Optional[str] = Query(None, description="Filter by workflow name"),
+    authorization: Optional[str] = Header(None)
 ):
     """Get completed image jobs"""
-    service = get_service()
+    service = get_service(_extract_bearer_token(authorization))
     jobs, error = await service.get_completed_jobs(
         limit=limit,
         offset=offset,
@@ -156,9 +221,9 @@ async def get_completed_image_jobs(
     )
 
 @router.delete("/{job_id}", response_model=ImageJobResponse)
-async def delete_image_job(job_id: str):
+async def delete_image_job(job_id: str, authorization: Optional[str] = Header(None)):
     """Delete an image job"""
-    service = get_service()
+    service = get_service(_extract_bearer_token(authorization))
     success, error = await service.delete_job(job_id)
 
     return ImageJobResponse(

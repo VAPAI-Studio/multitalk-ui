@@ -3,7 +3,6 @@ import { startJobMonitoring, checkComfyUIHealth } from "../components/utils";
 import ResizableFeedSidebar from "../components/ResizableFeedSidebar";
 import { useSmartResolution } from "../hooks/useSmartResolution";
 import { apiClient } from "../lib/apiClient";
-import { useAuth } from "../contexts/AuthContext";
 
 // UI Components
 function Label({ children, className }: { children: React.ReactNode; className?: string }) {
@@ -18,7 +17,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   return (
     <div className="rounded-3xl border border-gray-200/80 p-6 md:p-8 shadow-lg bg-gradient-to-br from-white to-gray-50/50 backdrop-blur-sm">
       <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
-        <div className="w-2 h-8 bg-gradient-to-b from-purple-500 to-pink-600 rounded-full"></div>
+        <div className="w-2 h-8 bg-gradient-to-b from-cyan-500 to-blue-600 rounded-full"></div>
         {title}
       </h2>
       {children}
@@ -26,7 +25,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-// Helper functions
+// Helper function to resize image
 async function resizeImageToTarget(file: File, targetWidth: number, targetHeight: number): Promise<File> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -39,14 +38,10 @@ async function resizeImageToTarget(file: File, targetWidth: number, targetHeight
     }
 
     img.onload = () => {
-      // Set canvas to exact target dimensions
       canvas.width = targetWidth;
       canvas.height = targetHeight;
-
-      // Draw image scaled to target size
       ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
 
-      // Convert to JPEG with good quality (85%)
       canvas.toBlob(
         (blob) => {
           if (!blob) {
@@ -59,7 +54,7 @@ async function resizeImageToTarget(file: File, targetWidth: number, targetHeight
             lastModified: Date.now(),
           });
 
-          console.log(`Resized image: ${img.width}x${img.height} (${(file.size / 1024 / 1024).toFixed(2)}MB) → ${targetWidth}x${targetHeight} (${(resizedFile.size / 1024 / 1024).toFixed(2)}MB)`);
+          console.log(`Resized image: ${img.width}x${img.height} -> ${targetWidth}x${targetHeight}`);
           resolve(resizedFile);
         },
         'image/jpeg',
@@ -76,17 +71,22 @@ interface Props {
   comfyUrl: string;
 }
 
-export default function WANI2V({ comfyUrl }: Props) {
-  // Auth context
-  const { user } = useAuth();
+// Duration presets in seconds and their frame equivalents (24fps)
+const DURATION_PRESETS = [
+  { label: '3s', seconds: 3, frames: 72 },
+  { label: '5s', seconds: 5, frames: 120 },
+  { label: '10s', seconds: 10, frames: 240 },
+];
 
+export default function LTX2I2V({ comfyUrl }: Props) {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
   const [imageAR, setImageAR] = useState<number | null>(null);
-  const [customPrompt, setCustomPrompt] = useState<string>('a beautiful scene transforming through time');
-  const [duration, setDuration] = useState<number>(3.375); // Duration in seconds (3-10)
+  const [customPrompt, setCustomPrompt] = useState<string>('');
+  const [duration, setDuration] = useState<number>(5); // Default 5 seconds
+  const [strength, setStrength] = useState<number>(0.6); // Default strength
 
-  // Smart resolution handling with auto-correction to multiples of 32
+  // Smart resolution handling
   const {
     width,
     height,
@@ -96,7 +96,7 @@ export default function WANI2V({ comfyUrl }: Props) {
     handleHeightChange,
     setWidth,
     setHeight
-  } = useSmartResolution(640, 360) // defaults for video
+  } = useSmartResolution(1280, 720);
 
   const [status, setStatus] = useState<string>("");
   const [videoUrl, setVideoUrl] = useState<string>("");
@@ -106,7 +106,7 @@ export default function WANI2V({ comfyUrl }: Props) {
 
   const imgRef = useRef<HTMLImageElement | null>(null);
 
-  // cleanup job monitor on unmount
+  // Cleanup job monitor on unmount
   useEffect(() => {
     return () => {
       if (jobMonitorCleanup) {
@@ -115,6 +115,7 @@ export default function WANI2V({ comfyUrl }: Props) {
     };
   }, [jobMonitorCleanup]);
 
+  // Handle image upload and aspect ratio
   useEffect(() => {
     if (!imageFile) return;
     const url = URL.createObjectURL(imageFile);
@@ -123,8 +124,8 @@ export default function WANI2V({ comfyUrl }: Props) {
     img.onload = () => {
       const ar = img.width / img.height;
       setImageAR(ar);
-      // Initialize W/H to the nearest multiples of 32 preserving aspect, max width ~ 640
-      const targetW = Math.max(32, Math.round(Math.min(640, img.width) / 32) * 32);
+      // Initialize to nearest multiples of 32, max width 1280
+      const targetW = Math.max(32, Math.round(Math.min(1280, img.width) / 32) * 32);
       const targetH = Math.max(32, Math.round((targetW / ar) / 32) * 32);
       setWidth(targetW);
       setHeight(targetH);
@@ -133,7 +134,7 @@ export default function WANI2V({ comfyUrl }: Props) {
     return () => URL.revokeObjectURL(url);
   }, [imageFile, setWidth, setHeight]);
 
-  // maintain image aspect ratio
+  // Maintain aspect ratio when width changes
   useEffect(() => {
     if (imageAR) {
       const h = Math.max(32, Math.round((width / imageAR) / 32) * 32);
@@ -143,65 +144,49 @@ export default function WANI2V({ comfyUrl }: Props) {
 
   async function buildPromptJSON(imageFilename: string, prompt: string) {
     try {
-      // Ensure width and height are valid numbers
-      const safeWidth = width || 640;
-      const safeHeight = height || 360;
+      const safeWidth = width || 1280;
+      const safeHeight = height || 720;
+      const frameCount = duration * 24; // Convert seconds to frames
 
-      // Calculate frame count from duration (fps = 24)
-      const frameRate = 24;
-      const frameCount = Math.round(duration * frameRate);
-
-      const response = await fetch('/workflows/WANI2V.json');
+      const response = await fetch('/workflows/LTX2_Simple.json');
       if (!response.ok) {
         throw new Error(`Failed to load workflow template: ${response.status}`);
       }
       const template = await response.json();
 
-      // Clean the prompt to avoid JSON issues
-      const cleanPrompt = prompt.replace(/"/g, '\\"').replace(/\n/g, '\\n');
-
-      // Instead of string replacement on the entire JSON, let's modify the template object directly
+      // Create a deep copy and modify values
       const modifiedTemplate = JSON.parse(JSON.stringify(template));
 
-      // Replace prompt
-      if (modifiedTemplate["149"] && modifiedTemplate["149"].inputs) {
-        modifiedTemplate["149"].inputs.value = cleanPrompt;
+      // Replace placeholders by modifying the template object directly
+      // Node 32 - Width
+      if (modifiedTemplate["32"]?.inputs) {
+        modifiedTemplate["32"].inputs.value = safeWidth;
       }
 
-      // Replace image node to use LoadImage instead of Base64
-      // Change node type and provide filename
-      if (modifiedTemplate["295"]) {
-        modifiedTemplate["295"] = {
-          "inputs": {
-            "image": imageFilename
-          },
-          "class_type": "LoadImage",
-          "_meta": {
-            "title": "Load Image"
-          }
-        };
+      // Node 34 - Height
+      if (modifiedTemplate["34"]?.inputs) {
+        modifiedTemplate["34"].inputs.value = safeHeight;
       }
 
-      // Replace width and height in all relevant nodes
-      const widthHeightNodes = ["257", "258", "259", "264"];
-      widthHeightNodes.forEach(nodeId => {
-        if (modifiedTemplate[nodeId] && modifiedTemplate[nodeId].inputs) {
-          if ('width' in modifiedTemplate[nodeId].inputs) {
-            modifiedTemplate[nodeId].inputs.width = safeWidth;
-          }
-          if ('height' in modifiedTemplate[nodeId].inputs) {
-            modifiedTemplate[nodeId].inputs.height = safeHeight;
-          }
-        }
-      });
+      // Node 26 - Prompt
+      if (modifiedTemplate["26"]?.inputs) {
+        modifiedTemplate["26"].inputs.text = prompt;
+      }
 
-      // Replace length (duration) in WanImageToVideo nodes (257, 258, 264)
-      const durationNodes = ["257", "258", "264"];
-      durationNodes.forEach(nodeId => {
-        if (modifiedTemplate[nodeId] && modifiedTemplate[nodeId].inputs) {
-          modifiedTemplate[nodeId].inputs.length = frameCount;
-        }
-      });
+      // Node 609 - Image Strength
+      if (modifiedTemplate["609"]?.inputs) {
+        modifiedTemplate["609"].inputs.value = strength;
+      }
+
+      // Node 12 - Video Length (frames)
+      if (modifiedTemplate["12"]?.inputs) {
+        modifiedTemplate["12"].inputs.value = frameCount;
+      }
+
+      // Node 849 - Image Filename
+      if (modifiedTemplate["849"]?.inputs) {
+        modifiedTemplate["849"].inputs.image = imageFilename;
+      }
 
       return modifiedTemplate;
     } catch (error: any) {
@@ -229,18 +214,19 @@ export default function WANI2V({ comfyUrl }: Props) {
 
     setIsSubmitting(true);
     try {
-      // First check ComfyUI health
+      // Check ComfyUI health
       setStatus("Checking ComfyUI...");
       const healthCheck = await checkComfyUIHealth(comfyUrl);
       if (!healthCheck.available) {
         throw new Error(`${healthCheck.error}${healthCheck.details ? `. ${healthCheck.details}` : ''}`);
       }
 
-      // Always resize image to target dimensions (width x height)
+      // Resize image to target dimensions
       setStatus(`Resizing image to ${width}x${height}...`);
       const fileToUpload = await resizeImageToTarget(imageFile, width, height);
 
-      setStatus("Uploading image to ComfyUI…");
+      // Upload to ComfyUI
+      setStatus("Uploading image to ComfyUI...");
       const uploadResult = await apiClient.uploadImageToComfyUI(comfyUrl, fileToUpload);
 
       if (!uploadResult.success || !uploadResult.filename) {
@@ -250,8 +236,9 @@ export default function WANI2V({ comfyUrl }: Props) {
       const uploadedFilename = uploadResult.filename;
       console.log('Uploaded image filename:', uploadedFilename);
 
-      setStatus("Sending prompt to ComfyUI…");
-      const clientId = `wani2v-ui-${Math.random().toString(36).slice(2)}`;
+      // Build and submit workflow
+      setStatus("Sending prompt to ComfyUI...");
+      const clientId = `ltx2-i2v-ui-${Math.random().toString(36).slice(2)}`;
       const promptJson = await buildPromptJSON(uploadedFilename, customPrompt);
 
       const response = await apiClient.submitPromptToComfyUI(
@@ -259,63 +246,60 @@ export default function WANI2V({ comfyUrl }: Props) {
         promptJson,
         clientId
       ) as { success: boolean; prompt_id?: string; error?: string };
-      
+
       if (!response.success) {
         throw new Error(response.error || 'Failed to submit prompt to ComfyUI');
       }
-      
+
       const id = response.prompt_id;
       if (!id) {
         throw new Error('ComfyUI did not return a valid prompt ID');
       }
       setJobId(id);
 
-      // Create job record in new video_jobs table
+      // Create job record
       await apiClient.createVideoJob({
-        user_id: user?.id || null,
         comfy_job_id: id,
-        workflow_name: 'wan-i2v',
+        workflow_name: 'ltx2-i2v',
         comfy_url: comfyUrl,
-        input_image_urls: [imageFile.name], // Just filename for now, not full URL
+        input_image_urls: [imageFile.name],
         width,
         height,
         fps: 24,
         duration_seconds: duration,
         parameters: {
-          prompt: customPrompt
+          prompt: customPrompt,
+          strength: strength
         }
       });
 
-      // Update job to processing status
+      // Update job to processing
       await apiClient.updateVideoJobToProcessing(id);
 
-      // Start monitoring job status
-      setStatus("Processing in ComfyUI…");
+      // Start monitoring
+      setStatus("Processing in ComfyUI...");
       const cleanup = startJobMonitoring(
         id,
         comfyUrl,
         async (jobStatus, message, videoInfo) => {
           if (jobStatus === 'processing') {
-            setStatus(message || 'Processing in ComfyUI…');
+            setStatus(message || 'Processing in ComfyUI...');
           } else if (jobStatus === 'completed' && videoInfo) {
-            // Construct video URL
             const videoUrl = videoInfo.subfolder
               ? `${comfyUrl}/api/view?filename=${encodeURIComponent(videoInfo.filename)}&subfolder=${encodeURIComponent(videoInfo.subfolder)}&type=temp`
               : `${comfyUrl}/api/view?filename=${encodeURIComponent(videoInfo.filename)}&type=temp`;
 
             setVideoUrl(videoUrl);
-            setStatus("✅ Video generated successfully!");
+            setStatus("Video generated successfully!");
             setIsSubmitting(false);
 
-            // Complete job in new system
             await apiClient.completeVideoJob(id, {
               job_id: id,
               status: 'completed',
               output_video_urls: [videoUrl]
             });
           } else if (jobStatus === 'error') {
-            // Handle error
-            setStatus(`❌ ${message}`);
+            setStatus(`Error: ${message}`);
             setIsSubmitting(false);
 
             try {
@@ -330,7 +314,7 @@ export default function WANI2V({ comfyUrl }: Props) {
           }
         }
       );
-      
+
       setJobMonitorCleanup(() => cleanup);
 
     } catch (error: any) {
@@ -341,7 +325,7 @@ export default function WANI2V({ comfyUrl }: Props) {
           error_message: error.message || 'Unknown error'
         }).catch(() => {});
       }
-      setStatus(`❌ Error: ${error.message || 'Unknown error'}`);
+      setStatus(`Error: ${error.message || 'Unknown error'}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -351,7 +335,7 @@ export default function WANI2V({ comfyUrl }: Props) {
     if (videoUrl) {
       const link = document.createElement('a');
       link.href = videoUrl;
-      link.download = `wan-i2v-${Date.now()}.mp4`;
+      link.download = `ltx2-i2v-${Date.now()}.mp4`;
       link.target = '_blank';
       document.body.appendChild(link);
       link.click();
@@ -360,17 +344,17 @@ export default function WANI2V({ comfyUrl }: Props) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-indigo-50">
+    <div className="min-h-screen bg-gradient-to-br from-cyan-50 via-blue-50 to-indigo-50">
       <div className="flex gap-6 p-6 md:p-10">
         {/* Main Content */}
         <div className="flex-1 max-w-4xl space-y-8">
           {/* Header */}
           <div className="text-center space-y-4">
-            <h1 className="text-4xl md:text-6xl font-bold bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 bg-clip-text text-transparent">
-              WAN I2V
+            <h1 className="text-4xl md:text-6xl font-bold bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 bg-clip-text text-transparent">
+              LTX2 I2V
             </h1>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Transform your images into captivating videos with AI-powered image-to-video generation
+              Transform your images into high-quality videos with the LTX2 model
             </p>
           </div>
 
@@ -382,11 +366,11 @@ export default function WANI2V({ comfyUrl }: Props) {
                 type="file"
                 accept="image/*"
                 onChange={(e) => setImageFile(e.target.files?.[0] || null)}
-                className="w-full p-3 border-2 border-dashed border-purple-300 rounded-2xl bg-purple-50 hover:bg-purple-100 transition-colors cursor-pointer"
+                className="w-full p-3 border-2 border-dashed border-cyan-300 rounded-2xl bg-cyan-50 hover:bg-cyan-100 transition-colors cursor-pointer"
               />
             </Field>
             {imagePreview && (
-              <div className="mt-4 p-4 border-2 border-purple-200 rounded-2xl bg-white">
+              <div className="mt-4 p-4 border-2 border-cyan-200 rounded-2xl bg-white">
                 <img
                   ref={imgRef}
                   src={imagePreview}
@@ -395,7 +379,7 @@ export default function WANI2V({ comfyUrl }: Props) {
                 />
                 {imageAR && (
                   <p className="text-sm text-gray-500 mt-2 text-center">
-                    Aspect ratio: {imageAR.toFixed(2)} ({Math.round(imageAR * 100) / 100})
+                    Aspect ratio: {imageAR.toFixed(2)}
                   </p>
                 )}
               </div>
@@ -409,13 +393,13 @@ export default function WANI2V({ comfyUrl }: Props) {
               <textarea
                 value={customPrompt}
                 onChange={(e) => setCustomPrompt(e.target.value)}
-                placeholder="e.g., a beautiful scene transforming through time, day turning into night, flowers blooming..."
-                className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 focus:border-purple-500 focus:outline-none transition-colors min-h-[100px] resize-vertical"
+                placeholder="e.g., A cinematic scene with smooth camera movement, the subject comes to life with natural motion..."
+                className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 focus:border-cyan-500 focus:outline-none transition-colors min-h-[100px] resize-vertical"
               />
             </Field>
           </Section>
 
-          {/* Resolution and Duration */}
+          {/* Video Settings */}
           <Section title="Video Settings">
             <div className="grid grid-cols-2 gap-4">
               <Field>
@@ -424,12 +408,12 @@ export default function WANI2V({ comfyUrl }: Props) {
                   type="number"
                   value={widthInput}
                   onChange={(e) => handleWidthChange(e.target.value)}
-                  className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 focus:border-purple-500 focus:outline-none transition-colors"
+                  className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 focus:border-cyan-500 focus:outline-none transition-colors"
                   step="32"
                   min="64"
-                  max="1024"
+                  max="1920"
                 />
-                <p className="text-xs text-gray-500 mt-1">Actual: {width}px (auto-adjusted to multiple of 32)</p>
+                <p className="text-xs text-gray-500 mt-1">Actual: {width}px (multiple of 32)</p>
               </Field>
               <Field>
                 <Label>Height</Label>
@@ -437,69 +421,74 @@ export default function WANI2V({ comfyUrl }: Props) {
                   type="number"
                   value={heightInput}
                   onChange={(e) => handleHeightChange(e.target.value)}
-                  className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 focus:border-purple-500 focus:outline-none transition-colors"
+                  className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 focus:border-cyan-500 focus:outline-none transition-colors"
                   step="32"
                   min="64"
-                  max="1024"
+                  max="1080"
                 />
-                <p className="text-xs text-gray-500 mt-1">Actual: {height}px (auto-adjusted to multiple of 32)</p>
+                <p className="text-xs text-gray-500 mt-1">Actual: {height}px (multiple of 32)</p>
               </Field>
             </div>
-            {imageAR && (
-              <p className="text-sm text-gray-600 mt-2">
-                💡 Resolution will be adjusted to maintain aspect ratio: {imageAR.toFixed(2)}
-              </p>
-            )}
 
+            {/* Duration Presets */}
             <Field>
-              <Label>Duration (seconds)</Label>
+              <Label>Duration</Label>
+              <div className="flex gap-3">
+                {DURATION_PRESETS.map((preset) => (
+                  <button
+                    key={preset.seconds}
+                    onClick={() => setDuration(preset.seconds)}
+                    className={`flex-1 py-3 px-4 rounded-2xl font-semibold transition-all duration-200 ${
+                      duration === preset.seconds
+                        ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    {preset.label}
+                    <span className="block text-xs opacity-75">{preset.frames} frames</span>
+                  </button>
+                ))}
+              </div>
+            </Field>
+
+            {/* Strength Slider */}
+            <Field>
+              <Label>Image Strength: {strength.toFixed(1)}</Label>
               <div className="flex items-center gap-4">
+                <span className="text-sm text-gray-500">0.4</span>
                 <input
                   type="range"
-                  min="3"
-                  max="10"
-                  step="0.125"
-                  value={duration}
-                  onChange={(e) => setDuration(parseFloat(e.target.value))}
-                  className="flex-1"
+                  min="0.4"
+                  max="1"
+                  step="0.1"
+                  value={strength}
+                  onChange={(e) => setStrength(parseFloat(e.target.value))}
+                  className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-cyan-500"
                 />
-                <input
-                  type="number"
-                  min="3"
-                  max="10"
-                  step="0.125"
-                  value={duration}
-                  onChange={(e) => {
-                    const val = parseFloat(e.target.value);
-                    if (!isNaN(val) && val >= 3 && val <= 10) {
-                      setDuration(val);
-                    }
-                  }}
-                  className="w-24 px-3 py-2 rounded-xl border-2 border-gray-200 focus:border-purple-500 focus:outline-none transition-colors"
-                />
+                <span className="text-sm text-gray-500">1.0</span>
               </div>
               <p className="text-xs text-gray-500 mt-1">
-                {duration.toFixed(2)}s = {Math.round(duration * 24)} frames @ 24fps
+                Lower values allow more creative freedom, higher values stay closer to the original image
               </p>
             </Field>
           </Section>
 
-          {/* Generation */}
+          {/* Generate */}
           <Section title="Generate Video">
             <div className="flex flex-wrap items-center gap-3">
               <button
-                className="px-8 py-4 rounded-2xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-lg shadow-lg hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02] transition-all duration-200 flex items-center gap-3"
+                className="px-8 py-4 rounded-2xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white font-bold text-lg shadow-lg hover:from-cyan-700 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02] transition-all duration-200 flex items-center gap-3"
                 onClick={submit}
                 disabled={isSubmitting}
               >
                 {isSubmitting ? (
                   <>
                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    Processing…
+                    Processing...
                   </>
                 ) : (
                   <>
-                    <span>🎬</span>
+                    <span>🎥</span>
                     Generate Video
                   </>
                 )}
@@ -512,9 +501,11 @@ export default function WANI2V({ comfyUrl }: Props) {
               <div className="mt-6 space-y-3">
                 <video src={videoUrl} controls className="w-full rounded-3xl shadow-2xl border border-gray-200/50" />
                 <div>
-                  <button className="px-6 py-3 rounded-2xl border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-semibold shadow-md hover:shadow-lg transition-all duration-200 flex items-center gap-2" onClick={handleDownload}>
-                    <span>⬇️</span>
-                    Download MP4
+                  <button
+                    className="px-6 py-3 rounded-2xl border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-semibold shadow-md hover:shadow-lg transition-all duration-200 flex items-center gap-2"
+                    onClick={handleDownload}
+                  >
+                    <span>Download MP4</span>
                   </button>
                 </div>
               </div>
@@ -522,12 +513,12 @@ export default function WANI2V({ comfyUrl }: Props) {
           </Section>
         </div>
 
-        {/* Right Sidebar - Resizable Feed */}
+        {/* Right Sidebar - Feed */}
         <ResizableFeedSidebar
-          storageKey="wan-i2v"
+          storageKey="ltx2-i2v"
           config={{
             mediaType: 'all',
-            pageContext: 'wan-i2v',
+            pageContext: 'ltx2-i2v',
             showCompletedOnly: false,
             maxItems: 10,
             showFixButton: true,

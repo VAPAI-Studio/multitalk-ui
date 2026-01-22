@@ -3,10 +3,11 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef, ty
 import { config } from '../config/environment';
 import { apiClient } from '../lib/apiClient';
 
-interface User {
+export interface User {
   id: string;
   email: string;
   full_name?: string;
+  profile_picture_url?: string | null;
   created_at?: string;
 }
 
@@ -105,7 +106,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (response.ok) {
         const userData = await response.json();
-        setUser(userData);
+
+        // Preserve profile_picture_url from localStorage since backend doesn't store it
+        const storedUser = localStorage.getItem('vapai-user');
+        const localProfilePictureUrl = storedUser ? JSON.parse(storedUser).profile_picture_url : null;
+
+        // Merge backend data with localStorage profile picture
+        setUser({
+          ...userData,
+          profile_picture_url: localProfilePictureUrl || userData.profile_picture_url
+        });
       } else if (response.status === 401) {
         // Token invalid - try refresh
         console.log('Token invalid, attempting refresh...');

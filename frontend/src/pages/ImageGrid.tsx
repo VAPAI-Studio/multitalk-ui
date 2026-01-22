@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { Label, Field, Section } from "../components/UI";
 import { apiClient } from "../lib/apiClient";
 import ResizableFeedSidebar from "../components/ResizableFeedSidebar";
+import { useAuth } from "../contexts/AuthContext";
+import { logger } from "../lib/logger";
 
 const SUBJECT_OPTIONS = [
   { value: "person", label: "Person" },
@@ -17,6 +19,9 @@ interface Props {
 }
 
 export default function ImageGrid({ comfyUrl }: Props) {
+  // Auth context
+  const { user } = useAuth();
+
   // State
   const [inputImage, setInputImage] = useState<File | null>(null);
   const [inputImagePreview, setInputImagePreview] = useState<string>("");
@@ -63,10 +68,16 @@ export default function ImageGrid({ comfyUrl }: Props) {
     setResultUrls([]);
     setJobId("");
 
+    // Clear previous timings and start overall workflow timing
+    logger.clearTimings();
+    logger.startTiming("Overall workflow");
+    logger.debug("=== Starting 3x3 Grid Generation ===");
+
     let databaseJobId: string | null = null;
 
     try {
       // 1. Upload image to ComfyUI
+      logger.startTiming("Step 1: Upload image to ComfyUI");
       const uploadFormData = new FormData();
       uploadFormData.append('image', inputImage);
       const uploadResponse = await fetch(`${comfyUrl}/upload/image`, {
@@ -80,21 +91,32 @@ export default function ImageGrid({ comfyUrl }: Props) {
 
       const uploadData = await uploadResponse.json();
       const uploadedFilename = uploadData.name || inputImage.name;
+      logger.endTiming("Step 1: Upload image to ComfyUI");
 
       setStatus("Building workflow...");
 
       // 2. Build subject prompt prefix
+      logger.startTiming("Step 2: Build workflow parameters");
       const subjectPromptPrefix = subjectCategory
         ? `Broad category chosen by user: ${subjectCategory}. `
         : "";
+      logger.endTiming("Step 2: Build workflow parameters");
 
       // 3. Submit workflow using backend template
+      logger.startTiming("Step 3: Submit workflow to ComfyUI");
       const clientId = `image-grid-${Math.random().toString(36).slice(2)}`;
+
+      // Generate random seeds for each generation
+      const seed1 = Math.floor(Math.random() * 1000000000000);
+      const seed2 = Math.floor(Math.random() * 1000000000000);
+
       const workflowResponse = await apiClient.submitWorkflow(
         'ImageGrid',
         {
           IMAGE_FILENAME: uploadedFilename,
-          SUBJECT_PROMPT_PREFIX: subjectPromptPrefix
+          SUBJECT_PROMPT_PREFIX: subjectPromptPrefix,
+          SEED_1: seed1,
+          SEED_2: seed2
         },
         comfyUrl,
         clientId
@@ -106,11 +128,15 @@ export default function ImageGrid({ comfyUrl }: Props) {
 
       const promptId = workflowResponse.prompt_id;
       setJobId(promptId);
+      logger.endTiming("Step 3: Submit workflow to ComfyUI");
 
       setStatus("Creating job record...");
 
       // 4. Create image job in database
+      console.log('Creating job with user_id:', user?.id || null);
+      logger.startTiming("Step 4: Create job record in database");
       const jobCreationResponse = await apiClient.createImageJob({
+        user_id: user?.id || null,
         comfy_job_id: promptId,
         workflow_name: 'image-grid',
         comfy_url: comfyUrl,
@@ -120,15 +146,21 @@ export default function ImageGrid({ comfyUrl }: Props) {
         }
       }) as any;
 
+      console.log('Job creation response:', jobCreationResponse);
+
       if (!jobCreationResponse.success || !jobCreationResponse.image_job?.id) {
-        throw new Error('Failed to create job record in database');
+        const errorMsg = jobCreationResponse.error || 'Unknown database error';
+        throw new Error(`Failed to create job record in database: ${errorMsg}`);
       }
 
       databaseJobId = jobCreationResponse.image_job.id;
+      logger.endTiming("Step 4: Create job record in database");
 
       setStatus("Processing in ComfyUI... This may take a few minutes.");
+      logger.debug("Waiting for ComfyUI to process the workflow...");
 
       // 5. Poll for completion
+      logger.startTiming("Step 5: ComfyUI processing (polling)");
       const startTime = Date.now();
       const maxWaitTime = 600000; // 10 minutes for grid generation
 
@@ -162,6 +194,10 @@ export default function ImageGrid({ comfyUrl }: Props) {
 
           // Check if completed
           if (historyEntry?.status?.status_str === "success" || historyEntry?.outputs) {
+            logger.endTiming("Step 5: ComfyUI processing (polling)");
+
+            // 6. Extract images from output nodes
+            logger.startTiming("Step 6: Extract images from ComfyUI output");
             const outputs = historyEntry.outputs;
 
             // Extract all 10 images from output nodes
@@ -183,16 +219,21 @@ export default function ImageGrid({ comfyUrl }: Props) {
             if (allImageUrls.length === 0) {
               throw new Error('No images found in ComfyUI output');
             }
+            logger.endTiming("Step 6: Extract images from ComfyUI output");
 
             setStatus(`Found ${allImageUrls.length} images. Saving to storage...`);
 
+            // 7. Reorder images
+            logger.startTiming("Step 7: Reorder images");
             // Reorder to put stitched image first (for feed preview)
             // Current order: [1-9, stitched] -> [stitched, 1-9]
             const reorderedUrls = allImageUrls.length === 10
               ? [allImageUrls[9], ...allImageUrls.slice(0, 9)]
               : allImageUrls;
+            logger.endTiming("Step 7: Reorder images");
 
-            // 6. Complete job with all URLs
+            // 8. Complete job with all URLs
+            logger.startTiming("Step 8: Save images to storage");
             if (!databaseJobId) {
               throw new Error('Database job ID is missing');
             }
@@ -208,6 +249,14 @@ export default function ImageGrid({ comfyUrl }: Props) {
             }
 
             const storedUrls = completionResult.image_job.output_image_urls;
+            logger.endTiming("Step 8: Save images to storage");
+
+            // End overall workflow timing
+            logger.endTiming("Overall workflow");
+
+            // Log complete timing summary
+            logger.logTimingSummary();
+
             setResultUrls(storedUrls);
             setStatus(`Grid generation completed! ${storedUrls.length} images saved.`);
             setIsSubmitting(false);
@@ -232,6 +281,8 @@ export default function ImageGrid({ comfyUrl }: Props) {
       await pollForResult();
 
     } catch (err: any) {
+      logger.error("Grid generation failed", err);
+      logger.logTimingSummary(); // Still log timing data on error
       setStatus(`Error: ${err.message || "Unknown error"}`);
       if (databaseJobId) {
         await apiClient.completeImageJob(databaseJobId, {
