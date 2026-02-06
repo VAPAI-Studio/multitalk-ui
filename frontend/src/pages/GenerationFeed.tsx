@@ -72,52 +72,52 @@ export default function GenerationFeed() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-indigo-50">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
       <div className="max-w-7xl mx-auto px-6 py-12">
         {/* Header */}
         <div className="text-center space-y-4 mb-8">
           <h1 className="text-4xl md:text-6xl font-bold bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 bg-clip-text text-transparent">
             Generation Feed
           </h1>
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto leading-relaxed">
+          <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto leading-relaxed">
             Your complete history of AI-generated content - videos and images all in one place.
           </p>
         </div>
 
         {/* Filter Bar */}
         <div className="max-w-4xl mx-auto mb-8">
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-4">
+          <div className="bg-white dark:bg-dark-surface-primary rounded-2xl shadow-lg border border-gray-200 dark:border-dark-border-primary p-4">
             <div className="flex flex-wrap items-center gap-4">
               {/* Media Type Filter */}
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-gray-700">Show:</span>
-                <div className="flex rounded-xl border border-gray-300 overflow-hidden">
+                <span className="text-sm font-medium text-gray-700 dark:text-dark-text-secondary">Show:</span>
+                <div className="flex rounded-xl border border-gray-300 dark:border-dark-border-primary overflow-hidden">
                   <button
                     onClick={() => setMediaType('all')}
                     className={`px-4 py-2 text-sm font-medium transition-colors ${
                       mediaType === 'all'
                         ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
-                        : 'bg-white text-gray-600 hover:bg-gray-50'
+                        : 'bg-white dark:bg-dark-surface-secondary text-gray-600 dark:text-dark-text-secondary hover:bg-gray-50 dark:hover:bg-dark-surface-elevated'
                     }`}
                   >
                     All
                   </button>
                   <button
                     onClick={() => setMediaType('video')}
-                    className={`px-4 py-2 text-sm font-medium border-l border-gray-300 transition-colors ${
+                    className={`px-4 py-2 text-sm font-medium border-l border-gray-300 dark:border-dark-border-primary transition-colors ${
                       mediaType === 'video'
                         ? 'bg-blue-600 text-white'
-                        : 'bg-white text-gray-600 hover:bg-gray-50'
+                        : 'bg-white dark:bg-dark-surface-secondary text-gray-600 dark:text-dark-text-secondary hover:bg-gray-50 dark:hover:bg-dark-surface-elevated'
                     }`}
                   >
                     Videos
                   </button>
                   <button
                     onClick={() => setMediaType('image')}
-                    className={`px-4 py-2 text-sm font-medium border-l border-gray-300 transition-colors ${
+                    className={`px-4 py-2 text-sm font-medium border-l border-gray-300 dark:border-dark-border-primary transition-colors ${
                       mediaType === 'image'
                         ? 'bg-pink-600 text-white'
-                        : 'bg-white text-gray-600 hover:bg-gray-50'
+                        : 'bg-white dark:bg-dark-surface-secondary text-gray-600 dark:text-dark-text-secondary hover:bg-gray-50 dark:hover:bg-dark-surface-elevated'
                     }`}
                   >
                     Images
@@ -127,12 +127,12 @@ export default function GenerationFeed() {
 
               {/* Workflow Multi-Select Dropdown */}
               <div className="relative flex-1 min-w-[200px]">
-                <span className="text-sm font-medium text-gray-700 mr-2">Workflows:</span>
+                <span className="text-sm font-medium text-gray-700 dark:text-dark-text-secondary mr-2">Workflows:</span>
                 <button
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  className="w-full px-4 py-2 text-left bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors flex items-center justify-between"
+                  className="w-full px-4 py-2 text-left bg-white dark:bg-dark-surface-secondary border border-gray-300 dark:border-dark-border-primary rounded-xl hover:bg-gray-50 dark:hover:bg-dark-surface-elevated transition-colors flex items-center justify-between"
                 >
-                  <span className="text-sm text-gray-700 truncate">
+                  <span className="text-sm text-gray-700 dark:text-dark-text-secondary truncate">
                     {selectedWorkflows.length === 0
                       ? 'All workflows'
                       : selectedWorkflows.length === 1
@@ -151,9 +151,9 @@ export default function GenerationFeed() {
 
                 {/* Dropdown Menu */}
                 {isDropdownOpen && (
-                  <div className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-xl shadow-xl max-h-80 overflow-y-auto">
+                  <div className="absolute z-50 mt-1 w-full bg-white dark:bg-dark-surface-primary border border-gray-300 dark:border-dark-border-primary rounded-xl shadow-xl max-h-80 overflow-y-auto">
                     {/* Quick actions */}
-                    <div className="sticky top-0 bg-gray-50 border-b border-gray-200 p-2 flex gap-2">
+                    <div className="sticky top-0 bg-gray-50 dark:bg-dark-surface-secondary border-b border-gray-200 dark:border-dark-border-primary p-2 flex gap-2">
                       <button
                         onClick={clearAllWorkflows}
                         className="px-3 py-1 text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition-colors"

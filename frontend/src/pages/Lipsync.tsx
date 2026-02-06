@@ -41,7 +41,7 @@ function TabButton({
       className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
         isActive
           ? `bg-gradient-to-r ${gradient} text-white shadow-lg`
-          : 'text-gray-600 hover:bg-gray-100'
+          : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-dark-surface-secondary'
       }`}
     >
       <span className="text-lg">{icon}</span>
@@ -1170,7 +1170,7 @@ export default function Lipsync({ comfyUrl, initialMode = 'one-person' }: Props)
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
       <div className="flex gap-6 p-6 md:p-10">
         {/* Main Content */}
         <div className="flex-1 max-w-4xl space-y-8">
@@ -1179,13 +1179,13 @@ export default function Lipsync({ comfyUrl, initialMode = 'one-person' }: Props)
             <h1 className="text-4xl md:text-6xl font-black bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
               Lipsync Studio
             </h1>
-            <p className="text-gray-600 max-w-2xl mx-auto leading-relaxed">
+            <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto leading-relaxed">
               Generate realistic talking videos from images or sync audio to existing videos
             </p>
           </div>
 
           {/* Mode Tabs */}
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-2 shadow-lg border border-gray-200/50">
+          <div className="bg-white/80 dark:bg-dark-surface-primary/80 backdrop-blur-sm rounded-2xl p-2 shadow-lg border border-gray-200/50 dark:border-dark-border-primary">
             <div className="flex gap-2">
               <TabButton
                 mode="one-person"
@@ -1220,7 +1220,7 @@ export default function Lipsync({ comfyUrl, initialMode = 'one-person' }: Props)
               <Label>Custom Prompt</Label>
               <textarea
                 rows={3}
-                className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all duration-200 bg-white/80 resize-vertical"
+                className="w-full rounded-2xl border-2 border-gray-200 dark:border-dark-border-primary px-4 py-3 text-gray-800 dark:text-dark-text-primary focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/30 transition-all duration-200 bg-white/80 dark:bg-dark-surface-secondary resize-vertical"
                 value={customPrompt}
                 onChange={(e) => setCustomPrompt(e.target.value)}
                 placeholder="Describe what the person should be doing..."
@@ -1243,7 +1243,7 @@ export default function Lipsync({ comfyUrl, initialMode = 'one-person' }: Props)
                       onChange={(e) => setOnePersonWorkflowMode(e.target.value as 'multitalk' | 'infinitetalk')}
                       className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
                     />
-                    <span className="text-sm font-medium text-gray-700">MultiTalk</span>
+                    <span className="text-sm font-medium text-gray-700 dark:text-dark-text-secondary">MultiTalk</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -1254,7 +1254,7 @@ export default function Lipsync({ comfyUrl, initialMode = 'one-person' }: Props)
                       onChange={(e) => setOnePersonWorkflowMode(e.target.value as 'multitalk' | 'infinitetalk')}
                       className="w-4 h-4 text-purple-600 border-gray-300 focus:ring-purple-500"
                     />
-                    <span className="text-sm font-medium text-gray-700">InfiniteTalk</span>
+                    <span className="text-sm font-medium text-gray-700 dark:text-dark-text-secondary">InfiniteTalk</span>
                   </label>
                 </div>
                 {onePersonWorkflowMode === 'infinitetalk' && (
@@ -1266,7 +1266,7 @@ export default function Lipsync({ comfyUrl, initialMode = 'one-person' }: Props)
                         step="0.1"
                         min="0.1"
                         max="2.0"
-                        className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all duration-200 bg-white/80"
+                        className="w-full rounded-2xl border-2 border-gray-200 dark:border-dark-border-primary px-4 py-3 text-gray-800 dark:text-dark-text-primary focus:border-purple-500 focus:ring-4 focus:ring-purple-100 dark:focus:ring-purple-900/30 transition-all duration-200 bg-white/80 dark:bg-dark-surface-secondary"
                         value={onePersonAudioScale}
                         onChange={(e) => setOnePersonAudioScale(Number(e.target.value))}
                       />
@@ -1285,7 +1285,7 @@ export default function Lipsync({ comfyUrl, initialMode = 'one-person' }: Props)
                         type="file"
                         accept="image/*"
                         onChange={(e) => setOnePersonImageFile(e.target.files?.[0] || null)}
-                        className="w-full rounded-2xl border-2 border-dashed border-gray-300 px-4 py-6 text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-gradient-to-r file:from-blue-500 file:to-purple-600 file:text-white file:font-semibold hover:file:from-blue-600 hover:file:to-purple-700 transition-all duration-200 bg-gray-50/50"
+                        className="w-full rounded-2xl border-2 border-dashed border-gray-300 dark:border-dark-border-primary px-4 py-6 text-gray-600 dark:text-dark-text-secondary file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-gradient-to-r file:from-blue-500 file:to-purple-600 file:text-white file:font-semibold hover:file:from-blue-600 hover:file:to-purple-700 transition-all duration-200 bg-gray-50/50 dark:bg-dark-surface-secondary"
                       />
                     </div>
                     {onePersonImagePreview && (
@@ -1315,7 +1315,7 @@ export default function Lipsync({ comfyUrl, initialMode = 'one-person' }: Props)
                             setOnePersonAudioDuration(0);
                           }
                         }}
-                        className="w-full rounded-2xl border-2 border-dashed border-gray-300 px-4 py-6 text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-gradient-to-r file:from-green-500 file:to-teal-600 file:text-white file:font-semibold hover:file:from-green-600 hover:file:to-teal-700 transition-all duration-200 bg-gray-50/50"
+                        className="w-full rounded-2xl border-2 border-dashed border-gray-300 dark:border-dark-border-primary px-4 py-6 text-gray-600 dark:text-dark-text-secondary file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-gradient-to-r file:from-green-500 file:to-teal-600 file:text-white file:font-semibold hover:file:from-green-600 hover:file:to-teal-700 transition-all duration-200 bg-gray-50/50 dark:bg-dark-surface-secondary"
                       />
                     </div>
                     {onePersonAudioDuration > 0 && (
@@ -1339,7 +1339,7 @@ export default function Lipsync({ comfyUrl, initialMode = 'one-person' }: Props)
                         type="file"
                         accept="image/*"
                         onChange={(e) => setMultiPersonImageFile(e.target.files?.[0] || null)}
-                        className="w-full rounded-2xl border-2 border-dashed border-gray-300 px-4 py-6 text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-gradient-to-r file:from-blue-500 file:to-purple-600 file:text-white file:font-semibold hover:file:from-blue-600 hover:file:to-purple-700 transition-all duration-200 bg-gray-50/50"
+                        className="w-full rounded-2xl border-2 border-dashed border-gray-300 dark:border-dark-border-primary px-4 py-6 text-gray-600 dark:text-dark-text-secondary file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-gradient-to-r file:from-blue-500 file:to-purple-600 file:text-white file:font-semibold hover:file:from-blue-600 hover:file:to-purple-700 transition-all duration-200 bg-gray-50/50 dark:bg-dark-surface-secondary"
                       />
                     </div>
                     {multiPersonImagePreview && (
@@ -1355,7 +1355,7 @@ export default function Lipsync({ comfyUrl, initialMode = 'one-person' }: Props)
                         <Label>Width (px)</Label>
                         <input
                           type="number"
-                          className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all duration-200 bg-white/80"
+                          className="w-full rounded-2xl border-2 border-gray-200 dark:border-dark-border-primary px-4 py-3 text-gray-800 dark:text-dark-text-primary focus:border-purple-500 focus:ring-4 focus:ring-purple-100 dark:focus:ring-purple-900/30 transition-all duration-200 bg-white/80 dark:bg-dark-surface-secondary"
                           value={widthInput}
                           onChange={(e) => handleWidthChange(e.target.value)}
                         />
@@ -1364,7 +1364,7 @@ export default function Lipsync({ comfyUrl, initialMode = 'one-person' }: Props)
                         <Label>Height (px)</Label>
                         <input
                           type="number"
-                          className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all duration-200 bg-white/80"
+                          className="w-full rounded-2xl border-2 border-gray-200 dark:border-dark-border-primary px-4 py-3 text-gray-800 dark:text-dark-text-primary focus:border-purple-500 focus:ring-4 focus:ring-purple-100 dark:focus:ring-purple-900/30 transition-all duration-200 bg-white/80 dark:bg-dark-surface-secondary"
                           value={heightInput}
                           onChange={(e) => handleHeightChange(e.target.value)}
                         />
@@ -1552,7 +1552,7 @@ export default function Lipsync({ comfyUrl, initialMode = 'one-person' }: Props)
                       step="0.1"
                       min="0.1"
                       max="3.0"
-                      className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-green-500 focus:ring-4 focus:ring-green-100 transition-all duration-200 bg-white/80"
+                      className="w-full rounded-2xl border-2 border-gray-200 dark:border-dark-border-primary px-4 py-3 text-gray-800 dark:text-dark-text-primary focus:border-green-500 focus:ring-4 focus:ring-green-100 dark:focus:ring-green-900/30 transition-all duration-200 bg-white/80 dark:bg-dark-surface-secondary"
                       value={videoLipsyncAudioScale}
                       onChange={(e) => setVideoLipsyncAudioScale(Number(e.target.value))}
                     />
@@ -1564,7 +1564,7 @@ export default function Lipsync({ comfyUrl, initialMode = 'one-person' }: Props)
                       <Label>Width (px)</Label>
                       <input
                         type="number"
-                        className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-green-500 focus:ring-4 focus:ring-green-100 transition-all duration-200 bg-white/80"
+                        className="w-full rounded-2xl border-2 border-gray-200 dark:border-dark-border-primary px-4 py-3 text-gray-800 dark:text-dark-text-primary focus:border-green-500 focus:ring-4 focus:ring-green-100 dark:focus:ring-green-900/30 transition-all duration-200 bg-white/80 dark:bg-dark-surface-secondary"
                         value={widthInput}
                         onChange={(e) => handleWidthChange(e.target.value)}
                       />
@@ -1573,7 +1573,7 @@ export default function Lipsync({ comfyUrl, initialMode = 'one-person' }: Props)
                       <Label>Height (px)</Label>
                       <input
                         type="number"
-                        className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-green-500 focus:ring-4 focus:ring-green-100 transition-all duration-200 bg-white/80"
+                        className="w-full rounded-2xl border-2 border-gray-200 dark:border-dark-border-primary px-4 py-3 text-gray-800 dark:text-dark-text-primary focus:border-green-500 focus:ring-4 focus:ring-green-100 dark:focus:ring-green-900/30 transition-all duration-200 bg-white/80 dark:bg-dark-surface-secondary"
                         value={heightInput}
                         onChange={(e) => handleHeightChange(e.target.value)}
                       />
@@ -1592,7 +1592,7 @@ export default function Lipsync({ comfyUrl, initialMode = 'one-person' }: Props)
                         type="file"
                         accept="video/*"
                         onChange={onVideoLipsyncVideoSelect}
-                        className="w-full rounded-2xl border-2 border-dashed border-gray-300 px-4 py-6 text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-gradient-to-r file:from-green-500 file:to-blue-600 file:text-white file:font-semibold hover:file:from-green-600 hover:file:to-blue-700 transition-all duration-200 bg-gray-50/50"
+                        className="w-full rounded-2xl border-2 border-dashed border-gray-300 dark:border-dark-border-primary px-4 py-6 text-gray-600 dark:text-dark-text-secondary file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-gradient-to-r file:from-green-500 file:to-blue-600 file:text-white file:font-semibold hover:file:from-green-600 hover:file:to-blue-700 transition-all duration-200 bg-gray-50/50 dark:bg-dark-surface-secondary"
                       />
                     </div>
                     {videoLipsyncVideoPreview && (
@@ -1613,7 +1613,7 @@ export default function Lipsync({ comfyUrl, initialMode = 'one-person' }: Props)
                         type="file"
                         accept="audio/*"
                         onChange={onVideoLipsyncAudioSelect}
-                        className="w-full rounded-2xl border-2 border-dashed border-gray-300 px-4 py-6 text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-gradient-to-r file:from-blue-500 file:to-purple-600 file:text-white file:font-semibold hover:file:from-blue-600 hover:file:to-purple-700 transition-all duration-200 bg-gray-50/50"
+                        className="w-full rounded-2xl border-2 border-dashed border-gray-300 dark:border-dark-border-primary px-4 py-6 text-gray-600 dark:text-dark-text-secondary file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-gradient-to-r file:from-blue-500 file:to-purple-600 file:text-white file:font-semibold hover:file:from-blue-600 hover:file:to-purple-700 transition-all duration-200 bg-gray-50/50 dark:bg-dark-surface-secondary"
                       />
                     </div>
                     {videoLipsyncAudioDuration > 0 && (
@@ -1732,7 +1732,7 @@ export default function Lipsync({ comfyUrl, initialMode = 'one-person' }: Props)
                   <Label>Width (px)</Label>
                   <input
                     type="number"
-                    className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all duration-200 bg-white/80"
+                    className="w-full rounded-2xl border-2 border-gray-200 dark:border-dark-border-primary px-4 py-3 text-gray-800 dark:text-dark-text-primary focus:border-purple-500 focus:ring-4 focus:ring-purple-100 dark:focus:ring-purple-900/30 transition-all duration-200 bg-white/80 dark:bg-dark-surface-secondary"
                     value={widthInput}
                     onChange={(e) => handleWidthChange(e.target.value)}
                   />
@@ -1741,7 +1741,7 @@ export default function Lipsync({ comfyUrl, initialMode = 'one-person' }: Props)
                   <Label>Height (px)</Label>
                   <input
                     type="number"
-                    className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all duration-200 bg-white/80"
+                    className="w-full rounded-2xl border-2 border-gray-200 dark:border-dark-border-primary px-4 py-3 text-gray-800 dark:text-dark-text-primary focus:border-purple-500 focus:ring-4 focus:ring-purple-100 dark:focus:ring-purple-900/30 transition-all duration-200 bg-white/80 dark:bg-dark-surface-secondary"
                     value={heightInput}
                     onChange={(e) => handleHeightChange(e.target.value)}
                   />

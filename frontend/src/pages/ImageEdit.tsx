@@ -1153,7 +1153,7 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
       <div className="flex gap-6 p-6 md:p-10">
         {/* Main Content */}
         <div className="flex-1 max-w-4xl space-y-8">
@@ -1166,7 +1166,7 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
                 AI Image Generation
               </span>
             </div>
-            <p className="text-gray-600 max-w-2xl mx-auto leading-relaxed">
+            <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto leading-relaxed">
               Upload an image and edit it using AI-powered image editing technology.
             </p>
           </div>
@@ -1212,7 +1212,7 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
                       type="file"
                       accept="image/*"
                       onChange={handleImageUpload}
-                      className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-purple-500 focus:ring-2 focus:ring-purple-100 transition-all duration-200 bg-white/80 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-medium file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100"
+                      className="w-full rounded-2xl border-2 border-gray-200 dark:border-dark-border-primary px-4 py-3 text-gray-800 dark:text-dark-text-primary focus:border-purple-500 focus:ring-2 focus:ring-purple-100 dark:focus:ring-purple-900/30 transition-all duration-200 bg-white/80 dark:bg-dark-surface-secondary file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-medium file:bg-purple-50 dark:file:bg-purple-900/30 file:text-purple-700 dark:file:text-purple-300 hover:file:bg-purple-100 dark:hover:file:bg-purple-900/50"
                     />
                     {originalImageUrl && (
                       <div className="mt-4">
@@ -1230,7 +1230,7 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
                     <Label>Edit Instructions</Label>
                     <textarea
                       rows={4}
-                      className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all duration-200 bg-white/80 resize-vertical"
+                      className="w-full rounded-2xl border-2 border-gray-200 dark:border-dark-border-primary px-4 py-3 text-gray-800 dark:text-dark-text-primary focus:border-purple-500 focus:ring-4 focus:ring-purple-100 dark:focus:ring-purple-900/30 transition-all duration-200 bg-white/80 dark:bg-dark-surface-secondary resize-vertical"
                       value={userPrompt}
                       onChange={(e) => setUserPrompt(e.target.value)}
                       onKeyDown={handleKeyPress}
@@ -1273,7 +1273,7 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
 
                   {editedImageUrl && (
                     <div className="space-y-4">
-                      <div className="p-6 rounded-2xl bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-200">
+                      <div className="p-6 rounded-2xl bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200 dark:border-purple-800">
                         <div className="flex items-center justify-between mb-4">
                           <div className="flex items-center gap-2 text-purple-800">
                             <span>✨</span>
@@ -1333,7 +1333,7 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
                     type="file"
                     accept="image/*"
                     onChange={handleCameraImageUpload}
-                    className="w-full rounded-2xl border-2 border-dashed border-gray-300 px-4 py-6 text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-gradient-to-r file:from-blue-500 file:to-purple-600 file:text-white file:font-semibold hover:file:from-blue-600 hover:file:to-purple-700 transition-all duration-200 bg-gray-50/50"
+                    className="w-full rounded-2xl border-2 border-dashed border-gray-300 dark:border-dark-border-primary px-4 py-6 text-gray-600 dark:text-dark-text-secondary file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-gradient-to-r file:from-blue-500 file:to-purple-600 file:text-white file:font-semibold hover:file:from-blue-600 hover:file:to-purple-700 transition-all duration-200 bg-gray-50/50 dark:bg-dark-surface-secondary"
                   />
                   {cameraImagePreview && (
                     <div className="mt-4">
@@ -1394,7 +1394,7 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
                     <Label>Width (px)</Label>
                     <input
                       type="number"
-                      className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all duration-200 bg-white/80"
+                      className="w-full rounded-2xl border-2 border-gray-200 dark:border-dark-border-primary px-4 py-3 text-gray-800 dark:text-dark-text-primary focus:border-purple-500 focus:ring-4 focus:ring-purple-100 dark:focus:ring-purple-900/30 transition-all duration-200 bg-white/80 dark:bg-dark-surface-secondary"
                       value={widthInput}
                       onChange={(e) => handleWidthChangeWithAspectRatio(e.target.value)}
                     />
@@ -1403,7 +1403,7 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
                     <Label>Height (px)</Label>
                     <input
                       type="number"
-                      className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all duration-200 bg-white/80"
+                      className="w-full rounded-2xl border-2 border-gray-200 dark:border-dark-border-primary px-4 py-3 text-gray-800 dark:text-dark-text-primary focus:border-purple-500 focus:ring-4 focus:ring-purple-100 dark:focus:ring-purple-900/30 transition-all duration-200 bg-white/80 dark:bg-dark-surface-secondary"
                       value={heightInput}
                       onChange={(e) => handleHeightChangeWithAspectRatio(e.target.value)}
                     />
