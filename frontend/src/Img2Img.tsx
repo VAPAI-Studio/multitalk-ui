@@ -155,7 +155,7 @@ export default function Img2Img({ comfyUrl }: Props) {
 
             await completeJob({
               job_id: id,
-              status: 'error',
+              status: 'failed',
               error_message: errorMsg
             }).catch(() => {});
 
@@ -187,9 +187,7 @@ export default function Img2Img({ comfyUrl }: Props) {
               await completeJob({
                 job_id: id,
                 status: 'completed',
-                filename: imageInfo.filename,
-                subfolder: imageInfo.subfolder || undefined,
-                comfy_url: comfyUrl
+                output_image_urls: [url]
               }).catch(() => {});
             } else {
               setStatus("❌ ComfyUI completed but no image output found");
@@ -213,7 +211,7 @@ export default function Img2Img({ comfyUrl }: Props) {
           setIsSubmitting(false);
           await completeJob({
             job_id: id,
-            status: 'error',
+            status: 'failed',
             error_message: 'Timeout'
           }).catch(() => {});
           return 'stop';
@@ -235,7 +233,7 @@ export default function Img2Img({ comfyUrl }: Props) {
       if (jobId) {
         await completeJob({
           job_id: jobId,
-          status: 'error',
+          status: 'failed',
           error_message: error.message || 'Unknown error'
         }).catch(() => { });
       }

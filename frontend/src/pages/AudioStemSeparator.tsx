@@ -253,7 +253,7 @@ export default function AudioStemSeparator({ comfyUrl }: Props) {
       if (currentJobId) {
         await completeJob({
           job_id: currentJobId,
-          status: 'error',
+          status: 'failed',
           error_message: error.message || 'Unknown error'
         }).catch(() => {});
       }

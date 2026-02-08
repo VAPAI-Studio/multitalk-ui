@@ -208,7 +208,7 @@ class ApiClient {
     if (cached) return cached
 
     // Redirect to video-jobs feed
-    const result = await this.request(`/video-jobs/feed?limit=${limit}&offset=${offset}`)
+    const result = await this.request<{ success: boolean; video_jobs: unknown[]; error?: string }>(`/video-jobs/feed?limit=${limit}&offset=${offset}`)
     // Transform response for backward compatibility
     const transformed = {
       success: result.success,
@@ -221,7 +221,7 @@ class ApiClient {
 
   async getJob(jobId: string) {
     // Try to get from video-jobs
-    const result = await this.request(`/video-jobs/${jobId}`)
+    const result = await this.request<{ success: boolean; video_job: unknown; error?: string }>(`/video-jobs/${jobId}`)
     return {
       success: result.success,
       job: result.video_job,
@@ -235,7 +235,7 @@ class ApiClient {
     if (cached) return cached
 
     // Redirect to video-jobs completed endpoint
-    const result = await this.request(`/video-jobs/completed/recent?limit=${limit}&offset=${offset}`)
+    const result = await this.request<{ success: boolean; video_jobs: unknown[]; error?: string }>(`/video-jobs/completed/recent?limit=${limit}&offset=${offset}`)
     const transformed = {
       success: result.success,
       jobs: result.video_jobs,
@@ -470,7 +470,7 @@ class ApiClient {
   }
 
   async getEditedImage(imageId: string) {
-    const result = await this.request(`/image-jobs/${imageId}`)
+    const result = await this.request<{ success: boolean; image_job: unknown; error?: string }>(`/image-jobs/${imageId}`)
     return { success: result.success, edited_image: result.image_job, error: result.error }
   }
 
@@ -523,7 +523,7 @@ class ApiClient {
     })
     if (completedOnly) params.append('status', 'completed')
 
-    const result = await this.request(`/image-jobs/feed?${params.toString()}`)
+    const result = await this.request<{ success: boolean; image_jobs: unknown[]; total_count: number; error?: string }>(`/image-jobs/feed?${params.toString()}`)
     const transformed = {
       success: result.success,
       edited_images: result.image_jobs,
@@ -554,7 +554,7 @@ class ApiClient {
   }
 
   async getStyleTransfer(transferId: string) {
-    const result = await this.request(`/image-jobs/${transferId}`)
+    const result = await this.request<{ success: boolean; image_job: unknown; error?: string }>(`/image-jobs/${transferId}`)
     return { success: result.success, style_transfer: result.image_job, error: result.error }
   }
 
@@ -607,7 +607,7 @@ class ApiClient {
     })
     if (completedOnly) params.append('status', 'completed')
 
-    const result = await this.request(`/image-jobs/feed?${params.toString()}`)
+    const result = await this.request<{ success: boolean; image_jobs: unknown[]; total_count: number; error?: string }>(`/image-jobs/feed?${params.toString()}`)
     const transformed = {
       success: result.success,
       style_transfers: result.image_jobs,

@@ -45,24 +45,20 @@ export async function fixStuckJob(jobId: string, comfyUrl: string) {
         await completeJob({
           job_id: jobId,
           status: 'completed',
-          filename: videoInfo.filename,
-          subfolder: videoInfo.subfolder || undefined,
-          video_url: uploadResult.publicUrl
+          output_video_urls: [uploadResult.publicUrl]
         })
-        
-        return { 
-          success: true, 
+
+        return {
+          success: true,
           message: 'Job fixed successfully with Supabase URL',
-          videoUrl: uploadResult.publicUrl 
+          videoUrl: uploadResult.publicUrl
         }
       } else {
         // Complete job without Supabase URL (fallback to ComfyUI)
         console.warn('⚠️ Could not upload to Supabase, completing with ComfyUI fallback')
         await completeJob({
           job_id: jobId,
-          status: 'completed',
-          filename: videoInfo.filename,
-          subfolder: videoInfo.subfolder || undefined
+          status: 'completed'
         })
         
         return { 
@@ -74,10 +70,10 @@ export async function fixStuckJob(jobId: string, comfyUrl: string) {
     } else {
       console.error('❌ No video found in ComfyUI history for job:', jobId)
       
-      // Mark as error since no video was produced
+      // Mark as failed since no video was produced
       await completeJob({
         job_id: jobId,
-        status: 'error',
+        status: 'failed',
         error_message: 'No video output found in ComfyUI history'
       })
       
