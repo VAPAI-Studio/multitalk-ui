@@ -14,7 +14,7 @@ import {
 
 // UI Components
 function Label({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <label className={className || "block text-sm font-semibold text-gray-800 mb-2"}>{children}</label>;
+  return <label className={className || "block text-sm font-semibold text-gray-800 dark:text-dark-text-primary mb-2"}>{children}</label>;
 }
 
 function Field({ children }: { children: React.ReactNode }) {
@@ -23,8 +23,8 @@ function Field({ children }: { children: React.ReactNode }) {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-3xl border border-gray-200/80 p-6 md:p-8 shadow-lg bg-gradient-to-br from-white to-gray-50/50 backdrop-blur-sm">
-      <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+    <div className="rounded-3xl border border-gray-200/80 dark:border-dark-border-primary p-6 md:p-8 shadow-lg bg-gradient-to-br from-white to-gray-50/50 dark:from-dark-surface-primary dark:to-dark-surface-primary backdrop-blur-sm">
+      <h2 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-dark-text-primary mb-6 flex items-center gap-3">
         <div className="w-2 h-8 bg-gradient-to-b from-cyan-500 to-blue-600 rounded-full"></div>
         {title}
       </h2>
@@ -312,7 +312,7 @@ export default function WANMove({ comfyUrl }: Props) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-cyan-50 via-blue-50 to-indigo-50">
+    <div className="min-h-screen bg-gradient-to-br from-cyan-50 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
       <div className="flex gap-6 p-6 md:p-10">
         {/* Main Content */}
         <div className="flex-1 max-w-5xl space-y-8">
@@ -321,7 +321,7 @@ export default function WANMove({ comfyUrl }: Props) {
             <h1 className="text-4xl md:text-6xl font-bold bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 bg-clip-text text-transparent">
               WAN Move
             </h1>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
               Animate objects in your images with custom motion paths. Draw paths to guide movement and add static anchors for stabilization.
             </p>
           </div>
@@ -334,7 +334,7 @@ export default function WANMove({ comfyUrl }: Props) {
                 type="file"
                 accept="image/*"
                 onChange={(e) => setImageFile(e.target.files?.[0] || null)}
-                className="w-full p-3 border-2 border-dashed border-cyan-300 rounded-2xl bg-cyan-50 hover:bg-cyan-100 transition-colors cursor-pointer"
+                className="w-full p-3 border-2 border-dashed border-cyan-300 dark:border-cyan-700 rounded-2xl bg-cyan-50 dark:bg-cyan-900/20 hover:bg-cyan-100 dark:hover:bg-cyan-900/30 transition-colors cursor-pointer dark:text-dark-text-secondary"
               />
             </Field>
           </Section>
@@ -399,7 +399,7 @@ export default function WANMove({ comfyUrl }: Props) {
                 value={customPrompt}
                 onChange={(e) => setCustomPrompt(e.target.value)}
                 placeholder="e.g., magical transformation, dancing, moving gracefully..."
-                className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 focus:border-cyan-500 focus:outline-none transition-colors min-h-[100px] resize-vertical"
+                className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 dark:border-dark-border-primary dark:bg-dark-surface-secondary dark:text-dark-text-primary focus:border-cyan-500 focus:outline-none transition-colors min-h-[100px] resize-vertical"
               />
             </Field>
           </Section>

@@ -3,7 +3,7 @@ import { apiClient } from "../lib/apiClient";
 
 // UI Components (reuse these patterns)
 function Label({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <label className={className || "block text-sm font-semibold text-gray-800 mb-2"}>{children}</label>;
+  return <label className={className || "block text-sm font-semibold text-gray-800 dark:text-dark-text-primary mb-2"}>{children}</label>;
 }
 
 function Field({ children }: { children: React.ReactNode }) {
@@ -12,8 +12,8 @@ function Field({ children }: { children: React.ReactNode }) {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-3xl border border-gray-200/80 p-6 md:p-8 shadow-lg bg-gradient-to-br from-white to-gray-50/50 backdrop-blur-sm">
-      <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+    <div className="rounded-3xl border border-gray-200/80 dark:border-dark-border-primary p-6 md:p-8 shadow-lg bg-gradient-to-br from-white to-gray-50/50 dark:from-dark-surface-primary dark:to-dark-surface-primary backdrop-blur-sm">
+      <h2 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-dark-text-primary mb-6 flex items-center gap-3">
         <div className="w-2 h-8 bg-gradient-to-b from-orange-500 to-red-600 rounded-full"></div>
         {title}
       </h2>
@@ -296,7 +296,7 @@ export default function LoRATrainer() {
             <h1 className="text-4xl md:text-6xl font-black bg-gradient-to-r from-orange-600 via-red-600 to-pink-600 bg-clip-text text-transparent">
               LoRA Trainer
             </h1>
-            <p className="text-gray-600 max-w-2xl mx-auto leading-relaxed">
+            <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto leading-relaxed">
               Train custom QWEN Image LoRA models using your own datasets. Perfect for creating consistent characters, styles, or objects.
             </p>
           </div>
@@ -308,7 +308,7 @@ export default function LoRATrainer() {
               <select
                 value={selectedDataset}
                 onChange={(e) => setSelectedDataset(e.target.value)}
-                className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-orange-500 focus:ring-4 focus:ring-orange-100 transition-all duration-200 bg-white/80"
+                className="w-full rounded-2xl border-2 border-gray-200 dark:border-dark-border-primary px-4 py-3 text-gray-800 dark:text-dark-text-primary focus:border-orange-500 focus:ring-4 focus:ring-orange-100 dark:focus:ring-orange-900/30 transition-all duration-200 bg-white/80 dark:bg-dark-surface-secondary"
               >
                 <option value="">Select a dataset...</option>
                 {datasets.map((dataset) => (
@@ -349,7 +349,7 @@ export default function LoRATrainer() {
                 value={outputName}
                 onChange={(e) => setOutputName(e.target.value)}
                 placeholder="my_lora_model"
-                className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-orange-500 focus:ring-4 focus:ring-orange-100 transition-all duration-200 bg-white/80"
+                className="w-full rounded-2xl border-2 border-gray-200 dark:border-dark-border-primary px-4 py-3 text-gray-800 dark:text-dark-text-primary focus:border-orange-500 focus:ring-4 focus:ring-orange-100 dark:focus:ring-orange-900/30 transition-all duration-200 bg-white/80 dark:bg-dark-surface-secondary"
               />
               <p className="text-xs text-gray-500 mt-1">Name for the output LoRA file (without extension)</p>
             </Field>
@@ -363,7 +363,7 @@ export default function LoRATrainer() {
                   max="256"
                   value={networkDim}
                   onChange={(e) => setNetworkDim(parseInt(e.target.value))}
-                  className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-orange-500 focus:ring-4 focus:ring-orange-100 transition-all duration-200 bg-white/80"
+                  className="w-full rounded-2xl border-2 border-gray-200 dark:border-dark-border-primary px-4 py-3 text-gray-800 dark:text-dark-text-primary focus:border-orange-500 focus:ring-4 focus:ring-orange-100 dark:focus:ring-orange-900/30 transition-all duration-200 bg-white/80 dark:bg-dark-surface-secondary"
                 />
                 <p className="text-xs text-gray-500 mt-1">Higher = more detail, slower training (1-256)</p>
               </Field>
@@ -377,7 +377,7 @@ export default function LoRATrainer() {
                   max="10"
                   value={networkAlpha}
                   onChange={(e) => setNetworkAlpha(parseFloat(e.target.value))}
-                  className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-orange-500 focus:ring-4 focus:ring-orange-100 transition-all duration-200 bg-white/80"
+                  className="w-full rounded-2xl border-2 border-gray-200 dark:border-dark-border-primary px-4 py-3 text-gray-800 dark:text-dark-text-primary focus:border-orange-500 focus:ring-4 focus:ring-orange-100 dark:focus:ring-orange-900/30 transition-all duration-200 bg-white/80 dark:bg-dark-surface-secondary"
                 />
                 <p className="text-xs text-gray-500 mt-1">Alpha scaling factor</p>
               </Field>
@@ -391,7 +391,7 @@ export default function LoRATrainer() {
                   max="0.001"
                   value={learningRate}
                   onChange={(e) => setLearningRate(parseFloat(e.target.value))}
-                  className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-orange-500 focus:ring-4 focus:ring-orange-100 transition-all duration-200 bg-white/80"
+                  className="w-full rounded-2xl border-2 border-gray-200 dark:border-dark-border-primary px-4 py-3 text-gray-800 dark:text-dark-text-primary focus:border-orange-500 focus:ring-4 focus:ring-orange-100 dark:focus:ring-orange-900/30 transition-all duration-200 bg-white/80 dark:bg-dark-surface-secondary"
                 />
                 <p className="text-xs text-gray-500 mt-1">Recommended: 0.00005</p>
               </Field>
@@ -404,7 +404,7 @@ export default function LoRATrainer() {
                   max="100"
                   value={maxEpochs}
                   onChange={(e) => setMaxEpochs(parseInt(e.target.value))}
-                  className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-orange-500 focus:ring-4 focus:ring-orange-100 transition-all duration-200 bg-white/80"
+                  className="w-full rounded-2xl border-2 border-gray-200 dark:border-dark-border-primary px-4 py-3 text-gray-800 dark:text-dark-text-primary focus:border-orange-500 focus:ring-4 focus:ring-orange-100 dark:focus:ring-orange-900/30 transition-all duration-200 bg-white/80 dark:bg-dark-surface-secondary"
                 />
                 <p className="text-xs text-gray-500 mt-1">Number of training epochs</p>
               </Field>
@@ -415,7 +415,7 @@ export default function LoRATrainer() {
                   type="number"
                   value={seed}
                   onChange={(e) => setSeed(parseInt(e.target.value))}
-                  className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-orange-500 focus:ring-4 focus:ring-orange-100 transition-all duration-200 bg-white/80"
+                  className="w-full rounded-2xl border-2 border-gray-200 dark:border-dark-border-primary px-4 py-3 text-gray-800 dark:text-dark-text-primary focus:border-orange-500 focus:ring-4 focus:ring-orange-100 dark:focus:ring-orange-900/30 transition-all duration-200 bg-white/80 dark:bg-dark-surface-secondary"
                 />
                 <p className="text-xs text-gray-500 mt-1">For reproducible results</p>
               </Field>
@@ -428,7 +428,7 @@ export default function LoRATrainer() {
                     const [w, h] = e.target.value.split(',').map(Number);
                     setResolution([w, h]);
                   }}
-                  className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-orange-500 focus:ring-4 focus:ring-orange-100 transition-all duration-200 bg-white/80"
+                  className="w-full rounded-2xl border-2 border-gray-200 dark:border-dark-border-primary px-4 py-3 text-gray-800 dark:text-dark-text-primary focus:border-orange-500 focus:ring-4 focus:ring-orange-100 dark:focus:ring-orange-900/30 transition-all duration-200 bg-white/80 dark:bg-dark-surface-secondary"
                 >
                   <option value="512,512">512x512</option>
                   <option value="768,768">768x768</option>

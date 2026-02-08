@@ -368,7 +368,7 @@ export default function CharacterCaption({ comfyUrl }: Props) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-indigo-50">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-6xl mx-auto space-y-8">
           {/* Header */}
@@ -376,7 +376,7 @@ export default function CharacterCaption({ comfyUrl }: Props) {
             <h1 className="text-4xl md:text-6xl font-black bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 bg-clip-text text-transparent">
               Character Caption Generator
             </h1>
-            <p className="text-gray-600 max-w-2xl mx-auto leading-relaxed">
+            <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto leading-relaxed">
               Generate captions for images to train LoRA models using AI-powered captioning
             </p>
           </div>
@@ -384,22 +384,22 @@ export default function CharacterCaption({ comfyUrl }: Props) {
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Settings Panel - Left Side */}
           <div>
-            <div className="rounded-3xl border border-gray-200/80 p-6 md:p-8 shadow-lg bg-gradient-to-br from-white to-gray-50/50 backdrop-blur-sm">
-              <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+            <div className="rounded-3xl border border-gray-200/80 dark:border-dark-border-primary p-6 md:p-8 shadow-lg bg-gradient-to-br from-white to-gray-50/50 dark:from-dark-surface-primary dark:to-dark-surface-primary backdrop-blur-sm">
+              <h2 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-dark-text-primary mb-6 flex items-center gap-3">
                 <div className="w-2 h-8 bg-gradient-to-b from-purple-500 to-pink-600 rounded-full"></div>
                 Caption Settings
               </h2>
               
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-dark-text-secondary mb-1">
                     Character Trigger
                   </label>
                   <input
                     type="text"
                     value={settings.character_name}
                     onChange={(e) => handleInputChange('character_name', e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    className="w-full p-3 border border-gray-300 dark:border-dark-border-primary rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white dark:bg-dark-surface-secondary dark:text-dark-text-primary"
                     placeholder="Enter character trigger"
                   />
                 </div>
@@ -407,9 +407,9 @@ export default function CharacterCaption({ comfyUrl }: Props) {
                 <div>
                   <button
                     onClick={() => setShowMoreSettings(!showMoreSettings)}
-                    className="flex items-center justify-between w-full p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                    className="flex items-center justify-between w-full p-3 bg-gray-50 dark:bg-dark-surface-secondary rounded-lg hover:bg-gray-100 dark:hover:bg-dark-surface-elevated transition-colors"
                   >
-                    <span className="text-sm font-medium text-gray-700">More Settings</span>
+                    <span className="text-sm font-medium text-gray-700 dark:text-dark-text-secondary">More Settings</span>
                     <svg 
                       className={`w-5 h-5 text-gray-500 transition-transform ${showMoreSettings ? 'rotate-180' : ''}`} 
                       fill="none" 
@@ -421,7 +421,7 @@ export default function CharacterCaption({ comfyUrl }: Props) {
                   </button>
                   
                   {showMoreSettings && (
-                    <div className="mt-4 space-y-4 bg-gray-50 p-4 rounded-lg">
+                    <div className="mt-4 space-y-4 bg-gray-50 dark:bg-dark-surface-secondary p-4 rounded-lg">
                       <div>
                         <CoolToggle
                           checked={runOnUpload}
@@ -431,13 +431,13 @@ export default function CharacterCaption({ comfyUrl }: Props) {
                       </div>
                       
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-dark-text-secondary mb-1">
                           Caption Length
                         </label>
                         <select
                           value={settings.caption_length}
                           onChange={(e) => handleInputChange('caption_length', e.target.value)}
-                          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="w-full p-3 border border-gray-300 dark:border-dark-border-primary rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-dark-surface-secondary dark:text-dark-text-primary"
                         >
                           <option value="any">Any</option>
                           <option value="very_short">Very Short</option>
@@ -449,21 +449,21 @@ export default function CharacterCaption({ comfyUrl }: Props) {
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-dark-text-secondary mb-1">
                           Max New Tokens
                         </label>
                         <input
                           type="number"
                           value={settings.max_new_tokens}
                           onChange={(e) => handleInputChange('max_new_tokens', parseInt(e.target.value))}
-                          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="w-full p-3 border border-gray-300 dark:border-dark-border-primary rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-dark-surface-secondary dark:text-dark-text-primary"
                           min="1"
                           max="2048"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-dark-text-secondary mb-1">
                           Temperature: {settings.temperature}
                         </label>
                         <input
@@ -473,7 +473,7 @@ export default function CharacterCaption({ comfyUrl }: Props) {
                           step="0.1"
                           value={settings.temperature}
                           onChange={(e) => handleInputChange('temperature', parseFloat(e.target.value))}
-                          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                          className="w-full h-2 bg-gray-200 dark:bg-dark-surface-elevated rounded-lg appearance-none cursor-pointer slider"
                         />
                       </div>
                     </div>
@@ -482,7 +482,7 @@ export default function CharacterCaption({ comfyUrl }: Props) {
               </div>
 
               <div className="mt-6">
-                <h3 className="text-lg font-semibold mb-4">Caption Options</h3>
+                <h3 className="text-lg font-semibold dark:text-dark-text-primary mb-4">Caption Options</h3>
                 <div className="space-y-2">
                   <CoolToggle
                     checked={settings.refer_character_name}
@@ -507,9 +507,9 @@ export default function CharacterCaption({ comfyUrl }: Props) {
                   <div className="mt-4">
                     <button
                       onClick={() => setShowMoreOptions(!showMoreOptions)}
-                      className="flex items-center justify-between w-full p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                      className="flex items-center justify-between w-full p-3 bg-gray-50 dark:bg-dark-surface-secondary rounded-lg hover:bg-gray-100 dark:hover:bg-dark-surface-elevated transition-colors"
                     >
-                      <span className="text-sm font-medium text-gray-700">More Options</span>
+                      <span className="text-sm font-medium text-gray-700 dark:text-dark-text-secondary">More Options</span>
                       <svg 
                         className={`w-5 h-5 text-gray-500 transition-transform ${showMoreOptions ? 'rotate-180' : ''}`} 
                         fill="none" 
@@ -547,12 +547,12 @@ export default function CharacterCaption({ comfyUrl }: Props) {
           {/* Upload and Images - Right Side */}
           <div className="lg:col-span-3 space-y-6">
             {/* Image Upload */}
-            <div className="rounded-3xl border border-gray-200/80 p-6 md:p-8 shadow-lg bg-gradient-to-br from-white to-gray-50/50 backdrop-blur-sm">
-              <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+            <div className="rounded-3xl border border-gray-200/80 dark:border-dark-border-primary p-6 md:p-8 shadow-lg bg-gradient-to-br from-white to-gray-50/50 dark:from-dark-surface-primary dark:to-dark-surface-primary backdrop-blur-sm">
+              <h2 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-dark-text-primary mb-6 flex items-center gap-3">
                 <div className="w-2 h-8 bg-gradient-to-b from-purple-500 to-pink-600 rounded-full"></div>
                 Upload Images
               </h2>
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-500 transition-colors">
+              <div className="border-2 border-dashed border-gray-300 dark:border-dark-border-primary rounded-lg p-8 text-center hover:border-blue-500 transition-colors">
                 <input
                   type="file"
                   multiple
@@ -564,10 +564,10 @@ export default function CharacterCaption({ comfyUrl }: Props) {
                 />
                 <label htmlFor="imageInput" className="cursor-pointer block">
                   <div className="text-6xl mb-4">📷</div>
-                  <p className="text-lg font-medium text-gray-700 mb-2">
+                  <p className="text-lg font-medium text-gray-700 dark:text-dark-text-secondary mb-2">
                     Click to upload images or drag and drop
                   </p>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
                     PNG, JPG, GIF up to 10MB each
                   </p>
                 </label>
@@ -575,7 +575,7 @@ export default function CharacterCaption({ comfyUrl }: Props) {
             </div>
             
             {/* Action Buttons */}
-            <div className="rounded-3xl border border-gray-200/80 p-6 md:p-8 shadow-lg bg-gradient-to-br from-white to-gray-50/50 backdrop-blur-sm">
+            <div className="rounded-3xl border border-gray-200/80 dark:border-dark-border-primary p-6 md:p-8 shadow-lg bg-gradient-to-br from-white to-gray-50/50 dark:from-dark-surface-primary dark:to-dark-surface-primary backdrop-blur-sm">
               <div className="flex flex-wrap gap-2 justify-between items-center">
                 <div className="flex flex-wrap gap-2">
                   <button
@@ -628,14 +628,14 @@ export default function CharacterCaption({ comfyUrl }: Props) {
             
             {/* Image Grid */}
             {images.length > 0 && (
-              <div className="rounded-3xl border border-gray-200/80 p-6 md:p-8 shadow-lg bg-gradient-to-br from-white to-gray-50/50 backdrop-blur-sm">
-                <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+              <div className="rounded-3xl border border-gray-200/80 dark:border-dark-border-primary p-6 md:p-8 shadow-lg bg-gradient-to-br from-white to-gray-50/50 dark:from-dark-surface-primary dark:to-dark-surface-primary backdrop-blur-sm">
+                <h2 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-dark-text-primary mb-6 flex items-center gap-3">
                   <div className="w-2 h-8 bg-gradient-to-b from-purple-500 to-pink-600 rounded-full"></div>
                   Images & Captions
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {images.map((image) => (
-                    <div key={image.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                    <div key={image.id} className="border border-gray-200 dark:border-dark-border-primary rounded-lg overflow-hidden">
                       <div className="relative">
                         {image.url ? (
                           <img
@@ -674,7 +674,7 @@ export default function CharacterCaption({ comfyUrl }: Props) {
                           placeholder={image.isProcessing ? "Generating caption..." : "Caption will appear here..."}
                           disabled={image.isProcessing}
                           rows={4}
-                          className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-vertical disabled:bg-gray-100"
+                          className="w-full p-2 border border-gray-300 dark:border-dark-border-primary rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-vertical disabled:bg-gray-100 dark:disabled:bg-dark-surface-elevated bg-white dark:bg-dark-surface-secondary dark:text-dark-text-primary"
                         />
                       </div>
                     </div>
@@ -690,18 +690,18 @@ export default function CharacterCaption({ comfyUrl }: Props) {
       {/* Save Dataset Modal */}
       {showDatasetModal && datasetModalMode === 'save' && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-            <h3 className="text-lg font-bold mb-4">Save Dataset</h3>
+          <div className="bg-white dark:bg-dark-surface-primary rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-bold dark:text-dark-text-primary mb-4">Save Dataset</h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-dark-text-secondary mb-1">
                   Dataset Name
                 </label>
                 <input
                   type="text"
                   value={datasetName}
                   onChange={(e) => setDatasetName(e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full p-3 border border-gray-300 dark:border-dark-border-primary rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-dark-surface-secondary dark:text-dark-text-primary"
                   placeholder="Enter dataset name"
                 />
               </div>

@@ -451,7 +451,7 @@ export default function CreateImage({ comfyUrl = "" }: Props) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
       <div className="flex gap-6 p-6 md:p-10">
         {/* Main Content */}
         <div className="flex-1 max-w-4xl space-y-8">
@@ -460,7 +460,7 @@ export default function CreateImage({ comfyUrl = "" }: Props) {
             <h1 className="text-4xl md:text-6xl font-black bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
               Create Image
             </h1>
-            <p className="text-gray-600 max-w-2xl mx-auto leading-relaxed">
+            <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto leading-relaxed">
               Generate images with custom LoRA models
             </p>
           </div>
@@ -506,7 +506,7 @@ export default function CreateImage({ comfyUrl = "" }: Props) {
               <Label>Image Description</Label>
               <textarea
                 rows={4}
-                className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all duration-200 bg-white/80 resize-vertical"
+                className="w-full rounded-2xl border-2 border-gray-200 dark:border-dark-border-primary px-4 py-3 text-gray-800 dark:text-dark-text-primary focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/30 transition-all duration-200 bg-white/80 dark:bg-dark-surface-secondary resize-vertical"
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 placeholder="Describe the image you want to generate..."
@@ -529,7 +529,7 @@ export default function CreateImage({ comfyUrl = "" }: Props) {
                   </div>
                   <div className="flex-1 space-y-3">
                     <select
-                      className="w-full rounded-xl border-2 border-gray-200 px-3 py-2 text-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all duration-200 bg-white"
+                      className="w-full rounded-xl border-2 border-gray-200 dark:border-dark-border-primary px-3 py-2 text-gray-800 dark:text-dark-text-primary focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/30 transition-all duration-200 bg-white dark:bg-dark-surface-secondary"
                       value={lora.name}
                       onChange={(e) => updateLora(lora.id, 'name', e.target.value)}
                       disabled={isLoadingLoras}
@@ -604,7 +604,7 @@ export default function CreateImage({ comfyUrl = "" }: Props) {
                   type="number"
                   min="1"
                   max="100"
-                  className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all duration-200 bg-white/80"
+                  className="w-full rounded-2xl border-2 border-gray-200 dark:border-dark-border-primary px-4 py-3 text-gray-800 dark:text-dark-text-primary focus:border-purple-500 focus:ring-4 focus:ring-purple-100 dark:focus:ring-purple-900/30 transition-all duration-200 bg-white/80 dark:bg-dark-surface-secondary"
                   value={steps}
                   onChange={(e) => setSteps(parseInt(e.target.value) || MODEL_CONFIG[selectedModel].defaultSteps)}
                 />
@@ -661,7 +661,7 @@ export default function CreateImage({ comfyUrl = "" }: Props) {
                 <Label>Width (px)</Label>
                 <input
                   type="number"
-                  className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all duration-200 bg-white/80"
+                  className="w-full rounded-2xl border-2 border-gray-200 dark:border-dark-border-primary px-4 py-3 text-gray-800 dark:text-dark-text-primary focus:border-purple-500 focus:ring-4 focus:ring-purple-100 dark:focus:ring-purple-900/30 transition-all duration-200 bg-white/80 dark:bg-dark-surface-secondary"
                   value={widthInput}
                   onChange={(e) => handleWidthChangeWithAspectRatio(e.target.value)}
                 />
@@ -670,7 +670,7 @@ export default function CreateImage({ comfyUrl = "" }: Props) {
                 <Label>Height (px)</Label>
                 <input
                   type="number"
-                  className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all duration-200 bg-white/80"
+                  className="w-full rounded-2xl border-2 border-gray-200 dark:border-dark-border-primary px-4 py-3 text-gray-800 dark:text-dark-text-primary focus:border-purple-500 focus:ring-4 focus:ring-purple-100 dark:focus:ring-purple-900/30 transition-all duration-200 bg-white/80 dark:bg-dark-surface-secondary"
                   value={heightInput}
                   onChange={(e) => handleHeightChangeWithAspectRatio(e.target.value)}
                 />

@@ -5,7 +5,7 @@ import { useSmartResolution } from "../hooks/useSmartResolution";
 
 // UI Components
 function Label({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <label className={className || "block text-sm font-semibold text-gray-800 mb-2"}>{children}</label>;
+  return <label className={className || "block text-sm font-semibold text-gray-800 dark:text-dark-text-primary mb-2"}>{children}</label>;
 }
 
 function Field({ children }: { children: React.ReactNode }) {
@@ -14,8 +14,8 @@ function Field({ children }: { children: React.ReactNode }) {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-3xl border border-gray-200/80 p-6 md:p-8 shadow-lg bg-gradient-to-br from-white to-gray-50/50 backdrop-blur-sm">
-      <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+    <div className="rounded-3xl border border-gray-200/80 dark:border-dark-border-primary p-6 md:p-8 shadow-lg bg-gradient-to-br from-white to-gray-50/50 dark:from-dark-surface-primary dark:to-dark-surface-primary backdrop-blur-sm">
+      <h2 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-dark-text-primary mb-6 flex items-center gap-3">
         <div className="w-2 h-8 bg-gradient-to-b from-purple-500 to-pink-600 rounded-full"></div>
         {title}
       </h2>
@@ -297,7 +297,7 @@ export default function StyleTransfer({ comfyUrl }: Props) {
             <h1 className="text-4xl md:text-6xl font-black bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 bg-clip-text text-transparent">
               Style Transfer
             </h1>
-            <p className="text-gray-600 max-w-2xl mx-auto leading-relaxed">
+            <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto leading-relaxed">
               Transfer artistic styles between images using AI. Upload a subject image and a style reference to create unique artistic combinations.
             </p>
             
@@ -313,10 +313,10 @@ export default function StyleTransfer({ comfyUrl }: Props) {
                   type="file"
                   accept="image/*"
                   onChange={(e) => setSubjectImage(e.target.files?.[0] || null)}
-                  className="w-full p-3 border-2 border-dashed border-purple-300 rounded-2xl bg-purple-50 hover:bg-purple-100 transition-colors cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-gradient-to-r file:from-purple-500 file:to-pink-600 file:text-white file:font-semibold hover:file:from-purple-600 hover:file:to-pink-700 transition-all duration-200"
+                  className="w-full p-3 border-2 border-dashed border-purple-300 dark:border-purple-700 rounded-2xl bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors cursor-pointer dark:text-dark-text-secondary file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-gradient-to-r file:from-purple-500 file:to-pink-600 file:text-white file:font-semibold hover:file:from-purple-600 hover:file:to-pink-700 transition-all duration-200"
                 />
                 {subjectPreview && (
-                  <div className="mt-4 p-4 border-2 border-purple-200 rounded-2xl bg-white">
+                  <div className="mt-4 p-4 border-2 border-purple-200 dark:border-purple-800 rounded-2xl bg-white dark:bg-dark-surface-secondary">
                     <img
                       ref={subjectImgRef}
                       src={subjectPreview}
@@ -335,10 +335,10 @@ export default function StyleTransfer({ comfyUrl }: Props) {
                   type="file"
                   accept="image/*"
                   onChange={(e) => setStyleImage(e.target.files?.[0] || null)}
-                  className="w-full p-3 border-2 border-dashed border-pink-300 rounded-2xl bg-pink-50 hover:bg-pink-100 transition-colors cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-gradient-to-r file:from-pink-500 file:to-indigo-600 file:text-white file:font-semibold hover:file:from-pink-600 hover:file:to-indigo-700 transition-all duration-200"
+                  className="w-full p-3 border-2 border-dashed border-pink-300 dark:border-pink-700 rounded-2xl bg-pink-50 dark:bg-pink-900/20 hover:bg-pink-100 dark:hover:bg-pink-900/30 transition-colors cursor-pointer dark:text-dark-text-secondary file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-gradient-to-r file:from-pink-500 file:to-indigo-600 file:text-white file:font-semibold hover:file:from-pink-600 hover:file:to-indigo-700 transition-all duration-200"
                 />
                 {stylePreview && (
-                  <div className="mt-4 p-4 border-2 border-pink-200 rounded-2xl bg-white">
+                  <div className="mt-4 p-4 border-2 border-pink-200 dark:border-pink-800 rounded-2xl bg-white dark:bg-dark-surface-secondary">
                     <img
                       ref={styleImgRef}
                       src={stylePreview}
@@ -360,7 +360,7 @@ export default function StyleTransfer({ comfyUrl }: Props) {
                 value={customPrompt}
                 onChange={(e) => setCustomPrompt(e.target.value)}
                 placeholder="e.g., A high-quality artistic image with transferred style, masterpiece quality, detailed"
-                className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 focus:border-purple-500 focus:outline-none transition-colors min-h-[120px] resize-vertical"
+                className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 dark:border-dark-border-primary dark:bg-dark-surface-secondary dark:text-dark-text-primary focus:border-purple-500 focus:outline-none transition-colors min-h-[120px] resize-vertical"
               />
               <p className="text-xs text-gray-500 mt-2">Describe what you want the final image to look like. This helps guide the style transfer process.</p>
             </Field>
@@ -375,7 +375,7 @@ export default function StyleTransfer({ comfyUrl }: Props) {
                   type="number"
                   value={widthInput}
                   onChange={(e) => handleWidthChange(e.target.value)}
-                  className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 focus:border-purple-500 focus:outline-none transition-colors"
+                  className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 dark:border-dark-border-primary dark:bg-dark-surface-secondary dark:text-dark-text-primary focus:border-purple-500 focus:outline-none transition-colors"
                   step="32"
                   min="512"
                   max="2048"
@@ -388,7 +388,7 @@ export default function StyleTransfer({ comfyUrl }: Props) {
                   type="number"
                   value={heightInput}
                   onChange={(e) => handleHeightChange(e.target.value)}
-                  className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 focus:border-purple-500 focus:outline-none transition-colors"
+                  className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 dark:border-dark-border-primary dark:bg-dark-surface-secondary dark:text-dark-text-primary focus:border-purple-500 focus:outline-none transition-colors"
                   step="32"
                   min="512"
                   max="2048"
@@ -427,7 +427,7 @@ export default function StyleTransfer({ comfyUrl }: Props) {
 
             {resultUrl && (
               <div className="mt-6 space-y-3">
-                <div className="p-4 border-2 border-gray-200 rounded-3xl bg-white">
+                <div className="p-4 border-2 border-gray-200 dark:border-dark-border-primary rounded-3xl bg-white dark:bg-dark-surface-secondary">
                   <img src={resultUrl} alt="Style Transfer Result" className="w-full rounded-2xl shadow-lg" />
                 </div>
                 <div>
