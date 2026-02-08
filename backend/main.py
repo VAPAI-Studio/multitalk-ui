@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import os
 
-from api import jobs, storage, datasets, image_edit, comfyui, edited_images, style_transfer, style_transfer_v2, style_transfer_v3, multitalk, auth, image_jobs, video_jobs, flux_trainer, lora_trainer, feed, google_drive
+from api import storage, datasets, image_edit, comfyui, multitalk, auth, image_jobs, video_jobs, flux_trainer, lora_trainer, feed, google_drive
 
 # Only load .env file if not running on Heroku
 if not os.getenv("DYNO"):  # DYNO is a Heroku-specific environment variable
@@ -25,17 +25,12 @@ app.add_middleware(
 
 # Include API routers
 app.include_router(auth.router, prefix="/api")
-app.include_router(jobs.router, prefix="/api")
-app.include_router(image_jobs.router, prefix="/api")  # New output-type-based jobs
-app.include_router(video_jobs.router, prefix="/api")  # New output-type-based jobs
+app.include_router(image_jobs.router, prefix="/api")
+app.include_router(video_jobs.router, prefix="/api")
 app.include_router(storage.router, prefix="/api")
 app.include_router(datasets.router, prefix="/api")
 app.include_router(image_edit.router, prefix="/api")
 app.include_router(comfyui.router, prefix="/api")
-app.include_router(edited_images.router, prefix="/api")
-app.include_router(style_transfer.router, prefix="/api/style-transfers")
-app.include_router(style_transfer_v2.router, prefix="/api/style-transfers-v2")
-app.include_router(style_transfer_v3.router, prefix="/api/style-transfers-v3")
 app.include_router(multitalk.router, prefix="/api/multitalk")
 app.include_router(flux_trainer.router, prefix="/api")
 app.include_router(lora_trainer.router, prefix="/api")

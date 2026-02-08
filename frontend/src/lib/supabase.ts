@@ -1,32 +1,73 @@
 // Note: Direct Supabase access removed from frontend
 // All database operations now go through the backend API
 
-// Job status types
-export type JobStatus = 'submitted' | 'processing' | 'completed' | 'error'
+// Job status types (standardized across all job tables)
+export type JobStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled'
 
-// Job record type
-export interface MultiTalkJob {
-  job_id: string // Primary key from ComfyUI
+// Unified Job interface (works for both video and image jobs)
+export interface Job {
+  id: string // UUID
+  user_id: string
+  workflow_id: number
+  workflow_name?: string // Denormalized from workflows table
   status: JobStatus
-  timestamp_submitted: string
-  timestamp_completed?: string
-  filename?: string
-  subfolder?: string
-  image_filename?: string
-  audio_filename?: string
-  width: number
-  height: number
-  trim_to_audio: boolean
+  created_at: string
+  comfy_job_id?: string
   comfy_url: string
   error_message?: string
-  video_url?: string // Supabase Storage URL
-  project_id?: string // Google Drive folder ID for saving outputs
-  // Additional metadata
-  created_at?: string
-  updated_at?: string
+  project_id?: string // Google Drive folder ID
+  parameters?: Record<string, any>
+  // Video-specific fields
+  input_image_urls?: string[]
+  input_audio_urls?: string[]
+  input_video_urls?: string[]
+  output_video_urls?: string[]
+  thumbnail_url?: string
+  fps?: number
+  duration_seconds?: number
+  // Image-specific fields
+  output_image_urls?: string[]
+  prompt?: string
+  // Common fields
+  width?: number
+  height?: number
 }
 
-// Job creation payload (what we send when starting a job)
+// Backward compatible alias
+export type MultiTalkJob = Job
+
+// Job creation payload for video jobs
+export interface CreateVideoJobPayload {
+  user_id: string
+  workflow_name: string
+  comfy_url: string
+  comfy_job_id?: string
+  input_image_urls?: string[]
+  input_audio_urls?: string[]
+  input_video_urls?: string[]
+  width?: number
+  height?: number
+  fps?: number
+  duration_seconds?: number
+  parameters?: Record<string, any>
+  project_id?: string
+}
+
+// Job creation payload for image jobs
+export interface CreateImageJobPayload {
+  user_id: string
+  workflow_name: string
+  comfy_url: string
+  comfy_job_id?: string
+  input_image_urls?: string[]
+  prompt?: string
+  width?: number
+  height?: number
+  parameters?: Record<string, any>
+  project_id?: string
+}
+
+// Legacy payload (for backward compatibility with old components)
 export interface CreateJobPayload {
   job_id: string
   comfy_url: string
@@ -34,20 +75,25 @@ export interface CreateJobPayload {
   audio_filename?: string
   width: number
   height: number
-  trim_to_audio: boolean
-  project_id?: string // Google Drive folder ID for saving outputs
+  trim_to_audio?: boolean
+  project_id?: string
+  user_id?: string
+  workflow_name?: string
+  workflow_type?: string
 }
 
-// Job completion payload (what we send when job finishes)
+// Job completion payload
 export interface CompleteJobPayload {
   job_id: string
-  status: 'completed' | 'error'
-  filename?: string
-  subfolder?: string
+  status: 'completed' | 'failed'
+  output_video_urls?: string[]
+  output_image_urls?: string[]
+  thumbnail_url?: string
+  width?: number
+  height?: number
+  fps?: number
+  duration_seconds?: number
   error_message?: string
-  video_url?: string // Added for Supabase Storage URL
-  comfy_url?: string // Added to avoid database lookup
-  video_type?: string // Added to use correct ComfyUI type
 }
 
 // Video storage functions - now handled by backend API

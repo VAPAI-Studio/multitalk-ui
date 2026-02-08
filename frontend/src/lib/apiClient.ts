@@ -159,24 +159,46 @@ class ApiClient {
     throw new Error('All retry attempts failed')
   }
 
-  // Job endpoints
+  // Legacy Job endpoints - redirect to video-jobs (backward compatibility)
+  // These were primarily used for video workflows (lipsync, multitalk, etc.)
   async createJob(payload: any) {
-    return this.request('/jobs', {
+    // Transform legacy payload to new format
+    const videoJobPayload = {
+      user_id: payload.user_id,
+      workflow_name: payload.workflow_name || payload.workflow_type || 'lipsync-one',
+      comfy_url: payload.comfy_url,
+      comfy_job_id: payload.job_id,
+      input_image_urls: payload.image_filename ? [payload.image_filename] : undefined,
+      input_audio_urls: payload.audio_filename ? [payload.audio_filename] : undefined,
+      width: payload.width,
+      height: payload.height,
+      parameters: payload.trim_to_audio !== undefined ? { trim_to_audio: payload.trim_to_audio } : undefined,
+      project_id: payload.project_id,
+    }
+    return this.request('/video-jobs', {
       method: 'POST',
-      body: JSON.stringify(payload),
+      body: JSON.stringify(videoJobPayload),
     })
   }
 
   async updateJobToProcessing(jobId: string) {
-    return this.request(`/jobs/${jobId}/processing`, {
+    // jobId is the comfy_job_id - use the video-jobs endpoint
+    return this.request(`/video-jobs/${jobId}/processing`, {
       method: 'PUT',
     })
   }
 
   async completeJob(jobId: string, payload: any) {
-    return this.request(`/jobs/${jobId}/complete`, {
+    // Transform legacy payload to new format
+    const completePayload = {
+      job_id: jobId,
+      status: payload.status === 'error' ? 'failed' : payload.status,
+      output_video_urls: payload.video_url ? [payload.video_url] : undefined,
+      error_message: payload.error_message,
+    }
+    return this.request(`/video-jobs/${jobId}/complete`, {
       method: 'PUT',
-      body: JSON.stringify(payload),
+      body: JSON.stringify(completePayload),
     })
   }
 
@@ -185,13 +207,26 @@ class ApiClient {
     const cached = this.getCached(cacheKey)
     if (cached) return cached
 
-    const result = await this.request(`/jobs/recent?limit=${limit}&offset=${offset}`)
-    this.setCache(cacheKey, result)
-    return result
+    // Redirect to video-jobs feed
+    const result = await this.request(`/video-jobs/feed?limit=${limit}&offset=${offset}`)
+    // Transform response for backward compatibility
+    const transformed = {
+      success: result.success,
+      jobs: result.video_jobs,
+      error: result.error
+    }
+    this.setCache(cacheKey, transformed)
+    return transformed
   }
 
   async getJob(jobId: string) {
-    return this.request(`/jobs/${jobId}`)
+    // Try to get from video-jobs
+    const result = await this.request(`/video-jobs/${jobId}`)
+    return {
+      success: result.success,
+      job: result.video_job,
+      error: result.error
+    }
   }
 
   async getCompletedJobsWithVideos(limit: number = 20, offset: number = 0) {
@@ -199,9 +234,15 @@ class ApiClient {
     const cached = this.getCached(cacheKey)
     if (cached) return cached
 
-    const result = await this.request(`/jobs/completed/with-videos?limit=${limit}&offset=${offset}`)
-    this.setCache(cacheKey, result)
-    return result
+    // Redirect to video-jobs completed endpoint
+    const result = await this.request(`/video-jobs/completed/recent?limit=${limit}&offset=${offset}`)
+    const transformed = {
+      success: result.success,
+      jobs: result.video_jobs,
+      error: result.error
+    }
+    this.setCache(cacheKey, transformed)
+    return transformed
   }
 
   // Storage endpoints
@@ -408,45 +449,65 @@ class ApiClient {
     }
   }
 
-  // Edited Images endpoints
+  // Legacy Edited Images endpoints - redirect to image-jobs (backward compatibility)
   async createEditedImage(payload: any) {
-    return this.request('/edited-images', {
+    // Transform to image-jobs format
+    const imageJobPayload = {
+      user_id: payload.user_id,
+      workflow_name: 'image-edit',
+      comfy_url: payload.comfy_url,
+      comfy_job_id: payload.comfy_job_id,
+      input_image_urls: payload.original_image_url ? [payload.original_image_url] : undefined,
+      prompt: payload.edit_prompt,
+      width: payload.width,
+      height: payload.height,
+      project_id: payload.project_id,
+    }
+    return this.request('/image-jobs', {
       method: 'POST',
-      body: JSON.stringify(payload),
+      body: JSON.stringify(imageJobPayload),
     })
   }
 
   async getEditedImage(imageId: string) {
-    return this.request(`/edited-images/${imageId}`)
+    const result = await this.request(`/image-jobs/${imageId}`)
+    return { success: result.success, edited_image: result.image_job, error: result.error }
   }
 
   async updateEditedImage(imageId: string, payload: any) {
-    return this.request(`/edited-images/${imageId}`, {
+    return this.request(`/image-jobs/${imageId}`, {
       method: 'PUT',
       body: JSON.stringify(payload),
     })
   }
 
   async updateToProcessing(imageId: string) {
-    return this.request(`/edited-images/${imageId}/processing`, {
+    return this.request(`/image-jobs/${imageId}/processing`, {
       method: 'PUT',
     })
   }
 
-  async completeEditedImage(imageId: string, resultImageUrl: string, processingTimeSeconds?: number, modelUsed?: string) {
-    const params = new URLSearchParams({ result_image_url: resultImageUrl })
-    if (processingTimeSeconds !== undefined) params.append('processing_time_seconds', processingTimeSeconds.toString())
-    if (modelUsed) params.append('model_used', modelUsed)
-    
-    return this.request(`/edited-images/${imageId}/complete?${params.toString()}`, {
+  async completeEditedImage(imageId: string, resultImageUrl: string, _processingTimeSeconds?: number, _modelUsed?: string) {
+    const payload = {
+      job_id: imageId,
+      status: 'completed',
+      output_image_urls: [resultImageUrl],
+    }
+    return this.request(`/image-jobs/${imageId}/complete`, {
       method: 'PUT',
+      body: JSON.stringify(payload),
     })
   }
 
   async failEditedImage(imageId: string, errorMessage: string) {
-    const params = new URLSearchParams({ error_message: errorMessage })
-    return this.request(`/edited-images/${imageId}/fail?${params.toString()}`, {
+    const payload = {
+      job_id: imageId,
+      status: 'failed',
+      error_message: errorMessage,
+    }
+    return this.request(`/image-jobs/${imageId}/complete`, {
       method: 'PUT',
+      body: JSON.stringify(payload),
     })
   }
 
@@ -458,55 +519,79 @@ class ApiClient {
     const params = new URLSearchParams({
       limit: limit.toString(),
       offset: offset.toString(),
-      completed_only: completedOnly.toString()
+      workflow_name: 'image-edit',
     })
-    const result = await this.request(`/edited-images?${params.toString()}`)
-    this.setCache(cacheKey, result)
-    return result
+    if (completedOnly) params.append('status', 'completed')
+
+    const result = await this.request(`/image-jobs/feed?${params.toString()}`)
+    const transformed = {
+      success: result.success,
+      edited_images: result.image_jobs,
+      total_count: result.total_count,
+      error: result.error
+    }
+    this.setCache(cacheKey, transformed)
+    return transformed
   }
 
-  // Style Transfer endpoints
+  // Legacy Style Transfer endpoints - redirect to image-jobs (backward compatibility)
   async createStyleTransfer(payload: any) {
-    return this.request('/style-transfers', {
+    const imageJobPayload = {
+      user_id: payload.user_id,
+      workflow_name: 'style-transfer',
+      comfy_url: payload.comfy_url,
+      comfy_job_id: payload.comfy_job_id,
+      input_image_urls: [payload.subject_image_url, payload.style_image_url].filter(Boolean),
+      prompt: payload.prompt,
+      width: payload.width,
+      height: payload.height,
+      project_id: payload.project_id,
+    }
+    return this.request('/image-jobs', {
       method: 'POST',
-      body: JSON.stringify(payload),
+      body: JSON.stringify(imageJobPayload),
     })
   }
 
   async getStyleTransfer(transferId: string) {
-    return this.request(`/style-transfers/${transferId}`)
+    const result = await this.request(`/image-jobs/${transferId}`)
+    return { success: result.success, style_transfer: result.image_job, error: result.error }
   }
 
   async updateStyleTransfer(transferId: string, payload: any) {
-    return this.request(`/style-transfers/${transferId}`, {
+    return this.request(`/image-jobs/${transferId}`, {
       method: 'PUT',
       body: JSON.stringify(payload),
     })
   }
 
   async updateStyleTransferToProcessing(transferId: string) {
-    return this.request(`/style-transfers/${transferId}/processing`, {
+    return this.request(`/image-jobs/${transferId}/processing`, {
       method: 'PUT',
     })
   }
 
-  async completeStyleTransfer(transferId: string, resultImageUrl: string, processingTimeSeconds?: number, modelUsed?: string) {
-    const queryParams = new URLSearchParams({
-      result_image_url: resultImageUrl,
-      ...(processingTimeSeconds && { processing_time_seconds: processingTimeSeconds.toString() }),
-      ...(modelUsed && { model_used: modelUsed })
-    })
-    return this.request(`/style-transfers/${transferId}/complete?${queryParams}`, {
+  async completeStyleTransfer(transferId: string, resultImageUrl: string, _processingTimeSeconds?: number, _modelUsed?: string) {
+    const payload = {
+      job_id: transferId,
+      status: 'completed',
+      output_image_urls: [resultImageUrl],
+    }
+    return this.request(`/image-jobs/${transferId}/complete`, {
       method: 'PUT',
+      body: JSON.stringify(payload),
     })
   }
 
   async failStyleTransfer(transferId: string, errorMessage: string) {
-    const queryParams = new URLSearchParams({
-      error_message: errorMessage
-    })
-    return this.request(`/style-transfers/${transferId}/fail?${queryParams}`, {
+    const payload = {
+      job_id: transferId,
+      status: 'failed',
+      error_message: errorMessage,
+    }
+    return this.request(`/image-jobs/${transferId}/complete`, {
       method: 'PUT',
+      body: JSON.stringify(payload),
     })
   }
 
@@ -515,49 +600,50 @@ class ApiClient {
     const cached = this.getCached(cacheKey)
     if (cached) return cached
 
-    const queryParams = new URLSearchParams({
+    const params = new URLSearchParams({
       limit: limit.toString(),
       offset: offset.toString(),
-      completed_only: completedOnly.toString()
+      workflow_name: 'style-transfer',
     })
-    const result = await this.request(`/style-transfers?${queryParams}`)
-    this.setCache(cacheKey, result)
-    return result
+    if (completedOnly) params.append('status', 'completed')
+
+    const result = await this.request(`/image-jobs/feed?${params.toString()}`)
+    const transformed = {
+      success: result.success,
+      style_transfers: result.image_jobs,
+      total_count: result.total_count,
+      error: result.error
+    }
+    this.setCache(cacheKey, transformed)
+    return transformed
   }
 
-  async submitStyleTransferToComfyUI(comfyUrl: string, transferId: string, promptJson: any) {
-    const queryParams = new URLSearchParams({
-      comfy_url: comfyUrl,
-      transfer_id: transferId
-    })
-    return this.request(`/style-transfers/submit-to-comfyui?${queryParams}`, {
-      method: 'POST',
-      body: JSON.stringify(promptJson),
-    })
+  // Legacy method - no longer needed, use submitWorkflow or submitPromptToComfyUI directly
+  async submitStyleTransferToComfyUI(_comfyUrl: string, _transferId: string, _promptJson: any) {
+    console.warn('submitStyleTransferToComfyUI is deprecated - use submitWorkflow instead')
+    return { success: false, error: 'This method is deprecated' }
   }
 
-  async submitStyleTransferWithUpload(payload: {
+  // DEPRECATED: Legacy v2/v3 style transfer methods - these endpoints have been removed
+  // Style transfers should now use the unified image-jobs workflow
+  async submitStyleTransferWithUpload(_payload: {
     subject_image_data: string;
     style_image_data: string;
     prompt: string;
     workflow_json: any;
     comfy_url?: string;
   }) {
-    return this.request('/style-transfers-v2/submit-with-upload', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    })
+    console.warn('submitStyleTransferWithUpload is deprecated - use submitWorkflow with workflow_name="style-transfer" instead')
+    return { success: false, error: 'This method is deprecated. Use the image-jobs API with workflow_name="style-transfer"' }
   }
 
-  async completeStyleTransferWithUpload(transferId: string, resultUrl: string) {
-    return this.request(`/style-transfers-v2/complete-with-upload/${transferId}`, {
-      method: 'POST',
-      body: JSON.stringify({ result_url: resultUrl }),
-    })
+  async completeStyleTransferWithUpload(_transferId: string, _resultUrl: string) {
+    console.warn('completeStyleTransferWithUpload is deprecated - use completeImageJob instead')
+    return { success: false, error: 'This method is deprecated. Use the image-jobs API' }
   }
 
-  // New template-based approach
-  async submitStyleTransferWithTemplate(payload: {
+  // DEPRECATED: Legacy template-based approach - now use submitWorkflow directly
+  async submitStyleTransferWithTemplate(_payload: {
     subject_image_data: string;
     style_image_data: string;
     prompt: string;
@@ -565,17 +651,13 @@ class ApiClient {
     height: number;
     comfy_url?: string;
   }) {
-    return this.request('/style-transfers-v3/submit-with-template', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    })
+    console.warn('submitStyleTransferWithTemplate is deprecated - use submitWorkflow with workflow_name="style-transfer" instead')
+    return { success: false, error: 'This method is deprecated. Use submitWorkflow with workflow_name="style-transfer"' }
   }
 
-  async completeStyleTransferV3(transferId: string, resultUrl: string) {
-    return this.request(`/style-transfers-v3/complete-with-upload/${transferId}`, {
-      method: 'POST',
-      body: JSON.stringify({ result_url: resultUrl }),
-    })
+  async completeStyleTransferV3(_transferId: string, _resultUrl: string) {
+    console.warn('completeStyleTransferV3 is deprecated - use completeImageJob instead')
+    return { success: false, error: 'This method is deprecated. Use the image-jobs API' }
   }
 
   // Unified Feed endpoints (optimized - single request for all feed types)

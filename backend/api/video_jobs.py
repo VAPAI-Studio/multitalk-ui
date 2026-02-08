@@ -40,10 +40,15 @@ async def create_video_job(
 ):
     """Create a new video job."""
     service = get_service(_extract_bearer_token(authorization))
-    success, error = await service.create_job(payload)
+    success, job_id, error = await service.create_job(payload)
 
     if not success:
-        raise HTTPException(status_code=500, detail=error)
+        raise HTTPException(status_code=400 if "Unknown workflow" in (error or "") else 500, detail=error)
+
+    # Fetch the created job to return
+    if job_id:
+        job, _ = await service.get_job(job_id)
+        return VideoJobResponse(success=True, video_job=job, error=None)
 
     return VideoJobResponse(success=True, error=None)
 
@@ -324,9 +329,9 @@ async def complete_video_job(
                 # Google Drive upload is non-blocking - log error but continue
                 print(f"[VIDEO_JOBS] ⚠️ Google Drive upload error (non-blocking): {str(drive_error)}")
 
-    success, job, error = await service.complete_job(payload)
+    success, completed_job, error = await service.complete_job(payload)
 
     if not success:
         raise HTTPException(status_code=404, detail=error)
 
-    return VideoJobResponse(success=True, video_job=job, error=None)
+    return VideoJobResponse(success=True, video_job=completed_job, error=None)

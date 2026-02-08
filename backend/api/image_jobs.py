@@ -37,20 +37,17 @@ async def create_image_job(
 ):
     """Create a new image job"""
     service = get_service(_extract_bearer_token(authorization))
-    success, error = await service.create_job(payload)
+    success, job_id, error = await service.create_job(payload)
 
-    if success:
-        # Get the created job (by comfy_job_id if provided, otherwise get most recent)
-        if payload.comfy_job_id:
-            job, job_error = await service.get_job_by_comfy_id(payload.comfy_job_id)
-        else:
-            # Get most recent job for this workflow
-            jobs, _, job_error = await service.get_recent_jobs(limit=1, workflow_name=payload.workflow_name)
-            job = jobs[0] if jobs else None
-
-        return ImageJobResponse(success=True, image_job=job, error=error or job_error)
-    else:
+    if not success:
         return ImageJobResponse(success=False, error=error)
+
+    # Fetch the created job by its UUID
+    if job_id:
+        job, job_error = await service.get_job(job_id)
+        return ImageJobResponse(success=True, image_job=job, error=job_error)
+
+    return ImageJobResponse(success=True, error=None)
 
 @router.get("/", response_model=ImageJobListResponse)
 async def get_image_jobs(
@@ -170,7 +167,7 @@ async def complete_image_job(
     storage_service = StorageService()
 
     # Get job to check for project_id and current status
-    existing_job, _ = await service.get_job(job_id)
+    existing_job, _ = await service.get_job_by_comfy_id(job_id)
     project_id = existing_job.project_id if existing_job else None
 
     # Skip if job is already completed (prevents duplicate uploads on repeated calls)
@@ -254,41 +251,46 @@ async def complete_image_job(
                 # Google Drive upload is non-blocking - log error but continue
                 print(f"[IMAGE_JOBS] ⚠️ Google Drive upload error (non-blocking): {str(drive_error)}")
 
-    success, error = await service.complete_job(payload)
+    success, completed_job, error = await service.complete_job(payload)
 
-    if success:
-        job, job_error = await service.get_job(job_id)
-        return ImageJobResponse(success=True, image_job=job, error=error or job_error)
-    else:
+    if not success:
         return ImageJobResponse(success=False, error=error)
+
+    return ImageJobResponse(success=True, image_job=completed_job, error=None)
 
 @router.get("/completed/recent", response_model=ImageJobListResponse)
 async def get_completed_image_jobs(
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
     workflow_name: Optional[str] = Query(None, description="Filter by workflow name"),
+    user_id: Optional[str] = Query(None, description="Filter by user ID"),
     authorization: Optional[str] = Header(None)
 ):
     """Get completed image jobs"""
     service = get_service(_extract_bearer_token(authorization))
-    jobs, error = await service.get_completed_jobs(
+    jobs, total_count, error = await service.get_completed_jobs(
         limit=limit,
         offset=offset,
-        workflow_name=workflow_name
+        workflow_name=workflow_name,
+        user_id=user_id
     )
 
     return ImageJobListResponse(
         success=error is None,
         image_jobs=jobs,
-        total_count=len(jobs),
+        total_count=total_count,
         error=error
     )
 
 @router.delete("/{job_id}", response_model=ImageJobResponse)
-async def delete_image_job(job_id: str, authorization: Optional[str] = Header(None)):
-    """Delete an image job"""
+async def delete_image_job(
+    job_id: str,
+    user_id: str = Query(..., description="User ID (required for ownership verification)"),
+    authorization: Optional[str] = Header(None)
+):
+    """Delete an image job (only if owned by user)"""
     service = get_service(_extract_bearer_token(authorization))
-    success, error = await service.delete_job(job_id)
+    success, error = await service.delete_job(job_id, user_id)
 
     return ImageJobResponse(
         success=success,
