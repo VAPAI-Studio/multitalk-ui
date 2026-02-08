@@ -19,6 +19,7 @@ class MultiTalkJob(BaseModel):
     comfy_url: str = Field(..., description="ComfyUI server URL")
     error_message: Optional[str] = Field(None, description="Error message if job failed")
     video_url: Optional[str] = Field(None, description="Supabase Storage URL for video")
+    project_id: Optional[str] = Field(None, description="Google Drive folder ID for saving outputs")
     # workflow_type removed - not in database schema
     created_at: Optional[datetime] = Field(None, description="Database creation timestamp")
     updated_at: Optional[datetime] = Field(None, description="Database update timestamp")
@@ -36,6 +37,7 @@ class CreateJobPayload(BaseModel):
     width: int
     height: int
     trim_to_audio: bool
+    project_id: Optional[str] = None  # Google Drive folder ID for saving outputs
     # workflow_type removed - not in database schema
 
 class CompleteJobPayload(BaseModel):

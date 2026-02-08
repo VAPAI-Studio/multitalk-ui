@@ -20,6 +20,7 @@ export interface MultiTalkJob {
   comfy_url: string
   error_message?: string
   video_url?: string // Supabase Storage URL
+  project_id?: string // Google Drive folder ID for saving outputs
   // Additional metadata
   created_at?: string
   updated_at?: string
@@ -34,6 +35,7 @@ export interface CreateJobPayload {
   width: number
   height: number
   trim_to_audio: boolean
+  project_id?: string // Google Drive folder ID for saving outputs
 }
 
 // Job completion payload (what we send when job finishes)

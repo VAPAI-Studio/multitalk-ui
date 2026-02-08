@@ -971,6 +971,31 @@ class ApiClient {
       body: JSON.stringify(data),
     })
   }
+
+  // Google Drive endpoints
+  async checkGoogleDriveConnection() {
+    return this.request('/google-drive/status')
+  }
+
+  async listGoogleDriveFiles(params?: {
+    folderId?: string;
+    pageSize?: number;
+    pageToken?: string;
+    orderBy?: string;
+  }) {
+    const queryParams = new URLSearchParams()
+    if (params?.folderId) queryParams.append('folder_id', params.folderId)
+    if (params?.pageSize) queryParams.append('page_size', params.pageSize.toString())
+    if (params?.pageToken) queryParams.append('page_token', params.pageToken)
+    if (params?.orderBy) queryParams.append('order_by', params.orderBy)
+
+    const query = queryParams.toString()
+    return this.request(`/google-drive/files${query ? `?${query}` : ''}`)
+  }
+
+  async getGoogleDriveFolder(folderId: string) {
+    return this.request(`/google-drive/folders/${folderId}`)
+  }
 }
 
 export const apiClient = new ApiClient()

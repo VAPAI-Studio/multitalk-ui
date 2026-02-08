@@ -1,4 +1,3 @@
-import os
 from fastapi import APIRouter, Query, UploadFile, File, HTTPException
 from typing import Optional, Dict, Any
 from pydantic import BaseModel
@@ -6,6 +5,7 @@ from pydantic import BaseModel
 from models.comfyui import ComfyUIStatusResponse
 from services.comfyui_service import ComfyUIService
 from services.workflow_service import WorkflowService
+from config.settings import settings
 
 # Request/Response models
 class PromptRequest(BaseModel):
@@ -232,8 +232,8 @@ async def submit_workflow(request: WorkflowSubmitRequest):
         }
 
         # Add ComfyUI API key if provided (required for paid API nodes like Gemini)
-        # First check request, then fall back to environment variable
-        api_key = request.comfyui_api_key or os.getenv("COMFY_API_KEY")
+        # First check request, then fall back to settings
+        api_key = request.comfyui_api_key or settings.COMFY_API_KEY
         if api_key:
             payload["extra_data"] = {
                 "api_key_comfy_org": api_key

@@ -41,6 +41,9 @@ class ImageJob(BaseModel):
     # Error handling
     error_message: Optional[str] = Field(None, description="Error message if failed")
 
+    # Google Drive integration
+    project_id: Optional[str] = Field(None, description="Google Drive folder ID for saving outputs")
+
     # Metadata
     model_used: Optional[str] = Field(None, description="AI model used (Dreamshaper, Flux, etc.)")
     user_ip: Optional[str] = Field(None, description="User IP for anonymous tracking")
@@ -69,6 +72,9 @@ class CreateImageJobPayload(BaseModel):
 
     # Workflow-specific parameters
     parameters: Dict[str, Any] = Field(default_factory=dict)
+
+    # Google Drive integration
+    project_id: Optional[str] = None
 
     # Metadata
     model_used: Optional[str] = None

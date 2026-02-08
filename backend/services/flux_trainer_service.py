@@ -1,6 +1,5 @@
 """Service for managing Flux LoRA training jobs using kohya_ss."""
 
-import os
 import asyncio
 import subprocess
 import shutil
@@ -13,6 +12,7 @@ import re
 from models.training_job import TrainingConfigTOML, TrainingStatus
 from services.storage_service import StorageService
 from core.supabase import get_supabase
+from config.settings import settings
 
 
 class FluxTrainerService:
@@ -23,11 +23,11 @@ class FluxTrainerService:
         self.storage_service = StorageService()
 
         # Training workspace directory
-        self.workspace_dir = Path(os.getenv("TRAINING_WORKSPACE_DIR", "./training_workspace"))
+        self.workspace_dir = Path(settings.TRAINING_WORKSPACE_DIR)
         self.workspace_dir.mkdir(parents=True, exist_ok=True)
 
         # Kohya_ss installation path (configure via environment)
-        self.kohya_path = Path(os.getenv("KOHYA_SS_PATH", "/opt/kohya_ss"))
+        self.kohya_path = Path(settings.KOHYA_SS_PATH)
         self.kohya_venv_python = self.kohya_path / "venv" / "bin" / "python"
 
     async def create_training_job(

@@ -45,6 +45,7 @@ class ImageJobService:
                 "width": payload.width,
                 "height": payload.height,
                 "parameters": payload.parameters,
+                "project_id": payload.project_id,
                 "model_used": payload.model_used,
                 "user_ip": payload.user_ip
             }
@@ -155,7 +156,7 @@ class ImageJobService:
         """Get a single image job by ID"""
         try:
             # Use specific columns and .single() for better performance
-            columns = "id, user_id, workflow_name, status, comfy_url, comfy_job_id, input_image_urls, output_image_urls, prompt, width, height, parameters, model_used, user_ip, comfyui_output_filename, comfyui_output_subfolder, comfyui_output_type, error_message, started_at, completed_at, processing_time_seconds, created_at"
+            columns = "id, user_id, workflow_name, status, comfy_url, comfy_job_id, input_image_urls, output_image_urls, prompt, width, height, parameters, project_id, model_used, user_ip, comfyui_output_filename, comfyui_output_subfolder, comfyui_output_type, error_message, started_at, completed_at, processing_time_seconds, created_at"
             result = self.supabase.table("image_jobs") \
                 .select(columns) \
                 .eq("id", job_id) \
@@ -175,7 +176,7 @@ class ImageJobService:
         """Get a single image job by ComfyUI job ID"""
         try:
             # Use specific columns and .single() for better performance
-            columns = "id, user_id, workflow_name, status, comfy_url, comfy_job_id, input_image_urls, output_image_urls, prompt, width, height, parameters, model_used, user_ip, comfyui_output_filename, comfyui_output_subfolder, comfyui_output_type, error_message, started_at, completed_at, processing_time_seconds, created_at"
+            columns = "id, user_id, workflow_name, status, comfy_url, comfy_job_id, input_image_urls, output_image_urls, prompt, width, height, parameters, project_id, model_used, user_ip, comfyui_output_filename, comfyui_output_subfolder, comfyui_output_type, error_message, started_at, completed_at, processing_time_seconds, created_at"
             result = self.supabase.table("image_jobs") \
                 .select(columns) \
                 .eq("comfy_job_id", comfy_job_id) \
@@ -201,7 +202,7 @@ class ImageJobService:
         """Get recent image jobs with optional filtering"""
         try:
             # Use specific columns instead of * for better performance
-            columns = "id, user_id, workflow_name, status, comfy_url, comfy_job_id, input_image_urls, output_image_urls, prompt, width, height, parameters, model_used, user_ip, comfyui_output_filename, comfyui_output_subfolder, comfyui_output_type, error_message, started_at, completed_at, processing_time_seconds, created_at"
+            columns = "id, user_id, workflow_name, status, comfy_url, comfy_job_id, input_image_urls, output_image_urls, prompt, width, height, parameters, project_id, model_used, user_ip, comfyui_output_filename, comfyui_output_subfolder, comfyui_output_type, error_message, started_at, completed_at, processing_time_seconds, created_at"
             query = self.supabase.table("image_jobs").select(columns, count="exact")
 
             # Apply filters
@@ -234,7 +235,7 @@ class ImageJobService:
         """Get completed image jobs"""
         try:
             # Use specific columns instead of * for better performance
-            columns = "id, user_id, workflow_name, status, comfy_url, comfy_job_id, input_image_urls, output_image_urls, prompt, width, height, parameters, model_used, user_ip, comfyui_output_filename, comfyui_output_subfolder, comfyui_output_type, error_message, started_at, completed_at, processing_time_seconds, created_at"
+            columns = "id, user_id, workflow_name, status, comfy_url, comfy_job_id, input_image_urls, output_image_urls, prompt, width, height, parameters, project_id, model_used, user_ip, comfyui_output_filename, comfyui_output_subfolder, comfyui_output_type, error_message, started_at, completed_at, processing_time_seconds, created_at"
             query = self.supabase.table("image_jobs").select(columns).eq("status", "completed")
 
             if workflow_name:

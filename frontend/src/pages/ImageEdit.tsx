@@ -4,6 +4,7 @@ import { apiClient } from "../lib/apiClient";
 import ResizableFeedSidebar from "../components/ResizableFeedSidebar";
 import { useSmartResolution } from "../hooks/useSmartResolution";
 import { useAuth } from "../contexts/AuthContext";
+import { useProject } from "../contexts/ProjectContext";
 
 type Tab = "edit" | "camera-angle";
 
@@ -768,6 +769,7 @@ interface Props {
 export default function ImageEdit({ comfyUrl = "" }: Props) {
   // Auth context
   const { user } = useAuth();
+  const { selectedProject } = useProject();
 
   const [activeTab, setActiveTab] = useState<Tab>("edit");
 
@@ -1031,6 +1033,7 @@ export default function ImageEdit({ comfyUrl = "" }: Props) {
         input_image_urls: [uploadedFilename],
         width,
         height,
+        project_id: selectedProject?.id || null,
         parameters: {
           prompt: buildCameraPrompt,
           azimuth,

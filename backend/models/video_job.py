@@ -47,6 +47,9 @@ class VideoJob(BaseModel):
     # Thumbnail for feed display
     thumbnail_url: Optional[str] = Field(None, description="Pre-generated thumbnail URL (first frame)")
 
+    # Google Drive integration
+    project_id: Optional[str] = Field(None, description="Google Drive folder ID for saving outputs")
+
     # Metadata
     updated_at: Optional[datetime] = Field(None, description="Last update timestamp")
 
@@ -76,6 +79,9 @@ class CreateVideoJobPayload(BaseModel):
 
     # Workflow-specific parameters
     parameters: Dict[str, Any] = Field(default_factory=dict)
+
+    # Google Drive integration
+    project_id: Optional[str] = None
 
 
 class UpdateVideoJobPayload(BaseModel):

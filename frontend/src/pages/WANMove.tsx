@@ -3,6 +3,7 @@ import { startJobMonitoring, checkComfyUIHealth } from "../components/utils";
 import ResizableFeedSidebar from "../components/ResizableFeedSidebar";
 import { apiClient } from "../lib/apiClient";
 import { useAuth } from "../contexts/AuthContext";
+import { useProject } from "../contexts/ProjectContext";
 import type { Path, DrawingTool } from "../components/PathAnimator";
 import {
   PathCanvas,
@@ -40,6 +41,7 @@ interface Props {
 export default function WANMove({ comfyUrl }: Props) {
   // Auth context
   const { user } = useAuth();
+  const { selectedProject } = useProject();
 
   // Image state
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -231,6 +233,7 @@ export default function WANMove({ comfyUrl }: Props) {
         height: canvasSize.height,
         fps: 16,
         duration_seconds: 5,
+        project_id: selectedProject?.id || null,
         parameters: {
           prompt: customPrompt,
           paths_count: paths.length,

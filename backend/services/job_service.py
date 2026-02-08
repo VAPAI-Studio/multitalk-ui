@@ -1,7 +1,6 @@
 from typing import List, Optional, Tuple
 from datetime import datetime
 import asyncio
-import httpx
 
 from core.supabase import get_supabase
 from models.job import MultiTalkJob, CreateJobPayload, CompleteJobPayload, JobStatus
@@ -23,6 +22,7 @@ class JobService:
                 "width": payload.width,
                 "height": payload.height,
                 "trim_to_audio": payload.trim_to_audio,
+                "project_id": payload.project_id,
                 # workflow_type removed - not in database schema
             }
 
@@ -131,12 +131,13 @@ class JobService:
                         if success and supabase_url:
                             update_data["video_url"] = supabase_url
                             print(f"✅ Video uploaded to Supabase: {supabase_url}")
+                            # Note: Google Drive upload is handled by the new video_jobs/image_jobs system
                         else:
                             print(f"⚠️ Failed to upload video to Supabase: {storage_error}")
                             # Continue with job completion even if upload fails
                     else:
                         print(f"⚠️ No comfy_url available for job {payload.job_id}, skipping Supabase upload")
-                        
+
                 except Exception as storage_error:
                     print(f"⚠️ Error during video upload: {storage_error}")
                     # Continue with job completion even if upload fails

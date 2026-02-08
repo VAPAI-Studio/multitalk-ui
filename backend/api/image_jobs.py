@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query, Header
 from typing import Optional
+import httpx
 
 from models.image_job import (
     CreateImageJobPayload,
@@ -11,6 +12,7 @@ from models.image_job import (
 )
 from services.image_job_service import ImageJobService
 from services.storage_service import StorageService
+from services.google_drive_service import GoogleDriveService
 from core.supabase import get_supabase_for_token
 
 router = APIRouter(prefix="/image-jobs", tags=["image-jobs"])
@@ -167,6 +169,15 @@ async def complete_image_job(
     service = get_service(_extract_bearer_token(authorization))
     storage_service = StorageService()
 
+    # Get job to check for project_id and current status
+    existing_job, _ = await service.get_job(job_id)
+    project_id = existing_job.project_id if existing_job else None
+
+    # Skip if job is already completed (prevents duplicate uploads on repeated calls)
+    if existing_job and existing_job.status == 'completed':
+        print(f"[IMAGE_JOBS] Job {job_id} already completed, skipping upload")
+        return ImageJobResponse(success=True, image_job=existing_job, error=None)
+
     # If completing successfully with output URLs, download from ComfyUI and upload to Supabase
     if payload.status == 'completed' and payload.output_image_urls:
         supabase_urls = []
@@ -189,6 +200,59 @@ async def complete_image_job(
 
         # Replace ComfyUI URLs with Supabase URLs
         payload.output_image_urls = supabase_urls
+
+        # Upload to Google Drive if project_id is set (non-blocking)
+        if project_id and supabase_urls:
+            try:
+                drive_service = GoogleDriveService()
+
+                # Get or create AI-Images folder
+                folder_success, ai_folder_id, folder_error = await drive_service.get_or_create_folder(
+                    parent_id=project_id,
+                    folder_name='AI-Images'
+                )
+
+                if folder_success and ai_folder_id:
+                    print(f"[IMAGE_JOBS] Uploading {len(supabase_urls)} images to Google Drive folder: AI-Images ({ai_folder_id})")
+
+                    # Upload ALL images to Drive (not just the first one)
+                    async with httpx.AsyncClient(timeout=120.0) as client:
+                        for idx, url in enumerate(supabase_urls):
+                            try:
+                                response = await client.get(url)
+                                if response.status_code == 200:
+                                    file_content = response.content
+                                    # Determine extension from URL or default to png
+                                    extension = 'png'
+                                    if '.jpg' in url.lower() or '.jpeg' in url.lower():
+                                        extension = 'jpg'
+                                    # Use index suffix for multiple images (e.g., job_id_001.png)
+                                    if len(supabase_urls) > 1:
+                                        drive_filename = f"{job_id}_{idx+1:03d}.{extension}"
+                                    else:
+                                        drive_filename = f"{job_id}.{extension}"
+
+                                    upload_success, file_id, upload_error = await drive_service.upload_file(
+                                        file_content=file_content,
+                                        filename=drive_filename,
+                                        folder_id=ai_folder_id,
+                                        mime_type=f'image/{extension}'
+                                    )
+
+                                    if upload_success:
+                                        print(f"[IMAGE_JOBS] ✅ Image {idx+1}/{len(supabase_urls)} uploaded to Google Drive: {drive_filename}")
+                                    else:
+                                        print(f"[IMAGE_JOBS] ⚠️ Failed to upload image {idx+1} to Google Drive: {upload_error}")
+                                else:
+                                    print(f"[IMAGE_JOBS] ⚠️ Failed to download image {idx+1} for Drive upload: {response.status_code}")
+                            except Exception as img_error:
+                                print(f"[IMAGE_JOBS] ⚠️ Error uploading image {idx+1} to Drive: {str(img_error)}")
+                else:
+                    print(f"[IMAGE_JOBS] ⚠️ Failed to create Drive folder: {folder_error}")
+
+            except Exception as drive_error:
+                # Google Drive upload is non-blocking - log error but continue
+                print(f"[IMAGE_JOBS] ⚠️ Google Drive upload error (non-blocking): {str(drive_error)}")
 
     success, error = await service.complete_job(payload)
 
