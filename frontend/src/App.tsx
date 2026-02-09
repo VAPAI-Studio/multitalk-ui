@@ -1,56 +1,163 @@
 import { useState, useEffect } from "react";
-// Page components (moved to pages/ folder)
+// Page components
 import Homepage from "./pages/Homepage";
-import Lipsync from "./pages/Lipsync";
-import ImageEdit from "./pages/ImageEdit";
 import GenerationFeed from "./pages/GenerationFeed";
-import CharacterCaption from "./pages/CharacterCaption";
-import WANI2V from "./pages/WANI2V";
-import WANMove from "./pages/WANMove";
-import StyleTransfer from "./pages/StyleTransfer";
-import CreateImage from "./pages/CreateImage";
-import LoRATrainer from "./pages/LoraTrainer";
-import ImageGrid from "./pages/ImageGrid";
-import AudioStemSeparator from "./pages/AudioStemSeparator";
-import LTX2I2V from "./pages/LTX2I2V";
 import ProfileSettings from "./ProfileSettings";
-// import Img2Img from "./pages/Img2Img"; // Hidden: Image to Image page
+import StudioPage from "./components/StudioPage";
+// UI Components
 import ComfyUIStatus from "./components/ComfyUIStatus";
 import ConsoleToggle from "./components/ConsoleToggle";
 import AuthPage from "./components/AuthPage";
 import ThemeToggle from "./components/ThemeToggle";
 import ProjectSelector from "./components/ProjectSelector";
+// Contexts & Config
 import { useAuth } from "./contexts/AuthContext";
 import { ProjectProvider } from "./contexts/ProjectContext";
+import { studios, getStudioById, setLastUsedApp, type StudioPageType, type StudioConfig } from "./lib/studioConfig";
+
+// Collapsible Sidebar Group Component
+function SidebarGroup({
+  studio,
+  currentPage,
+  isExpanded,
+  onToggleExpand,
+  onNavigate,
+}: {
+  studio: StudioConfig;
+  currentPage: StudioPageType;
+  isExpanded: boolean;
+  onToggleExpand: () => void;
+  onNavigate: (page: StudioPageType) => void;
+}) {
+  const isActive = currentPage === studio.id;
+  const hasMultipleApps = studio.apps.length > 1;
+  const isDisabled = studio.comingSoon;
+
+  return (
+    <div>
+      {/* Group Header */}
+      <button
+        onClick={() => {
+          if (isDisabled) return;
+          if (hasMultipleApps) {
+            onToggleExpand();
+          } else {
+            onNavigate(studio.id as StudioPageType);
+          }
+        }}
+        disabled={isDisabled}
+        className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 ${
+          isActive
+            ? `bg-gradient-to-r ${studio.gradient} text-white shadow-lg`
+            : isDisabled
+              ? 'text-gray-400 dark:text-gray-600 cursor-not-allowed'
+              : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
+        }`}
+      >
+        <div className="flex items-center gap-3">
+          <span className="text-lg">{studio.icon}</span>
+          <span className="font-medium">{studio.title}</span>
+          {isDisabled && (
+            <span className="text-xs px-2 py-0.5 bg-gray-200 dark:bg-gray-700 rounded-full">Soon</span>
+          )}
+        </div>
+        {hasMultipleApps && !isDisabled && (
+          <svg
+            className={`w-4 h-4 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        )}
+      </button>
+
+      {/* Collapsible Sub-items */}
+      {isExpanded && hasMultipleApps && !isDisabled && (
+        <div className="ml-4 mt-1 space-y-1 border-l-2 border-gray-200 dark:border-gray-700 pl-4">
+          {studio.apps.map((app) => (
+            <button
+              key={app.id}
+              onClick={() => {
+                // Set last used app and navigate to studio
+                setLastUsedApp(studio.id, app.id);
+                onNavigate(studio.id as StudioPageType);
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 transition-all duration-200"
+            >
+              <span>{app.icon}</span>
+              <span>{app.title}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function App() {
   const { isAuthenticated, loading, user, logout } = useAuth();
-  const [currentPage, setCurrentPage] = useState<"home" | "lipsync" | "image-edit" | "generation-feed" | "character-caption" | "wan-i2v" | "wan-move" | "style-transfer" | "create-image" | "lora-trainer" | "image-grid" | "audio-stem-separator" | "ltx2-i2v" | "img2img" | "profile-settings">("home");
+  const [currentPage, setCurrentPage] = useState<StudioPageType>("home");
   const [comfyUrl, setComfyUrl] = useState<string>("https://comfy.vapai.studio");
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
   const [userMenuOpen, setUserMenuOpen] = useState<boolean>(false);
+  const [expandedStudio, setExpandedStudio] = useState<string | null>(null);
+
+  // Valid page values for localStorage validation
+  const validPages: StudioPageType[] = [
+    'home',
+    'lipsync-studio',
+    'image-studio',
+    'video-studio',
+    'audio-studio',
+    'text-studio',
+    'lora-studio',
+    'history',
+    'profile-settings'
+  ];
 
   // Load saved page and ComfyUI URL from localStorage on mount
   useEffect(() => {
-    const savedPage = localStorage.getItem('vapai-current-page') as typeof currentPage;
+    const savedPage = localStorage.getItem('vapai-current-page') as StudioPageType;
     const savedComfyUrl = localStorage.getItem('vapai-comfy-url');
-    
-    if (savedPage && ['home', 'lipsync', 'image-edit', 'generation-feed', 'character-caption', 'wan-i2v', 'wan-move', 'style-transfer', 'create-image', 'lora-trainer', 'image-grid', 'audio-stem-separator', 'ltx2-i2v', 'img2img', 'profile-settings'].includes(savedPage)) {
+
+    if (savedPage && validPages.includes(savedPage)) {
       setCurrentPage(savedPage);
     }
-    // Migrate old page names to new unified lipsync page
-    if (savedPage && ['multitalk-one', 'multitalk-multiple', 'video-lipsync'].includes(savedPage)) {
-      setCurrentPage('lipsync');
-      localStorage.setItem('vapai-current-page', 'lipsync');
+
+    // Migrate old page names to new studio pages
+    const oldToNew: Record<string, StudioPageType> = {
+      'multitalk-one': 'lipsync-studio',
+      'multitalk-multiple': 'lipsync-studio',
+      'video-lipsync': 'lipsync-studio',
+      'lipsync': 'lipsync-studio',
+      'image-edit': 'image-studio',
+      'style-transfer': 'image-studio',
+      'create-image': 'image-studio',
+      'image-grid': 'image-studio',
+      'wan-i2v': 'video-studio',
+      'wan-move': 'video-studio',
+      'ltx2-i2v': 'video-studio',
+      'audio-stem-separator': 'audio-studio',
+      'character-caption': 'lora-studio',
+      'lora-trainer': 'lora-studio',
+      'generation-feed': 'history',
+    };
+
+    if (savedPage && oldToNew[savedPage]) {
+      const newPage = oldToNew[savedPage];
+      setCurrentPage(newPage);
+      localStorage.setItem('vapai-current-page', newPage);
     }
-    
+
     if (savedComfyUrl) {
       setComfyUrl(savedComfyUrl);
     }
   }, []);
 
   // Save current page to localStorage when it changes
-  const handlePageChange = (page: typeof currentPage) => {
+  const handlePageChange = (page: StudioPageType) => {
     setCurrentPage(page);
     localStorage.setItem('vapai-current-page', page);
     setSidebarOpen(false);
@@ -60,6 +167,11 @@ export default function App() {
   const handleComfyUrlChange = (url: string) => {
     setComfyUrl(url);
     localStorage.setItem('vapai-comfy-url', url);
+  };
+
+  // Toggle studio expansion
+  const toggleStudioExpansion = (studioId: string) => {
+    setExpandedStudio(expandedStudio === studioId ? null : studioId);
   };
 
   // Show loading state while checking authentication
@@ -108,7 +220,7 @@ export default function App() {
                 </button>
               </div>
             </div>
-            
+
             {/* Right: ComfyUI Settings + User Menu */}
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
@@ -251,6 +363,7 @@ export default function App() {
 
             {/* Navigation Items */}
             <div className="flex-1 p-6 space-y-2 overflow-y-auto">
+              {/* Home */}
               <button
                 onClick={() => handlePageChange("home")}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
@@ -262,150 +375,37 @@ export default function App() {
                 <span className="text-lg">🏠</span>
                 <span className="font-medium">Home</span>
               </button>
-              <button
-                onClick={() => handlePageChange("lipsync")}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
-                  currentPage === "lipsync"
-                    ? "bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg"
-                    : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
-                }`}
-              >
-                <span className="text-lg">🎤</span>
-                <span className="font-medium">Lipsync Studio</span>
-              </button>
-              <button
-                onClick={() => handlePageChange("image-edit")}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
-                  currentPage === "image-edit"
-                    ? "bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg"
-                    : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
-                }`}
-              >
-                <span className="text-lg">🎨</span>
-                <span className="font-medium">Image Edit</span>
-              </button>
-              <button
-                onClick={() => handlePageChange("character-caption")}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
-                  currentPage === "character-caption"
-                    ? "bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg"
-                    : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
-                }`}
-              >
-                <span className="text-lg">📝</span>
-                <span className="font-medium">Character Caption</span>
-              </button>
-              <button
-                onClick={() => handlePageChange("wan-i2v")}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
-                  currentPage === "wan-i2v"
-                    ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg"
-                    : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
-                }`}
-              >
-                <span className="text-lg">🎬</span>
-                <span className="font-medium">WAN I2V</span>
-              </button>
-              <button
-                onClick={() => handlePageChange("wan-move")}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
-                  currentPage === "wan-move"
-                    ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg"
-                    : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
-                }`}
-              >
-                <span className="text-lg">🎯</span>
-                <span className="font-medium">WAN Move</span>
-              </button>
-              <button
-                onClick={() => handlePageChange("ltx2-i2v")}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
-                  currentPage === "ltx2-i2v"
-                    ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg"
-                    : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
-                }`}
-              >
-                <span className="text-lg">🎥</span>
-                <span className="font-medium">LTX2 I2V</span>
-              </button>
-              <button
-                onClick={() => handlePageChange("style-transfer")}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
-                  currentPage === "style-transfer"
-                    ? "bg-gradient-to-r from-orange-500 to-red-600 text-white shadow-lg"
-                    : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
-                }`}
-              >
-                <span className="text-lg">🎨</span>
-                <span className="font-medium">Style Transfer</span>
-              </button>
-              <button
-                onClick={() => handlePageChange("create-image")}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
-                  currentPage === "create-image"
-                    ? "bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg"
-                    : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
-                }`}
-              >
-                <span className="text-lg">✨</span>
-                <span className="font-medium">Create Image</span>
-              </button>
-              <button
-                onClick={() => handlePageChange("lora-trainer")}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
-                  currentPage === "lora-trainer"
-                    ? "bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-lg"
-                    : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
-                }`}
-              >
-                <span className="text-lg">🧠</span>
-                <span className="font-medium">LoRA Trainer</span>
-              </button>
-              <button
-                onClick={() => handlePageChange("image-grid")}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
-                  currentPage === "image-grid"
-                    ? "bg-gradient-to-r from-teal-500 to-cyan-600 text-white shadow-lg"
-                    : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
-                }`}
-              >
-                <span className="text-lg">🖼️</span>
-                <span className="font-medium">Image Grid</span>
-              </button>
-              <button
-                onClick={() => handlePageChange("audio-stem-separator")}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
-                  currentPage === "audio-stem-separator"
-                    ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg"
-                    : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
-                }`}
-              >
-                <span className="text-lg">🎵</span>
-                <span className="font-medium">Audio Stem Separator</span>
-              </button>
-              <button
-                onClick={() => handlePageChange("generation-feed")}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
-                  currentPage === "generation-feed"
-                    ? "bg-gradient-to-r from-pink-500 to-rose-600 text-white shadow-lg"
-                    : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
-                }`}
-              >
-                <span className="text-lg">🖼️</span>
-                <span className="font-medium">Generation Feed</span>
-              </button>
-              {/* Hidden: Image to Image page */}
-              {/* <button
-                onClick={() => handlePageChange("img2img")}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
-                  currentPage === "img2img"
-                    ? "bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg"
-                    : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
-                }`}
-              >
-                <span className="text-lg">🖼️</span>
-                <span className="font-medium">Image to Image</span>
-              </button> */}
+
+              {/* Studio Groups */}
+              <div className="mt-4 pt-4 border-t border-gray-200/50 dark:border-gray-700/50">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-4 mb-3 block">Studios</span>
+                {studios.map((studio) => (
+                  <SidebarGroup
+                    key={studio.id}
+                    studio={studio}
+                    currentPage={currentPage}
+                    isExpanded={expandedStudio === studio.id}
+                    onToggleExpand={() => toggleStudioExpansion(studio.id)}
+                    onNavigate={handlePageChange}
+                  />
+                ))}
+              </div>
+
+              {/* Standalone Pages */}
+              <div className="mt-4 pt-4 border-t border-gray-200/50 dark:border-gray-700/50">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-4 mb-3 block">Tools</span>
+                <button
+                  onClick={() => handlePageChange("history")}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
+                    currentPage === "history"
+                      ? "bg-gradient-to-r from-gray-600 to-slate-700 text-white shadow-lg"
+                      : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                  }`}
+                >
+                  <span className="text-lg">📋</span>
+                  <span className="font-medium">History</span>
+                </button>
+              </div>
 
               {/* External Tools Section */}
               <div className="mt-6 pt-4 border-t border-gray-200/50">
@@ -464,58 +464,55 @@ export default function App() {
               user={user}
             />
           )}
-          {currentPage === "lipsync" && (
-            <div className="w-full max-w-6xl mx-auto p-6">
-              <Lipsync comfyUrl={comfyUrl} />
-            </div>
+
+          {/* Studio Pages */}
+          {currentPage === "lipsync-studio" && (
+            <StudioPage
+              studio={getStudioById("lipsync-studio")!}
+              comfyUrl={comfyUrl}
+            />
           )}
-          {currentPage === "image-edit" && (
-            <div className="w-full max-w-6xl mx-auto p-6">
-              <ImageEdit comfyUrl={comfyUrl} />
-            </div>
+          {currentPage === "image-studio" && (
+            <StudioPage
+              studio={getStudioById("image-studio")!}
+              comfyUrl={comfyUrl}
+            />
           )}
-          {currentPage === "generation-feed" && (
+          {currentPage === "video-studio" && (
+            <StudioPage
+              studio={getStudioById("video-studio")!}
+              comfyUrl={comfyUrl}
+            />
+          )}
+          {currentPage === "audio-studio" && (
+            <StudioPage
+              studio={getStudioById("audio-studio")!}
+              comfyUrl={comfyUrl}
+            />
+          )}
+          {currentPage === "text-studio" && (
+            <StudioPage
+              studio={getStudioById("text-studio")!}
+              comfyUrl={comfyUrl}
+            />
+          )}
+          {currentPage === "lora-studio" && (
+            <StudioPage
+              studio={getStudioById("lora-studio")!}
+              comfyUrl={comfyUrl}
+            />
+          )}
+
+          {/* Standalone Pages */}
+          {currentPage === "history" && (
             <GenerationFeed />
           )}
           {currentPage === "profile-settings" && (
             <ProfileSettings onNavigateBack={() => setCurrentPage("home")} />
           )}
-          {currentPage === "character-caption" && (
-            <div className="w-full max-w-7xl mx-auto p-6">
-              <CharacterCaption comfyUrl={comfyUrl} />
-            </div>
-          )}
-          {currentPage === "wan-i2v" && (
-            <WANI2V comfyUrl={comfyUrl} />
-          )}
-          {currentPage === "wan-move" && (
-            <WANMove comfyUrl={comfyUrl} />
-          )}
-          {currentPage === "style-transfer" && (
-            <StyleTransfer comfyUrl={comfyUrl} />
-          )}
-          {currentPage === "create-image" && (
-            <CreateImage comfyUrl={comfyUrl} />
-          )}
-          {currentPage === "lora-trainer" && (
-            <LoRATrainer />
-          )}
-          {currentPage === "image-grid" && (
-            <ImageGrid comfyUrl={comfyUrl} />
-          )}
-          {currentPage === "audio-stem-separator" && (
-            <AudioStemSeparator comfyUrl={comfyUrl} />
-          )}
-          {currentPage === "ltx2-i2v" && (
-            <LTX2I2V comfyUrl={comfyUrl} />
-          )}
-          {/* Hidden: Image to Image page */}
-          {/* {currentPage === "img2img" && (
-            <Img2Img comfyUrl={comfyUrl} />
-          )} */}
         </main>
       </div>
-      
+
       {/* Console Toggle */}
       <ConsoleToggle comfyUrl={comfyUrl} />
     </div>

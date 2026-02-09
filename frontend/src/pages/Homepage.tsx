@@ -1,119 +1,110 @@
 import { type User } from '../contexts/AuthContext';
+import { studios, standaloneApps, type StudioConfig, type StudioPageType } from '../lib/studioConfig';
 
 interface Props {
-  onNavigate: (page: "lipsync" | "image-edit" | "character-caption" | "wan-i2v" | "wan-move" | "ltx2-i2v" | "style-transfer" | "create-image" | "lora-trainer" | "image-grid" | "audio-stem-separator" | "img2img" | "generation-feed") => void;
+  onNavigate: (page: StudioPageType) => void;
   user: User | null;
 }
 
-export default function Homepage({ onNavigate, user }: Props) {
-  const apps = [
-    {
-      id: "lipsync" as const,
-      title: "Lipsync Studio",
-      description: "Generate realistic talking videos from images or sync audio to existing videos. Supports single person, multi-person, and video lipsync modes.",
-      icon: "🎤",
-      gradient: "from-blue-500 to-purple-600",
-      features: ["1 Person & Multi Person modes", "Video lipsync with timeline", "Model: Multitalk / Infinite Talk with WAN 2.1"]
-    },
-    {
-      id: "image-edit" as const,
-      title: "Image Edit",
-      description: "Edit and enhance images using AI-powered editing with natural language instructions.",
-      icon: "✨",
-      gradient: "from-purple-500 to-pink-600",
-      features: ["AI image editing", "Models: Nano Banana"]
-    },
-    {
-      id: "character-caption" as const,
-      title: "Character Caption",
-      description: "Generate detailed captions for character images to create training datasets for LoRA models.",
-      icon: "📝",
-      gradient: "from-indigo-500 to-purple-600",
-      features: ["AI caption generation", "Batch processing", "Model: JoyCaption Beta 2"]
-    },
-    {
-      id: "wan-i2v" as const,
-      title: "WAN I2V",
-      description: "Transform your images into captivating videos with AI-powered image-to-video generation.",
-      icon: "🎬",
-      gradient: "from-purple-600 to-pink-600",
-      features: ["Image to video generation", "Custom prompts", "Model: WAN I2V"]
-    },
-    {
-      id: "wan-move" as const,
-      title: "WAN Move",
-      description: "Animate objects in your images with custom motion paths. Draw paths to guide movement and add static anchors for stabilization.",
-      icon: "🎯",
-      gradient: "from-cyan-500 to-blue-600",
-      features: ["Custom motion paths", "Static anchors", "Animation preview", "Model: WAN Move"]
-    },
-    {
-      id: "ltx2-i2v" as const,
-      title: "LTX2 I2V",
-      description: "Transform your images into high-quality videos with the LTX2 model. Adjustable strength and duration for precise control.",
-      icon: "🎥",
-      gradient: "from-cyan-500 to-blue-600",
-      features: ["Image to video generation", "Adjustable strength", "Duration presets (3s, 5s, 10s)", "Model: LTX2"]
-    },
-    {
-      id: "style-transfer" as const,
-      title: "Style Transfer",
-      description: "Transfer artistic styles between images using AI. Combine subject and style reference images to create unique artistic combinations.",
-      icon: "🎨",
-      gradient: "from-orange-500 to-red-600",
-      features: ["Dual image input", "Artistic style transfer", "Model: Flux with USO Style Reference"]
-    },
-    {
-      id: "create-image" as const,
-      title: "Create Image",
-      description: "Generate images using Flux or Qwen with custom LoRA models. Add multiple LoRAs with adjustable weights for precise control.",
-      icon: "✨",
-      gradient: "from-indigo-500 to-purple-600",
-      features: ["Multiple LoRA support", "Flux & Qwen models", "Adjustable weights per LoRA"]
-    },
-    {
-      id: "lora-trainer" as const,
-      title: "LoRA Trainer",
-      description: "Train your own custom QWEN Image LoRA models with your datasets. Perfect for creating consistent characters, styles, or objects.",
-      icon: "🧠",
-      gradient: "from-amber-500 to-orange-600",
-      features: ["Custom LoRA training", "Dataset-based", "Advanced parameters", "Model: QWEN Image via Musubi Tuner"]
-    },
-    {
-      id: "image-grid" as const,
-      title: "Image Grid",
-      description: "Generate a 3×3 grid of unique image variations from a single reference. Perfect for product photography and creative exploration.",
-      icon: "🖼️",
-      gradient: "from-teal-500 to-cyan-600",
-      features: ["9 unique angles", "Subject-aware prompts", "Model: Gemini Pro Image"]
-    },
-    {
-      id: "audio-stem-separator" as const,
-      title: "Audio Stem Separator",
-      description: "Separate any audio track into individual stems: vocals, drums, bass, and other instruments using AI-powered audio separation.",
-      icon: "🎵",
-      gradient: "from-green-500 to-emerald-600",
-      features: ["Vocal isolation", "Drum & bass extraction", "Download as ZIP or separate files", "Model: Open Unmix"]
-    },
-    {
-      id: "generation-feed" as const,
-      title: "Generation Feed",
-      description: "View and manage all your AI generations in one place. Browse videos, images, and style transfers with real-time updates.",
-      icon: "📋",
-      gradient: "from-gray-600 to-slate-700",
-      features: ["All generations in one view", "Filter by type", "Real-time progress tracking"]
-    }
-    // Hidden: Image to Image
-    // {
-    //   id: "img2img" as const,
-    //   title: "Image to Image",
-    //   description: "Transform your images with AI-powered modifications. Upload an image and describe the changes you want.",
-    //   icon: "🖼️",
-    //   gradient: "from-purple-500 to-pink-600",
-    //   features: ["Image transformation", "Custom prompts", "Model: Dreamshaper 8"]
-    // }
-  ];
+// Studio Card Component
+function StudioCard({ studio, onClick }: { studio: StudioConfig; onClick: () => void }) {
+  const isComingSoon = studio.comingSoon;
 
+  return (
+    <button
+      onClick={onClick}
+      disabled={isComingSoon}
+      className={`group relative p-8 rounded-3xl bg-white/80 dark:bg-dark-surface-primary/80 backdrop-blur-sm border border-gray-300 dark:border-dark-border-primary/50 shadow-lg hover:shadow-2xl transform hover:scale-[1.02] transition-all duration-300 cursor-pointer overflow-hidden text-left w-full ${
+        isComingSoon ? 'opacity-60 cursor-not-allowed hover:scale-100 hover:shadow-lg' : ''
+      }`}
+    >
+      {/* Background Gradient */}
+      <div className={`absolute inset-0 bg-gradient-to-br ${studio.gradient} opacity-0 ${!isComingSoon ? 'group-hover:opacity-5 dark:group-hover:opacity-10' : ''} transition-opacity duration-300`}></div>
+
+      {/* Content */}
+      <div className="relative z-10">
+        <div className="flex items-start justify-between mb-4">
+          <div className={`w-14 h-14 bg-gradient-to-br ${studio.gradient} rounded-2xl flex items-center justify-center text-2xl shadow-lg ${!isComingSoon ? 'group-hover:scale-110' : ''} transition-transform duration-300`}>
+            {studio.icon}
+          </div>
+          {isComingSoon ? (
+            <div className="px-3 py-1 bg-gray-200 dark:bg-gray-700 rounded-full">
+              <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">Coming Soon</span>
+            </div>
+          ) : (
+            <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+              <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-dark-surface-secondary flex items-center justify-center">
+                <span className="text-gray-600 dark:text-gray-300">→</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <h3 className={`text-2xl font-bold text-gray-900 dark:text-dark-text-primary mb-3 ${!isComingSoon ? 'group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:bg-clip-text group-hover:from-blue-600 group-hover:to-purple-600' : ''} transition-all duration-300`}>
+          {studio.title}
+        </h3>
+
+        <p className="text-gray-600 dark:text-dark-text-secondary mb-6 leading-relaxed">
+          {studio.description}
+        </p>
+
+        {/* App Icons Preview */}
+        {!isComingSoon && studio.apps.length > 0 && (
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex -space-x-2">
+              {studio.apps.slice(0, 4).map((app) => (
+                <div
+                  key={app.id}
+                  className={`w-8 h-8 bg-gradient-to-br ${app.gradient} rounded-lg flex items-center justify-center text-sm shadow-md border-2 border-white dark:border-gray-800`}
+                  title={app.title}
+                >
+                  {app.icon}
+                </div>
+              ))}
+              {studio.apps.length > 4 && (
+                <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center text-xs font-bold text-gray-600 dark:text-gray-300 border-2 border-white dark:border-gray-800">
+                  +{studio.apps.length - 4}
+                </div>
+              )}
+            </div>
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              {studio.apps.length} {studio.apps.length === 1 ? 'app' : 'apps'}
+            </span>
+          </div>
+        )}
+
+        {/* Features list */}
+        {!isComingSoon && studio.apps.length > 0 && (
+          <div className="space-y-2">
+            {studio.apps.slice(0, 3).map((app) => (
+              <div key={app.id} className="flex items-center gap-3 text-sm">
+                <div className={`w-1.5 h-1.5 bg-gradient-to-r ${studio.gradient} rounded-full`}></div>
+                <span className="text-gray-600 dark:text-dark-text-secondary">{app.title}</span>
+              </div>
+            ))}
+            {studio.apps.length > 3 && (
+              <div className="flex items-center gap-3 text-sm">
+                <div className={`w-1.5 h-1.5 bg-gradient-to-r ${studio.gradient} rounded-full`}></div>
+                <span className="text-gray-500 dark:text-gray-400">+{studio.apps.length - 3} more</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {!isComingSoon && (
+          <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-700">
+            <div className={`inline-flex items-center gap-2 text-sm font-medium bg-gradient-to-r ${studio.gradient} bg-clip-text text-transparent`}>
+              <span>Open Studio</span>
+              <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">→</span>
+            </div>
+          </div>
+        )}
+      </div>
+    </button>
+  );
+}
+
+export default function Homepage({ onNavigate, user }: Props) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
       <div className="max-w-7xl mx-auto px-6 py-12">
@@ -157,55 +148,60 @@ export default function Homepage({ onNavigate, user }: Props) {
           )}
         </div>
 
-        {/* Apps Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-8 mb-16">
-          {apps.map((app) => (
-            <div
+        {/* Studios Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-8 mb-8">
+          {studios.map((studio) => (
+            <StudioCard
+              key={studio.id}
+              studio={studio}
+              onClick={() => onNavigate(studio.id as StudioPageType)}
+            />
+          ))}
+        </div>
+
+        {/* Standalone Apps (History) - Full Width */}
+        <div className="mb-16">
+          {standaloneApps.map((app) => (
+            <button
               key={app.id}
-              onClick={() => onNavigate(app.id)}
-              className="group relative p-8 rounded-3xl bg-white/80 dark:bg-dark-surface-primary/80 backdrop-blur-sm border border-gray-300 dark:border-dark-border-primary/50 shadow-lg hover:shadow-2xl transform hover:scale-[1.02] transition-all duration-300 cursor-pointer overflow-hidden"
+              onClick={() => onNavigate(app.id as StudioPageType)}
+              className="group relative w-full p-8 rounded-3xl bg-white/80 dark:bg-dark-surface-primary/80 backdrop-blur-sm border border-gray-300 dark:border-dark-border-primary/50 shadow-lg hover:shadow-2xl transform hover:scale-[1.01] transition-all duration-300 cursor-pointer overflow-hidden text-left"
             >
               {/* Background Gradient */}
               <div className={`absolute inset-0 bg-gradient-to-br ${app.gradient} opacity-0 group-hover:opacity-5 dark:group-hover:opacity-10 transition-opacity duration-300`}></div>
 
-              {/* Content */}
-              <div className="relative z-10">
-                <div className="flex items-start justify-between mb-4">
-                  <div className={`w-14 h-14 bg-gradient-to-br ${app.gradient} rounded-2xl flex items-center justify-center text-2xl shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+              {/* Content - Horizontal Layout for Full Width */}
+              <div className="relative z-10 flex items-center justify-between gap-8">
+                <div className="flex items-center gap-6">
+                  <div className={`w-16 h-16 bg-gradient-to-br ${app.gradient} rounded-2xl flex items-center justify-center text-3xl shadow-lg group-hover:scale-110 transition-transform duration-300`}>
                     {app.icon}
                   </div>
-                  <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-dark-surface-secondary flex items-center justify-center">
-                      <span className="text-gray-600 dark:text-gray-300">→</span>
-                    </div>
+                  <div>
+                    <h3 className="text-3xl font-bold text-gray-900 dark:text-dark-text-primary mb-2 group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:bg-clip-text group-hover:from-blue-600 group-hover:to-purple-600 transition-all duration-300">
+                      {app.title}
+                    </h3>
+                    <p className="text-gray-600 dark:text-dark-text-secondary leading-relaxed max-w-2xl">
+                      {app.description}
+                    </p>
                   </div>
                 </div>
 
-                <h3 className="text-2xl font-bold text-gray-900 dark:text-dark-text-primary mb-3 group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:bg-clip-text group-hover:from-blue-600 group-hover:to-purple-600 transition-all duration-300">
-                  {app.title}
-                </h3>
-
-                <p className="text-gray-600 dark:text-dark-text-secondary mb-6 leading-relaxed">
-                  {app.description}
-                </p>
-
-                <div className="space-y-2">
-                  {app.features.map((feature, index) => (
-                    <div key={index} className="flex items-center gap-3 text-sm">
-                      <div className={`w-1.5 h-1.5 bg-gradient-to-r ${app.gradient} rounded-full`}></div>
-                      <span className="text-gray-600 dark:text-dark-text-secondary">{feature}</span>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-700">
-                  <div className={`inline-flex items-center gap-2 text-sm font-medium bg-gradient-to-r ${app.gradient} bg-clip-text text-transparent`}>
-                    <span>Launch App</span>
-                    <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">→</span>
+                <div className="flex items-center gap-8">
+                  <div className="hidden md:flex items-center gap-4">
+                    {app.features.map((feature, index) => (
+                      <div key={index} className="flex items-center gap-2 text-sm px-4 py-2 bg-gray-100 dark:bg-dark-surface-secondary rounded-xl">
+                        <div className={`w-1.5 h-1.5 bg-gradient-to-r ${app.gradient} rounded-full`}></div>
+                        <span className="text-gray-600 dark:text-dark-text-secondary">{feature}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className={`inline-flex items-center gap-2 text-lg font-medium bg-gradient-to-r ${app.gradient} bg-clip-text text-transparent`}>
+                    <span>View All</span>
+                    <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-2xl">→</span>
                   </div>
                 </div>
               </div>
-            </div>
+            </button>
           ))}
         </div>
 
@@ -217,7 +213,7 @@ export default function Homepage({ onNavigate, user }: Props) {
               Access powerful development and workflow tools to enhance your AI media creation process.
             </p>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto">
             <button
               onClick={() => window.open('https://comfy.vapai.studio', '_blank')}
