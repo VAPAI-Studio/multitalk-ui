@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query, Header
 from typing import Optional
+import httpx
 from models.video_job import (
     CreateVideoJobPayload,
     UpdateVideoJobPayload,
@@ -11,6 +12,7 @@ from models.video_job import (
 from services.video_job_service import VideoJobService
 from services.storage_service import StorageService
 from services.thumbnail_service import ThumbnailService
+from services.google_drive_service import GoogleDriveService
 from core.supabase import get_supabase_for_token
 
 router = APIRouter(prefix="/video-jobs", tags=["video-jobs"])
@@ -38,10 +40,15 @@ async def create_video_job(
 ):
     """Create a new video job."""
     service = get_service(_extract_bearer_token(authorization))
-    success, error = await service.create_job(payload)
+    success, job_id, error = await service.create_job(payload)
 
     if not success:
-        raise HTTPException(status_code=500, detail=error)
+        raise HTTPException(status_code=400 if "Unknown workflow" in (error or "") else 500, detail=error)
+
+    # Fetch the created job to return
+    if job_id:
+        job, _ = await service.get_job(job_id)
+        return VideoJobResponse(success=True, video_job=job, error=None)
 
     return VideoJobResponse(success=True, error=None)
 
@@ -229,6 +236,15 @@ async def complete_video_job(
     storage_service = StorageService()
     thumbnail_service = ThumbnailService()
 
+    # Get job to check for project_id and current status
+    existing_job, _ = await service.get_job_by_comfy_id(job_id)
+    project_id = existing_job.project_id if existing_job else None
+
+    # Skip if job is already completed (prevents duplicate uploads on repeated calls)
+    if existing_job and existing_job.status == 'completed':
+        print(f"[VIDEO_JOBS] Job {job_id} already completed, skipping upload")
+        return VideoJobResponse(success=True, video_job=existing_job, error=None)
+
     # If completing successfully with output URLs, download from ComfyUI and upload to Supabase
     if payload.status == 'completed' and payload.output_video_urls:
         supabase_urls = []
@@ -272,9 +288,50 @@ async def complete_video_job(
                 # Thumbnail generation is non-blocking - log error but continue
                 print(f"[VIDEO_JOBS] Thumbnail generation exception (non-blocking): {str(e)}")
 
-    success, job, error = await service.complete_job(payload)
+        # Upload to Google Drive if project_id is set (non-blocking)
+        if project_id and supabase_urls:
+            try:
+                drive_service = GoogleDriveService()
+
+                # Get or create AI-Videos folder
+                folder_success, ai_folder_id, folder_error = await drive_service.get_or_create_folder(
+                    parent_id=project_id,
+                    folder_name='AI-Videos'
+                )
+
+                if folder_success and ai_folder_id:
+                    print(f"[VIDEO_JOBS] Uploading to Google Drive folder: AI-Videos ({ai_folder_id})")
+
+                    # Download file content from first Supabase URL and upload to Drive
+                    async with httpx.AsyncClient(timeout=120.0) as client:
+                        response = await client.get(supabase_urls[0])
+                        if response.status_code == 200:
+                            file_content = response.content
+                            drive_filename = f"{job_id}.mp4"
+
+                            upload_success, file_id, upload_error = await drive_service.upload_file(
+                                file_content=file_content,
+                                filename=drive_filename,
+                                folder_id=ai_folder_id,
+                                mime_type='video/mp4'
+                            )
+
+                            if upload_success:
+                                print(f"[VIDEO_JOBS] ✅ Video uploaded to Google Drive: {drive_filename}")
+                            else:
+                                print(f"[VIDEO_JOBS] ⚠️ Failed to upload to Google Drive: {upload_error}")
+                        else:
+                            print(f"[VIDEO_JOBS] ⚠️ Failed to download video for Drive upload: {response.status_code}")
+                else:
+                    print(f"[VIDEO_JOBS] ⚠️ Failed to create Drive folder: {folder_error}")
+
+            except Exception as drive_error:
+                # Google Drive upload is non-blocking - log error but continue
+                print(f"[VIDEO_JOBS] ⚠️ Google Drive upload error (non-blocking): {str(drive_error)}")
+
+    success, completed_job, error = await service.complete_job(payload)
 
     if not success:
         raise HTTPException(status_code=404, detail=error)
 
-    return VideoJobResponse(success=True, video_job=job, error=None)
+    return VideoJobResponse(success=True, video_job=completed_job, error=None)

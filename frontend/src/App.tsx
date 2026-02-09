@@ -19,7 +19,9 @@ import ComfyUIStatus from "./components/ComfyUIStatus";
 import ConsoleToggle from "./components/ConsoleToggle";
 import AuthPage from "./components/AuthPage";
 import ThemeToggle from "./components/ThemeToggle";
+import ProjectSelector from "./components/ProjectSelector";
 import { useAuth } from "./contexts/AuthContext";
+import { ProjectProvider } from "./contexts/ProjectContext";
 
 export default function App() {
   const { isAuthenticated, loading, user, logout } = useAuth();
@@ -80,6 +82,7 @@ export default function App() {
   }
 
   return (
+    <ProjectProvider>
     <div className="min-h-screen flex flex-col">
       {/* Header */}
       <header className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-lg border-b border-gray-200/50 dark:border-gray-700/50 sticky top-0 z-20 shadow-sm">
@@ -119,6 +122,9 @@ export default function App() {
                 />
               </div>
               <ComfyUIStatus baseUrl={comfyUrl} />
+
+              {/* Project Selector */}
+              <ProjectSelector />
 
               {/* User Menu */}
               <div className="relative flex items-center gap-3 pl-3 border-l border-gray-200 dark:border-gray-700">
@@ -513,5 +519,6 @@ export default function App() {
       {/* Console Toggle */}
       <ConsoleToggle comfyUrl={comfyUrl} />
     </div>
+    </ProjectProvider>
   );
 }

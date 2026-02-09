@@ -16,10 +16,25 @@ class Settings(BaseSettings):
     
     # Database - Supabase
     SUPABASE_URL: str = ""
-    SUPABASE_KEY: str = ""
+    SUPABASE_KEY: str = ""  # Legacy fallback
+    SUPABASE_SERVICE_ROLE_KEY: str = ""  # For server operations (bypasses RLS)
+    SUPABASE_ANON_KEY: str = ""  # For client operations
 
     # External APIs
     OPENROUTER_API_KEY: str = ""
+
+    # ComfyUI Configuration
+    COMFYUI_SERVER_URL: str = "https://comfy.vapai.studio"
+    COMFY_API_KEY: str = ""
+
+    # Training Configuration (Flux/LoRA)
+    TRAINING_WORKSPACE_DIR: str = "./training_workspace"
+    KOHYA_SS_PATH: str = "/opt/kohya_ss"
+
+    # Google Drive Configuration
+    GOOGLE_DRIVE_CREDENTIALS_FILE: str = ""  # Path to JSON file (dev)
+    GOOGLE_DRIVE_CREDENTIALS_JSON: str = ""  # JSON string (Heroku)
+    GOOGLE_DRIVE_SHARED_DRIVE_ID: str = ""
     
     # Storage Configuration
     STORAGE_BUCKET_VIDEOS: str = "multitalk-videos"
@@ -57,6 +72,16 @@ class Settings(BaseSettings):
         "case_sensitive": True,
         "extra": "ignore"
     }
+
+    @property
+    def supabase_key_resolved(self) -> str:
+        """Get Supabase key with fallback priority: SERVICE_ROLE_KEY > ANON_KEY > KEY"""
+        return self.SUPABASE_SERVICE_ROLE_KEY or self.SUPABASE_ANON_KEY or self.SUPABASE_KEY
+
+    @property
+    def supabase_anon_key_resolved(self) -> str:
+        """Get Supabase anon key with fallback: ANON_KEY > SERVICE_ROLE_KEY > KEY"""
+        return self.SUPABASE_ANON_KEY or self.SUPABASE_SERVICE_ROLE_KEY or self.SUPABASE_KEY
 
 # Global settings instance
 settings = Settings()

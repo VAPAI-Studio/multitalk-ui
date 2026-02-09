@@ -3,6 +3,8 @@ import { startJobMonitoring, checkComfyUIHealth } from "../components/utils";
 import ResizableFeedSidebar from "../components/ResizableFeedSidebar";
 import { useSmartResolution } from "../hooks/useSmartResolution";
 import { apiClient } from "../lib/apiClient";
+import { useAuth } from "../contexts/AuthContext";
+import { useProject } from "../contexts/ProjectContext";
 
 // UI Components
 function Label({ children, className }: { children: React.ReactNode; className?: string }) {
@@ -79,6 +81,10 @@ const DURATION_PRESETS = [
 ];
 
 export default function LTX2I2V({ comfyUrl }: Props) {
+  // Auth context
+  const { user } = useAuth();
+  const { selectedProject } = useProject();
+
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
   const [imageAR, setImageAR] = useState<number | null>(null);
@@ -259,6 +265,7 @@ export default function LTX2I2V({ comfyUrl }: Props) {
 
       // Create job record
       await apiClient.createVideoJob({
+        user_id: user?.id || null,
         comfy_job_id: id,
         workflow_name: 'ltx2-i2v',
         comfy_url: comfyUrl,
@@ -267,6 +274,7 @@ export default function LTX2I2V({ comfyUrl }: Props) {
         height,
         fps: 24,
         duration_seconds: duration,
+        project_id: selectedProject?.id || null,
         parameters: {
           prompt: customPrompt,
           strength: strength

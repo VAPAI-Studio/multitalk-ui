@@ -1,12 +1,12 @@
-import os
 import httpx
 import asyncio
 from typing import Tuple, Optional, Dict, Any
 from models.comfyui import ComfyUIStatus, QueueStatus, SystemStats, SystemInfo, SystemDevice
+from config.settings import settings
 
 class ComfyUIService:
     def __init__(self):
-        self.default_url = os.getenv("COMFYUI_SERVER_URL", "https://comfy.vapai.studio")
+        self.default_url = settings.COMFYUI_SERVER_URL
     
     async def get_status(self, base_url: Optional[str] = None) -> Tuple[bool, Optional[ComfyUIStatus], Optional[str]]:
         """Get ComfyUI status including queue and system stats"""

@@ -3,6 +3,7 @@ import { createJob, updateJobToProcessing, completeJob } from "./lib/jobTracking
 import { findImageFromHistory } from "./components/utils";
 import GenerationFeed from "./components/GenerationFeed";
 import { apiClient } from "./lib/apiClient";
+import { useProject } from "./contexts/ProjectContext";
 
 // UI Components
 function Label({ children, className }: { children: React.ReactNode; className?: string }) {
@@ -30,6 +31,7 @@ interface Props {
 }
 
 export default function Img2Img({ comfyUrl }: Props) {
+  const { selectedProject } = useProject();
   const [inputImage, setInputImage] = useState<File | null>(null);
   const [prompt, setPrompt] = useState<string>("photograph of victorian woman with wings, sky clouds, meadow grass");
 
@@ -116,7 +118,8 @@ export default function Img2Img({ comfyUrl }: Props) {
         audio_filename: undefined,
         width: 512,  // Default width for img2img
         height: 512, // Default height for img2img
-        trim_to_audio: false
+        trim_to_audio: false,
+        project_id: selectedProject?.id
       });
 
       await updateJobToProcessing(id);
@@ -152,7 +155,7 @@ export default function Img2Img({ comfyUrl }: Props) {
 
             await completeJob({
               job_id: id,
-              status: 'error',
+              status: 'failed',
               error_message: errorMsg
             }).catch(() => {});
 
@@ -184,9 +187,7 @@ export default function Img2Img({ comfyUrl }: Props) {
               await completeJob({
                 job_id: id,
                 status: 'completed',
-                filename: imageInfo.filename,
-                subfolder: imageInfo.subfolder || undefined,
-                comfy_url: comfyUrl
+                output_image_urls: [url]
               }).catch(() => {});
             } else {
               setStatus("❌ ComfyUI completed but no image output found");
@@ -210,7 +211,7 @@ export default function Img2Img({ comfyUrl }: Props) {
           setIsSubmitting(false);
           await completeJob({
             job_id: id,
-            status: 'error',
+            status: 'failed',
             error_message: 'Timeout'
           }).catch(() => {});
           return 'stop';
@@ -232,7 +233,7 @@ export default function Img2Img({ comfyUrl }: Props) {
       if (jobId) {
         await completeJob({
           job_id: jobId,
-          status: 'error',
+          status: 'failed',
           error_message: error.message || 'Unknown error'
         }).catch(() => { });
       }

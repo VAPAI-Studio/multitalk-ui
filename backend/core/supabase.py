@@ -1,6 +1,7 @@
 from supabase import create_client, Client
-import os
 from typing import Optional
+
+from config.settings import settings
 
 try:
     from supabase.client import ClientOptions
@@ -9,13 +10,13 @@ except Exception:
 
 class SupabaseClient:
     _instance: Optional[Client] = None
-    
+
     @classmethod
     def get_client(cls) -> Client:
         if cls._instance is None:
-            supabase_url = os.getenv("SUPABASE_URL")
-            # Prefer SERVICE_ROLE_KEY to bypass RLS, fallback to ANON_KEY, then SUPABASE_KEY
-            supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_KEY")
+            supabase_url = settings.SUPABASE_URL
+            # Use helper property for key resolution with fallback priority
+            supabase_key = settings.supabase_key_resolved
 
             if not supabase_url or not supabase_key:
                 raise ValueError("SUPABASE_URL and (SUPABASE_SERVICE_ROLE_KEY or SUPABASE_ANON_KEY) must be set in environment variables")
@@ -26,8 +27,8 @@ class SupabaseClient:
 
     @classmethod
     def create_authed_client(cls, access_token: str) -> Client:
-        supabase_url = os.getenv("SUPABASE_URL")
-        supabase_key = os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
+        supabase_url = settings.SUPABASE_URL
+        supabase_key = settings.supabase_anon_key_resolved
 
         if not supabase_url or not supabase_key:
             raise ValueError("SUPABASE_URL and (SUPABASE_ANON_KEY or SUPABASE_SERVICE_ROLE_KEY) must be set in environment variables")

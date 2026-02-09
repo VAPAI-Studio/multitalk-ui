@@ -4,10 +4,11 @@ import ResizableFeedSidebar from "../components/ResizableFeedSidebar";
 import { useSmartResolution } from "../hooks/useSmartResolution";
 import { apiClient } from "../lib/apiClient";
 import { useAuth } from "../contexts/AuthContext";
+import { useProject } from "../contexts/ProjectContext";
 
 // UI Components
 function Label({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <label className={className || "block text-sm font-semibold text-gray-800 mb-2"}>{children}</label>;
+  return <label className={className || "block text-sm font-semibold text-gray-800 dark:text-dark-text-primary mb-2"}>{children}</label>;
 }
 
 function Field({ children }: { children: React.ReactNode }) {
@@ -16,8 +17,8 @@ function Field({ children }: { children: React.ReactNode }) {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-3xl border border-gray-200/80 p-6 md:p-8 shadow-lg bg-gradient-to-br from-white to-gray-50/50 backdrop-blur-sm">
-      <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+    <div className="rounded-3xl border border-gray-200/80 dark:border-dark-border-primary p-6 md:p-8 shadow-lg bg-gradient-to-br from-white to-gray-50/50 dark:from-dark-surface-primary dark:to-dark-surface-primary backdrop-blur-sm">
+      <h2 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-dark-text-primary mb-6 flex items-center gap-3">
         <div className="w-2 h-8 bg-gradient-to-b from-purple-500 to-pink-600 rounded-full"></div>
         {title}
       </h2>
@@ -79,6 +80,7 @@ interface Props {
 export default function WANI2V({ comfyUrl }: Props) {
   // Auth context
   const { user } = useAuth();
+  const { selectedProject } = useProject();
 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
@@ -281,6 +283,7 @@ export default function WANI2V({ comfyUrl }: Props) {
         height,
         fps: 24,
         duration_seconds: duration,
+        project_id: selectedProject?.id || null,
         parameters: {
           prompt: customPrompt
         }
@@ -360,7 +363,7 @@ export default function WANI2V({ comfyUrl }: Props) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-indigo-50">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
       <div className="flex gap-6 p-6 md:p-10">
         {/* Main Content */}
         <div className="flex-1 max-w-4xl space-y-8">
@@ -369,7 +372,7 @@ export default function WANI2V({ comfyUrl }: Props) {
             <h1 className="text-4xl md:text-6xl font-bold bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 bg-clip-text text-transparent">
               WAN I2V
             </h1>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
               Transform your images into captivating videos with AI-powered image-to-video generation
             </p>
           </div>
@@ -382,11 +385,11 @@ export default function WANI2V({ comfyUrl }: Props) {
                 type="file"
                 accept="image/*"
                 onChange={(e) => setImageFile(e.target.files?.[0] || null)}
-                className="w-full p-3 border-2 border-dashed border-purple-300 rounded-2xl bg-purple-50 hover:bg-purple-100 transition-colors cursor-pointer"
+                className="w-full p-3 border-2 border-dashed border-purple-300 dark:border-purple-700 rounded-2xl bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors cursor-pointer dark:text-dark-text-secondary"
               />
             </Field>
             {imagePreview && (
-              <div className="mt-4 p-4 border-2 border-purple-200 rounded-2xl bg-white">
+              <div className="mt-4 p-4 border-2 border-purple-200 dark:border-purple-800 rounded-2xl bg-white dark:bg-dark-surface-secondary">
                 <img
                   ref={imgRef}
                   src={imagePreview}
@@ -410,7 +413,7 @@ export default function WANI2V({ comfyUrl }: Props) {
                 value={customPrompt}
                 onChange={(e) => setCustomPrompt(e.target.value)}
                 placeholder="e.g., a beautiful scene transforming through time, day turning into night, flowers blooming..."
-                className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 focus:border-purple-500 focus:outline-none transition-colors min-h-[100px] resize-vertical"
+                className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 dark:border-dark-border-primary dark:bg-dark-surface-secondary dark:text-dark-text-primary focus:border-purple-500 focus:outline-none transition-colors min-h-[100px] resize-vertical"
               />
             </Field>
           </Section>
@@ -424,7 +427,7 @@ export default function WANI2V({ comfyUrl }: Props) {
                   type="number"
                   value={widthInput}
                   onChange={(e) => handleWidthChange(e.target.value)}
-                  className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 focus:border-purple-500 focus:outline-none transition-colors"
+                  className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 dark:border-dark-border-primary dark:bg-dark-surface-secondary dark:text-dark-text-primary focus:border-purple-500 focus:outline-none transition-colors"
                   step="32"
                   min="64"
                   max="1024"
@@ -437,7 +440,7 @@ export default function WANI2V({ comfyUrl }: Props) {
                   type="number"
                   value={heightInput}
                   onChange={(e) => handleHeightChange(e.target.value)}
-                  className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 focus:border-purple-500 focus:outline-none transition-colors"
+                  className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 dark:border-dark-border-primary dark:bg-dark-surface-secondary dark:text-dark-text-primary focus:border-purple-500 focus:outline-none transition-colors"
                   step="32"
                   min="64"
                   max="1024"
@@ -475,7 +478,7 @@ export default function WANI2V({ comfyUrl }: Props) {
                       setDuration(val);
                     }
                   }}
-                  className="w-24 px-3 py-2 rounded-xl border-2 border-gray-200 focus:border-purple-500 focus:outline-none transition-colors"
+                  className="w-24 px-3 py-2 rounded-xl border-2 border-gray-200 dark:border-dark-border-primary dark:bg-dark-surface-secondary dark:text-dark-text-primary focus:border-purple-500 focus:outline-none transition-colors"
                 />
               </div>
               <p className="text-xs text-gray-500 mt-1">

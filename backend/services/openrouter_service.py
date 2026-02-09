@@ -1,10 +1,10 @@
-import os
 import httpx
 from typing import Tuple, Optional
+from config.settings import settings
 
 class OpenRouterService:
     def __init__(self):
-        self.api_key = os.getenv("OPENROUTER_API_KEY")
+        self.api_key = settings.OPENROUTER_API_KEY
         self.base_url = "https://openrouter.ai/api/v1"
         
     async def edit_image(self, image_data: str, prompt: str) -> Tuple[bool, Optional[str], Optional[str]]:

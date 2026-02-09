@@ -2,49 +2,40 @@ from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime
 
-JobStatus = Literal['pending', 'processing', 'completed', 'failed']
+JobStatus = Literal['pending', 'processing', 'completed', 'failed', 'cancelled']
 
 class ImageJob(BaseModel):
     """Model for image generation jobs (img2img, style-transfer, image-edit, etc.)"""
     id: str = Field(..., description="Primary key UUID")
-    user_id: Optional[str] = Field(None, description="User ID from auth.users")
-
-    # Workflow identification
-    workflow_name: str = Field(..., description="Workflow type: img2img, style-transfer, image-edit")
+    user_id: str = Field(..., description="User ID from auth.users (REQUIRED)")
+    workflow_id: int = Field(..., description="Foreign key to workflows table")
 
     # Status tracking
     status: JobStatus = Field(..., description="Current job status")
     created_at: datetime = Field(..., description="When job was created")
-    started_at: Optional[datetime] = Field(None, description="When processing started")
-    completed_at: Optional[datetime] = Field(None, description="When job completed")
-    processing_time_seconds: Optional[int] = Field(None, description="Processing duration")
 
-    # Common image inputs
+    # Inputs
     input_image_urls: Optional[List[str]] = Field(None, description="Input image URLs (source, style, etc.)")
     prompt: Optional[str] = Field(None, description="Text prompt for generation/editing")
+    parameters: Dict[str, Any] = Field(default_factory=dict, description="Workflow-specific params (JSONB)")
 
-    # Common image outputs
+    # Outputs
     output_image_urls: Optional[List[str]] = Field(None, description="Output image URLs (Supabase Storage)")
     width: Optional[int] = Field(None, description="Image width in pixels")
     height: Optional[int] = Field(None, description="Image height in pixels")
 
-    # Feature-specific parameters
-    parameters: Dict[str, Any] = Field(default_factory=dict, description="Workflow-specific params (JSONB)")
-
     # ComfyUI integration
     comfy_job_id: Optional[str] = Field(None, description="ComfyUI prompt ID")
     comfy_url: str = Field(..., description="ComfyUI server URL")
-    comfyui_output_filename: Optional[str] = Field(None, description="Output filename from ComfyUI")
-    comfyui_output_subfolder: Optional[str] = Field(None, description="Output subfolder from ComfyUI")
-    comfyui_output_type: str = Field(default='output', description="Output type from ComfyUI")
+
+    # Google Drive integration
+    project_id: Optional[str] = Field(None, description="Google Drive folder ID for saving outputs")
 
     # Error handling
     error_message: Optional[str] = Field(None, description="Error message if failed")
 
-    # Metadata
-    model_used: Optional[str] = Field(None, description="AI model used (Dreamshaper, Flux, etc.)")
-    user_ip: Optional[str] = Field(None, description="User IP for anonymous tracking")
-    updated_at: Optional[datetime] = Field(None, description="Last update timestamp")
+    # Denormalized workflow name for convenience (populated by service)
+    workflow_name: Optional[str] = Field(None, description="Workflow name (denormalized from workflows table)")
 
     class Config:
         json_encoders = {
@@ -54,8 +45,8 @@ class ImageJob(BaseModel):
 
 class CreateImageJobPayload(BaseModel):
     """Payload for creating a new image job"""
-    user_id: Optional[str] = None
-    workflow_name: str
+    user_id: str  # REQUIRED
+    workflow_name: str  # Will be converted to workflow_id by service
     comfy_url: str
     comfy_job_id: Optional[str] = None
 
@@ -70,27 +61,18 @@ class CreateImageJobPayload(BaseModel):
     # Workflow-specific parameters
     parameters: Dict[str, Any] = Field(default_factory=dict)
 
-    # Metadata
-    model_used: Optional[str] = None
-    user_ip: Optional[str] = None
+    # Google Drive integration
+    project_id: Optional[str] = None
 
 
 class UpdateImageJobPayload(BaseModel):
     """Payload for updating an image job"""
     status: Optional[JobStatus] = None
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
-    processing_time_seconds: Optional[int] = None
 
     # Outputs
     output_image_urls: Optional[List[str]] = None
     width: Optional[int] = None
     height: Optional[int] = None
-
-    # ComfyUI output info
-    comfyui_output_filename: Optional[str] = None
-    comfyui_output_subfolder: Optional[str] = None
-    comfyui_output_type: Optional[str] = None
 
     # Error handling
     error_message: Optional[str] = None
@@ -103,9 +85,6 @@ class CompleteImageJobPayload(BaseModel):
 
     # Output information
     output_image_urls: Optional[List[str]] = None
-    comfyui_output_filename: Optional[str] = None
-    comfyui_output_subfolder: Optional[str] = None
-    comfyui_output_type: Optional[str] = None
 
     # Image metadata
     width: Optional[int] = None
@@ -133,6 +112,6 @@ class ImageJobListResponse(BaseModel):
 class ImageJobFeedResponse(BaseModel):
     """Response for feed endpoint - lightweight job data for display"""
     success: bool
-    image_jobs: List[Dict[str, Any]] = []  # Named image_jobs for frontend compatibility
+    image_jobs: List[Dict[str, Any]] = []
     total_count: int = 0
     error: Optional[str] = None

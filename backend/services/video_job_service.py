@@ -29,18 +29,77 @@ def _parse_parameters(params) -> Dict[str, Any]:
 class VideoJobService:
     """Service for managing video generation jobs in the video_jobs table."""
 
+    # Cache for workflow lookups
+    _workflow_cache: Dict[str, int] = {}
+    _workflow_name_cache: Dict[int, str] = {}
+
     def __init__(self, supabase: Optional[Client] = None):
         self.supabase = supabase or get_supabase()
 
-    async def create_job(self, payload: CreateVideoJobPayload) -> Tuple[bool, Optional[str]]:
+    async def _get_workflow_id(self, workflow_name: str) -> Optional[int]:
+        """Get workflow_id from workflow_name, with caching."""
+        if workflow_name in self._workflow_cache:
+            return self._workflow_cache[workflow_name]
+
+        try:
+            result = self.supabase.table("workflows") \
+                .select("id") \
+                .eq("name", workflow_name) \
+                .single() \
+                .execute()
+
+            if result.data:
+                workflow_id = result.data["id"]
+                self._workflow_cache[workflow_name] = workflow_id
+                self._workflow_name_cache[workflow_id] = workflow_name
+                return workflow_id
+            return None
+        except Exception:
+            return None
+
+    async def _get_workflow_name(self, workflow_id: int) -> Optional[str]:
+        """Get workflow_name from workflow_id, with caching."""
+        if workflow_id in self._workflow_name_cache:
+            return self._workflow_name_cache[workflow_id]
+
+        try:
+            result = self.supabase.table("workflows") \
+                .select("name") \
+                .eq("id", workflow_id) \
+                .single() \
+                .execute()
+
+            if result.data:
+                workflow_name = result.data["name"]
+                self._workflow_name_cache[workflow_id] = workflow_name
+                self._workflow_cache[workflow_name] = workflow_id
+                return workflow_name
+            return None
+        except Exception:
+            return None
+
+    def _enrich_job_with_workflow_name(self, job_data: Dict) -> Dict:
+        """Add workflow_name to job data if workflow_id exists."""
+        if "workflow_id" in job_data and job_data["workflow_id"]:
+            workflow_id = job_data["workflow_id"]
+            if workflow_id in self._workflow_name_cache:
+                job_data["workflow_name"] = self._workflow_name_cache[workflow_id]
+        return job_data
+
+    async def create_job(self, payload: CreateVideoJobPayload) -> Tuple[bool, Optional[str], Optional[str]]:
         """
         Create a new video job record.
-        Returns: (success, error_message)
+        Returns: (success, job_id, error_message)
         """
         try:
+            # Lookup workflow_id from workflow_name
+            workflow_id = await self._get_workflow_id(payload.workflow_name)
+            if not workflow_id:
+                return False, None, f"Unknown workflow: {payload.workflow_name}"
+
             job_data = {
                 "user_id": payload.user_id,
-                "workflow_name": payload.workflow_name,
+                "workflow_id": workflow_id,
                 "status": "pending",
                 "comfy_url": payload.comfy_url,
                 "comfy_job_id": payload.comfy_job_id,
@@ -50,6 +109,7 @@ class VideoJobService:
                 "width": payload.width,
                 "height": payload.height,
                 "parameters": payload.parameters,
+                "project_id": payload.project_id,
             }
 
             # Add fps and duration_seconds if provided
@@ -64,12 +124,13 @@ class VideoJobService:
             result = self.supabase.table("video_jobs").insert(job_data).execute()
 
             if result.data:
-                return True, None
+                job_id = result.data[0].get("id")
+                return True, job_id, None
             else:
-                return False, "Failed to create video job"
+                return False, None, "Failed to create video job"
 
         except Exception as e:
-            return False, str(e)
+            return False, None, str(e)
 
     async def update_job(self, job_id: str, payload: UpdateVideoJobPayload) -> Tuple[bool, Optional[str]]:
         """
@@ -83,12 +144,21 @@ class VideoJobService:
                 update_data["status"] = payload.status
             if payload.output_video_urls:
                 update_data["output_video_urls"] = payload.output_video_urls
+            if payload.thumbnail_url:
+                update_data["thumbnail_url"] = payload.thumbnail_url
             if payload.error_message is not None:
                 update_data["error_message"] = payload.error_message
-            if payload.parameters:
-                update_data["parameters"] = payload.parameters
+            if payload.width is not None:
+                update_data["width"] = payload.width
+            if payload.height is not None:
+                update_data["height"] = payload.height
+            if payload.fps is not None:
+                update_data["fps"] = payload.fps
+            if payload.duration_seconds is not None:
+                update_data["duration_seconds"] = payload.duration_seconds
 
-            update_data["updated_at"] = datetime.utcnow().isoformat()
+            if not update_data:
+                return True, None  # Nothing to update
 
             result = self.supabase.table("video_jobs") \
                 .update(update_data) \
@@ -110,10 +180,7 @@ class VideoJobService:
         """
         try:
             result = self.supabase.table("video_jobs") \
-                .update({
-                    "status": "processing",
-                    "updated_at": datetime.utcnow().isoformat()
-                }) \
+                .update({"status": "processing"}) \
                 .eq("comfy_job_id", job_id) \
                 .execute()
 
@@ -133,7 +200,6 @@ class VideoJobService:
         try:
             update_data = {
                 "status": payload.status,
-                "updated_at": datetime.utcnow().isoformat()
             }
 
             if payload.output_video_urls:
@@ -144,6 +210,12 @@ class VideoJobService:
                 update_data["duration_seconds"] = payload.duration_seconds
             if payload.thumbnail_url:
                 update_data["thumbnail_url"] = payload.thumbnail_url
+            if payload.width is not None:
+                update_data["width"] = payload.width
+            if payload.height is not None:
+                update_data["height"] = payload.height
+            if payload.fps is not None:
+                update_data["fps"] = payload.fps
 
             result = self.supabase.table("video_jobs") \
                 .update(update_data) \
@@ -151,7 +223,9 @@ class VideoJobService:
                 .execute()
 
             if result.data:
-                job = VideoJob(**result.data[0])
+                job_data = self._enrich_job_with_workflow_name(result.data[0])
+                job_data['parameters'] = _parse_parameters(job_data.get('parameters'))
+                job = VideoJob(**job_data)
                 return True, job, None
             else:
                 return False, None, "Job not found"
@@ -166,14 +240,18 @@ class VideoJobService:
         """
         try:
             result = self.supabase.table("video_jobs") \
-                .select("id, user_id, workflow_name, status, comfy_url, comfy_job_id, input_image_urls, input_audio_urls, input_video_urls, output_video_urls, width, height, fps, duration_seconds, parameters, error_message, thumbnail_url, created_at, updated_at") \
+                .select("*") \
                 .eq("id", job_id) \
                 .single() \
                 .execute()
 
             if result.data:
-                result.data['parameters'] = _parse_parameters(result.data.get('parameters'))
-                job = VideoJob(**result.data)
+                job_data = result.data
+                # Get workflow name
+                if job_data.get("workflow_id"):
+                    job_data["workflow_name"] = await self._get_workflow_name(job_data["workflow_id"])
+                job_data['parameters'] = _parse_parameters(job_data.get('parameters'))
+                job = VideoJob(**job_data)
                 return job, None
             else:
                 return None, "Job not found"
@@ -188,14 +266,18 @@ class VideoJobService:
         """
         try:
             result = self.supabase.table("video_jobs") \
-                .select("id, user_id, workflow_name, status, comfy_url, comfy_job_id, input_image_urls, input_audio_urls, input_video_urls, output_video_urls, width, height, fps, duration_seconds, parameters, error_message, thumbnail_url, created_at, updated_at") \
+                .select("*") \
                 .eq("comfy_job_id", comfy_job_id) \
                 .single() \
                 .execute()
 
             if result.data:
-                result.data['parameters'] = _parse_parameters(result.data.get('parameters'))
-                job = VideoJob(**result.data)
+                job_data = result.data
+                # Get workflow name
+                if job_data.get("workflow_id"):
+                    job_data["workflow_name"] = await self._get_workflow_name(job_data["workflow_id"])
+                job_data['parameters'] = _parse_parameters(job_data.get('parameters'))
+                job = VideoJob(**job_data)
                 return job, None
             else:
                 return None, "Job not found"
@@ -215,13 +297,13 @@ class VideoJobService:
         Returns: (jobs, total_count, error_message)
         """
         try:
-            # Use specific columns instead of * for better performance
-            columns = "id, user_id, workflow_name, status, comfy_url, comfy_job_id, input_image_urls, input_audio_urls, input_video_urls, output_video_urls, width, height, fps, duration_seconds, parameters, error_message, thumbnail_url, created_at, updated_at"
-            query = self.supabase.table("video_jobs").select(columns, count="exact")
+            query = self.supabase.table("video_jobs").select("*", count="exact")
 
             # Apply filters
             if workflow_name:
-                query = query.eq("workflow_name", workflow_name)
+                workflow_id = await self._get_workflow_id(workflow_name)
+                if workflow_id:
+                    query = query.eq("workflow_id", workflow_id)
             if user_id:
                 query = query.eq("user_id", user_id)
 
@@ -231,11 +313,14 @@ class VideoJobService:
 
             result = query.execute()
 
-            # Parse parameters field (may be JSON string or dict)
+            # Parse and enrich jobs
             jobs = []
-            for job in result.data:
-                job['parameters'] = _parse_parameters(job.get('parameters'))
-                jobs.append(VideoJob(**job))
+            for job_data in result.data:
+                if job_data.get("workflow_id"):
+                    job_data["workflow_name"] = await self._get_workflow_name(job_data["workflow_id"])
+                job_data['parameters'] = _parse_parameters(job_data.get('parameters'))
+                jobs.append(VideoJob(**job_data))
+
             total_count = result.count if result.count is not None else len(jobs)
 
             return jobs, total_count, None
@@ -255,16 +340,16 @@ class VideoJobService:
         Returns: (jobs, total_count, error_message)
         """
         try:
-            # Use specific columns instead of * for better performance
-            columns = "id, user_id, workflow_name, status, comfy_url, comfy_job_id, input_image_urls, input_audio_urls, input_video_urls, output_video_urls, width, height, fps, duration_seconds, parameters, error_message, thumbnail_url, created_at, updated_at"
-            query = self.supabase.table("video_jobs").select(columns, count="exact")
+            query = self.supabase.table("video_jobs").select("*", count="exact")
 
             # Filter for completed jobs only
             query = query.eq("status", "completed")
 
             # Apply additional filters
             if workflow_name:
-                query = query.eq("workflow_name", workflow_name)
+                workflow_id = await self._get_workflow_id(workflow_name)
+                if workflow_id:
+                    query = query.eq("workflow_id", workflow_id)
             if user_id:
                 query = query.eq("user_id", user_id)
 
@@ -274,112 +359,20 @@ class VideoJobService:
 
             result = query.execute()
 
-            # Parse parameters field (may be JSON string or dict)
+            # Parse and enrich jobs
             jobs = []
-            for job in result.data:
-                job['parameters'] = _parse_parameters(job.get('parameters'))
-                jobs.append(VideoJob(**job))
+            for job_data in result.data:
+                if job_data.get("workflow_id"):
+                    job_data["workflow_name"] = await self._get_workflow_name(job_data["workflow_id"])
+                job_data['parameters'] = _parse_parameters(job_data.get('parameters'))
+                jobs.append(VideoJob(**job_data))
+
             total_count = result.count if result.count is not None else len(jobs)
 
             return jobs, total_count, None
 
         except Exception as e:
             return [], 0, str(e)
-
-    async def get_recent_jobs_feed(
-        self,
-        limit: int = 50,
-        offset: int = 0,
-        workflow_name: Optional[str] = None,
-        user_id: Optional[str] = None
-    ) -> Tuple[List[Dict], Optional[str]]:
-        """
-        Get recent video jobs for feed display (optimized - no count, minimal columns).
-        Also includes legacy jobs from the 'jobs' table for backward compatibility.
-        Returns: (jobs_dict_list, error_message)
-        """
-        try:
-            all_jobs = []
-
-            # 1. Fetch from video_jobs (new table)
-            feed_columns = "id, status, created_at, workflow_name, output_video_urls, width, height, comfy_job_id, error_message, thumbnail_url"
-            query = self.supabase.table("video_jobs").select(feed_columns)
-
-            if workflow_name:
-                query = query.eq("workflow_name", workflow_name)
-            if user_id:
-                query = query.eq("user_id", user_id)
-
-            query = query.order("created_at", desc=True).range(0, limit * 2 - 1)  # Fetch more for merging
-            result = query.execute()
-            all_jobs.extend(result.data or [])
-
-            # 2. Fetch from legacy 'jobs' table and map to expected format
-            legacy_columns = "job_id, status, created_at, video_url, width, height, error_message"
-            legacy_query = self.supabase.table("multitalk_jobs").select(legacy_columns)
-            legacy_query = legacy_query.order("created_at", desc=True).range(0, limit * 2 - 1)
-            legacy_result = legacy_query.execute()
-
-            for job in (legacy_result.data or []):
-                # Map legacy job to new format
-                mapped_job = {
-                    "id": job.get("job_id"),
-                    "status": job.get("status"),
-                    "created_at": job.get("created_at"),
-                    "workflow_name": "legacy",  # Mark as legacy
-                    "output_video_urls": [job.get("video_url")] if job.get("video_url") else None,
-                    "width": job.get("width"),
-                    "height": job.get("height"),
-                    "comfy_job_id": job.get("job_id"),
-                    "error_message": job.get("error_message"),
-                    "thumbnail_url": None
-                }
-                all_jobs.append(mapped_job)
-
-            # 3. Sort by created_at descending and apply pagination
-            all_jobs.sort(key=lambda x: x.get("created_at", ""), reverse=True)
-            paginated = all_jobs[offset:offset + limit]
-
-            return paginated, None
-
-        except Exception as e:
-            return [], str(e)
-
-    async def get_completed_jobs_feed(
-        self,
-        limit: int = 50,
-        offset: int = 0,
-        workflow_name: Optional[str] = None,
-        user_id: Optional[str] = None
-    ) -> Tuple[List[Dict], Optional[str]]:
-        """
-        Get completed video jobs for feed display (optimized - no count, minimal columns).
-        Returns: (jobs_dict_list, error_message)
-        """
-        try:
-            # Select only columns needed for feed display
-            feed_columns = "id, status, created_at, workflow_name, output_video_urls, width, height, comfy_job_id, error_message, thumbnail_url"
-
-            query = self.supabase.table("video_jobs").select(feed_columns)  # No count
-
-            # Filter for completed jobs only
-            query = query.eq("status", "completed")
-
-            # Apply additional filters
-            if workflow_name:
-                query = query.eq("workflow_name", workflow_name)
-            if user_id:
-                query = query.eq("user_id", user_id)
-
-            # Order and paginate
-            query = query.order("created_at", desc=True).range(offset, offset + limit - 1)
-
-            result = query.execute()
-
-            return result.data or [], None
-
-        except Exception as e:
-            return [], str(e)
 
     async def get_feed_jobs(
         self,
@@ -390,29 +383,20 @@ class VideoJobService:
         status: Optional[str] = None
     ) -> Tuple[List[Dict], int, Optional[str]]:
         """
-        Optimized feed query with server-side caching.
-        Returns minimal columns needed for feed display.
-        Cached for 10 seconds to reduce database load.
-
+        Optimized feed query - returns minimal columns needed for display.
         Returns: (jobs_dict_list, total_count, error_message)
         """
-        from core.cache import get_cached, set_cached, make_feed_cache_key
-
-        # Check cache first
-        cache_key = make_feed_cache_key("video_jobs", user_id, workflow_name, status, limit, offset)
-        cached = get_cached(cache_key)
-        if cached is not None:
-            return cached
-
         try:
-            # Minimal columns for feed display (no parameters, no input URLs)
-            feed_columns = "id, status, created_at, workflow_name, output_video_urls, thumbnail_url, comfy_job_id, error_message"
+            # Join with workflows to get workflow_name
+            feed_columns = "id, status, created_at, workflow_id, output_video_urls, thumbnail_url, comfy_job_id, error_message, width, height"
 
             query = self.supabase.table("video_jobs").select(feed_columns, count="exact")
 
             # Apply filters
             if workflow_name:
-                query = query.eq("workflow_name", workflow_name)
+                workflow_id = await self._get_workflow_id(workflow_name)
+                if workflow_id:
+                    query = query.eq("workflow_id", workflow_id)
             if user_id:
                 query = query.eq("user_id", user_id)
             if status:
@@ -424,12 +408,34 @@ class VideoJobService:
             result = query.execute()
             total_count = result.count if result.count is not None else len(result.data or [])
 
-            response = (result.data or [], total_count, None)
+            # Enrich with workflow names
+            jobs = []
+            for job_data in (result.data or []):
+                if job_data.get("workflow_id"):
+                    job_data["workflow_name"] = await self._get_workflow_name(job_data["workflow_id"])
+                jobs.append(job_data)
 
-            # Cache the result
-            set_cached(cache_key, response)
-
-            return response
+            return jobs, total_count, None
 
         except Exception as e:
             return [], 0, str(e)
+
+    async def delete_job(self, job_id: str, user_id: str) -> Tuple[bool, Optional[str]]:
+        """
+        Delete a video job by UUID (only if owned by user).
+        Returns: (success, error_message)
+        """
+        try:
+            result = self.supabase.table("video_jobs") \
+                .delete() \
+                .eq("id", job_id) \
+                .eq("user_id", user_id) \
+                .execute()
+
+            if result.data:
+                return True, None
+            else:
+                return False, "Job not found or not owned by user"
+
+        except Exception as e:
+            return False, str(e)

@@ -3,6 +3,7 @@ import { Label, Field, Section } from "../components/UI";
 import { apiClient } from "../lib/apiClient";
 import ResizableFeedSidebar from "../components/ResizableFeedSidebar";
 import { useAuth } from "../contexts/AuthContext";
+import { useProject } from "../contexts/ProjectContext";
 import { logger } from "../lib/logger";
 
 const SUBJECT_OPTIONS = [
@@ -21,6 +22,7 @@ interface Props {
 export default function ImageGrid({ comfyUrl }: Props) {
   // Auth context
   const { user } = useAuth();
+  const { selectedProject } = useProject();
 
   // State
   const [inputImage, setInputImage] = useState<File | null>(null);
@@ -141,6 +143,7 @@ export default function ImageGrid({ comfyUrl }: Props) {
         workflow_name: 'image-grid',
         comfy_url: comfyUrl,
         input_image_urls: [inputImagePreview],
+        project_id: selectedProject?.id || null,
         parameters: {
           subject_category: subjectCategory || 'other'
         }
@@ -308,7 +311,7 @@ export default function ImageGrid({ comfyUrl }: Props) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-teal-50 via-white to-cyan-50">
+    <div className="min-h-screen bg-gradient-to-br from-teal-50 via-white to-cyan-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
       <div className="flex gap-6 p-6 md:p-10">
         {/* Main Content */}
         <div className="flex-1 max-w-4xl space-y-8">
@@ -322,7 +325,7 @@ export default function ImageGrid({ comfyUrl }: Props) {
                 AI-Powered Grid Generation
               </span>
             </div>
-            <p className="text-gray-600 max-w-2xl mx-auto leading-relaxed">
+            <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto leading-relaxed">
               Upload a reference image and generate a 3×3 grid of unique variations with different angles and perspectives.
             </p>
           </div>
@@ -335,7 +338,7 @@ export default function ImageGrid({ comfyUrl }: Props) {
                 type="file"
                 accept="image/*"
                 onChange={handleImageUpload}
-                className="w-full rounded-2xl border-2 border-dashed border-gray-300 px-4 py-6 text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-gradient-to-r file:from-teal-500 file:to-cyan-600 file:text-white file:font-semibold hover:file:from-teal-600 hover:file:to-cyan-700 transition-all duration-200 bg-gray-50/50"
+                className="w-full rounded-2xl border-2 border-dashed border-gray-300 dark:border-dark-border-primary px-4 py-6 text-gray-600 dark:text-dark-text-secondary file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-gradient-to-r file:from-teal-500 file:to-cyan-600 file:text-white file:font-semibold hover:file:from-teal-600 hover:file:to-cyan-700 transition-all duration-200 bg-gray-50/50 dark:bg-dark-surface-secondary"
               />
               {inputImagePreview && (
                 <div className="mt-4">
@@ -357,7 +360,7 @@ export default function ImageGrid({ comfyUrl }: Props) {
               <select
                 value={subjectCategory}
                 onChange={(e) => setSubjectCategory(e.target.value)}
-                className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-teal-500 focus:ring-4 focus:ring-teal-100 transition-all duration-200 bg-white/80"
+                className="w-full rounded-2xl border-2 border-gray-200 dark:border-dark-border-primary px-4 py-3 text-gray-800 dark:text-dark-text-primary focus:border-teal-500 focus:ring-4 focus:ring-teal-100 dark:focus:ring-teal-900/30 transition-all duration-200 bg-white/80 dark:bg-dark-surface-secondary"
               >
                 {SUBJECT_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
