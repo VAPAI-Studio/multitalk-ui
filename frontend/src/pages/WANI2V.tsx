@@ -4,6 +4,7 @@ import ResizableFeedSidebar from "../components/ResizableFeedSidebar";
 import { useSmartResolution } from "../hooks/useSmartResolution";
 import { apiClient } from "../lib/apiClient";
 import { useAuth } from "../contexts/AuthContext";
+import { useProject } from "../contexts/ProjectContext";
 
 // UI Components
 function Label({ children, className }: { children: React.ReactNode; className?: string }) {
@@ -79,6 +80,7 @@ interface Props {
 export default function WANI2V({ comfyUrl }: Props) {
   // Auth context
   const { user } = useAuth();
+  const { selectedProject } = useProject();
 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
@@ -281,6 +283,7 @@ export default function WANI2V({ comfyUrl }: Props) {
         height,
         fps: 24,
         duration_seconds: duration,
+        project_id: selectedProject?.id || null,
         parameters: {
           prompt: customPrompt
         }

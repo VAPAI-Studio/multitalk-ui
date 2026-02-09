@@ -3,6 +3,7 @@ import { Label, Field, Section } from "../components/UI";
 import { apiClient } from "../lib/apiClient";
 import ResizableFeedSidebar from "../components/ResizableFeedSidebar";
 import { useAuth } from "../contexts/AuthContext";
+import { useProject } from "../contexts/ProjectContext";
 import { logger } from "../lib/logger";
 
 const SUBJECT_OPTIONS = [
@@ -21,6 +22,7 @@ interface Props {
 export default function ImageGrid({ comfyUrl }: Props) {
   // Auth context
   const { user } = useAuth();
+  const { selectedProject } = useProject();
 
   // State
   const [inputImage, setInputImage] = useState<File | null>(null);
@@ -141,6 +143,7 @@ export default function ImageGrid({ comfyUrl }: Props) {
         workflow_name: 'image-grid',
         comfy_url: comfyUrl,
         input_image_urls: [inputImagePreview],
+        project_id: selectedProject?.id || null,
         parameters: {
           subject_category: subjectCategory || 'other'
         }

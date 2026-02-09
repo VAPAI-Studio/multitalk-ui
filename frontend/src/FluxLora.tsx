@@ -3,6 +3,8 @@ import { Label, Field, Section } from "./components/UI";
 import { apiClient } from "./lib/apiClient";
 import GenerationFeed from "./components/GenerationFeed";
 import { useSmartResolution } from "./hooks/useSmartResolution";
+import { useAuth } from "./contexts/AuthContext";
+import { useProject } from "./contexts/ProjectContext";
 
 interface Props {
   comfyUrl?: string;
@@ -18,6 +20,10 @@ interface LoraConfig {
 const STORAGE_KEY = 'fluxLora_settings';
 
 export default function FluxLora({ comfyUrl = "" }: Props) {
+  // Auth context
+  const { user } = useAuth();
+  const { selectedProject } = useProject();
+
   // Load saved settings from localStorage
   const loadSettings = () => {
     try {
@@ -235,6 +241,8 @@ export default function FluxLora({ comfyUrl = "" }: Props) {
       setStatus("💾 Creating job record...");
 
       const jobCreationResponse = await apiClient.createImageJob({
+        user_id: user?.id || null,
+        project_id: selectedProject?.id || null,
         comfy_job_id: promptId,
         workflow_name: 'flux-lora',
         comfy_url: comfyUrl,

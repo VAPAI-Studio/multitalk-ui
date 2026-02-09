@@ -4,6 +4,7 @@ import { apiClient } from "../lib/apiClient";
 import ResizableFeedSidebar from "../components/ResizableFeedSidebar";
 import { useSmartResolution } from "../hooks/useSmartResolution";
 import { useAuth } from "../contexts/AuthContext";
+import { useProject } from "../contexts/ProjectContext";
 
 interface Props {
   comfyUrl?: string;
@@ -46,6 +47,7 @@ const MODEL_CONFIG = {
 export default function CreateImage({ comfyUrl = "" }: Props) {
   // Auth context
   const { user } = useAuth();
+  const { selectedProject } = useProject();
 
   // Debug: Log user info
   console.log('CreateImage - User:', user ? `Authenticated (${user.id})` : 'NOT AUTHENTICATED');
@@ -332,6 +334,7 @@ export default function CreateImage({ comfyUrl = "" }: Props) {
         input_image_urls: [],
         width,
         height,
+        project_id: selectedProject?.id || null,
         parameters: {
           prompt,
           steps,

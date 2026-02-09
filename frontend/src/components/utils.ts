@@ -176,41 +176,29 @@ export async function pollForResult(promptId: string, baseUrl: string, intervalM
             
             if (uploadResult.success && uploadResult.publicUrl) {
               // Update job with Supabase Storage URL
-              // Video upload successful
               await completeJob({
                 job_id: jobId,
                 status: 'completed',
-                filename: found.filename,
-                subfolder: found.subfolder || undefined,
-                video_url: uploadResult.publicUrl,
-                comfy_url: baseUrl,
-                video_type: found.type || 'output'
+                output_video_urls: [uploadResult.publicUrl]
               });
-              // Job completed with Supabase URL
             } else {
               console.error('❌ Failed to upload video to Supabase Storage:', uploadResult.error);
-              // Completing job without Supabase URL - video will fallback to ComfyUI
-              // Still complete the job with ComfyUI info
+              // Fallback to ComfyUI URL
+              const comfyVideoUrl = `${baseUrl}/view?filename=${encodeURIComponent(found.filename)}&subfolder=${encodeURIComponent(found.subfolder || '')}&type=${found.type || 'output'}`;
               await completeJob({
                 job_id: jobId,
                 status: 'completed',
-                filename: found.filename,
-                subfolder: found.subfolder || undefined,
-                comfy_url: baseUrl,
-                video_type: found.type || 'output'
+                output_video_urls: [comfyVideoUrl]
               });
             }
           } catch (uploadError) {
             console.error('❌ Error during video upload:', uploadError);
-            // Completing job without Supabase URL due to upload error
-            // Still complete the job with ComfyUI info
+            // Fallback to ComfyUI URL
+            const comfyVideoUrl = `${baseUrl}/view?filename=${encodeURIComponent(found.filename)}&subfolder=${encodeURIComponent(found.subfolder || '')}&type=${found.type || 'output'}`;
             await completeJob({
               job_id: jobId,
               status: 'completed',
-              filename: found.filename,
-              subfolder: found.subfolder || undefined,
-              comfy_url: baseUrl,
-              video_type: found.type || 'output'
+              output_video_urls: [comfyVideoUrl]
             });
           }
         }
@@ -384,43 +372,31 @@ export function startJobMonitoring(
             
             if (uploadResult.success && uploadResult.publicUrl) {
               // Update job with Supabase Storage URL
-              // Video upload successful
               await completeJob({
                 job_id: jobId,
                 status: 'completed',
-                filename: videoInfo.filename,
-                subfolder: videoInfo.subfolder || undefined,
-                video_url: uploadResult.publicUrl,
-                comfy_url: baseUrl,
-                video_type: videoInfo.type || 'output'
+                output_video_urls: [uploadResult.publicUrl]
               });
-              // Job completed with Supabase URL
               onStatusUpdate('completed', 'Video guardado y completado', { ...videoInfo, video_url: uploadResult.publicUrl });
             } else {
               console.error('❌ Failed to upload video to Supabase Storage:', uploadResult.error);
-              // Completing job without Supabase URL - video will fallback to ComfyUI
-              // Still complete the job with ComfyUI info
+              // Fallback to ComfyUI URL
+              const comfyVideoUrl = `${baseUrl}/view?filename=${encodeURIComponent(videoInfo.filename)}&subfolder=${encodeURIComponent(videoInfo.subfolder || '')}&type=${videoInfo.type || 'output'}`;
               await completeJob({
                 job_id: jobId,
                 status: 'completed',
-                filename: videoInfo.filename,
-                subfolder: videoInfo.subfolder || undefined,
-                comfy_url: baseUrl,
-                video_type: videoInfo.type || 'output'
+                output_video_urls: [comfyVideoUrl]
               });
               onStatusUpdate('completed', 'Procesamiento completado (sin subir a storage)', videoInfo);
             }
           } catch (uploadError) {
             console.error('❌ Error during video upload:', uploadError);
-            // Completing job without Supabase URL due to upload error
-            // Still complete the job with ComfyUI info
+            // Fallback to ComfyUI URL
+            const comfyVideoUrl = `${baseUrl}/view?filename=${encodeURIComponent(videoInfo.filename)}&subfolder=${encodeURIComponent(videoInfo.subfolder || '')}&type=${videoInfo.type || 'output'}`;
             await completeJob({
               job_id: jobId,
               status: 'completed',
-              filename: videoInfo.filename,
-              subfolder: videoInfo.subfolder || undefined,
-              comfy_url: baseUrl,
-              video_type: videoInfo.type || 'output'
+              output_video_urls: [comfyVideoUrl]
             });
             onStatusUpdate('completed', 'Procesamiento completado (error subiendo)', videoInfo);
           }

@@ -28,15 +28,69 @@ def _parse_parameters(params) -> Dict[str, Any]:
 class ImageJobService:
     """Service for managing image generation jobs (img2img, style-transfer, image-edit)"""
 
+    # Cache for workflow lookups
+    _workflow_cache: Dict[str, int] = {}
+    _workflow_name_cache: Dict[int, str] = {}
+
     def __init__(self, supabase: Optional[Client] = None):
         self.supabase = supabase or get_supabase()
 
-    async def create_job(self, payload: CreateImageJobPayload) -> Tuple[bool, Optional[str]]:
-        """Create a new image job"""
+    async def _get_workflow_id(self, workflow_name: str) -> Optional[int]:
+        """Get workflow_id from workflow_name, with caching."""
+        if workflow_name in self._workflow_cache:
+            return self._workflow_cache[workflow_name]
+
         try:
+            result = self.supabase.table("workflows") \
+                .select("id") \
+                .eq("name", workflow_name) \
+                .single() \
+                .execute()
+
+            if result.data:
+                workflow_id = result.data["id"]
+                self._workflow_cache[workflow_name] = workflow_id
+                self._workflow_name_cache[workflow_id] = workflow_name
+                return workflow_id
+            return None
+        except Exception:
+            return None
+
+    async def _get_workflow_name(self, workflow_id: int) -> Optional[str]:
+        """Get workflow_name from workflow_id, with caching."""
+        if workflow_id in self._workflow_name_cache:
+            return self._workflow_name_cache[workflow_id]
+
+        try:
+            result = self.supabase.table("workflows") \
+                .select("name") \
+                .eq("id", workflow_id) \
+                .single() \
+                .execute()
+
+            if result.data:
+                workflow_name = result.data["name"]
+                self._workflow_name_cache[workflow_id] = workflow_name
+                self._workflow_cache[workflow_name] = workflow_id
+                return workflow_name
+            return None
+        except Exception:
+            return None
+
+    async def create_job(self, payload: CreateImageJobPayload) -> Tuple[bool, Optional[str], Optional[str]]:
+        """
+        Create a new image job.
+        Returns: (success, job_id, error_message)
+        """
+        try:
+            # Lookup workflow_id from workflow_name
+            workflow_id = await self._get_workflow_id(payload.workflow_name)
+            if not workflow_id:
+                return False, None, f"Unknown workflow: {payload.workflow_name}"
+
             job_data = {
                 "user_id": payload.user_id,
-                "workflow_name": payload.workflow_name,
+                "workflow_id": workflow_id,
                 "status": "pending",
                 "comfy_url": payload.comfy_url,
                 "comfy_job_id": payload.comfy_job_id,
@@ -45,45 +99,36 @@ class ImageJobService:
                 "width": payload.width,
                 "height": payload.height,
                 "parameters": payload.parameters,
-                "model_used": payload.model_used,
-                "user_ip": payload.user_ip
+                "project_id": payload.project_id,
             }
+
+            # Remove None values to use database defaults
+            job_data = {k: v for k, v in job_data.items() if v is not None}
 
             result = self.supabase.table("image_jobs").insert(job_data).execute()
 
             if result.data:
-                return True, None
+                job_id = result.data[0].get("id")
+                return True, job_id, None
             else:
-                return False, "Failed to create image job"
+                return False, None, "Failed to create image job"
 
         except Exception as e:
-            return False, str(e)
+            return False, None, str(e)
 
     async def update_job(self, job_id: str, payload: UpdateImageJobPayload) -> Tuple[bool, Optional[str]]:
-        """Update an image job"""
+        """Update an image job by UUID or comfy_job_id"""
         try:
             update_data = {}
 
             if payload.status is not None:
                 update_data["status"] = payload.status
-            if payload.started_at is not None:
-                update_data["started_at"] = payload.started_at.isoformat()
-            if payload.completed_at is not None:
-                update_data["completed_at"] = payload.completed_at.isoformat()
-            if payload.processing_time_seconds is not None:
-                update_data["processing_time_seconds"] = payload.processing_time_seconds
             if payload.output_image_urls is not None:
                 update_data["output_image_urls"] = payload.output_image_urls
             if payload.width is not None:
                 update_data["width"] = payload.width
             if payload.height is not None:
                 update_data["height"] = payload.height
-            if payload.comfyui_output_filename is not None:
-                update_data["comfyui_output_filename"] = payload.comfyui_output_filename
-            if payload.comfyui_output_subfolder is not None:
-                update_data["comfyui_output_subfolder"] = payload.comfyui_output_subfolder
-            if payload.comfyui_output_type is not None:
-                update_data["comfyui_output_type"] = payload.comfyui_output_type
             if payload.error_message is not None:
                 update_data["error_message"] = payload.error_message
 
@@ -103,12 +148,10 @@ class ImageJobService:
     async def update_to_processing(self, job_id: str) -> Tuple[bool, Optional[str]]:
         """Mark job as processing"""
         try:
-            update_data = {
-                "status": "processing",
-                "started_at": datetime.utcnow().isoformat()
-            }
-
-            result = self.supabase.table("image_jobs").update(update_data).eq("id", job_id).execute()
+            result = self.supabase.table("image_jobs") \
+                .update({"status": "processing"}) \
+                .eq("comfy_job_id", job_id) \
+                .execute()
 
             if result.data:
                 return True, None
@@ -118,22 +161,18 @@ class ImageJobService:
         except Exception as e:
             return False, str(e)
 
-    async def complete_job(self, payload: CompleteImageJobPayload) -> Tuple[bool, Optional[str]]:
-        """Mark job as completed or failed"""
+    async def complete_job(self, payload: CompleteImageJobPayload) -> Tuple[bool, Optional[ImageJob], Optional[str]]:
+        """
+        Mark job as completed or failed.
+        Returns: (success, job, error_message)
+        """
         try:
             update_data = {
                 "status": payload.status,
-                "completed_at": datetime.utcnow().isoformat()
             }
 
             if payload.output_image_urls:
                 update_data["output_image_urls"] = payload.output_image_urls
-            if payload.comfyui_output_filename:
-                update_data["comfyui_output_filename"] = payload.comfyui_output_filename
-            if payload.comfyui_output_subfolder:
-                update_data["comfyui_output_subfolder"] = payload.comfyui_output_subfolder
-            if payload.comfyui_output_type:
-                update_data["comfyui_output_type"] = payload.comfyui_output_type
             if payload.width:
                 update_data["width"] = payload.width
             if payload.height:
@@ -141,30 +180,48 @@ class ImageJobService:
             if payload.error_message:
                 update_data["error_message"] = payload.error_message
 
-            result = self.supabase.table("image_jobs").update(update_data).eq("id", payload.job_id).execute()
+            # Try to find by UUID first, then by comfy_job_id
+            # This handles both cases: endpoint passing UUID or comfy_job_id
+            result = self.supabase.table("image_jobs") \
+                .update(update_data) \
+                .eq("id", payload.job_id) \
+                .execute()
+
+            # If no match by UUID, try by comfy_job_id
+            if not result.data:
+                result = self.supabase.table("image_jobs") \
+                    .update(update_data) \
+                    .eq("comfy_job_id", payload.job_id) \
+                    .execute()
 
             if result.data:
-                return True, None
+                job_data = result.data[0]
+                if job_data.get("workflow_id"):
+                    job_data["workflow_name"] = await self._get_workflow_name(job_data["workflow_id"])
+                job_data['parameters'] = _parse_parameters(job_data.get('parameters'))
+                job = ImageJob(**job_data)
+                return True, job, None
             else:
-                return False, "Failed to complete job"
+                return False, None, "Failed to complete job"
 
         except Exception as e:
-            return False, str(e)
+            return False, None, str(e)
 
     async def get_job(self, job_id: str) -> Tuple[Optional[ImageJob], Optional[str]]:
-        """Get a single image job by ID"""
+        """Get a single image job by UUID"""
         try:
-            # Use specific columns and .single() for better performance
-            columns = "id, user_id, workflow_name, status, comfy_url, comfy_job_id, input_image_urls, output_image_urls, prompt, width, height, parameters, model_used, user_ip, comfyui_output_filename, comfyui_output_subfolder, comfyui_output_type, error_message, started_at, completed_at, processing_time_seconds, created_at"
             result = self.supabase.table("image_jobs") \
-                .select(columns) \
+                .select("*") \
                 .eq("id", job_id) \
                 .single() \
                 .execute()
 
             if result.data:
-                result.data['parameters'] = _parse_parameters(result.data.get('parameters'))
-                return ImageJob(**result.data), None
+                job_data = result.data
+                if job_data.get("workflow_id"):
+                    job_data["workflow_name"] = await self._get_workflow_name(job_data["workflow_id"])
+                job_data['parameters'] = _parse_parameters(job_data.get('parameters'))
+                return ImageJob(**job_data), None
             else:
                 return None, "Job not found"
 
@@ -174,17 +231,18 @@ class ImageJobService:
     async def get_job_by_comfy_id(self, comfy_job_id: str) -> Tuple[Optional[ImageJob], Optional[str]]:
         """Get a single image job by ComfyUI job ID"""
         try:
-            # Use specific columns and .single() for better performance
-            columns = "id, user_id, workflow_name, status, comfy_url, comfy_job_id, input_image_urls, output_image_urls, prompt, width, height, parameters, model_used, user_ip, comfyui_output_filename, comfyui_output_subfolder, comfyui_output_type, error_message, started_at, completed_at, processing_time_seconds, created_at"
             result = self.supabase.table("image_jobs") \
-                .select(columns) \
+                .select("*") \
                 .eq("comfy_job_id", comfy_job_id) \
                 .single() \
                 .execute()
 
             if result.data:
-                result.data['parameters'] = _parse_parameters(result.data.get('parameters'))
-                return ImageJob(**result.data), None
+                job_data = result.data
+                if job_data.get("workflow_id"):
+                    job_data["workflow_name"] = await self._get_workflow_name(job_data["workflow_id"])
+                job_data['parameters'] = _parse_parameters(job_data.get('parameters'))
+                return ImageJob(**job_data), None
             else:
                 return None, "Job not found"
 
@@ -200,25 +258,28 @@ class ImageJobService:
     ) -> Tuple[List[ImageJob], int, Optional[str]]:
         """Get recent image jobs with optional filtering"""
         try:
-            # Use specific columns instead of * for better performance
-            columns = "id, user_id, workflow_name, status, comfy_url, comfy_job_id, input_image_urls, output_image_urls, prompt, width, height, parameters, model_used, user_ip, comfyui_output_filename, comfyui_output_subfolder, comfyui_output_type, error_message, started_at, completed_at, processing_time_seconds, created_at"
-            query = self.supabase.table("image_jobs").select(columns, count="exact")
+            query = self.supabase.table("image_jobs").select("*", count="exact")
 
             # Apply filters
             if workflow_name:
-                query = query.eq("workflow_name", workflow_name)
+                workflow_id = await self._get_workflow_id(workflow_name)
+                if workflow_id:
+                    query = query.eq("workflow_id", workflow_id)
             if user_id:
                 query = query.eq("user_id", user_id)
 
             # Order and paginate
             result = query.order("created_at", desc=True).range(offset, offset + limit - 1).execute()
 
-            # Parse parameters field (may be JSON string or dict)
+            # Parse and enrich jobs
             jobs = []
-            for job in (result.data or []):
-                job['parameters'] = _parse_parameters(job.get('parameters'))
-                jobs.append(ImageJob(**job))
-            total_count = result.count if hasattr(result, 'count') else len(jobs)
+            for job_data in (result.data or []):
+                if job_data.get("workflow_id"):
+                    job_data["workflow_name"] = await self._get_workflow_name(job_data["workflow_id"])
+                job_data['parameters'] = _parse_parameters(job_data.get('parameters'))
+                jobs.append(ImageJob(**job_data))
+
+            total_count = result.count if result.count is not None else len(jobs)
 
             return jobs, total_count, None
 
@@ -229,38 +290,50 @@ class ImageJobService:
         self,
         limit: int = 20,
         offset: int = 0,
-        workflow_name: Optional[str] = None
-    ) -> Tuple[List[ImageJob], Optional[str]]:
+        workflow_name: Optional[str] = None,
+        user_id: Optional[str] = None
+    ) -> Tuple[List[ImageJob], int, Optional[str]]:
         """Get completed image jobs"""
         try:
-            # Use specific columns instead of * for better performance
-            columns = "id, user_id, workflow_name, status, comfy_url, comfy_job_id, input_image_urls, output_image_urls, prompt, width, height, parameters, model_used, user_ip, comfyui_output_filename, comfyui_output_subfolder, comfyui_output_type, error_message, started_at, completed_at, processing_time_seconds, created_at"
-            query = self.supabase.table("image_jobs").select(columns).eq("status", "completed")
+            query = self.supabase.table("image_jobs").select("*", count="exact").eq("status", "completed")
 
             if workflow_name:
-                query = query.eq("workflow_name", workflow_name)
+                workflow_id = await self._get_workflow_id(workflow_name)
+                if workflow_id:
+                    query = query.eq("workflow_id", workflow_id)
+            if user_id:
+                query = query.eq("user_id", user_id)
 
-            result = query.order("completed_at", desc=True).range(offset, offset + limit - 1).execute()
+            result = query.order("created_at", desc=True).range(offset, offset + limit - 1).execute()
 
-            # Parse parameters field (may be JSON string or dict)
+            # Parse and enrich jobs
             jobs = []
-            for job in (result.data or []):
-                job['parameters'] = _parse_parameters(job.get('parameters'))
-                jobs.append(ImageJob(**job))
-            return jobs, None
+            for job_data in (result.data or []):
+                if job_data.get("workflow_id"):
+                    job_data["workflow_name"] = await self._get_workflow_name(job_data["workflow_id"])
+                job_data['parameters'] = _parse_parameters(job_data.get('parameters'))
+                jobs.append(ImageJob(**job_data))
+
+            total_count = result.count if result.count is not None else len(jobs)
+
+            return jobs, total_count, None
 
         except Exception as e:
-            return [], str(e)
+            return [], 0, str(e)
 
-    async def delete_job(self, job_id: str) -> Tuple[bool, Optional[str]]:
-        """Delete an image job"""
+    async def delete_job(self, job_id: str, user_id: str) -> Tuple[bool, Optional[str]]:
+        """Delete an image job (only if owned by user)"""
         try:
-            result = self.supabase.table("image_jobs").delete().eq("id", job_id).execute()
+            result = self.supabase.table("image_jobs") \
+                .delete() \
+                .eq("id", job_id) \
+                .eq("user_id", user_id) \
+                .execute()
 
             if result.data:
                 return True, None
             else:
-                return False, "Failed to delete job"
+                return False, "Job not found or not owned by user"
 
         except Exception as e:
             return False, str(e)
@@ -274,29 +347,20 @@ class ImageJobService:
         status: Optional[str] = None
     ) -> Tuple[List[Dict], int, Optional[str]]:
         """
-        Optimized feed query with server-side caching.
-        Returns minimal columns needed for feed display.
-        Cached for 10 seconds to reduce database load.
-
+        Optimized feed query - returns minimal columns needed for display.
         Returns: (jobs_dict_list, total_count, error_message)
         """
-        from core.cache import get_cached, set_cached, make_feed_cache_key
-
-        # Check cache first
-        cache_key = make_feed_cache_key("image_jobs", user_id, workflow_name, status, limit, offset)
-        cached = get_cached(cache_key)
-        if cached is not None:
-            return cached
-
         try:
-            # Minimal columns for feed display (no parameters, no comfyui output details)
-            feed_columns = "id, status, created_at, workflow_name, output_image_urls, prompt, comfy_job_id, error_message, model_used"
+            # Minimal columns for feed display
+            feed_columns = "id, status, created_at, workflow_id, output_image_urls, prompt, comfy_job_id, error_message, width, height"
 
             query = self.supabase.table("image_jobs").select(feed_columns, count="exact")
 
             # Apply filters
             if workflow_name:
-                query = query.eq("workflow_name", workflow_name)
+                workflow_id = await self._get_workflow_id(workflow_name)
+                if workflow_id:
+                    query = query.eq("workflow_id", workflow_id)
             if user_id:
                 query = query.eq("user_id", user_id)
             if status:
@@ -308,12 +372,14 @@ class ImageJobService:
             result = query.execute()
             total_count = result.count if result.count is not None else len(result.data or [])
 
-            response = (result.data or [], total_count, None)
+            # Enrich with workflow names
+            jobs = []
+            for job_data in (result.data or []):
+                if job_data.get("workflow_id"):
+                    job_data["workflow_name"] = await self._get_workflow_name(job_data["workflow_id"])
+                jobs.append(job_data)
 
-            # Cache the result
-            set_cached(cache_key, response)
-
-            return response
+            return jobs, total_count, None
 
         except Exception as e:
             return [], 0, str(e)

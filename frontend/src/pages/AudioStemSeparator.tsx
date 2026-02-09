@@ -4,6 +4,7 @@ import { apiClient } from "../lib/apiClient";
 import { createJob, updateJobToProcessing, completeJob } from "../lib/jobTracking";
 import { uploadMediaToComfy, checkComfyUIHealth } from "../components/utils";
 import ResizableFeedSidebar from "../components/ResizableFeedSidebar";
+import { useProject } from "../contexts/ProjectContext";
 
 // UI Components
 function Label({ children, className }: { children: React.ReactNode; className?: string }) {
@@ -38,6 +39,7 @@ interface AudioStems {
 }
 
 export default function AudioStemSeparator({ comfyUrl }: Props) {
+  const { selectedProject } = useProject();
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [audioPreview, setAudioPreview] = useState<string>("");
   const [originalFilename, setOriginalFilename] = useState<string>("");
@@ -171,7 +173,8 @@ export default function AudioStemSeparator({ comfyUrl }: Props) {
         audio_filename: audioFile.name,
         width: 0,
         height: 0,
-        trim_to_audio: false
+        trim_to_audio: false,
+        project_id: selectedProject?.id
       });
 
       await updateJobToProcessing(id);
@@ -250,7 +253,7 @@ export default function AudioStemSeparator({ comfyUrl }: Props) {
       if (currentJobId) {
         await completeJob({
           job_id: currentJobId,
-          status: 'error',
+          status: 'failed',
           error_message: error.message || 'Unknown error'
         }).catch(() => {});
       }

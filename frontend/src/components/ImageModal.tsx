@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { apiClient } from '../lib/apiClient'
+import { useAuth } from '../contexts/AuthContext'
+import { useProject } from '../contexts/ProjectContext'
 import type { ImageItem } from '../types/ui'
 
 interface ImageModalProps {
@@ -12,6 +14,8 @@ interface ImageModalProps {
 }
 
 export default function ImageModal({ image, isOpen, onClose, focusedImageIndex, comfyUrl, onUpscaleComplete }: ImageModalProps) {
+  const { user } = useAuth()
+  const { selectedProject } = useProject()
   const [sourceLoaded, setSourceLoaded] = useState(false)
   const [resultLoaded, setResultLoaded] = useState(false)
   const [currentImageIndex, setCurrentImageIndex] = useState(focusedImageIndex ?? 0)
@@ -141,6 +145,8 @@ export default function ImageModal({ image, isOpen, onClose, focusedImageIndex, 
       // 4. Create image job in database
       setUpscaleStatus('Creating job record...')
       const jobCreationResponse = await apiClient.createImageJob({
+        user_id: user?.id || null,
+        project_id: selectedProject?.id || null,
         comfy_job_id: promptId,
         workflow_name: 'nanobanana-upscale',
         comfy_url: comfyUrl,
