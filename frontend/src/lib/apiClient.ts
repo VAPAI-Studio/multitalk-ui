@@ -1078,6 +1078,57 @@ class ApiClient {
   async getGoogleDriveFolder(folderId: string) {
     return this.request(`/google-drive/folders/${folderId}`)
   }
+
+  // Auto Content endpoints
+  async createBatchJob(payload: {
+    user_id: string;
+    project_folder_id: string;
+    comfy_url: string;
+  }) {
+    return this.request('/auto-content/batch-jobs', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  }
+
+  async getBatchJob(batchJobId: string) {
+    return this.request(`/auto-content/batch-jobs/${batchJobId}`)
+  }
+
+  async startBatchGeneration(batchJobId: string, payload: {
+    master_frame_variations?: number;
+  }) {
+    return this.request(`/auto-content/batch-jobs/${batchJobId}/start-generation`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  }
+
+  async getBatchItems(batchJobId: string, params?: {
+    starred_only?: boolean;
+    limit?: number;
+    offset?: number;
+  }) {
+    const queryParams = new URLSearchParams()
+    if (params?.starred_only) queryParams.append('starred_only', 'true')
+    if (params?.limit) queryParams.append('limit', params.limit.toString())
+    if (params?.offset) queryParams.append('offset', params.offset.toString())
+
+    const query = queryParams.toString()
+    return this.request(`/auto-content/batch-jobs/${batchJobId}/items${query ? `?${query}` : ''}`)
+  }
+
+  async starBatchItem(itemId: string) {
+    return this.request(`/auto-content/batch-items/${itemId}/star`, {
+      method: 'PUT',
+    })
+  }
+
+  async deleteBatchItem(itemId: string) {
+    return this.request(`/auto-content/batch-items/${itemId}`, {
+      method: 'DELETE',
+    })
+  }
 }
 
 export const apiClient = new ApiClient()

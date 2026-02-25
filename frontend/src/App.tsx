@@ -4,6 +4,7 @@ import Homepage from "./pages/Homepage";
 import GenerationFeed from "./pages/GenerationFeed";
 import ProfileSettings from "./ProfileSettings";
 import StudioPage from "./components/StudioPage";
+import AutoContent from "./pages/AutoContent";
 // UI Components
 import ComfyUIStatus from "./components/ComfyUIStatus";
 import ConsoleToggle from "./components/ConsoleToggle";
@@ -113,6 +114,7 @@ export default function App() {
     'audio-studio',
     'text-studio',
     'lora-studio',
+    'auto-content-studio',
     'history',
     'profile-settings'
   ];
@@ -501,6 +503,9 @@ export default function App() {
               studio={getStudioById("lora-studio")!}
               comfyUrl={comfyUrl}
             />
+          )}
+          {currentPage === "auto-content-studio" && (
+            <AutoContent comfyUrl={comfyUrl} />
           )}
 
           {/* Standalone Pages */}

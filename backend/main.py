@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import os
 
-from api import storage, datasets, image_edit, comfyui, multitalk, auth, image_jobs, video_jobs, flux_trainer, lora_trainer, feed, google_drive
+from api import storage, datasets, image_edit, comfyui, multitalk, auth, image_jobs, video_jobs, flux_trainer, lora_trainer, feed, google_drive, auto_content
 
 # Only load .env file if not running on Heroku
 if not os.getenv("DYNO"):  # DYNO is a Heroku-specific environment variable
@@ -36,6 +36,7 @@ app.include_router(flux_trainer.router, prefix="/api")
 app.include_router(lora_trainer.router, prefix="/api")
 app.include_router(feed.router, prefix="/api")
 app.include_router(google_drive.router, prefix="/api")
+app.include_router(auto_content.router, prefix="/api")
 
 @app.get("/")
 async def root():

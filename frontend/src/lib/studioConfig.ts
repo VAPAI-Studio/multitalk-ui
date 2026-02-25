@@ -188,6 +188,23 @@ export const studios: StudioConfig[] = [
         features: ['Custom LoRA training', 'Dataset-based', 'Advanced parameters', 'Model: QWEN Image via Musubi Tuner']
       }
     ]
+  },
+  {
+    id: 'auto-content-studio',
+    title: 'Auto Content',
+    icon: '🎬',
+    gradient: 'from-indigo-500 to-purple-600',
+    description: 'Automate content production from scripts with batch image generation from master frames.',
+    apps: [
+      {
+        id: 'auto-content',
+        title: 'Auto Content',
+        icon: '🎬',
+        gradient: 'from-indigo-500 to-purple-600',
+        description: 'Batch-generate multiple variations of images from master frames using Google Drive projects.',
+        features: ['Batch image generation', 'Master frame variations', 'Google Drive integration', 'AI script analysis']
+      }
+    ]
   }
 ];
 
@@ -288,5 +305,6 @@ export type StudioPageType =
   | 'audio-studio'
   | 'text-studio'
   | 'lora-studio'
+  | 'auto-content-studio'
   | 'history'
   | 'profile-settings';

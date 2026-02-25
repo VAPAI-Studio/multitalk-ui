@@ -249,3 +249,39 @@ class GoogleDriveService:
 
         except Exception as e:
             return False, None, str(e)
+
+    async def download_file(self, file_id: str) -> bytes:
+        """
+        Download a file from Google Drive.
+
+        Args:
+            file_id: ID of the file to download
+
+        Returns: File content as bytes
+
+        Raises:
+            Exception: If download fails
+        """
+        if not self.drive:
+            raise Exception("Google Drive not configured")
+
+        try:
+            from io import BytesIO
+
+            request = self.drive.files().get_media(
+                fileId=file_id,
+                supportsAllDrives=True
+            )
+
+            file_content = BytesIO()
+            from googleapiclient.http import MediaIoBaseDownload
+
+            downloader = MediaIoBaseDownload(file_content, request)
+            done = False
+            while not done:
+                status, done = downloader.next_chunk()
+
+            return file_content.getvalue()
+
+        except Exception as e:
+            raise Exception(f"Failed to download file from Drive: {str(e)}")
