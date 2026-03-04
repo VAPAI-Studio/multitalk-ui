@@ -73,3 +73,7 @@ class MoveFolderRequest(BaseModel):
     """Request to move or rename a folder (recursive copy + delete)."""
     source_path: str        # Current folder prefix (no trailing slash)
     dest_path: str          # New folder prefix (no trailing slash)
+
+class CreateFolderRequest(BaseModel):
+    """Request to create a new folder (zero-byte S3 placeholder)."""
+    path: str               # Desired folder path, e.g. "models/my-loras"

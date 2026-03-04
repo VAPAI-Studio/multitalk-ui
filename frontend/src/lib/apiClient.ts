@@ -1366,6 +1366,13 @@ class ApiClient {
     });
   }
 
+  async createFolder(path: string): Promise<{ success: boolean; path: string }> {
+    return this.request('/infrastructure/folders', {
+      method: 'POST',
+      body: JSON.stringify({ path }),
+    });
+  }
+
   // Helper method for authenticated requests (backward compatibility)
   async fetchWithAuth(endpoint: string, options: RequestInit = {}) {
     return this.request(endpoint, options);

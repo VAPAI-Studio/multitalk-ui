@@ -266,9 +266,9 @@ class InfrastructureService:
 
     async def delete_folder(self, path: str) -> Tuple[bool, int, Optional[str]]:
         """
-        Recursively delete all objects under a folder prefix using batch delete.
+        Recursively delete all objects under a folder prefix.
         Returns (success, deleted_count, error).
-        Uses delete_objects batches of 1000 — checks Errors in each response.
+        Uses individual delete_object calls (delete_objects batch not supported by RunPod S3).
         """
         try:
             safe_path = self._validate_path(path)
@@ -283,26 +283,12 @@ class InfrastructureService:
 
             deleted_count = 0
             for page in pages:
-                objects = page.get('Contents', [])
-                if not objects:
-                    continue
-                delete_payload = {
-                    'Objects': [{'Key': obj['Key']} for obj in objects],
-                    'Quiet': True  # suppress per-key success entries; saves bandwidth
-                }
-                response = s3_client.delete_objects(
-                    Bucket=settings.RUNPOD_NETWORK_VOLUME_ID,
-                    Delete=delete_payload
-                )
-                errors = response.get('Errors', [])
-                if errors:
-                    # Surface first error; partial deletion may have occurred
-                    first_err = errors[0]
-                    return False, deleted_count, (
-                        f"Failed to delete {len(errors)} object(s): "
-                        f"{first_err.get('Key')} — {first_err.get('Message', 'Unknown S3 error')}"
+                for obj in page.get('Contents', []):
+                    s3_client.delete_object(
+                        Bucket=settings.RUNPOD_NETWORK_VOLUME_ID,
+                        Key=obj['Key']
                     )
-                deleted_count += len(objects)
+                    deleted_count += 1
 
             return True, deleted_count, None
         except ValueError as e:
@@ -314,9 +300,9 @@ class InfrastructureService:
 
     async def move_object(self, source_path: str, dest_path: str) -> Tuple[bool, Optional[str]]:
         """
-        Move or rename a single file via server-side copy then delete.
-        copy_object is S3-native — no data flows through backend memory.
-        Only deletes source AFTER successful copy.
+        Move or rename a single file via download-stream then re-upload then delete.
+        copy_object is not supported by RunPod S3, so we stream through the backend.
+        Only deletes source AFTER successful upload.
         """
         try:
             safe_src = self._validate_path(source_path)
@@ -329,13 +315,22 @@ class InfrastructureService:
             if safe_src == safe_dst:
                 return False, "Source and destination paths are identical"
 
-            copy_source = {'Bucket': settings.RUNPOD_NETWORK_VOLUME_ID, 'Key': safe_src}
-            s3_client.copy_object(
-                CopySource=copy_source,
+            get_resp = s3_client.get_object(
                 Bucket=settings.RUNPOD_NETWORK_VOLUME_ID,
-                Key=safe_dst
+                Key=safe_src
             )
-            # Only delete after confirmed successful copy
+            body = get_resp['Body']
+            content_length = get_resp.get('ContentLength', 0)
+            content_type = get_resp.get('ContentType', 'application/octet-stream')
+
+            s3_client.put_object(
+                Bucket=settings.RUNPOD_NETWORK_VOLUME_ID,
+                Key=safe_dst,
+                Body=body,
+                ContentLength=content_length,
+                ContentType=content_type,
+            )
+            # Only delete source after confirmed successful upload
             s3_client.delete_object(
                 Bucket=settings.RUNPOD_NETWORK_VOLUME_ID,
                 Key=safe_src
@@ -350,10 +345,9 @@ class InfrastructureService:
 
     async def move_folder(self, source_path: str, dest_path: str) -> Tuple[bool, int, Optional[str]]:
         """
-        Move or rename a folder by recursively copying all objects then batch-deleting originals.
-        IMPORTANT: S3 has no atomic multi-object transaction. If copy succeeds but delete fails
-        partially, both old and new locations may have partial data. This is documented behaviour
-        for Phase 4 — large folder moves on Heroku may also approach the 30s timeout.
+        Move or rename a folder by streaming each object to the new prefix then deleting originals.
+        copy_object and delete_objects batch are not supported by RunPod S3, so we stream each
+        file through the backend individually. Only deletes source keys after all uploads succeed.
         Returns (success, moved_count, error).
         """
         try:
@@ -372,48 +366,63 @@ class InfrastructureService:
                 Prefix=src_prefix
             )
 
-            # Phase 1: copy all objects to new prefix
+            # Phase 1: stream-copy all objects to new prefix
             source_keys = []
             for page in pages:
                 for obj in page.get('Contents', []):
                     old_key = obj['Key']
-                    # Replace source prefix with dest prefix
                     new_key = dst_prefix + old_key[len(src_prefix):]
-                    s3_client.copy_object(
-                        CopySource={'Bucket': settings.RUNPOD_NETWORK_VOLUME_ID, 'Key': old_key},
+                    get_resp = s3_client.get_object(
                         Bucket=settings.RUNPOD_NETWORK_VOLUME_ID,
-                        Key=new_key
+                        Key=old_key
+                    )
+                    s3_client.put_object(
+                        Bucket=settings.RUNPOD_NETWORK_VOLUME_ID,
+                        Key=new_key,
+                        Body=get_resp['Body'],
+                        ContentLength=get_resp.get('ContentLength', 0),
+                        ContentType=get_resp.get('ContentType', 'application/octet-stream'),
                     )
                     source_keys.append(old_key)
 
             if not source_keys:
                 return True, 0, None  # empty folder — nothing to move
 
-            # Phase 2: batch delete originals (only after all copies succeeded)
-            moved_count = 0
-            for i in range(0, len(source_keys), 1000):
-                batch = source_keys[i:i + 1000]
-                delete_payload = {
-                    'Objects': [{'Key': k} for k in batch],
-                    'Quiet': True
-                }
-                response = s3_client.delete_objects(
+            # Phase 2: delete originals individually (only after all uploads succeeded)
+            for old_key in source_keys:
+                s3_client.delete_object(
                     Bucket=settings.RUNPOD_NETWORK_VOLUME_ID,
-                    Delete=delete_payload
+                    Key=old_key
                 )
-                errors = response.get('Errors', [])
-                if errors:
-                    first_err = errors[0]
-                    return False, moved_count, (
-                        f"Copies succeeded but failed to delete {len(errors)} source object(s): "
-                        f"{first_err.get('Key')} — {first_err.get('Message', 'Unknown S3 error')}"
-                    )
-                moved_count += len(batch)
 
-            return True, moved_count, None
+            return True, len(source_keys), None
         except ValueError as e:
             return False, 0, str(e)
         except ClientError as e:
             return False, 0, f"S3 error: {str(e)}"
         except Exception as e:
             return False, 0, f"Unexpected error: {str(e)}"
+
+    async def create_folder(self, path: str) -> Tuple[bool, Optional[str]]:
+        """
+        Create a folder by writing a zero-byte object with a trailing slash.
+        In S3 object storage, folders are virtual — this placeholder makes them visible.
+        """
+        try:
+            safe_path = self._validate_path(path)
+            self._check_protected(safe_path)
+            if not safe_path:
+                return False, "Folder path is empty"
+            key = safe_path.rstrip('/') + '/'
+            s3_client.put_object(
+                Bucket=settings.RUNPOD_NETWORK_VOLUME_ID,
+                Key=key,
+                Body=b''
+            )
+            return True, None
+        except ValueError as e:
+            return False, str(e)
+        except ClientError as e:
+            return False, f"S3 error: {str(e)}"
+        except Exception as e:
+            return False, f"Unexpected error: {str(e)}"

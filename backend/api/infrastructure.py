@@ -13,6 +13,7 @@ from models.infrastructure import (
     DeleteRequest,
     MoveFileRequest,
     MoveFolderRequest,
+    CreateFolderRequest,
 )
 from services.infrastructure_service import InfrastructureService
 from core.s3_client import s3_client
@@ -333,3 +334,24 @@ async def move_folder_endpoint(
         "dest_path": payload.dest_path,
         "moved_count": moved_count
     }
+
+
+@router.post("/folders")
+async def create_folder(
+    payload: CreateFolderRequest,
+    admin_user: dict = Depends(verify_admin)
+) -> dict:
+    """
+    Create a folder by writing a zero-byte S3 placeholder object.
+    Admin-only.
+    """
+    if not settings.RUNPOD_S3_ACCESS_KEY or not settings.RUNPOD_NETWORK_VOLUME_ID:
+        raise HTTPException(status_code=400, detail="S3 credentials not configured")
+
+    service = InfrastructureService()
+    success, error = await service.create_folder(payload.path)
+    if not success:
+        if error and "protected" in error.lower():
+            raise HTTPException(status_code=403, detail=error)
+        raise HTTPException(status_code=500, detail=error)
+    return {"success": True, "path": payload.path.rstrip('/') + '/'}

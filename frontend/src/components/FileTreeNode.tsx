@@ -36,6 +36,8 @@ export function FileTreeNode({ item, depth, onOperationComplete }: Props) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showRenameModal, setShowRenameModal] = useState(false);
   const [showMoveModal, setShowMoveModal] = useState(false);
+  const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
 
   // Rename input: pre-filled with current name
   const [newName, setNewName] = useState(item.name);
@@ -124,6 +126,32 @@ export function FileTreeNode({ item, depth, onOperationComplete }: Props) {
       setOperationError(msg);
       setTimeout(() => setOperationError(""), 5000);
       setShowRenameModal(false);
+    } finally {
+      setIsOperating(false);
+    }
+  };
+
+  const handleCreateFolder = async () => {
+    const trimmed = newFolderName.trim();
+    if (!trimmed) return;
+    const folderPath = item.path ? `${item.path}/${trimmed}` : trimmed;
+    setIsOperating(true);
+    setOperationError("");
+    try {
+      await apiClient.createFolder(folderPath);
+      setShowCreateFolderModal(false);
+      setNewFolderName("");
+      // Reload children if expanded so the new folder appears
+      if (isExpanded) {
+        const response = await apiClient.listFiles(item.path, 200);
+        setChildren(response.items);
+      }
+      onOperationComplete?.();
+    } catch (err: any) {
+      const msg = err.message || "Create folder failed";
+      setOperationError(msg);
+      setTimeout(() => setOperationError(""), 5000);
+      setShowCreateFolderModal(false);
     } finally {
       setIsOperating(false);
     }
@@ -246,6 +274,19 @@ export function FileTreeNode({ item, depth, onOperationComplete }: Props) {
           📦
         </button>
 
+        {/* Create subfolder button (folders only) */}
+        {item.type === "folder" && (
+          <button
+            onClick={(e) => { e.stopPropagation(); setNewFolderName(""); setShowCreateFolderModal(true); }}
+            disabled={isOperating}
+            title="Create subfolder"
+            className="flex-shrink-0 px-2 py-1 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-green-200"
+            aria-label="Create subfolder"
+          >
+            ➕
+          </button>
+        )}
+
         {/* Delete button */}
         <button
           onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm(true); }}
@@ -362,6 +403,43 @@ export function FileTreeNode({ item, depth, onOperationComplete }: Props) {
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 font-medium"
               >
                 {isOperating ? "Renaming..." : "Rename"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Folder Modal */}
+      {showCreateFolderModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowCreateFolderModal(false)}>
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-gray-900 mb-1">Create Subfolder</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              Inside <span className="font-mono bg-gray-100 px-1 rounded">{item.path}/</span>
+            </p>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Folder name</label>
+            <input
+              type="text"
+              value={newFolderName}
+              onChange={(e) => setNewFolderName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleCreateFolder(); if (e.key === "Escape") setShowCreateFolderModal(false); }}
+              className="w-full px-3 py-2 border-2 border-gray-300 rounded-xl text-sm focus:border-green-500 focus:outline-none"
+              placeholder="e.g. my-loras"
+              autoFocus
+            />
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setShowCreateFolderModal(false)}
+                className="flex-1 px-4 py-2 border-2 border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50 font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateFolder}
+                disabled={isOperating || !newFolderName.trim()}
+                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 disabled:opacity-50 font-medium"
+              >
+                {isOperating ? "Creating..." : "Create"}
               </button>
             </div>
           </div>
