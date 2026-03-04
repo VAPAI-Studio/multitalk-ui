@@ -4,6 +4,7 @@ import Homepage from "./pages/Homepage";
 import GenerationFeed from "./pages/GenerationFeed";
 import ProfileSettings from "./ProfileSettings";
 import StudioPage from "./components/StudioPage";
+import Infrastructure from "./pages/Infrastructure";
 // UI Components
 import ComfyUIStatus from "./components/ComfyUIStatus";
 import ConsoleToggle from "./components/ConsoleToggle";
@@ -534,6 +535,9 @@ export default function App() {
               studio={getStudioById("lora-studio")!}
               comfyUrl={comfyUrl}
             />
+          )}
+          {currentPage === "infrastructure-studio" && (
+            <Infrastructure comfyUrl={comfyUrl} />
           )}
 
           {/* Standalone Pages */}
