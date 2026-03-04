@@ -77,3 +77,23 @@ class MoveFolderRequest(BaseModel):
 class CreateFolderRequest(BaseModel):
     """Request to create a new folder (zero-byte S3 placeholder)."""
     path: str               # Desired folder path, e.g. "models/my-loras"
+
+
+# --- HuggingFace Download models ---
+
+class HFDownloadRequest(BaseModel):
+    """Request to start a HuggingFace model download to the RunPod network volume."""
+    url: str                          # Full HuggingFace URL (blob or resolve form)
+    target_path: str                  # Target directory on volume (e.g. "models/checkpoints")
+    hf_token: Optional[str] = None   # HF access token for gated/private repos
+
+class HFDownloadJobStatus(BaseModel):
+    """Current status of a background HF download job."""
+    job_id: str
+    status: Literal["pending", "downloading", "uploading", "done", "error"]
+    progress_pct: float = 0.0         # 0-100 within current phase
+    bytes_done: int = 0
+    total_bytes: Optional[int] = None
+    filename: str                     # Original filename being downloaded
+    s3_key: str                       # Final S3 key on the volume
+    error: Optional[str] = None       # Human-readable error message if status == "error"
