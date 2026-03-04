@@ -30,12 +30,14 @@ Decimal phases appear between their surrounding integers in numeric order.
   1. Admin user sees an "Infrastructure" section in the app navigation and can access it
   2. Non-admin user cannot see infrastructure navigation items and gets a 403 if they try API endpoints directly
   3. Admin role is read from Supabase user_metadata and available in the frontend AuthContext as an `isAdmin` property
-  4. All `/api/admin/` backend endpoints reject non-admin requests with 403 status before any business logic runs
-**Plans**: TBD
+  4. All `/api/infrastructure/` backend endpoints reject non-admin requests with 403 status before any business logic runs
+**Plans**: 4 plans in 2 waves
 
 Plans:
-- [ ] 01-01: TBD
-- [ ] 01-02: TBD
+- [ ] 01-01: Backend User Role Foundation (Wave 1) - Extend User model with role field, update /auth/me to extract and return role from Supabase metadata
+- [ ] 01-02: Backend Infrastructure API Router (Wave 2) - Create admin-protected /api/infrastructure router with health endpoint, register in main.py, document admin role implementation
+- [ ] 01-03: Frontend Auth Integration (Wave 2) - Extend AuthContext with isAdmin property, add Infrastructure studio to studioConfig with adminOnly flag
+- [ ] 01-04: Frontend Navigation & Page (Wave 2) - Filter studios by admin status, add Infrastructure page routing, create placeholder component
 
 ### Phase 2: Network Volume File Browser
 **Goal**: Admin can see and navigate every file and folder on the RunPod network volume from within the app
@@ -142,7 +144,7 @@ Note: Phase 6 depends only on Phase 1 and can run in parallel with Phases 2-5 if
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Admin Access Control | 0/2 | Not started | - |
+| 1. Admin Access Control | 0/4 | Planned | - |
 | 2. Network Volume File Browser | 0/2 | Not started | - |
 | 3. File Transfer | 0/3 | Not started | - |
 | 4. File Operations | 0/2 | Not started | - |
