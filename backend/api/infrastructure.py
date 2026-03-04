@@ -70,10 +70,31 @@ async def list_files(
     List files and folders on RunPod network volume.
     Admin-only endpoint with pagination support.
     """
+    # Check if credentials are configured before attempting S3 call
+    if not settings.RUNPOD_S3_ACCESS_KEY or not settings.RUNPOD_NETWORK_VOLUME_ID:
+        raise HTTPException(
+            status_code=400,
+            detail="S3 credentials not configured. Set RUNPOD_S3_ACCESS_KEY, RUNPOD_S3_SECRET_KEY, RUNPOD_NETWORK_VOLUME_ID, RUNPOD_S3_ENDPOINT_URL, and RUNPOD_S3_REGION in backend/.env"
+        )
+
     service = InfrastructureService()
     success, response, error = await service.list_files(path, limit, continuation_token)
 
     if not success:
-        raise HTTPException(status_code=500, detail=error)
+        # Map S3 errors to appropriate HTTP status codes (avoids client-side retry loops)
+        if error and "AccessDenied" in error:
+            raise HTTPException(
+                status_code=403,
+                detail="S3 access denied. Verify your RUNPOD_S3_ACCESS_KEY and RUNPOD_S3_SECRET_KEY have permission for this network volume."
+            )
+        elif error and "NoSuchBucket" in error:
+            raise HTTPException(
+                status_code=404,
+                detail="Network volume not found. Check RUNPOD_NETWORK_VOLUME_ID in backend/.env"
+            )
+        elif error and "Path traversal detected" in error:
+            raise HTTPException(status_code=400, detail=error)
+        else:
+            raise HTTPException(status_code=500, detail=error)
 
     return response

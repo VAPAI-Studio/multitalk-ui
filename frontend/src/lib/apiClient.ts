@@ -117,7 +117,9 @@ class ApiClient {
 
           // Don't retry on client errors (4xx), only on server errors (5xx) and network issues
           if (response.status >= 400 && response.status < 500) {
-            throw new Error(`API request failed: ${response.status} ${response.statusText}`)
+            const err = new Error(`API request failed: ${response.status} ${response.statusText}`)
+            ;(err as any).noRetry = true
+            throw err
           }
           throw new Error(`API request failed: ${response.status} ${response.statusText}`)
         }
@@ -126,9 +128,8 @@ class ApiClient {
       } catch (error) {
         clearTimeout(timeoutId)
 
-        // AbortError = intentional cancellation (React cleanup or timeout) - don't retry
-        if (error instanceof Error && error.name === 'AbortError') {
-          // Just re-throw silently - this is expected during component unmount
+        // AbortError or 4xx client errors = don't retry
+        if (error instanceof Error && (error.name === 'AbortError' || (error as any).noRetry)) {
           throw error
         }
 
