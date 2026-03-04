@@ -9,12 +9,20 @@ from botocore.exceptions import ClientError
 
 CHUNK_SIZE = 5 * 1024 * 1024  # 5MB — S3 minimum part size
 
+# Critical paths that cannot be deleted or moved.
+# ComfyUI/ and venv/ are system infrastructure required for RunPod serverless execution.
+# models/ subdirectories ARE deletable — that is the primary use case for this feature.
+PROTECTED_PATHS = frozenset([
+    "ComfyUI",
+    "venv",
+])
+
 
 class InfrastructureService:
     """Service for managing RunPod infrastructure."""
 
     @staticmethod
-    def _format_size(bytes_size: int) -> str:
+    def _format_size(bytes_size: float) -> str:
         """Convert bytes to human-readable size."""
         for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
             if bytes_size < 1024.0:
@@ -30,6 +38,17 @@ class InfrastructureService:
         # Remove leading/trailing slashes, ensure safe
         path = path.strip('/')
         return path
+
+    @staticmethod
+    def _check_protected(path: str) -> None:
+        """Raise ValueError if path is a protected system path."""
+        normalized = path.strip('/')
+        for protected in PROTECTED_PATHS:
+            if normalized == protected or normalized.startswith(protected + '/'):
+                raise ValueError(
+                    f"Path '{normalized}' is protected and cannot be deleted or moved. "
+                    f"Protected top-level directories: {sorted(PROTECTED_PATHS)}"
+                )
 
     async def list_files(
         self,
@@ -227,3 +246,68 @@ class InfrastructureService:
                 await anyio.sleep(0)  # yield control; allows connection cancellation
 
         return chunk_generator(), content_length, filename
+
+    async def delete_object(self, path: str) -> Tuple[bool, Optional[str]]:
+        """Delete a single file. S3 delete_object is idempotent (204 even if key absent)."""
+        try:
+            safe_path = self._validate_path(path)
+            self._check_protected(safe_path)
+            s3_client.delete_object(
+                Bucket=settings.RUNPOD_NETWORK_VOLUME_ID,
+                Key=safe_path
+            )
+            return True, None
+        except ValueError as e:
+            return False, str(e)
+        except ClientError as e:
+            return False, f"S3 error: {str(e)}"
+        except Exception as e:
+            return False, f"Unexpected error: {str(e)}"
+
+    async def delete_folder(self, path: str) -> Tuple[bool, int, Optional[str]]:
+        """
+        Recursively delete all objects under a folder prefix using batch delete.
+        Returns (success, deleted_count, error).
+        Uses delete_objects batches of 1000 — checks Errors in each response.
+        """
+        try:
+            safe_path = self._validate_path(path)
+            self._check_protected(safe_path)
+            prefix = safe_path.rstrip('/') + '/'
+
+            paginator = s3_client.get_paginator('list_objects_v2')
+            pages = paginator.paginate(
+                Bucket=settings.RUNPOD_NETWORK_VOLUME_ID,
+                Prefix=prefix
+            )
+
+            deleted_count = 0
+            for page in pages:
+                objects = page.get('Contents', [])
+                if not objects:
+                    continue
+                delete_payload = {
+                    'Objects': [{'Key': obj['Key']} for obj in objects],
+                    'Quiet': True  # suppress per-key success entries; saves bandwidth
+                }
+                response = s3_client.delete_objects(
+                    Bucket=settings.RUNPOD_NETWORK_VOLUME_ID,
+                    Delete=delete_payload
+                )
+                errors = response.get('Errors', [])
+                if errors:
+                    # Surface first error; partial deletion may have occurred
+                    first_err = errors[0]
+                    return False, deleted_count, (
+                        f"Failed to delete {len(errors)} object(s): "
+                        f"{first_err.get('Key')} — {first_err.get('Message', 'Unknown S3 error')}"
+                    )
+                deleted_count += len(objects)
+
+            return True, deleted_count, None
+        except ValueError as e:
+            return False, 0, str(e)
+        except ClientError as e:
+            return False, 0, f"S3 error: {str(e)}"
+        except Exception as e:
+            return False, 0, f"Unexpected error: {str(e)}"
