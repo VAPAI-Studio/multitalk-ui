@@ -82,11 +82,12 @@ Plans:
   2. Critical system paths are protected and cannot be accidentally deleted
   3. Admin can move files between directories and rename files and folders on the volume
   4. Every file operation (delete, move, rename) shows clear success or failure feedback to the admin
-**Plans**: TBD
+**Plans**: 3 plans in 3 waves
 
 Plans:
-- [ ] 04-01: TBD
-- [ ] 04-02: TBD
+- [ ] 04-01-PLAN.md — Backend service layer: PROTECTED_PATHS, delete_object, delete_folder, move_object, move_folder (Wave 1)
+- [ ] 04-02-PLAN.md — Backend API endpoints: DELETE /files, DELETE /folders, POST /files/move, POST /folders/move (Wave 2)
+- [ ] 04-03-PLAN.md — Frontend: apiClient methods + FileTreeNode Delete/Rename/Move buttons with confirmation modals (Wave 3)
 
 ### Phase 5: HuggingFace Integration
 **Goal**: Admin can download AI models from HuggingFace directly to the RunPod network volume without a local intermediary
