@@ -311,3 +311,109 @@ class InfrastructureService:
             return False, 0, f"S3 error: {str(e)}"
         except Exception as e:
             return False, 0, f"Unexpected error: {str(e)}"
+
+    async def move_object(self, source_path: str, dest_path: str) -> Tuple[bool, Optional[str]]:
+        """
+        Move or rename a single file via server-side copy then delete.
+        copy_object is S3-native — no data flows through backend memory.
+        Only deletes source AFTER successful copy.
+        """
+        try:
+            safe_src = self._validate_path(source_path)
+            safe_dst = self._validate_path(dest_path)
+            self._check_protected(safe_src)
+            if not safe_src:
+                return False, "Source path is empty"
+            if not safe_dst:
+                return False, "Destination path is empty"
+            if safe_src == safe_dst:
+                return False, "Source and destination paths are identical"
+
+            copy_source = {'Bucket': settings.RUNPOD_NETWORK_VOLUME_ID, 'Key': safe_src}
+            s3_client.copy_object(
+                CopySource=copy_source,
+                Bucket=settings.RUNPOD_NETWORK_VOLUME_ID,
+                Key=safe_dst
+            )
+            # Only delete after confirmed successful copy
+            s3_client.delete_object(
+                Bucket=settings.RUNPOD_NETWORK_VOLUME_ID,
+                Key=safe_src
+            )
+            return True, None
+        except ValueError as e:
+            return False, str(e)
+        except ClientError as e:
+            return False, f"S3 error: {str(e)}"
+        except Exception as e:
+            return False, f"Unexpected error: {str(e)}"
+
+    async def move_folder(self, source_path: str, dest_path: str) -> Tuple[bool, int, Optional[str]]:
+        """
+        Move or rename a folder by recursively copying all objects then batch-deleting originals.
+        IMPORTANT: S3 has no atomic multi-object transaction. If copy succeeds but delete fails
+        partially, both old and new locations may have partial data. This is documented behaviour
+        for Phase 4 — large folder moves on Heroku may also approach the 30s timeout.
+        Returns (success, moved_count, error).
+        """
+        try:
+            safe_src = self._validate_path(source_path)
+            safe_dst = self._validate_path(dest_path)
+            self._check_protected(safe_src)
+            if safe_src == safe_dst:
+                return False, 0, "Source and destination paths are identical"
+
+            src_prefix = safe_src.rstrip('/') + '/'
+            dst_prefix = safe_dst.rstrip('/') + '/'
+
+            paginator = s3_client.get_paginator('list_objects_v2')
+            pages = paginator.paginate(
+                Bucket=settings.RUNPOD_NETWORK_VOLUME_ID,
+                Prefix=src_prefix
+            )
+
+            # Phase 1: copy all objects to new prefix
+            source_keys = []
+            for page in pages:
+                for obj in page.get('Contents', []):
+                    old_key = obj['Key']
+                    # Replace source prefix with dest prefix
+                    new_key = dst_prefix + old_key[len(src_prefix):]
+                    s3_client.copy_object(
+                        CopySource={'Bucket': settings.RUNPOD_NETWORK_VOLUME_ID, 'Key': old_key},
+                        Bucket=settings.RUNPOD_NETWORK_VOLUME_ID,
+                        Key=new_key
+                    )
+                    source_keys.append(old_key)
+
+            if not source_keys:
+                return True, 0, None  # empty folder — nothing to move
+
+            # Phase 2: batch delete originals (only after all copies succeeded)
+            moved_count = 0
+            for i in range(0, len(source_keys), 1000):
+                batch = source_keys[i:i + 1000]
+                delete_payload = {
+                    'Objects': [{'Key': k} for k in batch],
+                    'Quiet': True
+                }
+                response = s3_client.delete_objects(
+                    Bucket=settings.RUNPOD_NETWORK_VOLUME_ID,
+                    Delete=delete_payload
+                )
+                errors = response.get('Errors', [])
+                if errors:
+                    first_err = errors[0]
+                    return False, moved_count, (
+                        f"Copies succeeded but failed to delete {len(errors)} source object(s): "
+                        f"{first_err.get('Key')} — {first_err.get('Message', 'Unknown S3 error')}"
+                    )
+                moved_count += len(batch)
+
+            return True, moved_count, None
+        except ValueError as e:
+            return False, 0, str(e)
+        except ClientError as e:
+            return False, 0, f"S3 error: {str(e)}"
+        except Exception as e:
+            return False, 0, f"Unexpected error: {str(e)}"
