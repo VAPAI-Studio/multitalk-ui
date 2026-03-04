@@ -1,5 +1,6 @@
 import { type User } from '../contexts/AuthContext';
 import { studios, standaloneApps, type StudioConfig, type StudioPageType } from '../lib/studioConfig';
+import { useMemo } from 'react';
 
 interface Props {
   onNavigate: (page: StudioPageType) => void;
@@ -105,6 +106,20 @@ function StudioCard({ studio, onClick }: { studio: StudioConfig; onClick: () => 
 }
 
 export default function Homepage({ onNavigate, user }: Props) {
+  // Compute isAdmin from user role
+  const isAdmin = useMemo(() => user?.role === 'admin', [user]);
+
+  // Filter studios based on admin status
+  const visibleStudios = useMemo(() => {
+    return studios.filter(studio => {
+      // Hide admin-only studios from non-admins
+      if (studio.adminOnly && !isAdmin) return false;
+      // Hide coming soon studios (already handled in UI but filter anyway)
+      if (studio.comingSoon) return false;
+      return true;
+    });
+  }, [isAdmin]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
       <div className="max-w-7xl mx-auto px-6 py-12">
@@ -150,7 +165,7 @@ export default function Homepage({ onNavigate, user }: Props) {
 
         {/* Studios Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-8 mb-8">
-          {studios.map((studio) => (
+          {visibleStudios.map((studio) => (
             <StudioCard
               key={studio.id}
               studio={studio}
