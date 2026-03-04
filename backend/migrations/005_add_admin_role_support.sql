@@ -1,0 +1,36 @@
+-- Migration: Add Admin Role Support
+-- Created: 2026-03-04
+-- Purpose: Document admin role implementation using Supabase app_metadata
+--
+-- IMPLEMENTATION NOTES:
+-- - Admin role stored in auth.users.raw_app_meta_data JSON field (Supabase managed)
+-- - No schema changes required (metadata fields already exist in Supabase)
+-- - Admin assignment must be done via Supabase Dashboard or service_role key
+-- - Backend verify_admin() dependency checks app_metadata.role == 'admin'
+--
+-- TO ASSIGN ADMIN ROLE TO USER:
+-- 1. Go to Supabase Dashboard > Authentication > Users
+-- 2. Find user by email
+-- 3. Edit User > App Metadata field
+-- 4. Add: { "role": "admin" }
+-- 5. Save changes
+--
+-- VERIFICATION QUERY (requires service_role access):
+-- SELECT email, raw_app_meta_data->>'role' as role
+-- FROM auth.users
+-- WHERE raw_app_meta_data->>'role' = 'admin';
+--
+-- SECURITY NOTES:
+-- - app_metadata is server-side only, not exposed to client JWT
+-- - Users cannot modify their own app_metadata
+-- - Only service_role key or Dashboard can set admin role
+-- - Frontend receives role via /api/auth/me endpoint
+--
+-- BACKEND IMPLEMENTATION:
+-- - verify_admin() dependency in backend/core/auth.py (lines 75-103)
+-- - Checks both user_metadata and app_metadata for role (prefers app_metadata)
+-- - Returns 403 Forbidden for non-admin users
+-- - All infrastructure endpoints use Depends(verify_admin) for protection
+
+-- No schema changes required for this migration
+SELECT 1; -- Placeholder for migration execution
