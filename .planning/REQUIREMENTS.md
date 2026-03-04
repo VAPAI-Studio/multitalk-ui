@@ -9,7 +9,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Admin Access Control
 
-- [ ] **ADMIN-01**: Admin user can access infrastructure management pages
+- [x] **ADMIN-01**: Admin user can access infrastructure management pages
 - [x] **ADMIN-02**: Non-admin users cannot see or access infrastructure management features
 - [x] **ADMIN-03**: Admin role is determined by Supabase user metadata flag
 - [x] **ADMIN-04**: Backend API endpoints enforce admin-only access with 403 responses for non-admins
@@ -139,7 +139,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ADMIN-01 | Phase 1 | Pending |
+| ADMIN-01 | Phase 1 | Complete |
 | ADMIN-02 | Phase 1 | Complete |
 | ADMIN-03 | Phase 1 | Complete |
 | ADMIN-04 | Phase 1 | Complete |

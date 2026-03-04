@@ -12,7 +12,7 @@ This roadmap delivers admin-only infrastructure management for RunPod serverless
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Admin Access Control** - Restrict infrastructure features to admin users with server-enforced authorization
+- [x] **Phase 1: Admin Access Control** - Restrict infrastructure features to admin users with server-enforced authorization
 - [ ] **Phase 2: Network Volume File Browser** - Browse and navigate RunPod network volume files in a hierarchical tree
 - [ ] **Phase 3: File Transfer** - Upload files to and download files from the RunPod network volume
 - [ ] **Phase 4: File Operations** - Delete, move, and rename files and folders on the network volume
@@ -37,7 +37,7 @@ Plans:
 - [x] 01-01: Backend User Role Foundation (Wave 1) - Extend User model with role field, update /auth/me to extract and return role from Supabase metadata
 - [x] 01-02: Backend Infrastructure API Router (Wave 2) - Create admin-protected /api/infrastructure router with health endpoint, register in main.py, document admin role implementation
 - [x] 01-03: Frontend Auth Integration (Wave 2) - Extend AuthContext with isAdmin property, add Infrastructure studio to studioConfig with adminOnly flag
-- [ ] 01-04: Frontend Navigation & Page (Wave 2) - Filter studios by admin status, add Infrastructure page routing, create placeholder component
+- [x] 01-04: Frontend Navigation & Page (Wave 2) - Filter studios by admin status, add Infrastructure page routing, create placeholder component (+ bug fixes for complete access control)
 
 ### Phase 2: Network Volume File Browser
 **Goal**: Admin can see and navigate every file and folder on the RunPod network volume from within the app
@@ -144,7 +144,7 @@ Note: Phase 6 depends only on Phase 1 and can run in parallel with Phases 2-5 if
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Admin Access Control | 3/4 | In progress | - |
+| 1. Admin Access Control | 4/4 | ✅ Complete | 2026-03-04 |
 | 2. Network Volume File Browser | 0/2 | Not started | - |
 | 3. File Transfer | 0/3 | Not started | - |
 | 4. File Operations | 0/2 | Not started | - |

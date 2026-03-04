@@ -66,7 +66,39 @@ metrics:
 
 ## Deviations from Plan
 
-None - plan executed exactly as written.
+### Bug Fixes Added (Post-Implementation)
+
+During manual testing, a critical bug was discovered: non-admin users could still access Infrastructure through multiple paths. The following fixes were implemented:
+
+**Bug 1: Auth endpoints missing role field**
+- **Issue:** /auth/login, /auth/register, /auth/refresh didn't return role in UserResponse
+- **Impact:** User object lacked role field, isAdmin computed incorrectly
+- **Fix:** Updated all three endpoints to extract role from app_metadata/user_metadata
+- **Commits:** 3361490, 4360650
+
+**Bug 2: No page-level access guard**
+- **Issue:** Infrastructure page component had no admin check
+- **Impact:** Direct URL navigation bypassed sidebar filtering
+- **Fix:** Added useAuth() check in Infrastructure.tsx, shows "Access Denied" for non-admins
+- **Commit:** da9b2ba
+
+**Bug 3: Homepage not filtering studios**
+- **Issue:** Homepage studio grid showed all studios including Infrastructure
+- **Impact:** Non-admins saw Infrastructure card on homepage
+- **Fix:** Added same filtering logic (useMemo with isAdmin check) to Homepage.tsx
+- **Commit:** 6dd24dc
+
+**Bug 4: Debug logging left in code**
+- **Cleanup:** Removed temporary console.log statements after confirming fixes
+- **Commit:** 3fbf135
+
+### Final Implementation
+All access points now properly secured:
+- ✅ Backend returns role in all auth responses
+- ✅ Sidebar filters admin-only studios
+- ✅ Homepage filters admin-only studios
+- ✅ Page component shows access denied for non-admins
+- ✅ localStorage validation redirects non-admins
 
 ## Verification Results
 
