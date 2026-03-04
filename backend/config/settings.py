@@ -41,6 +41,8 @@ class Settings(BaseSettings):
     RUNPOD_NETWORK_VOLUME_ID: str = ""
     RUNPOD_S3_ENDPOINT_URL: str = "https://eu-ro-1.s3.runpod.io"
     RUNPOD_S3_REGION: str = "eu-ro-1"
+    # HuggingFace access token (optional default; per-request token overrides)
+    HF_TOKEN: str = ""
 
     # Training Configuration (Flux/LoRA)
     TRAINING_WORKSPACE_DIR: str = "./training_workspace"
