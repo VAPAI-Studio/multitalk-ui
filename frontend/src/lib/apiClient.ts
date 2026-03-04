@@ -1078,6 +1078,149 @@ class ApiClient {
   async getGoogleDriveFolder(folderId: string) {
     return this.request(`/google-drive/folders/${folderId}`)
   }
+
+  // Virtual Set (World Labs / Marble API)
+  async generateVirtualSetWorld(imageData: string, displayName?: string, model?: string) {
+    return this.request('/virtual-set/generate', {
+      method: 'POST',
+      body: JSON.stringify({
+        image_data: imageData,
+        display_name: displayName || 'Virtual Set Scene',
+        model: model || 'Marble 0.1-plus',
+      }),
+    })
+  }
+
+  async getVirtualSetStatus(operationId: string) {
+    return this.request(`/virtual-set/status/${operationId}`)
+  }
+
+  async reconstructVirtualSet(screenshotData: string, originalImageData: string, prompt?: string) {
+    return this.request('/virtual-set/reconstruct', {
+      method: 'POST',
+      body: JSON.stringify({
+        screenshot_data: screenshotData,
+        original_image_data: originalImageData,
+        prompt: prompt || '',
+      }),
+    })
+  }
+
+  async saveVirtualSetWorld(imageData: string, splatUrl: string, worldId?: string, model?: string) {
+    return this.request('/virtual-set/save-world', {
+      method: 'POST',
+      body: JSON.stringify({
+        image_data: imageData,
+        splat_url: splatUrl,
+        world_id: worldId || null,
+        model: model || 'Marble 0.1-plus',
+      }),
+    })
+  }
+
+  async checkVirtualSetConfig() {
+    return this.request('/virtual-set/health')
+  }
+
+  // ============================================================================
+  // RunPod Serverless Methods
+  // ============================================================================
+
+  async submitWorkflowToRunPod(
+    workflowName: string,
+    parameters: Record<string, any>,
+    endpointId?: string
+  ) {
+    return this.request('/runpod/submit-workflow', {
+      method: 'POST',
+      body: JSON.stringify({
+        workflow_name: workflowName,
+        parameters,
+        endpoint_id: endpointId
+      })
+    })
+  }
+
+  async getRunPodJobStatus(jobId: string, endpointId?: string) {
+    const params = new URLSearchParams()
+    if (endpointId) params.append('endpoint_id', endpointId)
+
+    const query = params.toString()
+    return this.request(`/runpod/status/${jobId}${query ? `?${query}` : ''}`)
+  }
+
+  async cancelRunPodJob(jobId: string, endpointId?: string) {
+    const params = new URLSearchParams()
+    if (endpointId) params.append('endpoint_id', endpointId)
+
+    const query = params.toString()
+    return this.request(`/runpod/cancel/${jobId}${query ? `?${query}` : ''}`, {
+      method: 'POST'
+    })
+  }
+
+  async getRunPodHealth() {
+    return this.request('/runpod/health')
+  }
+
+  async getRunPodEndpointInfo(endpointId?: string) {
+    const params = new URLSearchParams()
+    if (endpointId) params.append('endpoint_id', endpointId)
+
+    const query = params.toString()
+    return this.request(`/runpod/endpoint-info${query ? `?${query}` : ''}`)
+  }
+
+  async updateUserMetadata(metadata: Record<string, any>) {
+    return this.request('/auth/update-metadata', {
+      method: 'PUT',
+      body: JSON.stringify(metadata)
+    })
+  }
+
+  // ============================================================================
+  // Infrastructure / Network Volume File Browser Methods
+  // ============================================================================
+
+  /**
+   * List files and folders on RunPod network volume
+   * @param path Directory path (empty string for root)
+   * @param limit Max items per page (default 200)
+   * @param continuationToken Pagination token from previous response
+   */
+  async listFiles(
+    path: string = "",
+    limit: number = 200,
+    continuationToken?: string
+  ): Promise<{
+    items: Array<{
+      type: "file" | "folder";
+      name: string;
+      path: string;
+      size: number | null;
+      sizeHuman: string | null;
+      lastModified: string | null;
+      childCount: number | null;
+    }>;
+    totalItems: number;
+    hasMore: boolean;
+    continuationToken: string | null;
+  }> {
+    const params = new URLSearchParams({
+      path,
+      limit: limit.toString(),
+    });
+    if (continuationToken) {
+      params.append("continuation_token", continuationToken);
+    }
+
+    return this.request(`/infrastructure/files?${params.toString()}`);
+  }
+
+  // Helper method for authenticated requests (backward compatibility)
+  async fetchWithAuth(endpoint: string, options: RequestInit = {}) {
+    return this.request(endpoint, options);
+  }
 }
 
 export const apiClient = new ApiClient()
