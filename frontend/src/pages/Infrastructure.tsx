@@ -1,5 +1,5 @@
-import React from "react";
 import { useAuth } from "../contexts/AuthContext";
+import { FileTree } from "../components/FileTree";
 
 interface Props {
   comfyUrl: string;
@@ -38,22 +38,29 @@ export default function Infrastructure({ comfyUrl }: Props) {
             </p>
           </div>
 
-          {/* Placeholder Content */}
-          <div className="rounded-3xl border border-gray-200/80 p-6 md:p-8 shadow-lg bg-gradient-to-br from-white to-gray-50/50 backdrop-blur-sm">
-            <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
-              <div className="w-2 h-8 bg-gradient-to-b from-slate-500 to-gray-700 rounded-full"></div>
-              Coming in Phase 2
+          {/* File Browser */}
+          <div className="space-y-4">
+            <FileTree />
+          </div>
+
+          {/* Instructions Card */}
+          <div className="rounded-3xl border border-blue-200/80 p-6 shadow-lg bg-gradient-to-br from-blue-50 to-white">
+            <h2 className="text-lg font-bold text-blue-900 mb-3 flex items-center gap-2">
+              <span>ℹ️</span>
+              Setup Instructions
             </h2>
-            <div className="space-y-4 text-gray-600">
-              <p>Infrastructure management features will be added in upcoming phases:</p>
-              <ul className="list-disc list-inside space-y-2 ml-4">
-                <li><strong>Phase 2:</strong> Network Volume File Browser</li>
-                <li><strong>Phase 3:</strong> File Upload and Download</li>
-                <li><strong>Phase 4:</strong> File Operations (delete, move, rename)</li>
-                <li><strong>Phase 5:</strong> HuggingFace Direct Downloads</li>
-                <li><strong>Phase 6:</strong> Dockerfile Editor</li>
-                <li><strong>Phase 7:</strong> GitHub Integration</li>
+            <div className="space-y-2 text-sm text-blue-800">
+              <p>To use the file browser, configure your RunPod S3 credentials in the backend .env file:</p>
+              <ul className="list-disc list-inside space-y-1 ml-2 text-blue-700">
+                <li>RUNPOD_S3_ACCESS_KEY</li>
+                <li>RUNPOD_S3_SECRET_KEY</li>
+                <li>RUNPOD_NETWORK_VOLUME_ID</li>
+                <li>RUNPOD_S3_ENDPOINT_URL</li>
+                <li>RUNPOD_S3_REGION</li>
               </ul>
+              <p className="mt-3 text-xs text-blue-600">
+                Get these credentials from: RunPod Dashboard → Storage → Network Volumes → S3 API Access
+              </p>
             </div>
           </div>
         </div>
