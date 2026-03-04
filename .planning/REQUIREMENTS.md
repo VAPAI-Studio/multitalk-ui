@@ -139,13 +139,56 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (To be filled by roadmapper) | | |
+| ADMIN-01 | Phase 1 | Pending |
+| ADMIN-02 | Phase 1 | Pending |
+| ADMIN-03 | Phase 1 | Pending |
+| ADMIN-04 | Phase 1 | Pending |
+| VOL-01 | Phase 2 | Pending |
+| VOL-02 | Phase 2 | Pending |
+| VOL-03 | Phase 2 | Pending |
+| VOL-04 | Phase 2 | Pending |
+| VOL-05 | Phase 2 | Pending |
+| UPLOAD-01 | Phase 3 | Pending |
+| UPLOAD-02 | Phase 3 | Pending |
+| UPLOAD-03 | Phase 3 | Pending |
+| UPLOAD-04 | Phase 3 | Pending |
+| UPLOAD-05 | Phase 3 | Pending |
+| DWNLD-01 | Phase 3 | Pending |
+| DWNLD-02 | Phase 3 | Pending |
+| DWNLD-03 | Phase 3 | Pending |
+| DWNLD-04 | Phase 3 | Pending |
+| FILEOP-01 | Phase 4 | Pending |
+| FILEOP-02 | Phase 4 | Pending |
+| FILEOP-03 | Phase 4 | Pending |
+| FILEOP-04 | Phase 4 | Pending |
+| FILEOP-05 | Phase 4 | Pending |
+| FILEOP-06 | Phase 4 | Pending |
+| HF-01 | Phase 5 | Pending |
+| HF-02 | Phase 5 | Pending |
+| HF-03 | Phase 5 | Pending |
+| HF-04 | Phase 5 | Pending |
+| HF-05 | Phase 5 | Pending |
+| HF-06 | Phase 5 | Pending |
+| HF-07 | Phase 5 | Pending |
+| DOCKER-01 | Phase 6 | Pending |
+| DOCKER-02 | Phase 6 | Pending |
+| DOCKER-03 | Phase 6 | Pending |
+| DOCKER-04 | Phase 6 | Pending |
+| DOCKER-05 | Phase 6 | Pending |
+| DOCKER-06 | Phase 6 | Pending |
+| DOCKER-07 | Phase 6 | Pending |
+| GIT-01 | Phase 7 | Pending |
+| GIT-02 | Phase 7 | Pending |
+| GIT-03 | Phase 7 | Pending |
+| GIT-04 | Phase 7 | Pending |
+| GIT-05 | Phase 7 | Pending |
+| GIT-06 | Phase 7 | Pending |
 
 **Coverage:**
-- v1 requirements: 38 total
-- Mapped to phases: (pending)
-- Unmapped: (pending)
+- v1 requirements: 44 total
+- Mapped to phases: 44
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-04*
-*Last updated: 2026-03-04 after initial definition*
+*Last updated: 2026-03-04 after roadmap creation*
