@@ -1373,6 +1373,49 @@ class ApiClient {
     });
   }
 
+  // ============================================================================
+  // HuggingFace Download Methods
+  // ============================================================================
+
+  /**
+   * Start a HuggingFace model download to the RunPod network volume.
+   * Returns job_id immediately — poll getHFDownloadStatus for progress.
+   * @param url         Full HuggingFace URL (blob or resolve form)
+   * @param targetPath  Target directory on volume (e.g. "models/checkpoints")
+   * @param hfToken     Optional HF access token for gated/private repos
+   */
+  async startHFDownload(
+    url: string,
+    targetPath: string,
+    hfToken?: string
+  ): Promise<{ success: boolean; job_id: string; filename: string; s3_key: string }> {
+    return this.request('/infrastructure/hf-download', {
+      method: 'POST',
+      body: JSON.stringify({
+        url,
+        target_path: targetPath,
+        hf_token: hfToken || undefined,
+      }),
+    });
+  }
+
+  /**
+   * Poll the status of a HuggingFace download job.
+   * Call every 2-3 seconds until status === "done" or "error".
+   */
+  async getHFDownloadStatus(jobId: string): Promise<{
+    job_id: string;
+    status: 'pending' | 'downloading' | 'uploading' | 'done' | 'error';
+    progress_pct: number;
+    bytes_done: number;
+    total_bytes: number | null;
+    filename: string;
+    s3_key: string;
+    error: string | null;
+  }> {
+    return this.request(`/infrastructure/hf-download/${encodeURIComponent(jobId)}`);
+  }
+
   // Helper method for authenticated requests (backward compatibility)
   async fetchWithAuth(endpoint: string, options: RequestInit = {}) {
     return this.request(endpoint, options);
