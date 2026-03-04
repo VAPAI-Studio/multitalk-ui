@@ -1,7 +1,9 @@
 """Infrastructure management API endpoints (admin-only)."""
-from fastapi import APIRouter, Depends
-from typing import Dict, Any
+from fastapi import APIRouter, Depends, HTTPException, Query
+from typing import Dict, Any, Optional
 from core.auth import verify_admin
+from models.infrastructure import FileSystemResponse
+from services.infrastructure_service import InfrastructureService
 
 router = APIRouter(prefix="/api/infrastructure", tags=["infrastructure"])
 
@@ -23,3 +25,23 @@ async def infrastructure_health(
         "message": "Infrastructure API available",
         "admin_user_id": admin_user.id
     }
+
+
+@router.get("/files", response_model=FileSystemResponse)
+async def list_files(
+    path: str = Query(default="", description="Directory path to list"),
+    limit: int = Query(default=200, le=500, description="Max items per page"),
+    continuation_token: Optional[str] = Query(default=None, description="Pagination token"),
+    admin_user: dict = Depends(verify_admin)
+) -> FileSystemResponse:
+    """
+    List files and folders on RunPod network volume.
+    Admin-only endpoint with pagination support.
+    """
+    service = InfrastructureService()
+    success, response, error = await service.list_files(path, limit, continuation_token)
+
+    if not success:
+        raise HTTPException(status_code=500, detail=error)
+
+    return response
