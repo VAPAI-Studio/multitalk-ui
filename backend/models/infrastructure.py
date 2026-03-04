@@ -55,3 +55,21 @@ class AbortUploadRequest(BaseModel):
     """Request to abort and clean up a failed multipart upload."""
     upload_id: str
     key: str                # same key returned by init
+
+
+# --- File operation models ---
+
+class DeleteRequest(BaseModel):
+    """Request to delete a single file or folder on the network volume."""
+    path: str               # S3 key (file) or prefix without trailing slash (folder)
+    is_folder: bool = False # True triggers recursive deletion
+
+class MoveFileRequest(BaseModel):
+    """Request to move or rename a single file."""
+    source_path: str        # Current S3 key
+    dest_path: str          # New S3 key (may be in a different directory)
+
+class MoveFolderRequest(BaseModel):
+    """Request to move or rename a folder (recursive copy + delete)."""
+    source_path: str        # Current folder prefix (no trailing slash)
+    dest_path: str          # New folder prefix (no trailing slash)
