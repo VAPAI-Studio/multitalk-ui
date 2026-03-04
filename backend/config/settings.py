@@ -1,3 +1,4 @@
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 from typing import List
 
@@ -81,6 +82,13 @@ class Settings(BaseSettings):
     DEFAULT_PAGE_SIZE: int = 20
     MAX_PAGE_SIZE: int = 100
     
+    @field_validator('ALLOWED_ORIGINS', 'ALLOWED_EMAIL_DOMAINS', 'ALLOWED_IMAGE_TYPES', mode='before')
+    @classmethod
+    def parse_list_fields(cls, v):
+        if isinstance(v, str):
+            return [item.strip() for item in v.split(',') if item.strip()]
+        return v
+
     model_config = {
         "env_file": ".env",
         "case_sensitive": True,
