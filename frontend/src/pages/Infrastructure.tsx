@@ -1,10 +1,28 @@
 import React from "react";
+import { useAuth } from "../contexts/AuthContext";
 
 interface Props {
   comfyUrl: string;
 }
 
 export default function Infrastructure({ comfyUrl }: Props) {
+  const { isAdmin } = useAuth();
+
+  // Admin-only access control
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-orange-50 flex items-center justify-center p-6">
+        <div className="max-w-md w-full rounded-3xl border border-red-200/80 p-8 shadow-lg bg-white text-center space-y-4">
+          <div className="text-6xl">🚫</div>
+          <h1 className="text-2xl font-bold text-gray-900">Access Denied</h1>
+          <p className="text-gray-600">
+            This section is restricted to administrators only. If you believe you should have access, please contact your system administrator.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-gray-50">
       <div className="flex gap-6 p-6 md:p-10">
