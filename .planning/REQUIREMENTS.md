@@ -44,7 +44,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **FILEOP-03**: Critical system paths are protected from accidental deletion
 - [x] **FILEOP-04**: Admin can move files between directories on the volume
 - [x] **FILEOP-05**: Admin can rename files and folders
-- [ ] **FILEOP-06**: File operations show success/failure feedback to admin
+- [x] **FILEOP-06**: File operations show success/failure feedback to admin
 
 ### HuggingFace Integration
 
@@ -162,7 +162,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FILEOP-03 | Phase 4 | Complete |
 | FILEOP-04 | Phase 4 | Complete |
 | FILEOP-05 | Phase 4 | Complete |
-| FILEOP-06 | Phase 4 | Pending |
+| FILEOP-06 | Phase 4 | Complete |
 | HF-01 | Phase 5 | Pending |
 | HF-02 | Phase 5 | Pending |
 | HF-03 | Phase 5 | Pending |
