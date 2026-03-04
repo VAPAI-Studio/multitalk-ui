@@ -283,3 +283,53 @@ async def delete_folder(
             raise HTTPException(status_code=403, detail=error)
         raise HTTPException(status_code=500, detail=error)
     return {"success": True, "path": path, "deleted_count": deleted_count}
+
+
+@router.post("/files/move")
+async def move_file(
+    payload: MoveFileRequest,
+    admin_user: dict = Depends(verify_admin)
+) -> dict:
+    """
+    Move or rename a single file via server-side S3 copy + delete.
+    No data flows through the backend — copy_object is an S3-native operation.
+    Admin-only.
+    """
+    if not settings.RUNPOD_S3_ACCESS_KEY or not settings.RUNPOD_NETWORK_VOLUME_ID:
+        raise HTTPException(status_code=400, detail="S3 credentials not configured")
+
+    service = InfrastructureService()
+    success, error = await service.move_object(payload.source_path, payload.dest_path)
+    if not success:
+        if error and "protected" in error.lower():
+            raise HTTPException(status_code=403, detail=error)
+        raise HTTPException(status_code=500, detail=error)
+    return {"success": True, "source_path": payload.source_path, "dest_path": payload.dest_path}
+
+
+@router.post("/folders/move")
+async def move_folder_endpoint(
+    payload: MoveFolderRequest,
+    admin_user: dict = Depends(verify_admin)
+) -> dict:
+    """
+    Move or rename a folder by recursively copying all objects then batch-deleting originals.
+    NOTE: S3 has no atomic multi-object transaction. Large folder operations may approach
+    Heroku's 30-second timeout. For very large folders (>1000 files), consider smaller batches.
+    Admin-only.
+    """
+    if not settings.RUNPOD_S3_ACCESS_KEY or not settings.RUNPOD_NETWORK_VOLUME_ID:
+        raise HTTPException(status_code=400, detail="S3 credentials not configured")
+
+    service = InfrastructureService()
+    success, moved_count, error = await service.move_folder(payload.source_path, payload.dest_path)
+    if not success:
+        if error and "protected" in error.lower():
+            raise HTTPException(status_code=403, detail=error)
+        raise HTTPException(status_code=500, detail=error)
+    return {
+        "success": True,
+        "source_path": payload.source_path,
+        "dest_path": payload.dest_path,
+        "moved_count": moved_count
+    }
