@@ -26,7 +26,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **UPLOAD-01**: Admin can upload files from local machine to RunPod network volume
 - [x] **UPLOAD-02**: File upload supports files up to 10GB using chunked/multipart upload
-- [ ] **UPLOAD-03**: Upload progress indicator shows percentage and estimated time remaining
+- [x] **UPLOAD-03**: Upload progress indicator shows percentage and estimated time remaining
 - [x] **UPLOAD-04**: Admin can select target directory before uploading
 - [x] **UPLOAD-05**: Upload handles network interruptions gracefully (retry or resume)
 
@@ -150,7 +150,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | VOL-05 | Phase 2 | Complete |
 | UPLOAD-01 | Phase 3 | Complete |
 | UPLOAD-02 | Phase 3 | Complete |
-| UPLOAD-03 | Phase 3 | Pending |
+| UPLOAD-03 | Phase 3 | Complete |
 | UPLOAD-04 | Phase 3 | Complete |
 | UPLOAD-05 | Phase 3 | Complete |
 | DWNLD-01 | Phase 3 | Complete |

@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-04T20:39:39.312Z"
+last_updated: "2026-03-04T20:52:10.469Z"
 progress:
   total_phases: 3
   completed_phases: 2
   total_plans: 11
-  completed_plans: 9
+  completed_plans: 10
 ---
 
 # Project State
@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-03-04)
 Phase: 3 of 7 (File Transfer)
 Plan: 1 of TBD in current phase
 Status: In progress
-Last activity: 2026-03-04 -- Completed Plan 03-01 (Backend File Transfer API)
+Last activity: 2026-03-04 -- Completed Plan 03-02 (Frontend FileUpload component + apiClient upload methods)
 
 Progress: [████████░░] 57% (2 of 7 phases complete)
 
@@ -60,6 +60,7 @@ Progress: [████████░░] 57% (2 of 7 phases complete)
 | Phase 02 P03 | 169 | 4 tasks | 4 files |
 | Phase 02 P04 | checkpoint | human-verify | pass |
 | Phase 03-file-transfer P01 | 105 | 3 tasks | 3 files |
+| Phase 03-file-transfer P02 | 393 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -89,6 +90,9 @@ Recent decisions affecting current work:
 - [Phase 02-03]: Health endpoint performs minimal S3 operation (MaxKeys=1) for fast connectivity test
 - [Phase 03-file-transfer]: CHUNK_SIZE=5MB at module level in service; abort endpoint must be called on any upload failure
 - [Phase 03-file-transfer]: Streaming download uses anyio.sleep(0) in async generator to yield control and enable Heroku keep-alive
+- [Phase 03-file-transfer]: XHR for part upload (not fetch) — only browser API with upload progress events
+- [Phase 03-file-transfer]: Per-part retry (3x, exponential backoff) before propagating to abort — transient failures should not abort large uploads
+- [Phase 03-file-transfer]: key={refreshTrigger} on FileTree causes remount+reload on upload complete (simpler than imperative callback)
 
 ### Pending Todos
 
@@ -102,5 +106,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-03-04
-Stopped at: Completed 03-01-PLAN.md (backend file transfer API — 5 endpoints, 6 models, streaming download)
+Stopped at: Completed 03-02-PLAN.md (frontend upload: FileUpload component, XHR chunked upload, per-part retry, Infrastructure wiring)
 Resume file: None
