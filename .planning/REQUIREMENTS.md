@@ -34,16 +34,16 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **DWNLD-01**: Admin can download files from RunPod network volume to local machine
 - [x] **DWNLD-02**: Download uses presigned S3 URLs with streaming (no backend buffering)
-- [ ] **DWNLD-03**: Admin receives download initiation confirmation
+- [x] **DWNLD-03**: Admin receives download initiation confirmation
 - [x] **DWNLD-04**: Download works for files of any size without timeout
 
 ### File Operations
 
-- [ ] **FILEOP-01**: Admin can delete individual files with confirmation dialog
-- [ ] **FILEOP-02**: Admin can delete folders with recursive deletion warning
-- [ ] **FILEOP-03**: Critical system paths are protected from accidental deletion
-- [ ] **FILEOP-04**: Admin can move files between directories on the volume
-- [ ] **FILEOP-05**: Admin can rename files and folders
+- [x] **FILEOP-01**: Admin can delete individual files with confirmation dialog
+- [x] **FILEOP-02**: Admin can delete folders with recursive deletion warning
+- [x] **FILEOP-03**: Critical system paths are protected from accidental deletion
+- [x] **FILEOP-04**: Admin can move files between directories on the volume
+- [x] **FILEOP-05**: Admin can rename files and folders
 - [ ] **FILEOP-06**: File operations show success/failure feedback to admin
 
 ### HuggingFace Integration
@@ -155,13 +155,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UPLOAD-05 | Phase 3 | Complete |
 | DWNLD-01 | Phase 3 | Complete |
 | DWNLD-02 | Phase 3 | Complete |
-| DWNLD-03 | Phase 3 | Pending |
+| DWNLD-03 | Phase 3 | Complete |
 | DWNLD-04 | Phase 3 | Complete |
-| FILEOP-01 | Phase 4 | Pending |
-| FILEOP-02 | Phase 4 | Pending |
-| FILEOP-03 | Phase 4 | Pending |
-| FILEOP-04 | Phase 4 | Pending |
-| FILEOP-05 | Phase 4 | Pending |
+| FILEOP-01 | Phase 4 | Complete |
+| FILEOP-02 | Phase 4 | Complete |
+| FILEOP-03 | Phase 4 | Complete |
+| FILEOP-04 | Phase 4 | Complete |
+| FILEOP-05 | Phase 4 | Complete |
 | FILEOP-06 | Phase 4 | Pending |
 | HF-01 | Phase 5 | Pending |
 | HF-02 | Phase 5 | Pending |

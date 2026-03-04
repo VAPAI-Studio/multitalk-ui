@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-04T21:46:55.234Z"
+last_updated: "2026-03-04T22:22:03.322Z"
 progress:
-  total_phases: 3
+  total_phases: 4
   completed_phases: 3
-  total_plans: 11
-  completed_plans: 11
+  total_plans: 14
+  completed_plans: 12
 ---
 
 # Project State
@@ -18,16 +18,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** Enable self-service infrastructure management for RunPod serverless workflows without leaving the application
-**Current focus:** Phase 3: File Transfer — COMPLETE
+**Current focus:** Phase 4: File Operations — In Progress
 
 ## Current Position
 
-Phase: 3 of 7 (File Transfer) — COMPLETE
-Plan: 3 of 3 in current phase — all plans complete
-Status: Complete
-Last activity: 2026-03-04 -- Completed Plan 03-03 (Download button in FileTreeNode, human-verified)
+Phase: 4 of 7 (File Operations) — In Progress
+Plan: 1 of 3 complete in current phase
+Status: In Progress
+Last activity: 2026-03-04 -- Completed Plan 04-01 (service layer: PROTECTED_PATHS, delete_object, delete_folder, move_object, move_folder)
 
-Progress: [████████░░] 57% (phases 1-2 complete; phase 3 plans all complete, awaiting next phase)
+Progress: [████████░░] 62% (phases 1-3 complete; phase 4 plan 1 of 3 complete)
 
 ## Performance Metrics
 
@@ -62,6 +62,7 @@ Progress: [████████░░] 57% (phases 1-2 complete; phase 3 pla
 | Phase 03-file-transfer P01 | 105 | 3 tasks | 3 files |
 | Phase 03-file-transfer P02 | 393 | 2 tasks | 4 files |
 | Phase 03-file-transfer P03 | 300 | 1 tasks | 2 files |
+| Phase 04-file-operations P01 | 120 | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -96,6 +97,7 @@ Recent decisions affecting current work:
 - [Phase 03-file-transfer]: key={refreshTrigger} on FileTree causes remount+reload on upload complete (simpler than imperative callback)
 - [Phase 03-file-transfer]: fetch+blob for download: streams to browser memory before save dialog — acceptable for admin files, documented >1GB limitation
 - [Phase 03-file-transfer]: e.stopPropagation() on download button prevents folder-expand toggle from firing on file rows
+- [Phase 04-file-operations]: PROTECTED_PATHS as module-level frozenset guards all S3 mutations; delete_folder/move_folder return deleted/moved count for UI feedback
 
 ### Pending Todos
 
@@ -109,5 +111,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-03-04
-Stopped at: Completed 03-03-PLAN.md (download button: apiClient.downloadFile fetch+blob, FileTreeNode Download button with spinner and inline error, human-verified)
+Stopped at: Completed 04-01-PLAN.md (service layer: PROTECTED_PATHS, delete_object, delete_folder, move_object, move_folder — all four operations + Pydantic models)
 Resume file: None
