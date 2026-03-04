@@ -4,27 +4,59 @@ from typing import Dict, Any, Optional
 from core.auth import verify_admin
 from models.infrastructure import FileSystemResponse
 from services.infrastructure_service import InfrastructureService
+from core.s3_client import s3_client
+from config.settings import settings
+from botocore.exceptions import ClientError
 
 router = APIRouter(prefix="/api/infrastructure", tags=["infrastructure"])
 
 
 @router.get("/health")
 async def infrastructure_health(
-    admin_user: dict = Depends(verify_admin)  # Per-endpoint protection
+    admin_user: dict = Depends(verify_admin)
 ) -> Dict[str, Any]:
     """
-    Infrastructure health check endpoint.
-    Admin-only: Returns basic status.
+    Infrastructure health check endpoint with S3 connectivity test.
+    Admin-only: Returns API status and S3 connection status.
 
     NOTE: This project uses per-endpoint protection, not router-level dependencies.
     All future endpoints added to this router must explicitly include
     Depends(verify_admin) in their signature to ensure admin-only access.
     """
-    return {
+    # Basic API health
+    result = {
         "success": True,
         "message": "Infrastructure API available",
-        "admin_user_id": admin_user.id
+        "admin_user_id": admin_user.id,
+        "s3_connected": False,
+        "s3_bucket": settings.RUNPOD_NETWORK_VOLUME_ID,
+        "s3_error": None
     }
+
+    # Test S3 connectivity
+    if not settings.RUNPOD_S3_ACCESS_KEY or not settings.RUNPOD_NETWORK_VOLUME_ID:
+        result["s3_error"] = "S3 credentials not configured. Set RUNPOD_S3_ACCESS_KEY, RUNPOD_S3_SECRET_KEY, and RUNPOD_NETWORK_VOLUME_ID in .env"
+        return result
+
+    try:
+        # Try to list bucket (empty prefix, limit 1 to minimize overhead)
+        response = s3_client.list_objects_v2(
+            Bucket=settings.RUNPOD_NETWORK_VOLUME_ID,
+            Prefix="",
+            MaxKeys=1
+        )
+        result["s3_connected"] = True
+        result["message"] = "Infrastructure API and S3 connection healthy"
+
+    except ClientError as e:
+        error_code = e.response.get('Error', {}).get('Code', 'Unknown')
+        error_message = e.response.get('Error', {}).get('Message', str(e))
+        result["s3_error"] = f"S3 error ({error_code}): {error_message}"
+
+    except Exception as e:
+        result["s3_error"] = f"Unexpected S3 error: {str(e)}"
+
+    return result
 
 
 @router.get("/files", response_model=FileSystemResponse)
