@@ -20,7 +20,6 @@ from models.infrastructure import (
 from services.infrastructure_service import InfrastructureService
 from services.hf_download_service import (
     parse_hf_url,
-    validate_hf_url,
     new_job,
     get_hf_job,
     start_hf_download_job,
@@ -377,13 +376,14 @@ async def start_hf_download(
     Returns job_id immediately — poll GET /hf-download/{job_id} for status.
     Admin-only.
 
-    Flow: validate URL (dry_run) → create job → fire background task → return job_id.
+    Flow: parse URL → create job → fire background task → return job_id.
     Background task: hf_hub_download to /tmp → S3 multipart upload → delete /tmp.
+    Auth/not-found errors surface via polling (status === "error").
     """
     if not settings.RUNPOD_S3_ACCESS_KEY or not settings.RUNPOD_NETWORK_VOLUME_ID:
         raise HTTPException(status_code=400, detail="S3 credentials not configured")
 
-    # Step 1: Parse URL to extract repo_id and filename
+    # Step 1: Parse URL to extract repo_id and filename (format validation only)
     try:
         repo_id, filename = parse_hf_url(payload.url)
     except ValueError as e:
@@ -392,20 +392,15 @@ async def start_hf_download(
     # Step 2: Resolve HF token (per-request takes priority over settings default)
     hf_token = payload.hf_token or settings.HF_TOKEN or None
 
-    # Step 3: Validate URL (dry_run — no download, just metadata check)
-    try:
-        validate_hf_url(repo_id, filename, hf_token)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-    # Step 4: Determine S3 key
+    # Step 3: Determine S3 key
     target = payload.target_path.rstrip("/")
     s3_key = f"{target}/{filename}" if target else filename
 
-    # Step 5: Create in-memory job record
+    # Step 4: Create in-memory job record
     job_id = new_job(filename, s3_key)
 
-    # Step 6: Fire background task — runs in threadpool, response returned immediately
+    # Step 5: Fire background task — runs in threadpool, response returned immediately
+    # Auth/not-found/gated errors are caught inside _blocking_hf_download_and_upload
     background_tasks.add_task(
         start_hf_download_job, job_id, repo_id, filename, s3_key, hf_token
     )
