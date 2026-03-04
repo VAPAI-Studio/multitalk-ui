@@ -290,6 +290,17 @@ class InfrastructureService:
                     )
                     deleted_count += 1
 
+            # Also delete the folder placeholder itself (zero-byte key with trailing slash).
+            # list_objects_v2 may or may not include it depending on the S3 implementation,
+            # so we delete it explicitly as a no-op-safe cleanup.
+            try:
+                s3_client.delete_object(
+                    Bucket=settings.RUNPOD_NETWORK_VOLUME_ID,
+                    Key=prefix
+                )
+            except Exception:
+                pass  # idempotent — ignore if key didn't exist
+
             return True, deleted_count, None
         except ValueError as e:
             return False, 0, str(e)

@@ -128,7 +128,7 @@ export function FileTree({ currentPath: externalPath, onNavigate, onRefreshReque
         {!isLoading && !error && rootItems.length > 0 && (
           <div className="py-2">
             {rootItems.map((item) => (
-              <FileTreeNode key={item.path} item={item} depth={0} />
+              <FileTreeNode key={item.path} item={item} depth={0} onOperationComplete={handleRefresh} />
             ))}
           </div>
         )}
