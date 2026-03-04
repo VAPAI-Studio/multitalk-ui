@@ -1285,6 +1285,41 @@ class ApiClient {
     });
   }
 
+  /**
+   * Download a file from the RunPod network volume.
+   * Streams through the authenticated backend proxy (RunPod S3 does not support presigned URLs).
+   * Uses fetch+blob — works for typical admin files. Large files (>1GB) may require
+   * significant browser memory; this is a known limitation of the fetch+blob approach.
+   * @param filePath  Full S3 key (e.g. "models/checkpoints/my-model.safetensors")
+   * @param filename  Filename for the browser save dialog
+   */
+  async downloadFile(filePath: string, filename: string): Promise<void> {
+    const token = this.getAuthToken();
+    const url = `${this.baseURL}/infrastructure/download?path=${encodeURIComponent(filePath)}`;
+
+    const response = await fetch(url, {
+      headers: {
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => response.statusText);
+      throw new Error(`Download failed: ${response.status} ${errorText}`);
+    }
+
+    // Stream to blob then trigger browser save dialog
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = objectUrl;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(objectUrl);
+  }
+
   // Helper method for authenticated requests (backward compatibility)
   async fetchWithAuth(endpoint: string, options: RequestInit = {}) {
     return this.request(endpoint, options);
