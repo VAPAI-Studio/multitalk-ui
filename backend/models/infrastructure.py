@@ -19,3 +19,39 @@ class FileSystemResponse(BaseModel):
     totalItems: int
     hasMore: bool
     continuationToken: Optional[str] = None
+
+
+# --- Upload models ---
+
+class UploadInitRequest(BaseModel):
+    """Request to start a multipart upload."""
+    filename: str           # original filename (not a path)
+    target_path: str        # directory on S3 to upload into (e.g. "models/checkpoints")
+    file_size: int          # total bytes — used to compute total_parts for frontend
+
+class UploadInitResponse(BaseModel):
+    """Returned after creating a multipart upload on S3."""
+    upload_id: str          # S3 UploadId — must be passed back for each part
+    key: str                # full S3 key: target_path/filename
+    total_parts: int        # ceil(file_size / CHUNK_SIZE) — tells frontend how many parts to send
+
+class UploadPartResponse(BaseModel):
+    """Returned after each part is successfully uploaded."""
+    part_number: int
+    etag: str               # MD5 of part content; pass verbatim to complete step
+
+class CompletePartInfo(BaseModel):
+    """A single part descriptor for the complete-upload request."""
+    part_number: int
+    etag: str               # exactly as returned by UploadPartResponse
+
+class CompleteUploadRequest(BaseModel):
+    """Request to finalize a multipart upload."""
+    upload_id: str
+    key: str                # same key returned by init
+    parts: List[CompletePartInfo]  # sorted by part_number ascending
+
+class AbortUploadRequest(BaseModel):
+    """Request to abort and clean up a failed multipart upload."""
+    upload_id: str
+    key: str                # same key returned by init
