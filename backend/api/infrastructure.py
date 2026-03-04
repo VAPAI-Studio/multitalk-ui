@@ -1,5 +1,5 @@
 """Infrastructure management API endpoints (admin-only)."""
-from fastapi import APIRouter, Depends, HTTPException, Query, File, Form, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, File, Form, UploadFile
 from fastapi.responses import StreamingResponse
 from typing import Dict, Any, Optional
 from core.auth import verify_admin
@@ -14,8 +14,17 @@ from models.infrastructure import (
     MoveFileRequest,
     MoveFolderRequest,
     CreateFolderRequest,
+    HFDownloadRequest,
+    HFDownloadJobStatus,
 )
 from services.infrastructure_service import InfrastructureService
+from services.hf_download_service import (
+    parse_hf_url,
+    validate_hf_url,
+    new_job,
+    get_hf_job,
+    start_hf_download_job,
+)
 from core.s3_client import s3_client
 from config.settings import settings
 from botocore.exceptions import ClientError
@@ -355,3 +364,72 @@ async def create_folder(
             raise HTTPException(status_code=403, detail=error)
         raise HTTPException(status_code=500, detail=error)
     return {"success": True, "path": payload.path.rstrip('/') + '/'}
+
+
+@router.post("/hf-download")
+async def start_hf_download(
+    payload: HFDownloadRequest,
+    background_tasks: BackgroundTasks,
+    admin_user: dict = Depends(verify_admin),
+) -> dict:
+    """
+    Start a HuggingFace model download directly to the RunPod network volume.
+    Returns job_id immediately — poll GET /hf-download/{job_id} for status.
+    Admin-only.
+
+    Flow: validate URL (dry_run) → create job → fire background task → return job_id.
+    Background task: hf_hub_download to /tmp → S3 multipart upload → delete /tmp.
+    """
+    if not settings.RUNPOD_S3_ACCESS_KEY or not settings.RUNPOD_NETWORK_VOLUME_ID:
+        raise HTTPException(status_code=400, detail="S3 credentials not configured")
+
+    # Step 1: Parse URL to extract repo_id and filename
+    try:
+        repo_id, filename = parse_hf_url(payload.url)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # Step 2: Resolve HF token (per-request takes priority over settings default)
+    hf_token = payload.hf_token or settings.HF_TOKEN or None
+
+    # Step 3: Validate URL (dry_run — no download, just metadata check)
+    try:
+        validate_hf_url(repo_id, filename, hf_token)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # Step 4: Determine S3 key
+    target = payload.target_path.rstrip("/")
+    s3_key = f"{target}/{filename}" if target else filename
+
+    # Step 5: Create in-memory job record
+    job_id = new_job(filename, s3_key)
+
+    # Step 6: Fire background task — runs in threadpool, response returned immediately
+    background_tasks.add_task(
+        start_hf_download_job, job_id, repo_id, filename, s3_key, hf_token
+    )
+
+    return {
+        "success": True,
+        "job_id": job_id,
+        "filename": filename,
+        "s3_key": s3_key,
+    }
+
+
+@router.get("/hf-download/{job_id}")
+async def get_hf_download_status(
+    job_id: str,
+    admin_user: dict = Depends(verify_admin),
+) -> dict:
+    """
+    Poll the status of a HuggingFace download job.
+    Returns immediately (dict lookup only — no blocking).
+    Poll every 2-3 seconds from the frontend.
+    Admin-only.
+    """
+    job = get_hf_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found. It may have expired (server restart clears in-memory jobs).")
+    return {"job_id": job_id, **job}
