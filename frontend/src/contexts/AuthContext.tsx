@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo, type ReactNode } from 'react';
 import { config } from '../config/environment';
 import { apiClient } from '../lib/apiClient';
 
@@ -9,6 +9,7 @@ export interface User {
   full_name?: string;
   profile_picture_url?: string | null;
   created_at?: string;
+  role?: string;
 }
 
 interface AuthContextType {
@@ -19,6 +20,7 @@ interface AuthContextType {
   register: (email: string, password: string, fullName?: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
+  isAdmin: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -31,6 +33,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Track if initial verification has run (prevents HMR re-verification)
   const initialVerificationDone = useRef(false);
+
+  // Compute isAdmin from user role
+  const isAdmin = useMemo(() => {
+    return user?.role === 'admin';
+  }, [user]);
 
   // Declare logout first so it can be referenced by other callbacks
   const logout = useCallback(() => {
@@ -111,10 +118,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const storedUser = localStorage.getItem('vapai-user');
         const localProfilePictureUrl = storedUser ? JSON.parse(storedUser).profile_picture_url : null;
 
-        // Merge backend data with localStorage profile picture
+        // Merge backend data with localStorage profile picture (role is from backend)
         setUser({
           ...userData,
-          profile_picture_url: localProfilePictureUrl || userData.profile_picture_url
+          profile_picture_url: localProfilePictureUrl || userData.profile_picture_url,
+          role: userData.role
         });
       } else if (response.status === 401) {
         // Token invalid - try refresh
@@ -262,6 +270,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         register,
         logout,
         isAuthenticated: !!user && !!token,
+        isAdmin,
       }}
     >
       {children}
