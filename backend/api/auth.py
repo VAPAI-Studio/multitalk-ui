@@ -145,6 +145,10 @@ async def login(
 
         # Get user metadata
         user_metadata = auth_response.user.user_metadata or {}
+        app_metadata = auth_response.user.app_metadata or {}
+
+        # Extract role (prefer app_metadata for security, fallback to user_metadata)
+        role = app_metadata.get('role') or user_metadata.get('role')
 
         return TokenResponse(
             access_token=auth_response.session.access_token,
@@ -155,6 +159,7 @@ async def login(
                 id=auth_response.user.id,
                 email=auth_response.user.email,
                 full_name=user_metadata.get("full_name"),
+                role=role,
                 created_at=auth_response.user.created_at
             )
         )
