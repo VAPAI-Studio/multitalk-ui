@@ -8,7 +8,7 @@ import uuid
 from typing import Optional
 
 from tqdm.auto import tqdm
-from huggingface_hub import hf_hub_download
+from huggingface_hub import hf_hub_download, hf_hub_url, get_hf_file_metadata
 from huggingface_hub.errors import GatedRepoError, RepositoryNotFoundError, EntryNotFoundError
 
 from core.s3_client import s3_client
@@ -59,18 +59,14 @@ def parse_hf_url(url: str) -> tuple[str, Optional[str]]:
 
 def validate_hf_url(repo_id: str, filename: str, token: Optional[str]) -> dict:
     """
-    Validate a HF file URL using dry_run=True (no download, just metadata check).
+    Validate a HF file URL using get_hf_file_metadata (no download, just a HEAD request).
     Returns {"valid": True, "size": N, "filename": filename}.
     Raises ValueError with user-friendly message on auth/not-found errors.
     """
     try:
-        info = hf_hub_download(
-            repo_id=repo_id,
-            filename=filename,
-            token=token or None,
-            dry_run=True,
-        )
-        return {"valid": True, "size": info.size, "filename": filename}
+        url = hf_hub_url(repo_id=repo_id, filename=filename)
+        metadata = get_hf_file_metadata(url=url, token=token or None)
+        return {"valid": True, "size": getattr(metadata, "size", None), "filename": filename}
     except GatedRepoError:
         raise ValueError(
             f"Model '{repo_id}' is gated. Provide a HuggingFace access token "
@@ -85,6 +81,8 @@ def validate_hf_url(repo_id: str, filename: str, token: Optional[str]) -> dict:
         raise ValueError(
             f"File '{filename}' not found in repository '{repo_id}'."
         )
+    except Exception as e:
+        raise ValueError(f"Could not validate HuggingFace URL: {str(e)}")
 
 
 # ---- Job store ----

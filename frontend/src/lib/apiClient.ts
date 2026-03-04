@@ -117,7 +117,13 @@ class ApiClient {
 
           // Don't retry on client errors (4xx), only on server errors (5xx) and network issues
           if (response.status >= 400 && response.status < 500) {
-            const err = new Error(`API request failed: ${response.status} ${response.statusText}`)
+            // Extract FastAPI error detail from response body
+            let detail = `${response.status} ${response.statusText}`
+            try {
+              const body = await response.json()
+              if (body?.detail) detail = typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail)
+            } catch {}
+            const err = new Error(detail)
             ;(err as any).noRetry = true
             throw err
           }
