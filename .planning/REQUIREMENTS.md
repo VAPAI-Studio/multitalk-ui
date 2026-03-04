@@ -49,12 +49,12 @@ Requirements for initial release. Each maps to roadmap phases.
 ### HuggingFace Integration
 
 - [ ] **HF-01**: Admin can paste HuggingFace model URL into download interface
-- [ ] **HF-02**: System validates HuggingFace URL before starting download
-- [ ] **HF-03**: System downloads HuggingFace model directly to RunPod network volume (no local intermediary)
-- [ ] **HF-04**: Download progress shows percentage and file size being downloaded
-- [ ] **HF-05**: HuggingFace downloads run as background jobs (not blocking HTTP requests)
+- [x] **HF-02**: System validates HuggingFace URL before starting download
+- [x] **HF-03**: System downloads HuggingFace model directly to RunPod network volume (no local intermediary)
+- [x] **HF-04**: Download progress shows percentage and file size being downloaded
+- [x] **HF-05**: HuggingFace downloads run as background jobs (not blocking HTTP requests)
 - [ ] **HF-06**: Admin can select target directory on volume for downloaded model
-- [ ] **HF-07**: System handles HuggingFace authentication for gated models
+- [x] **HF-07**: System handles HuggingFace authentication for gated models
 
 ### Dockerfile Editor
 
@@ -164,12 +164,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FILEOP-05 | Phase 4 | Complete |
 | FILEOP-06 | Phase 4 | Complete |
 | HF-01 | Phase 5 | Pending |
-| HF-02 | Phase 5 | Pending |
-| HF-03 | Phase 5 | Pending |
-| HF-04 | Phase 5 | Pending |
-| HF-05 | Phase 5 | Pending |
+| HF-02 | Phase 5 | Complete |
+| HF-03 | Phase 5 | Complete |
+| HF-04 | Phase 5 | Complete |
+| HF-05 | Phase 5 | Complete |
 | HF-06 | Phase 5 | Pending |
-| HF-07 | Phase 5 | Pending |
+| HF-07 | Phase 5 | Complete |
 | DOCKER-01 | Phase 6 | Pending |
 | DOCKER-02 | Phase 6 | Pending |
 | DOCKER-03 | Phase 6 | Pending |

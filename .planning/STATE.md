@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-04T22:54:46.311Z"
+last_updated: "2026-03-04T23:20:11.242Z"
 progress:
-  total_phases: 4
+  total_phases: 5
   completed_phases: 4
-  total_plans: 14
-  completed_plans: 14
+  total_plans: 17
+  completed_plans: 15
 ---
 
 # Project State
@@ -18,16 +18,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** Enable self-service infrastructure management for RunPod serverless workflows without leaving the application
-**Current focus:** Phase 4: File Operations — Complete
+**Current focus:** Phase 5: HuggingFace Integration — In Progress
 
 ## Current Position
 
-Phase: 4 of 4 (File Operations) — Complete
-Plan: 3 of 3 complete in current phase
-Status: Complete
-Last activity: 2026-03-04 -- Completed Plan 04-03 (File Operations UI — Delete/Rename/Move modals, post-verification S3 fixes, create-folder, multi-upload)
+Phase: 5 of 5 (HuggingFace Integration) — In Progress
+Plan: 1 of 3 complete in current phase
+Status: In Progress
+Last activity: 2026-03-04 -- Completed Plan 05-01 (HuggingFace download service — parse_hf_url, in-memory job store, asyncio.to_thread pipeline, S3 multipart upload)
 
-Progress: [██████████] 100% (all 4 phases complete; 14/14 plans complete)
+Progress: [████████░░] 88% (15/17 plans complete)
 
 ## Performance Metrics
 
@@ -65,6 +65,7 @@ Progress: [██████████] 100% (all 4 phases complete; 14/14 pl
 | Phase 04-file-operations P01 | 120 | 3 tasks | 2 files |
 | Phase 04-file-operations P02 | 113 | 2 tasks | 1 files |
 | Phase 04-file-operations P03 | 2400 | 3 tasks | 4 files |
+| Phase 05 P01 | 213 | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -104,6 +105,9 @@ Recent decisions affecting current work:
 - [Phase 04-file-operations]: Protected path 403 vs generic 500: 'protected' in error.lower() determines HTTP status code for delete/move endpoints
 - [Phase 04-file-operations]: Streaming S3 get_object+put_object for copy instead of copy_object (RunPod S3 endpoint does not support copy_object)
 - [Phase 04-file-operations]: Per-key delete_object loop instead of delete_objects batch (RunPod S3 endpoint does not support batch delete)
+- [Phase 05-01]: Regex lookahead in parse_hf_url handles 1-segment and 2-segment HuggingFace repo IDs correctly
+- [Phase 05-01]: hf_token never stored in _HF_JOBS dict — passed directly to hf_hub_download only
+- [Phase 05-01]: tmp_dir always cleaned in finally block; local_dir bypasses HF global cache
 
 ### Pending Todos
 
@@ -117,5 +121,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-03-04
-Stopped at: Completed 04-03-PLAN.md (File Operations UI — Delete/Rename/Move buttons with modals, S3 copy/delete fixes, create-folder, multi-file/folder upload)
+Stopped at: Completed 05-01-PLAN.md (HuggingFace download service — parse_hf_url, validate_hf_url, in-memory job store, asyncio.to_thread pipeline, S3 multipart upload)
 Resume file: None
