@@ -1320,6 +1320,52 @@ class ApiClient {
     URL.revokeObjectURL(objectUrl);
   }
 
+  /**
+   * Delete a single file from the RunPod network volume.
+   * Returns 403 if path is a protected system directory.
+   */
+  async deleteFile(path: string): Promise<{ success: boolean; path: string }> {
+    return this.request(
+      `/infrastructure/files?path=${encodeURIComponent(path)}`,
+      { method: 'DELETE' }
+    );
+  }
+
+  /**
+   * Recursively delete all objects under a folder prefix.
+   * Returns deleted_count — number of S3 objects removed.
+   * WARNING: irreversible — use only after user confirmation.
+   */
+  async deleteFolder(path: string): Promise<{ success: boolean; path: string; deleted_count: number }> {
+    return this.request(
+      `/infrastructure/folders?path=${encodeURIComponent(path)}`,
+      { method: 'DELETE' }
+    );
+  }
+
+  /**
+   * Move or rename a single file via server-side S3 copy + delete.
+   * @param sourcePath Current S3 key
+   * @param destPath   New S3 key (may be in a different directory = move, or same dir = rename)
+   */
+  async moveFile(sourcePath: string, destPath: string): Promise<{ success: boolean; source_path: string; dest_path: string }> {
+    return this.request('/infrastructure/files/move', {
+      method: 'POST',
+      body: JSON.stringify({ source_path: sourcePath, dest_path: destPath }),
+    });
+  }
+
+  /**
+   * Move or rename a folder by recursively copying all objects then batch-deleting originals.
+   * Large folders (>1000 files) may be slow — Heroku 30s timeout applies.
+   */
+  async moveFolder(sourcePath: string, destPath: string): Promise<{ success: boolean; source_path: string; dest_path: string; moved_count: number }> {
+    return this.request('/infrastructure/folders/move', {
+      method: 'POST',
+      body: JSON.stringify({ source_path: sourcePath, dest_path: destPath }),
+    });
+  }
+
   // Helper method for authenticated requests (backward compatibility)
   async fetchWithAuth(endpoint: string, options: RequestInit = {}) {
     return this.request(endpoint, options);
