@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-04T23:20:11.242Z"
+last_updated: "2026-03-04T23:24:14.036Z"
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 17
-  completed_plans: 15
+  completed_plans: 16
 ---
 
 # Project State
@@ -23,11 +23,11 @@ See: .planning/PROJECT.md (updated 2026-03-04)
 ## Current Position
 
 Phase: 5 of 5 (HuggingFace Integration) — In Progress
-Plan: 1 of 3 complete in current phase
+Plan: 2 of 3 complete in current phase
 Status: In Progress
-Last activity: 2026-03-04 -- Completed Plan 05-01 (HuggingFace download service — parse_hf_url, in-memory job store, asyncio.to_thread pipeline, S3 multipart upload)
+Last activity: 2026-03-04 -- Completed Plan 05-02 (HF download API endpoints — POST /api/infrastructure/hf-download and GET /api/infrastructure/hf-download/{job_id} with admin auth, background task dispatch, URL validation)
 
-Progress: [████████░░] 88% (15/17 plans complete)
+Progress: [█████████░] 94% (16/17 plans complete)
 
 ## Performance Metrics
 
@@ -66,6 +66,7 @@ Progress: [████████░░] 88% (15/17 plans complete)
 | Phase 04-file-operations P02 | 113 | 2 tasks | 1 files |
 | Phase 04-file-operations P03 | 2400 | 3 tasks | 4 files |
 | Phase 05 P01 | 213 | 3 tasks | 4 files |
+| Phase 05 P02 | 92 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -108,6 +109,7 @@ Recent decisions affecting current work:
 - [Phase 05-01]: Regex lookahead in parse_hf_url handles 1-segment and 2-segment HuggingFace repo IDs correctly
 - [Phase 05-01]: hf_token never stored in _HF_JOBS dict — passed directly to hf_hub_download only
 - [Phase 05-01]: tmp_dir always cleaned in finally block; local_dir bypasses HF global cache
+- [Phase 05]: BackgroundTasks added to existing fastapi import line; hf_token resolved per-request (payload > settings.HF_TOKEN > None) and never returned in response; 404 message for expired jobs mentions server restart
 
 ### Pending Todos
 
@@ -121,5 +123,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-03-04
-Stopped at: Completed 05-01-PLAN.md (HuggingFace download service — parse_hf_url, validate_hf_url, in-memory job store, asyncio.to_thread pipeline, S3 multipart upload)
+Stopped at: Completed 05-02-PLAN.md (HF download API endpoints — POST /hf-download and GET /hf-download/{job_id} on infrastructure router, admin-only, BackgroundTasks dispatch)
 Resume file: None
