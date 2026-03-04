@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { apiClient } from "../lib/apiClient";
 import { FileTreeNode } from "./FileTreeNode";
 import { Breadcrumb } from "./Breadcrumb";
@@ -13,16 +13,31 @@ interface FileSystemItem {
   childCount: number | null;
 }
 
-export function FileTree() {
+interface FileTreeProps {
+  currentPath?: string;                    // controlled from Infrastructure.tsx
+  onNavigate?: (path: string) => void;     // called when user navigates
+  onRefreshRequest?: () => void;           // called when refresh button clicked
+}
+
+export function FileTree({ currentPath: externalPath, onNavigate, onRefreshRequest }: FileTreeProps = {}) {
   const [rootItems, setRootItems] = useState<FileSystemItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string>("");
-  const [currentPath, setCurrentPath] = useState<string>("");
+  const [currentPath, setCurrentPath] = useState<string>(externalPath ?? "");
 
   // Load root directory on mount
   useEffect(() => {
-    loadDirectory("");
+    loadDirectory(externalPath ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Sync when parent navigates to a different path
+  useEffect(() => {
+    if (externalPath !== undefined && externalPath !== currentPath) {
+      loadDirectory(externalPath);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [externalPath]);
 
   const loadDirectory = async (path: string = "") => {
     setIsLoading(true);
@@ -31,6 +46,7 @@ export function FileTree() {
       const response = await apiClient.listFiles(path, 200);
       setRootItems(response.items);
       setCurrentPath(path);
+      onNavigate?.(path);
     } catch (err: any) {
       setError(err.message || "Failed to load directory contents");
     } finally {
@@ -40,6 +56,7 @@ export function FileTree() {
 
   const handleRefresh = () => {
     loadDirectory(currentPath);
+    onRefreshRequest?.();
   };
 
   return (

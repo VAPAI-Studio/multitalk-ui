@@ -1,12 +1,16 @@
+import { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { FileTree } from "../components/FileTree";
+import { FileUpload } from "../components/FileUpload";
 
 interface Props {
   comfyUrl: string;
 }
 
-export default function Infrastructure({ comfyUrl }: Props) {
+export default function Infrastructure({ comfyUrl: _comfyUrl }: Props) {
   const { isAdmin } = useAuth();
+  const [currentPath, setCurrentPath] = useState<string>("");
+  const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
 
   // Admin-only access control
   if (!isAdmin) {
@@ -23,6 +27,8 @@ export default function Infrastructure({ comfyUrl }: Props) {
     );
   }
 
+  const handleTreeRefresh = () => setRefreshTrigger(t => t + 1);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-gray-50">
       <div className="flex gap-6 p-6 md:p-10">
@@ -38,10 +44,21 @@ export default function Infrastructure({ comfyUrl }: Props) {
             </p>
           </div>
 
-          {/* File Browser */}
+          {/* File Browser — remounts on refreshTrigger change to force reload */}
           <div className="space-y-4">
-            <FileTree />
+            <FileTree
+              key={refreshTrigger}
+              currentPath={currentPath}
+              onNavigate={setCurrentPath}
+              onRefreshRequest={handleTreeRefresh}
+            />
           </div>
+
+          {/* Upload to Network Volume */}
+          <FileUpload
+            targetPath={currentPath}
+            onUploadComplete={handleTreeRefresh}
+          />
 
           {/* Instructions Card */}
           <div className="rounded-3xl border border-blue-200/80 p-6 shadow-lg bg-gradient-to-br from-blue-50 to-white">

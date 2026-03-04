@@ -1218,6 +1218,73 @@ class ApiClient {
     return this.request(`/infrastructure/files?${params.toString()}`);
   }
 
+  /**
+   * Step 1: Initialize a multipart upload. Returns upload_id, key, total_parts.
+   */
+  async initUpload(filename: string, targetPath: string, fileSize: number): Promise<{
+    upload_id: string; key: string; total_parts: number;
+  }> {
+    return this.request('/infrastructure/upload/init', {
+      method: 'POST',
+      body: JSON.stringify({ filename, target_path: targetPath, file_size: fileSize }),
+    });
+  }
+
+  /**
+   * Step 2: Upload one 5MB chunk via XHR for upload progress events.
+   * Returns the ETag — store it for the complete step.
+   */
+  uploadPart(
+    uploadId: string,
+    key: string,
+    partNumber: number,
+    chunk: Blob,
+    onProgress: (loaded: number, total: number) => void
+  ): Promise<{ part_number: number; etag: string }> {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      const formData = new FormData();
+      formData.append('chunk', chunk, `part-${partNumber}`);
+
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) onProgress(e.loaded, e.total);
+      };
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(JSON.parse(xhr.responseText));
+        } else {
+          reject(new Error(`Part ${partNumber} upload failed: ${xhr.status} ${xhr.statusText}`));
+        }
+      };
+      xhr.onerror = () => reject(new Error(`Network error on part ${partNumber}`));
+
+      const token = localStorage.getItem('vapai-auth-token');
+      xhr.open('PUT', `${this.baseURL}/infrastructure/upload/part?upload_id=${encodeURIComponent(uploadId)}&part_number=${partNumber}&key=${encodeURIComponent(key)}`);
+      if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      xhr.send(formData);
+    });
+  }
+
+  /**
+   * Step 3: Finalize the multipart upload.
+   */
+  async completeUpload(uploadId: string, key: string, parts: Array<{ part_number: number; etag: string }>): Promise<{ success: boolean; key: string }> {
+    return this.request('/infrastructure/upload/complete', {
+      method: 'POST',
+      body: JSON.stringify({ upload_id: uploadId, key, parts }),
+    });
+  }
+
+  /**
+   * Abort: MUST be called on any upload failure to prevent orphaned S3 parts and storage charges.
+   */
+  async abortUpload(uploadId: string, key: string): Promise<{ success: boolean }> {
+    return this.request('/infrastructure/upload/abort', {
+      method: 'POST',
+      body: JSON.stringify({ upload_id: uploadId, key }),
+    });
+  }
+
   // Helper method for authenticated requests (backward compatibility)
   async fetchWithAuth(endpoint: string, options: RequestInit = {}) {
     return this.request(endpoint, options);
