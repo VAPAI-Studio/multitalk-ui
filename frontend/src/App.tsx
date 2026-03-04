@@ -124,19 +124,14 @@ export default function App() {
 
   // Filter studios based on admin status
   const visibleStudios = useMemo(() => {
-    console.log('[DEBUG] Filtering studios - isAdmin:', isAdmin, 'user:', user);
     return studios.filter(studio => {
-      const shouldHide = studio.adminOnly && !isAdmin;
-      if (studio.adminOnly) {
-        console.log('[DEBUG] Studio:', studio.title, 'adminOnly:', studio.adminOnly, 'isAdmin:', isAdmin, 'shouldHide:', shouldHide);
-      }
       // Hide admin-only studios from non-admins
-      if (shouldHide) return false;
+      if (studio.adminOnly && !isAdmin) return false;
       // Hide coming soon studios
       if (studio.comingSoon) return false;
       return true;
     });
-  }, [isAdmin, user]);
+  }, [isAdmin]);
 
   // Load saved page and ComfyUI URL from localStorage on mount
   useEffect(() => {
