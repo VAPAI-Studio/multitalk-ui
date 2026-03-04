@@ -99,12 +99,12 @@ Plans:
   3. Download runs as a background job with progress tracking (percentage and file size) visible in the UI
   4. Admin can choose the target directory on the volume for the downloaded model
   5. System handles gated models by accepting HuggingFace authentication tokens
-**Plans**: TBD
+**Plans**: 3 plans in 3 waves
 
 Plans:
-- [ ] 05-01: TBD
-- [ ] 05-02: TBD
-- [ ] 05-03: TBD
+- [ ] 05-01-PLAN.md — Backend service + models + settings: hf_download_service.py, HFDownloadRequest/HFDownloadJobStatus models, HF_TOKEN setting, huggingface_hub dependency (Wave 1)
+- [ ] 05-02-PLAN.md — Backend API endpoints: POST /hf-download (start job) + GET /hf-download/{job_id} (poll status), wired into infrastructure router (Wave 2)
+- [ ] 05-03-PLAN.md — Frontend: apiClient methods + HFDownload component with progress polling + wired into Infrastructure page (Wave 3, has checkpoint)
 
 ### Phase 6: Dockerfile Editor
 **Goal**: Admin can view and edit workflow Dockerfiles in-browser with a professional code editing experience
@@ -146,8 +146,8 @@ Note: Phase 6 depends only on Phase 1 and can run in parallel with Phases 2-5 if
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Admin Access Control | 4/4 | ✅ Complete | 2026-03-04 |
-| 2. Network Volume File Browser | 4/4 | ✅ Complete | 2026-03-04 |
+| 1. Admin Access Control | 4/4 | Complete | 2026-03-04 |
+| 2. Network Volume File Browser | 4/4 | Complete | 2026-03-04 |
 | 3. File Transfer | 3/3 | Complete   | 2026-03-04 |
 | 4. File Operations | 3/3 | Complete   | 2026-03-04 |
 | 5. HuggingFace Integration | 0/3 | Not started | - |
