@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { FileTree } from "../components/FileTree";
 import { FileUpload } from "../components/FileUpload";
+import { HFDownload } from "../components/HFDownload";
 
 interface Props {
   comfyUrl: string;
@@ -58,6 +59,12 @@ export default function Infrastructure({ comfyUrl: _comfyUrl }: Props) {
           <FileUpload
             targetPath={currentPath}
             onUploadComplete={handleTreeRefresh}
+          />
+
+          {/* Download from HuggingFace directly to volume */}
+          <HFDownload
+            targetPath={currentPath}
+            onComplete={handleTreeRefresh}
           />
 
           {/* Instructions Card */}
