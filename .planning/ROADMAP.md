@@ -13,7 +13,7 @@ This roadmap delivers admin-only infrastructure management for RunPod serverless
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Admin Access Control** - Restrict infrastructure features to admin users with server-enforced authorization
-- [ ] **Phase 2: Network Volume File Browser** - Browse and navigate RunPod network volume files in a hierarchical tree
+- [x] **Phase 2: Network Volume File Browser** - Browse and navigate RunPod network volume files in a hierarchical tree
 - [ ] **Phase 3: File Transfer** - Upload files to and download files from the RunPod network volume
 - [ ] **Phase 4: File Operations** - Delete, move, and rename files and folders on the network volume
 - [ ] **Phase 5: HuggingFace Integration** - Download models from HuggingFace directly to the RunPod network volume
@@ -52,9 +52,9 @@ Plans:
 **Plans**: 3 plans in 3 waves
 
 Plans:
-- [ ] 02-01: Backend S3 Foundation (Wave 1) — S3 client singleton, InfrastructureService with list_files(), GET /api/infrastructure/files endpoint with pagination
-- [ ] 02-02: Frontend File Tree Component (Wave 2) — Custom tree UI with FileTreeNode and FileTree components, lazy loading, apiClient.listFiles() method
-- [ ] 02-03: Integration and Polish (Wave 3) — Breadcrumb navigation, refresh functionality, enhanced health endpoint with S3 connectivity check
+- [x] 02-01: Backend S3 Foundation (Wave 1) — S3 client singleton, InfrastructureService with list_files(), GET /api/infrastructure/files endpoint with pagination
+- [x] 02-02: Frontend File Tree Component (Wave 2) — Custom tree UI with FileTreeNode and FileTree components, lazy loading, apiClient.listFiles() method
+- [x] 02-03: Integration and Polish (Wave 3) — Breadcrumb navigation, refresh functionality, enhanced health endpoint with S3 connectivity check
 
 ### Phase 3: File Transfer
 **Goal**: Admin can move files between local machine and RunPod network volume in both directions
@@ -63,15 +63,15 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. Admin can upload a file from local machine to a chosen directory on the RunPod volume
   2. Uploads handle files up to 10GB using chunked/multipart transfer with a progress bar showing percentage and estimated time
-  3. Uploads survive network interruptions gracefully (retry or resume without losing progress)
-  4. Admin can download any file from the volume to local machine via presigned S3 URL (streaming, no backend buffering)
-  5. Downloads work for files of any size without timeout and admin sees download initiation confirmation
-**Plans**: TBD
+  3. Uploads survive network interruptions gracefully (abort on failure prevents orphaned S3 parts; per-part retry on network error)
+  4. Admin can download any file from the volume to local machine via authenticated backend streaming proxy (RunPod S3 does not support presigned URLs — streaming is the only viable approach)
+  5. Downloads work for files of any size without timeout; admin sees download initiation confirmation
+**Plans**: 3 plans in 2 waves
 
 Plans:
-- [ ] 03-01: TBD
-- [ ] 03-02: TBD
-- [ ] 03-03: TBD
+- [ ] 03-01-PLAN.md — Backend multipart upload API (init/part/complete/abort) + streaming download endpoint (Wave 1)
+- [ ] 03-02-PLAN.md — Frontend FileUpload component with XHR chunked progress + Infrastructure page wiring (Wave 2)
+- [ ] 03-03-PLAN.md — FileTreeNode download button + apiClient.downloadFile() + human checkpoint (Wave 2)
 
 ### Phase 4: File Operations
 **Goal**: Admin can reorganize the network volume by deleting, moving, and renaming files and folders
@@ -146,7 +146,7 @@ Note: Phase 6 depends only on Phase 1 and can run in parallel with Phases 2-5 if
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Admin Access Control | 4/4 | ✅ Complete | 2026-03-04 |
-| 2. Network Volume File Browser | 0/3 | Planned | - |
+| 2. Network Volume File Browser | 4/4 | ✅ Complete | 2026-03-04 |
 | 3. File Transfer | 0/3 | Not started | - |
 | 4. File Operations | 0/2 | Not started | - |
 | 5. HuggingFace Integration | 0/3 | Not started | - |
