@@ -34,6 +34,7 @@ class UserResponse(BaseModel):
     email: str
     full_name: Optional[str] = None
     profile_picture_url: Optional[str] = None
+    role: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
