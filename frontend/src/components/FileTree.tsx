@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { apiClient } from "../lib/apiClient";
 import { FileTreeNode } from "./FileTreeNode";
+import { Breadcrumb } from "./Breadcrumb";
 
 interface FileSystemItem {
   type: "file" | "folder";
@@ -16,36 +17,61 @@ export function FileTree() {
   const [rootItems, setRootItems] = useState<FileSystemItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string>("");
+  const [currentPath, setCurrentPath] = useState<string>("");
 
   // Load root directory on mount
   useEffect(() => {
-    loadRoot();
+    loadDirectory("");
   }, []);
 
-  const loadRoot = async () => {
+  const loadDirectory = async (path: string = "") => {
     setIsLoading(true);
     setError("");
     try {
-      const response = await apiClient.listFiles("", 200);
+      const response = await apiClient.listFiles(path, 200);
       setRootItems(response.items);
+      setCurrentPath(path);
     } catch (err: any) {
-      setError(err.message || "Failed to load network volume contents");
+      setError(err.message || "Failed to load directory contents");
     } finally {
       setIsLoading(false);
     }
   };
 
+  const handleRefresh = () => {
+    loadDirectory(currentPath);
+  };
+
   return (
     <div className="rounded-3xl border border-gray-200/80 shadow-lg bg-white overflow-hidden">
       {/* Header */}
-      <div className="px-6 py-4 bg-gradient-to-r from-slate-50 to-gray-50 border-b border-gray-200">
-        <h2 className="text-xl font-bold text-gray-900 flex items-center gap-3">
-          <span>💾</span>
-          Network Volume Browser
-        </h2>
-        <p className="text-sm text-gray-600 mt-1">
-          Browse files and folders on your RunPod network volume
-        </p>
+      <div className="bg-gradient-to-r from-slate-50 to-gray-50 border-b border-gray-200">
+        <div className="px-6 py-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 flex items-center gap-3">
+              <span>💾</span>
+              Network Volume Browser
+            </h2>
+            <p className="text-sm text-gray-600 mt-1">
+              Browse files and folders on your RunPod network volume
+            </p>
+          </div>
+          <button
+            onClick={handleRefresh}
+            disabled={isLoading}
+            className="px-4 py-2 bg-white border-2 border-gray-300 rounded-xl text-gray-700 font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+            title="Refresh current directory"
+          >
+            <span className={isLoading ? "animate-spin" : ""}>🔄</span>
+            Refresh
+          </button>
+        </div>
+
+        {/* Breadcrumb navigation */}
+        <Breadcrumb
+          currentPath={currentPath}
+          onNavigate={(path) => loadDirectory(path)}
+        />
       </div>
 
       {/* Content */}
@@ -65,7 +91,7 @@ export function FileTree() {
                 <h3 className="font-semibold text-red-900 mb-1">Error Loading Volume</h3>
                 <p className="text-sm text-red-700">{error}</p>
                 <button
-                  onClick={loadRoot}
+                  onClick={handleRefresh}
                   className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
                 >
                   Retry
