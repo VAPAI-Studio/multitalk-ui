@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-04T20:52:10.469Z"
+last_updated: "2026-03-04T21:46:55.234Z"
 progress:
   total_phases: 3
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 11
-  completed_plans: 10
+  completed_plans: 11
 ---
 
 # Project State
@@ -18,16 +18,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** Enable self-service infrastructure management for RunPod serverless workflows without leaving the application
-**Current focus:** Phase 3: File Transfer
+**Current focus:** Phase 3: File Transfer — COMPLETE
 
 ## Current Position
 
-Phase: 3 of 7 (File Transfer)
-Plan: 1 of TBD in current phase
-Status: In progress
-Last activity: 2026-03-04 -- Completed Plan 03-02 (Frontend FileUpload component + apiClient upload methods)
+Phase: 3 of 7 (File Transfer) — COMPLETE
+Plan: 3 of 3 in current phase — all plans complete
+Status: Complete
+Last activity: 2026-03-04 -- Completed Plan 03-03 (Download button in FileTreeNode, human-verified)
 
-Progress: [████████░░] 57% (2 of 7 phases complete)
+Progress: [████████░░] 57% (phases 1-2 complete; phase 3 plans all complete, awaiting next phase)
 
 ## Performance Metrics
 
@@ -61,6 +61,7 @@ Progress: [████████░░] 57% (2 of 7 phases complete)
 | Phase 02 P04 | checkpoint | human-verify | pass |
 | Phase 03-file-transfer P01 | 105 | 3 tasks | 3 files |
 | Phase 03-file-transfer P02 | 393 | 2 tasks | 4 files |
+| Phase 03-file-transfer P03 | 300 | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -93,6 +94,8 @@ Recent decisions affecting current work:
 - [Phase 03-file-transfer]: XHR for part upload (not fetch) — only browser API with upload progress events
 - [Phase 03-file-transfer]: Per-part retry (3x, exponential backoff) before propagating to abort — transient failures should not abort large uploads
 - [Phase 03-file-transfer]: key={refreshTrigger} on FileTree causes remount+reload on upload complete (simpler than imperative callback)
+- [Phase 03-file-transfer]: fetch+blob for download: streams to browser memory before save dialog — acceptable for admin files, documented >1GB limitation
+- [Phase 03-file-transfer]: e.stopPropagation() on download button prevents folder-expand toggle from firing on file rows
 
 ### Pending Todos
 
@@ -106,5 +109,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-03-04
-Stopped at: Completed 03-02-PLAN.md (frontend upload: FileUpload component, XHR chunked upload, per-part retry, Infrastructure wiring)
+Stopped at: Completed 03-03-PLAN.md (download button: apiClient.downloadFile fetch+blob, FileTreeNode Download button with spinner and inline error, human-verified)
 Resume file: None
