@@ -1,11 +1,16 @@
 """HuggingFace model download service with background job tracking."""
 import asyncio
+import os
 import re
 import shutil
 import tempfile
 import pathlib
 import uuid
 from typing import Optional
+
+# Disable XET storage backend (huggingface_hub>=1.0 uses XET for some repos,
+# but hf_xet package is not installed). Fall back to standard HTTP downloads.
+os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
 
 from tqdm.auto import tqdm
 from huggingface_hub import hf_hub_download, hf_hub_url, get_hf_file_metadata
