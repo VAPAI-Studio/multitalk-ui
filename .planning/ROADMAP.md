@@ -49,11 +49,12 @@ Plans:
   3. Admin can expand and collapse folders inline without page reload (lazy-loaded from S3)
   4. File browser handles directories with 10,000+ files without crashing by paginating results
   5. Admin can navigate to any depth level in the volume hierarchy via breadcrumb or tree clicks
-**Plans**: TBD
+**Plans**: 3 plans in 3 waves
 
 Plans:
-- [ ] 02-01: TBD
-- [ ] 02-02: TBD
+- [ ] 02-01: Backend S3 Foundation (Wave 1) — S3 client singleton, InfrastructureService with list_files(), GET /api/infrastructure/files endpoint with pagination
+- [ ] 02-02: Frontend File Tree Component (Wave 2) — Custom tree UI with FileTreeNode and FileTree components, lazy loading, apiClient.listFiles() method
+- [ ] 02-03: Integration and Polish (Wave 3) — Breadcrumb navigation, refresh functionality, enhanced health endpoint with S3 connectivity check
 
 ### Phase 3: File Transfer
 **Goal**: Admin can move files between local machine and RunPod network volume in both directions
@@ -145,7 +146,7 @@ Note: Phase 6 depends only on Phase 1 and can run in parallel with Phases 2-5 if
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Admin Access Control | 4/4 | ✅ Complete | 2026-03-04 |
-| 2. Network Volume File Browser | 0/2 | Not started | - |
+| 2. Network Volume File Browser | 0/3 | Planned | - |
 | 3. File Transfer | 0/3 | Not started | - |
 | 4. File Operations | 0/2 | Not started | - |
 | 5. HuggingFace Integration | 0/3 | Not started | - |
