@@ -10,6 +10,9 @@ from models.infrastructure import (
     UploadPartResponse,
     CompleteUploadRequest,
     AbortUploadRequest,
+    DeleteRequest,
+    MoveFileRequest,
+    MoveFolderRequest,
 )
 from services.infrastructure_service import InfrastructureService
 from core.s3_client import s3_client
@@ -35,7 +38,7 @@ async def infrastructure_health(
     result = {
         "success": True,
         "message": "Infrastructure API available",
-        "admin_user_id": admin_user.id,
+        "admin_user_id": admin_user.get("id") if isinstance(admin_user, dict) else admin_user.id,
         "s3_connected": False,
         "s3_bucket": settings.RUNPOD_NETWORK_VOLUME_ID,
         "s3_error": None
@@ -235,3 +238,48 @@ async def download_file(
         media_type="application/octet-stream",
         headers=headers
     )
+
+
+@router.delete("/files")
+async def delete_file(
+    path: str = Query(..., description="Full S3 key of the file to delete"),
+    admin_user: dict = Depends(verify_admin)
+) -> dict:
+    """
+    Delete a single file from the RunPod network volume.
+    Returns 403 if the path is a protected system directory.
+    Admin-only.
+    """
+    if not settings.RUNPOD_S3_ACCESS_KEY or not settings.RUNPOD_NETWORK_VOLUME_ID:
+        raise HTTPException(status_code=400, detail="S3 credentials not configured")
+
+    service = InfrastructureService()
+    success, error = await service.delete_object(path)
+    if not success:
+        if error and "protected" in error.lower():
+            raise HTTPException(status_code=403, detail=error)
+        raise HTTPException(status_code=500, detail=error)
+    return {"success": True, "path": path}
+
+
+@router.delete("/folders")
+async def delete_folder(
+    path: str = Query(..., description="Folder prefix to delete recursively (no trailing slash)"),
+    admin_user: dict = Depends(verify_admin)
+) -> dict:
+    """
+    Recursively delete all objects under a folder prefix.
+    Returns 403 if the path is a protected system directory.
+    WARNING: This permanently deletes all contents. No undo.
+    Admin-only.
+    """
+    if not settings.RUNPOD_S3_ACCESS_KEY or not settings.RUNPOD_NETWORK_VOLUME_ID:
+        raise HTTPException(status_code=400, detail="S3 credentials not configured")
+
+    service = InfrastructureService()
+    success, deleted_count, error = await service.delete_folder(path)
+    if not success:
+        if error and "protected" in error.lower():
+            raise HTTPException(status_code=403, detail=error)
+        raise HTTPException(status_code=500, detail=error)
+    return {"success": True, "path": path, "deleted_count": deleted_count}
