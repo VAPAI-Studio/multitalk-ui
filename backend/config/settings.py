@@ -22,10 +22,24 @@ class Settings(BaseSettings):
 
     # External APIs
     OPENROUTER_API_KEY: str = ""
+    WORLDLABS_API_KEY: str = ""
 
     # ComfyUI Configuration
     COMFYUI_SERVER_URL: str = "https://comfy.vapai.studio"
     COMFY_API_KEY: str = ""
+
+    # RunPod Configuration
+    ENABLE_RUNPOD: bool = False  # Feature flag - set to True to enable RunPod integration
+    RUNPOD_API_KEY: str = ""  # RunPod API key for serverless execution
+    RUNPOD_ENDPOINT_ID: str = ""  # RunPod endpoint ID (ComfyUI serverless deployment)
+    RUNPOD_TIMEOUT: int = 600  # Timeout in seconds for RunPod requests (default: 10 minutes)
+
+    # RunPod S3 API Configuration (for Network Volume access)
+    RUNPOD_S3_ACCESS_KEY: str = ""
+    RUNPOD_S3_SECRET_KEY: str = ""
+    RUNPOD_NETWORK_VOLUME_ID: str = ""
+    RUNPOD_S3_ENDPOINT_URL: str = "https://eu-ro-1.s3.runpod.io"
+    RUNPOD_S3_REGION: str = "eu-ro-1"
 
     # Training Configuration (Flux/LoRA)
     TRAINING_WORKSPACE_DIR: str = "./training_workspace"
