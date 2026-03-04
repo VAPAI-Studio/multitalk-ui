@@ -20,22 +20,22 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **VOL-02**: File browser displays file name, size (human-readable), and last modified date
 - [x] **VOL-03**: Admin can expand and collapse folders without page reload
 - [x] **VOL-04**: File browser handles directories with 10,000+ files without crashing (pagination)
-- [ ] **VOL-05**: Admin can navigate to any path level in the volume
+- [x] **VOL-05**: Admin can navigate to any path level in the volume
 
 ### File Upload
 
-- [ ] **UPLOAD-01**: Admin can upload files from local machine to RunPod network volume
-- [ ] **UPLOAD-02**: File upload supports files up to 10GB using chunked/multipart upload
+- [x] **UPLOAD-01**: Admin can upload files from local machine to RunPod network volume
+- [x] **UPLOAD-02**: File upload supports files up to 10GB using chunked/multipart upload
 - [ ] **UPLOAD-03**: Upload progress indicator shows percentage and estimated time remaining
-- [ ] **UPLOAD-04**: Admin can select target directory before uploading
-- [ ] **UPLOAD-05**: Upload handles network interruptions gracefully (retry or resume)
+- [x] **UPLOAD-04**: Admin can select target directory before uploading
+- [x] **UPLOAD-05**: Upload handles network interruptions gracefully (retry or resume)
 
 ### File Download
 
-- [ ] **DWNLD-01**: Admin can download files from RunPod network volume to local machine
-- [ ] **DWNLD-02**: Download uses presigned S3 URLs with streaming (no backend buffering)
+- [x] **DWNLD-01**: Admin can download files from RunPod network volume to local machine
+- [x] **DWNLD-02**: Download uses presigned S3 URLs with streaming (no backend buffering)
 - [ ] **DWNLD-03**: Admin receives download initiation confirmation
-- [ ] **DWNLD-04**: Download works for files of any size without timeout
+- [x] **DWNLD-04**: Download works for files of any size without timeout
 
 ### File Operations
 
@@ -147,16 +147,16 @@ Which phases cover which requirements. Updated during roadmap creation.
 | VOL-02 | Phase 2 | Complete |
 | VOL-03 | Phase 2 | Complete |
 | VOL-04 | Phase 2 | Complete |
-| VOL-05 | Phase 2 | Pending |
-| UPLOAD-01 | Phase 3 | Pending |
-| UPLOAD-02 | Phase 3 | Pending |
+| VOL-05 | Phase 2 | Complete |
+| UPLOAD-01 | Phase 3 | Complete |
+| UPLOAD-02 | Phase 3 | Complete |
 | UPLOAD-03 | Phase 3 | Pending |
-| UPLOAD-04 | Phase 3 | Pending |
-| UPLOAD-05 | Phase 3 | Pending |
-| DWNLD-01 | Phase 3 | Pending |
-| DWNLD-02 | Phase 3 | Pending |
+| UPLOAD-04 | Phase 3 | Complete |
+| UPLOAD-05 | Phase 3 | Complete |
+| DWNLD-01 | Phase 3 | Complete |
+| DWNLD-02 | Phase 3 | Complete |
 | DWNLD-03 | Phase 3 | Pending |
-| DWNLD-04 | Phase 3 | Pending |
+| DWNLD-04 | Phase 3 | Complete |
 | FILEOP-01 | Phase 4 | Pending |
 | FILEOP-02 | Phase 4 | Pending |
 | FILEOP-03 | Phase 4 | Pending |
