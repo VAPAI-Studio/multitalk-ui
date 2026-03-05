@@ -58,13 +58,13 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Dockerfile Editor
 
-- [ ] **DOCKER-01**: Admin can view the configured Dockerfile from GitHub repository
+- [x] **DOCKER-01**: Admin can view the configured Dockerfile from GitHub repository
 - [ ] **DOCKER-02**: Admin can open Dockerfile in in-browser code editor
 - [ ] **DOCKER-03**: Code editor displays Dockerfile syntax highlighting (FROM, RUN, COPY, ENV, etc.)
 - [ ] **DOCKER-04**: Code editor shows line numbers
 - [ ] **DOCKER-05**: Code editor supports undo/redo operations
 - [ ] **DOCKER-06**: Editor indicates when file has unsaved changes
-- [ ] **DOCKER-07**: Admin can save Dockerfile changes with custom commit message
+- [x] **DOCKER-07**: Admin can save Dockerfile changes with custom commit message
 
 ### GitHub Integration
 
@@ -170,13 +170,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HF-05 | Phase 5 | Complete |
 | HF-06 | Phase 5 | Complete |
 | HF-07 | Phase 5 | Complete |
-| DOCKER-01 | Phase 6 | Pending |
+| DOCKER-01 | Phase 6 | Complete |
 | DOCKER-02 | Phase 6 | Pending |
 | DOCKER-03 | Phase 6 | Pending |
 | DOCKER-04 | Phase 6 | Pending |
 | DOCKER-05 | Phase 6 | Pending |
 | DOCKER-06 | Phase 6 | Pending |
-| DOCKER-07 | Phase 6 | Pending |
+| DOCKER-07 | Phase 6 | Complete |
 | GIT-01 | Phase 7 | Pending |
 | GIT-02 | Phase 7 | Pending |
 | GIT-03 | Phase 7 | Pending |

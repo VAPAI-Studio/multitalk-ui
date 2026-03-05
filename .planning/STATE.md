@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-05T01:38:02.504Z"
+last_updated: "2026-03-05T02:10:55.410Z"
 progress:
-  total_phases: 5
+  total_phases: 6
   completed_phases: 5
-  total_plans: 17
-  completed_plans: 17
+  total_plans: 19
+  completed_plans: 18
 ---
 
 # Project State
@@ -18,16 +18,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** Enable self-service infrastructure management for RunPod serverless workflows without leaving the application
-**Current focus:** Phase 5: HuggingFace Integration — In Progress
+**Current focus:** Phase 6: Dockerfile Editor — In Progress
 
 ## Current Position
 
-Phase: 5 of 5 (HuggingFace Integration) — Complete
-Plan: 3 of 3 complete in current phase
-Status: Complete
-Last activity: 2026-03-04 -- Completed Plan 05-03 (HFDownload React component, apiClient methods, streaming S3 upload, huggingface_hub 1.x compatibility fixes — verified end-to-end)
+Phase: 6 of 6 (Dockerfile Editor) — In Progress
+Plan: 1 of 2 complete in current phase
+Status: In Progress
+Last activity: 2026-03-05 -- Completed Plan 06-01 (GitHub service with get_file/update_file, DockerfileContent/DockerfileSaveRequest models, GET+PUT /api/infrastructure/dockerfiles/content admin endpoints)
 
-Progress: [██████████] 100% (17/17 plans complete)
+Progress: [█████████░] 95% (18/19 plans complete)
 
 ## Performance Metrics
 
@@ -68,6 +68,7 @@ Progress: [██████████] 100% (17/17 plans complete)
 | Phase 05 P01 | 213 | 3 tasks | 4 files |
 | Phase 05 P02 | 92 | 2 tasks | 1 files |
 | Phase 05 P03 | ~90min | 3 tasks | 5 files |
+| Phase 06-dockerfile-editor P06-01 | 190 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -115,6 +116,10 @@ Recent decisions affecting current work:
 - [Phase 05-03]: Skip validate_hf_url pre-check — errors surface via background job polling (avoids pre-flight latency and false negatives)
 - [Phase 05-03]: HF_HUB_DISABLE_XET=1 disables XET storage backend incompatible with huggingface_hub>=1.0
 - [Phase 05-03]: Pop name= kwarg in ProgressTqdm.__init__ — huggingface_hub 1.x passes it internally but tqdm rejects it
+- [Phase 06-01]: Per-call httpx.AsyncClient in GitHubService — no shared state, clean per-request lifecycle
+- [Phase 06-01]: 409 conflict returns specific actionable message for stale SHA — most common failure mode
+- [Phase 06-01]: GitHub path/repo never accepted from frontend — taken from settings only (prevents path injection)
+- [Phase 06-01]: Credentials check (400) before any GitHub API call — fast fail with clear error
 
 ### Pending Todos
 
@@ -127,6 +132,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-03-04
-Stopped at: Completed 05-03-PLAN.md (HFDownload UI component, apiClient methods, streaming S3 download, compatibility fixes — all 17 plans complete)
+Last session: 2026-03-05
+Stopped at: Completed 06-01-PLAN.md (GitHub service, DockerfileContent/SaveRequest models, GET+PUT /dockerfiles/content admin endpoints — 18/19 plans complete)
 Resume file: None
