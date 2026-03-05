@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-05T02:10:55.410Z"
+last_updated: "2026-03-05T02:15:03.000Z"
 progress:
   total_phases: 6
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 19
-  completed_plans: 18
+  completed_plans: 19
 ---
 
 # Project State
@@ -69,6 +69,7 @@ Progress: [█████████░] 95% (18/19 plans complete)
 | Phase 05 P02 | 92 | 2 tasks | 1 files |
 | Phase 05 P03 | ~90min | 3 tasks | 5 files |
 | Phase 06-dockerfile-editor P06-01 | 190 | 2 tasks | 6 files |
+| Phase 06-dockerfile-editor P06-02 | 240 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -120,6 +121,9 @@ Recent decisions affecting current work:
 - [Phase 06-01]: 409 conflict returns specific actionable message for stale SHA — most common failure mode
 - [Phase 06-01]: GitHub path/repo never accepted from frontend — taken from settings only (prevents path injection)
 - [Phase 06-01]: Credentials check (400) before any GitHub API call — fast fail with clear error
+- [Phase 06-02]: Monaco defaultValue+key prop (not value) for uncontrolled editor — preserves native undo/redo without custom code
+- [Phase 06-02]: Monaco lazy-imported inside DockerfileEditor via React.lazy() — 3MB bundle only loads when Infrastructure page renders editor section
+- [Phase 06-02]: 409 conflict preserves dirty state — user edits not discarded on external-modification error
 
 ### Pending Todos
 
