@@ -107,20 +107,19 @@ Plans:
 - [ ] 05-03-PLAN.md — Frontend: apiClient methods + HFDownload component with progress polling + wired into Infrastructure page (Wave 3, has checkpoint)
 
 ### Phase 6: Dockerfile Editor
-**Goal**: Admin can view and edit workflow Dockerfiles in-browser with a professional code editing experience
+**Goal**: Admin can view and edit the workflow Dockerfile in-browser with a professional code editing experience
 **Depends on**: Phase 1
 **Requirements**: DOCKER-01, DOCKER-02, DOCKER-03, DOCKER-04, DOCKER-05, DOCKER-06, DOCKER-07
 **Success Criteria** (what must be TRUE):
-  1. Admin sees a list of Dockerfiles fetched from the GitHub repository
-  2. Admin can open any Dockerfile in a Monaco-based in-browser editor with Dockerfile syntax highlighting and line numbers
-  3. Editor supports undo/redo and indicates when the file has unsaved changes
-  4. Admin can save changes by providing a custom commit message
-**Plans**: TBD
+  1. Admin sees the configured Dockerfile fetched from GitHub (single file, path set in GITHUB_DOCKERFILE_PATH env var)
+  2. Admin can edit the Dockerfile in a Monaco-based in-browser editor with Dockerfile syntax highlighting and line numbers
+  3. Editor supports undo/redo (Monaco built-in) and indicates when the file has unsaved changes
+  4. Admin can save changes by providing a custom commit message; change is committed to GitHub
+**Plans**: 2 plans in 2 waves
 
 Plans:
-- [ ] 06-01: TBD
-- [ ] 06-02: TBD
-- [ ] 06-03: TBD
+- [ ] 06-01-PLAN.md — Backend: GitHubService (httpx), settings (GITHUB_TOKEN/REPO/BRANCH/DOCKERFILE_PATH), Pydantic models, GET+PUT /dockerfiles/content endpoints (Wave 1)
+- [ ] 06-02-PLAN.md — Frontend: @monaco-editor/react install, DockerfileEditor component (load/dirty-track/commit), apiClient methods, Infrastructure.tsx wiring + human checkpoint (Wave 2)
 
 ### Phase 7: GitHub Integration
 **Goal**: Dockerfile changes commit and push to GitHub, triggering RunPod rebuilds, with secure credential handling
@@ -151,5 +150,5 @@ Note: Phase 6 depends only on Phase 1 and can run in parallel with Phases 2-5 if
 | 3. File Transfer | 3/3 | Complete   | 2026-03-04 |
 | 4. File Operations | 3/3 | Complete   | 2026-03-04 |
 | 5. HuggingFace Integration | 3/3 | Complete   | 2026-03-05 |
-| 6. Dockerfile Editor | 0/3 | Not started | - |
+| 6. Dockerfile Editor | 0/2 | Not started | - |
 | 7. GitHub Integration | 0/2 | Not started | - |
