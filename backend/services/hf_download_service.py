@@ -117,6 +117,11 @@ def get_hf_job(job_id: str) -> Optional[dict]:
 def make_tqdm_class(job_id: str):
     """Returns a tqdm subclass that writes download progress to _HF_JOBS[job_id]."""
     class ProgressTqdm(tqdm):
+        def __init__(self, *args, **kwargs):
+            # huggingface_hub 1.x passes name= internally; tqdm doesn't accept it
+            kwargs.pop("name", None)
+            super().__init__(*args, **kwargs)
+
         def update(self, n=1):
             super().update(n)
             job = _HF_JOBS.get(job_id)
