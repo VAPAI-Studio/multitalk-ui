@@ -2,6 +2,7 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, File, Form, UploadFile
 from fastapi.responses import StreamingResponse
 from typing import Dict, Any, Optional
+import httpx
 from core.auth import verify_admin
 from models.infrastructure import (
     FileSystemResponse,
@@ -16,6 +17,8 @@ from models.infrastructure import (
     CreateFolderRequest,
     HFDownloadRequest,
     HFDownloadJobStatus,
+    DockerfileContent,
+    DockerfileSaveRequest,
 )
 from services.infrastructure_service import InfrastructureService
 from services.hf_download_service import (
@@ -24,6 +27,7 @@ from services.hf_download_service import (
     get_hf_job,
     start_hf_download_job,
 )
+from services.github_service import GitHubService
 from core.s3_client import s3_client
 from config.settings import settings
 from botocore.exceptions import ClientError
@@ -428,3 +432,71 @@ async def get_hf_download_status(
     if not job:
         raise HTTPException(status_code=404, detail="Job not found. It may have expired (server restart clears in-memory jobs).")
     return {"job_id": job_id, **job}
+
+
+# ---------------------------------------------------------------------------
+# Dockerfile editor endpoints (Phase 6)
+# ---------------------------------------------------------------------------
+
+@router.get("/dockerfiles/content")
+async def get_dockerfile(
+    admin_user: dict = Depends(verify_admin),
+) -> dict:
+    """
+    Fetch the configured Dockerfile from GitHub.
+    Returns content (decoded UTF-8), sha, and path.
+    Path and repo are taken from settings — the frontend does not pass them.
+    Admin-only.
+    """
+    if not settings.GITHUB_TOKEN or not settings.GITHUB_REPO or not settings.GITHUB_DOCKERFILE_PATH:
+        raise HTTPException(
+            status_code=400,
+            detail="GitHub credentials not configured. Set GITHUB_TOKEN, GITHUB_REPO, and GITHUB_DOCKERFILE_PATH in .env",
+        )
+    service = GitHubService(settings.GITHUB_TOKEN, settings.GITHUB_REPO, settings.GITHUB_BRANCH)
+    try:
+        result = await service.get_file(settings.GITHUB_DOCKERFILE_PATH)
+        return {"success": True, **result}
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=e.response.status_code, detail=f"GitHub API error: {e.response.text}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"GitHub error: {str(e)}")
+
+
+@router.put("/dockerfiles/content")
+async def save_dockerfile(
+    payload: DockerfileSaveRequest,
+    admin_user: dict = Depends(verify_admin),
+) -> dict:
+    """
+    Commit updated Dockerfile content to GitHub with a custom commit message.
+    SHA must be the value returned by the most recent GET /dockerfiles/content call.
+    Returns commit_sha of the new commit.
+    Admin-only.
+    """
+    if not settings.GITHUB_TOKEN or not settings.GITHUB_REPO or not settings.GITHUB_DOCKERFILE_PATH:
+        raise HTTPException(
+            status_code=400,
+            detail="GitHub credentials not configured. Set GITHUB_TOKEN, GITHUB_REPO, and GITHUB_DOCKERFILE_PATH in .env",
+        )
+    if not payload.commit_message.strip():
+        raise HTTPException(status_code=422, detail="commit_message must not be empty")
+    service = GitHubService(settings.GITHUB_TOKEN, settings.GITHUB_REPO, settings.GITHUB_BRANCH)
+    try:
+        result = await service.update_file(
+            settings.GITHUB_DOCKERFILE_PATH,
+            payload.content,
+            payload.sha,
+            payload.commit_message.strip(),
+        )
+        return {"success": True, "commit_sha": result["commit"]["sha"]}
+    except httpx.HTTPStatusError as e:
+        status = e.response.status_code
+        if status == 409:
+            raise HTTPException(
+                status_code=409,
+                detail="SHA conflict: the file was modified since you opened it. Reload and re-apply your changes.",
+            )
+        raise HTTPException(status_code=status, detail=f"GitHub API error: {e.response.text}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"GitHub error: {str(e)}")
