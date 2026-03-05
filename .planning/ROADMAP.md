@@ -121,6 +121,34 @@ Plans:
 - [x] 06-01-PLAN.md — Backend: GitHubService (httpx), settings (GITHUB_TOKEN/REPO/BRANCH/DOCKERFILE_PATH), Pydantic models, GET+PUT /dockerfiles/content endpoints (Wave 1)
 - [x] 06-02-PLAN.md — Frontend: @monaco-editor/react install, DockerfileEditor component (load/dirty-track/commit), apiClient methods, Infrastructure.tsx wiring + human checkpoint (Wave 2)
 
+### Phase 6.1: File Tree Pagination (INSERTED — gap closure)
+**Goal**: Close VOL-04 gap — admin can page through directories with more than 200 items; fix double API call on file operations
+**Depends on**: Phase 6
+**Requirements**: VOL-04
+**Gap Closure**: Closes gaps from v1.0 audit (VOL-04 partial, double-call tech debt)
+**Success Criteria** (what must be TRUE):
+  1. Admin sees a "Load more" control when a directory has more than 200 items
+  2. Clicking "Load more" appends the next page of items to the existing tree without losing expanded state
+  3. File operations (delete/rename/move) trigger exactly one GET /files reload, not two
+**Plans**: TBD
+
+Plans:
+- [ ] 06.1-01: TBD
+
+### Phase 6.2: Verification Documentation (INSERTED — gap closure)
+**Goal**: Create missing VERIFICATION.md files for phases 02, 03, and 06 — all were human-verified via checkpoint but lack formal documentation
+**Depends on**: Phase 6
+**Requirements**: None (documentation only — supports audit completeness)
+**Gap Closure**: Closes 3 "unverified phase" flags from v1.0 audit
+**Success Criteria** (what must be TRUE):
+  1. Phase 02 has VERIFICATION.md documenting code evidence for VOL-01 through VOL-05
+  2. Phase 03 has VERIFICATION.md documenting code evidence for UPLOAD-01 through DWNLD-04
+  3. Phase 06 has VERIFICATION.md documenting code evidence for DOCKER-01 through DOCKER-07
+**Plans**: TBD
+
+Plans:
+- [ ] 06.2-01: TBD
+
 ### Phase 7: GitHub Integration
 **Goal**: Dockerfile changes commit and push to GitHub, triggering RunPod rebuilds, with secure credential handling
 **Depends on**: Phase 6
@@ -140,8 +168,9 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 6.1 -> 6.2 -> 7
 Note: Phase 6 depends only on Phase 1 and can run in parallel with Phases 2-5 if desired.
+Note: Phases 6.1 and 6.2 are gap closure phases inserted after audit; they can run in parallel.
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -151,4 +180,6 @@ Note: Phase 6 depends only on Phase 1 and can run in parallel with Phases 2-5 if
 | 4. File Operations | 3/3 | Complete   | 2026-03-04 |
 | 5. HuggingFace Integration | 3/3 | Complete   | 2026-03-05 |
 | 6. Dockerfile Editor | 2/2 | Complete   | 2026-03-05 |
+| 6.1. File Tree Pagination | 0/1 | Not started | - |
+| 6.2. Verification Documentation | 0/1 | Not started | - |
 | 7. GitHub Integration | 0/2 | Not started | - |
