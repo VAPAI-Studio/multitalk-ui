@@ -27,11 +27,13 @@ function formatBytes(bytes: number): string {
 function getStatusLabel(job: HFJob): string {
   switch (job.status) {
     case "pending":
-      return "Preparing download...";
+      return "Preparing...";
     case "downloading":
-      return `Downloading from HuggingFace... ${job.progress_pct.toFixed(1)}%`;
+      return job.progress_pct > 0
+        ? `Streaming to volume... ${job.progress_pct.toFixed(1)}%`
+        : "Streaming to volume...";
     case "uploading":
-      return `Uploading to volume... ${job.progress_pct.toFixed(1)}%`;
+      return `Streaming to volume... ${job.progress_pct.toFixed(1)}%`;
     case "done":
       return `Download complete! Saved to: ${job.s3_key}`;
     case "error":
@@ -280,10 +282,10 @@ export function HFDownload({ targetPath, onComplete }: Props) {
               </p>
             )}
 
-            {/* Size warning for large files */}
+            {/* Size note for large files */}
             {activeJob.status === "pending" && (
-              <p className="text-xs text-amber-600">
-                Note: Files larger than ~400MB may exceed Heroku disk limits. For large models, deploy the backend with adequate ephemeral storage.
+              <p className="text-xs text-gray-400">
+                Streaming directly to volume — no disk space limits.
               </p>
             )}
           </div>
