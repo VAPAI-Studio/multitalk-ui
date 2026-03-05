@@ -118,8 +118,8 @@ Plans:
 **Plans**: 2 plans in 2 waves
 
 Plans:
-- [ ] 06-01-PLAN.md — Backend: GitHubService (httpx), settings (GITHUB_TOKEN/REPO/BRANCH/DOCKERFILE_PATH), Pydantic models, GET+PUT /dockerfiles/content endpoints (Wave 1)
-- [ ] 06-02-PLAN.md — Frontend: @monaco-editor/react install, DockerfileEditor component (load/dirty-track/commit), apiClient methods, Infrastructure.tsx wiring + human checkpoint (Wave 2)
+- [x] 06-01-PLAN.md — Backend: GitHubService (httpx), settings (GITHUB_TOKEN/REPO/BRANCH/DOCKERFILE_PATH), Pydantic models, GET+PUT /dockerfiles/content endpoints (Wave 1)
+- [x] 06-02-PLAN.md — Frontend: @monaco-editor/react install, DockerfileEditor component (load/dirty-track/commit), apiClient methods, Infrastructure.tsx wiring + human checkpoint (Wave 2)
 
 ### Phase 7: GitHub Integration
 **Goal**: Dockerfile changes commit and push to GitHub, triggering RunPod rebuilds, with secure credential handling
