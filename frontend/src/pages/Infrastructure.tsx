@@ -3,6 +3,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { FileTree } from "../components/FileTree";
 import { FileUpload } from "../components/FileUpload";
 import { HFDownload } from "../components/HFDownload";
+import { DockerfileEditor } from "../components/DockerfileEditor";
 
 interface Props {
   comfyUrl: string;
@@ -66,6 +67,9 @@ export default function Infrastructure({ comfyUrl: _comfyUrl }: Props) {
             targetPath={currentPath}
             onComplete={handleTreeRefresh}
           />
+
+          {/* Edit Dockerfile — in-browser Monaco editor backed by GitHub */}
+          <DockerfileEditor />
 
           {/* Instructions Card */}
           <div className="rounded-3xl border border-blue-200/80 p-6 shadow-lg bg-gradient-to-br from-blue-50 to-white">
