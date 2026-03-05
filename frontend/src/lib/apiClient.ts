@@ -1422,6 +1422,18 @@ class ApiClient {
     return this.request(`/infrastructure/hf-download/${encodeURIComponent(jobId)}`);
   }
 
+  // Dockerfile editor methods (Phase 6)
+  async getDockerfile(): Promise<{ success: boolean; content: string; sha: string; path: string }> {
+    return this.request('/infrastructure/dockerfiles/content')
+  }
+
+  async saveDockerfile(content: string, sha: string, commitMessage: string): Promise<{ success: boolean; commit_sha: string }> {
+    return this.request('/infrastructure/dockerfiles/content', {
+      method: 'PUT',
+      body: JSON.stringify({ content, sha, commit_message: commitMessage }),
+    })
+  }
+
   // Helper method for authenticated requests (backward compatibility)
   async fetchWithAuth(endpoint: string, options: RequestInit = {}) {
     return this.request(endpoint, options);
