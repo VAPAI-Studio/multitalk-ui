@@ -44,6 +44,16 @@ class Settings(BaseSettings):
     # HuggingFace access token (optional default; per-request token overrides)
     HF_TOKEN: str = ""
 
+    # GitHub Integration (Dockerfile editor — Phase 6)
+    # Fine-grained PAT: Contents: read+write on the repo below (single repo only)
+    GITHUB_TOKEN: str = ""
+    # "owner/repo" — the repository containing the Dockerfile
+    GITHUB_REPO: str = ""
+    # Branch to read from and commit to (must exist)
+    GITHUB_BRANCH: str = "main"
+    # Exact path to the Dockerfile within the repo
+    GITHUB_DOCKERFILE_PATH: str = ""
+
     # Training Configuration (Flux/LoRA)
     TRAINING_WORKSPACE_DIR: str = "./training_workspace"
     KOHYA_SS_PATH: str = "/opt/kohya_ss"

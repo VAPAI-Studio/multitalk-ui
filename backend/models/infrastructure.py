@@ -97,3 +97,19 @@ class HFDownloadJobStatus(BaseModel):
     filename: str                     # Original filename being downloaded
     s3_key: str                       # Final S3 key on the volume
     error: Optional[str] = None       # Human-readable error message if status == "error"
+
+
+# --- Dockerfile editor models (Phase 6) ---
+
+class DockerfileContent(BaseModel):
+    """Response model for GET /dockerfiles/content."""
+    path: str
+    content: str    # Decoded UTF-8 Dockerfile text
+    sha: str        # Current blob SHA — must be passed back unmodified on save
+
+
+class DockerfileSaveRequest(BaseModel):
+    """Request body for PUT /dockerfiles/content."""
+    content: str
+    sha: str
+    commit_message: str  # Non-empty required; validation happens in the API layer
