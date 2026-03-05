@@ -58,7 +58,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Dockerfile Editor
 
-- [ ] **DOCKER-01**: Admin can view list of Dockerfiles from GitHub repository
+- [ ] **DOCKER-01**: Admin can view the configured Dockerfile from GitHub repository
 - [ ] **DOCKER-02**: Admin can open Dockerfile in in-browser code editor
 - [ ] **DOCKER-03**: Code editor displays Dockerfile syntax highlighting (FROM, RUN, COPY, ENV, etc.)
 - [ ] **DOCKER-04**: Code editor shows line numbers
