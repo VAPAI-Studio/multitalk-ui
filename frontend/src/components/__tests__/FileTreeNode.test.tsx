@@ -130,7 +130,7 @@ describe('FileTreeNode', () => {
 
     // Second click: collapse
     fireEvent.click(folderElement);
-    await waitFor(() => expect(screen.queryByText('child.txt')).not.toBeVisible());
+    await waitFor(() => expect(screen.queryByText('child.txt')).not.toBeInTheDocument());
   });
 
   it('displays error message on load failure', async () => {
