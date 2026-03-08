@@ -159,11 +159,11 @@ Plans:
   3. GitHub credentials are stored securely server-side (encrypted, never exposed to frontend)
   4. System detects merge conflicts and aborts with a clear error message instead of silently corrupting the file
   5. Admin receives confirmation on successful push and a meaningful error message if push fails
-**Plans**: TBD
+**Plans**: 2 plans in 2 waves
 
 Plans:
-- [ ] 07-01: TBD
-- [ ] 07-02: TBD
+- [ ] 07-01-PLAN.md — Backend: GitHubService.create_release() method, DockerfileSaveRequest.trigger_deploy field, extended save_dockerfile endpoint with optional release creation (Wave 1)
+- [ ] 07-02-PLAN.md — Frontend: Deploy toggle checkbox in DockerfileEditor, apiClient.saveDockerfile() with triggerDeploy param, enhanced status messages + human checkpoint (Wave 2)
 
 ## Progress
 
@@ -181,5 +181,5 @@ Note: Phases 6.1 and 6.2 are gap closure phases inserted after audit; they can r
 | 5. HuggingFace Integration | 3/3 | Complete   | 2026-03-05 |
 | 6. Dockerfile Editor | 2/2 | Complete   | 2026-03-05 |
 | 6.1. File Tree Pagination | 1/1 | Complete    | 2026-03-08 |
-| 6.2. Verification Documentation | 0/1 | Not started | - |
+| 6.2. Verification Documentation | 1/1 | Complete | 2026-03-08 |
 | 7. GitHub Integration | 0/2 | Not started | - |
