@@ -2,13 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: complete
-last_updated: "2026-03-05T02:30:00.000Z"
+status: completed
+stopped_at: Completed 06.1-01-PLAN.md (FileTree pagination + double API call fix — 14 passing tests, VOL-04 closed)
+last_updated: "2026-03-08T03:48:51.879Z"
+last_activity: 2026-03-05 -- Completed Plan 06-02 (Monaco Dockerfile editor — lazy-loaded, dirty-state tracking, GitHub commit with SHA conflict detection, human-verified end-to-end)
 progress:
-  total_phases: 6
-  completed_phases: 6
-  total_plans: 19
-  completed_plans: 19
+  total_phases: 9
+  completed_phases: 7
+  total_plans: 20
+  completed_plans: 20
+  percent: 100
 ---
 
 # Project State
@@ -70,6 +73,7 @@ Progress: [██████████] 100% (19/19 plans complete)
 | Phase 05 P03 | ~90min | 3 tasks | 5 files |
 | Phase 06-dockerfile-editor P06-01 | 190 | 2 tasks | 6 files |
 | Phase 06-dockerfile-editor P06-02 | 240 | 2 tasks | 4 files |
+| Phase 06.1-file-tree-pagination P01 | 300 | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -124,6 +128,9 @@ Recent decisions affecting current work:
 - [Phase 06-02]: Monaco defaultValue+key prop (not value) for uncontrolled editor — preserves native undo/redo without custom code
 - [Phase 06-02]: Monaco lazy-imported inside DockerfileEditor via React.lazy() — 3MB bundle only loads when Infrastructure page renders editor section
 - [Phase 06-02]: 409 conflict preserves dirty state — user edits not discarded on external-modification error
+- [Phase 06.1-01]: refreshId prop pattern (increment integer) replaces key={refreshTrigger} remount — avoids destroying expanded folder state on file operations
+- [Phase 06.1-01]: handleRefresh in FileTree calls only loadDirectory — removed onRefreshRequest?.() which was the double API call source
+- [Phase 06.1-01]: jsdom downgraded from v27 to v25 to fix @csstools/css-calc ESM require() incompatibility in vitest
 
 ### Pending Todos
 
@@ -136,6 +143,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-03-05
-Stopped at: Completed 06-02-PLAN.md (Monaco DockerfileEditor component, apiClient methods, Infrastructure.tsx wiring, human-verified — 19/19 plans complete, milestone complete)
+Last session: 2026-03-08T03:48:51.876Z
+Stopped at: Completed 06.1-01-PLAN.md (FileTree pagination + double API call fix — 14 passing tests, VOL-04 closed)
 Resume file: None

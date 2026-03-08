@@ -19,7 +19,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **VOL-01**: Admin can view hierarchical tree of files and folders on RunPod network volume
 - [x] **VOL-02**: File browser displays file name, size (human-readable), and last modified date
 - [x] **VOL-03**: Admin can expand and collapse folders without page reload
-- [ ] **VOL-04**: File browser handles directories with 10,000+ files without crashing (pagination)
+- [x] **VOL-04**: File browser handles directories with 10,000+ files without crashing (pagination)
 - [x] **VOL-05**: Admin can navigate to any path level in the volume
 
 ### File Upload
@@ -146,7 +146,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | VOL-01 | Phase 2 | Complete |
 | VOL-02 | Phase 2 | Complete |
 | VOL-03 | Phase 2 | Complete |
-| VOL-04 | Phase 6.1 (gap closure) | Pending |
+| VOL-04 | Phase 6.1 (gap closure) | Complete |
 | VOL-05 | Phase 2 | Complete |
 | UPLOAD-01 | Phase 3 | Complete |
 | UPLOAD-02 | Phase 3 | Complete |
