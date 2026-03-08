@@ -69,9 +69,9 @@ Plans:
 **Plans**: 3 plans in 2 waves
 
 Plans:
-- [ ] 03-01-PLAN.md — Backend multipart upload API (init/part/complete/abort) + streaming download endpoint (Wave 1)
-- [ ] 03-02-PLAN.md — Frontend FileUpload component with XHR chunked progress + Infrastructure page wiring (Wave 2)
-- [ ] 03-03-PLAN.md — FileTreeNode download button + apiClient.downloadFile() + human checkpoint (Wave 2)
+- [x] 03-01-PLAN.md — Backend multipart upload API (init/part/complete/abort) + streaming download endpoint (Wave 1)
+- [x] 03-02-PLAN.md — Frontend FileUpload component with XHR chunked progress + Infrastructure page wiring (Wave 2)
+- [x] 03-03-PLAN.md — FileTreeNode download button + apiClient.downloadFile() + human checkpoint (Wave 2)
 
 ### Phase 4: File Operations
 **Goal**: Admin can reorganize the network volume by deleting, moving, and renaming files and folders
@@ -85,9 +85,9 @@ Plans:
 **Plans**: 3 plans in 3 waves
 
 Plans:
-- [ ] 04-01-PLAN.md — Backend service layer: PROTECTED_PATHS, delete_object, delete_folder, move_object, move_folder (Wave 1)
-- [ ] 04-02-PLAN.md — Backend API endpoints: DELETE /files, DELETE /folders, POST /files/move, POST /folders/move (Wave 2)
-- [ ] 04-03-PLAN.md — Frontend: apiClient methods + FileTreeNode Delete/Rename/Move buttons with confirmation modals (Wave 3)
+- [x] 04-01-PLAN.md — Backend service layer: PROTECTED_PATHS, delete_object, delete_folder, move_object, move_folder (Wave 1)
+- [x] 04-02-PLAN.md — Backend API endpoints: DELETE /files, DELETE /folders, POST /files/move, POST /folders/move (Wave 2)
+- [x] 04-03-PLAN.md — Frontend: apiClient methods + FileTreeNode Delete/Rename/Move buttons with confirmation modals (Wave 3)
 
 ### Phase 5: HuggingFace Integration
 **Goal**: Admin can download AI models from HuggingFace directly to the RunPod network volume without a local intermediary
@@ -102,9 +102,9 @@ Plans:
 **Plans**: 3 plans in 3 waves
 
 Plans:
-- [ ] 05-01-PLAN.md — Backend service + models + settings: hf_download_service.py, HFDownloadRequest/HFDownloadJobStatus models, HF_TOKEN setting, huggingface_hub dependency (Wave 1)
-- [ ] 05-02-PLAN.md — Backend API endpoints: POST /hf-download (start job) + GET /hf-download/{job_id} (poll status), wired into infrastructure router (Wave 2)
-- [ ] 05-03-PLAN.md — Frontend: apiClient methods + HFDownload component with progress polling + wired into Infrastructure page (Wave 3, has checkpoint)
+- [x] 05-01-PLAN.md — Backend service + models + settings: hf_download_service.py, HFDownloadRequest/HFDownloadJobStatus models, HF_TOKEN setting, huggingface_hub dependency (Wave 1)
+- [x] 05-02-PLAN.md — Backend API endpoints: POST /hf-download (start job) + GET /hf-download/{job_id} (poll status), wired into infrastructure router (Wave 2)
+- [x] 05-03-PLAN.md — Frontend: apiClient methods + HFDownload component with progress polling + wired into Infrastructure page (Wave 3, has checkpoint)
 
 ### Phase 6: Dockerfile Editor
 **Goal**: Admin can view and edit the workflow Dockerfile in-browser with a professional code editing experience
@@ -133,7 +133,7 @@ Plans:
 **Plans**: 1 plan in 1 wave
 
 Plans:
-- [ ] 06.1-01-PLAN.md — FileTree + FileTreeNode pagination state and Load more buttons; Infrastructure.tsx refreshId fix replacing key remount (Wave 1)
+- [x] 06.1-01-PLAN.md — FileTree + FileTreeNode pagination state and Load more buttons; Infrastructure.tsx refreshId fix replacing key remount (Wave 1)
 
 ### Phase 6.2: Verification Documentation (INSERTED — gap closure)
 **Goal**: Create missing VERIFICATION.md files for phases 02, 03, and 06 — all were human-verified via checkpoint but lack formal documentation
@@ -144,10 +144,10 @@ Plans:
   1. Phase 02 has VERIFICATION.md documenting code evidence for VOL-01 through VOL-05
   2. Phase 03 has VERIFICATION.md documenting code evidence for UPLOAD-01 through DWNLD-04
   3. Phase 06 has VERIFICATION.md documenting code evidence for DOCKER-01 through DOCKER-07
-**Plans**: TBD
+**Plans**: 1 plan in 1 wave
 
 Plans:
-- [ ] 06.2-01: TBD
+- [ ] 06.2-01-PLAN.md — Create VERIFICATION.md for phases 02, 03, and 06 with code-level evidence for all requirements (Wave 1)
 
 ### Phase 7: GitHub Integration
 **Goal**: Dockerfile changes commit and push to GitHub, triggering RunPod rebuilds, with secure credential handling
