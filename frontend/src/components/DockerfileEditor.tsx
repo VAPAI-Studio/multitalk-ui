@@ -14,6 +14,7 @@ export function DockerfileEditor() {
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [loadError, setLoadError] = useState<string>("");
   const [saveStatus, setSaveStatus] = useState<string>("");
+  const [triggerDeploy, setTriggerDeploy] = useState<boolean>(false);
 
   // Load Dockerfile on mount
   useEffect(() => {
@@ -43,19 +44,28 @@ export function DockerfileEditor() {
     setSaveStatus(""); // clear previous save status on edit
   };
 
-  // Save and commit (DOCKER-07)
+  // Save and commit (DOCKER-07), optionally trigger deploy (GIT-02)
   const handleSave = async () => {
     if (!isDirty || !commitMessage.trim() || isSaving) return;
     setIsSaving(true);
     setSaveStatus("");
     try {
-      const result = await apiClient.saveDockerfile(content, sha, commitMessage.trim());
+      const result = await apiClient.saveDockerfile(content, sha, commitMessage.trim(), triggerDeploy);
       // Update SHA from response so next save uses the new HEAD SHA
       setSha(result.commit_sha);
       setOriginalContent(content);
       setIsDirty(false);
-      setSaveStatus("Committed successfully (" + result.commit_sha.slice(0, 7) + ")");
       setCommitMessage("");
+
+      // Build status message based on deploy result
+      const shortSha = result.commit_sha.slice(0, 7);
+      if (result.deploy_triggered && result.release) {
+        setSaveStatus(`Committed (${shortSha}) and deployment triggered (${result.release.tag_name})`);
+      } else if (triggerDeploy && result.deploy_error) {
+        setSaveStatus(`Committed (${shortSha}) but deploy failed: ${result.deploy_error}`);
+      } else {
+        setSaveStatus(`Committed successfully (${shortSha})`);
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Unknown error";
       if (message.includes("409")) {
@@ -134,6 +144,16 @@ export function DockerfileEditor() {
               onKeyDown={(e) => e.key === "Enter" && handleSave()}
               className="w-full rounded-2xl border-2 border-gray-200 px-4 py-3 text-gray-800 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all duration-200 bg-white/80"
             />
+            <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={triggerDeploy}
+                onChange={(e) => setTriggerDeploy(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              Deploy to RunPod
+              <span className="text-xs text-gray-400">(creates GitHub release to trigger rebuild)</span>
+            </label>
             <div className="flex items-center gap-3 flex-wrap">
               <button
                 onClick={handleSave}
@@ -145,12 +165,20 @@ export function DockerfileEditor() {
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                     Saving...
                   </>
+                ) : triggerDeploy ? (
+                  "Save, Commit & Deploy"
                 ) : (
                   "Save & Commit"
                 )}
               </button>
               {saveStatus && (
-                <span className={`text-sm ${saveStatus.startsWith("Committed") ? "text-green-600" : "text-red-600"}`}>
+                <span className={`text-sm ${
+                  saveStatus.startsWith("Committed")
+                    ? saveStatus.includes("but deploy failed")
+                      ? "text-amber-600"
+                      : "text-green-600"
+                    : "text-red-600"
+                }`}>
                   {saveStatus}
                 </span>
               )}

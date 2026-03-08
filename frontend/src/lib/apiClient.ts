@@ -1427,10 +1427,26 @@ class ApiClient {
     return this.request('/infrastructure/dockerfiles/content')
   }
 
-  async saveDockerfile(content: string, sha: string, commitMessage: string): Promise<{ success: boolean; commit_sha: string }> {
+  async saveDockerfile(
+    content: string,
+    sha: string,
+    commitMessage: string,
+    triggerDeploy: boolean = false
+  ): Promise<{
+    success: boolean;
+    commit_sha: string;
+    deploy_triggered: boolean;
+    release?: { tag_name: string; html_url: string } | null;
+    deploy_error?: string | null;
+  }> {
     return this.request('/infrastructure/dockerfiles/content', {
       method: 'PUT',
-      body: JSON.stringify({ content, sha, commit_message: commitMessage }),
+      body: JSON.stringify({
+        content,
+        sha,
+        commit_message: commitMessage,
+        trigger_deploy: triggerDeploy,
+      }),
     })
   }
 
