@@ -162,7 +162,7 @@ Plans:
 **Plans**: 2 plans in 2 waves
 
 Plans:
-- [ ] 07-01-PLAN.md — Backend: GitHubService.create_release() method, DockerfileSaveRequest.trigger_deploy field, extended save_dockerfile endpoint with optional release creation (Wave 1)
+- [x] 07-01-PLAN.md — Backend: GitHubService.create_release() method, DockerfileSaveRequest.trigger_deploy field, extended save_dockerfile endpoint with optional release creation (Wave 1) [SUMMARY](07-01-SUMMARY.md)
 - [ ] 07-02-PLAN.md — Frontend: Deploy toggle checkbox in DockerfileEditor, apiClient.saveDockerfile() with triggerDeploy param, enhanced status messages + human checkpoint (Wave 2)
 
 ## Progress
@@ -182,4 +182,4 @@ Note: Phases 6.1 and 6.2 are gap closure phases inserted after audit; they can r
 | 6. Dockerfile Editor | 2/2 | Complete   | 2026-03-05 |
 | 6.1. File Tree Pagination | 1/1 | Complete    | 2026-03-08 |
 | 6.2. Verification Documentation | 1/1 | Complete | 2026-03-08 |
-| 7. GitHub Integration | 0/2 | Not started | - |
+| 7. GitHub Integration | 1/2 | In progress | - |

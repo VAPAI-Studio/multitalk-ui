@@ -68,12 +68,12 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### GitHub Integration
 
-- [ ] **GIT-01**: System commits Dockerfile changes to GitHub repository
-- [ ] **GIT-02**: System pushes commit to correct branch (triggers RunPod rebuild)
-- [ ] **GIT-03**: GitHub credentials stored securely (encrypted, server-side only)
-- [ ] **GIT-04**: System detects merge conflicts and aborts with error message
-- [ ] **GIT-05**: Admin receives confirmation when push succeeds
-- [ ] **GIT-06**: System provides meaningful error message if push fails
+- [x] **GIT-01**: System commits Dockerfile changes to GitHub repository
+- [x] **GIT-02**: System pushes commit to correct branch (triggers RunPod rebuild)
+- [x] **GIT-03**: GitHub credentials stored securely (encrypted, server-side only)
+- [x] **GIT-04**: System detects merge conflicts and aborts with error message
+- [x] **GIT-05**: Admin receives confirmation when push succeeds
+- [x] **GIT-06**: System provides meaningful error message if push fails
 
 ## v2 Requirements
 
@@ -177,12 +177,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DOCKER-05 | Phase 6 | Complete |
 | DOCKER-06 | Phase 6 | Complete |
 | DOCKER-07 | Phase 6 | Complete |
-| GIT-01 | Phase 7 | Pending |
-| GIT-02 | Phase 7 | Pending |
-| GIT-03 | Phase 7 | Pending |
-| GIT-04 | Phase 7 | Pending |
-| GIT-05 | Phase 7 | Pending |
-| GIT-06 | Phase 7 | Pending |
+| GIT-01 | Phase 7 | Complete |
+| GIT-02 | Phase 7 | Complete |
+| GIT-03 | Phase 7 | Complete |
+| GIT-04 | Phase 7 | Complete |
+| GIT-05 | Phase 7 | Complete |
+| GIT-06 | Phase 7 | Complete |
 
 **Coverage:**
 - v1 requirements: 44 total
