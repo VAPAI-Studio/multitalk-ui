@@ -93,3 +93,46 @@ class GitHubService:
             )
             response.raise_for_status()
             return response.json()
+
+    async def create_release(
+        self,
+        tag_name: str,
+        target_commitish: str,
+        name: str,
+        body: str = "",
+    ) -> dict:
+        """
+        Create a GitHub release to trigger RunPod rebuild.
+
+        RunPod monitors GitHub releases (not branch pushes) to trigger
+        automated Docker image builds.
+
+        Args:
+            tag_name: Unique tag for this release (e.g., "deploy-20260308-143022").
+            target_commitish: Branch name or commit SHA to tag.
+            name: Human-readable release name.
+            body: Release description (optional).
+
+        Returns:
+            Full GitHub API response JSON (contains id, tag_name, html_url, ...).
+
+        Raises:
+            httpx.HTTPStatusError: If GitHub returns 4xx/5xx (e.g., 422 if tag exists).
+        """
+        url = f"https://api.github.com/repos/{self.repo}/releases"
+        payload = {
+            "tag_name": tag_name,
+            "target_commitish": target_commitish,
+            "name": name,
+            "body": body,
+            "draft": False,
+            "prerelease": False,
+        }
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                url,
+                json=payload,
+                headers=self.headers,
+            )
+            response.raise_for_status()
+            return response.json()
