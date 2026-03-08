@@ -295,3 +295,180 @@ class TestInfrastructureModels:
         from pydantic import ValidationError
         with pytest.raises(ValidationError):
             DockerfileSaveRequest(content="x", sha="y")
+
+
+class TestGitHubServiceCreateRelease:
+    """Test create_release async method."""
+
+    @pytest.mark.asyncio
+    async def test_create_release_sends_post_with_correct_payload(self):
+        from services.github_service import GitHubService
+        svc = GitHubService("tok", "owner/repo", "main")
+
+        expected_response = {
+            "id": 1,
+            "tag_name": "deploy-20260308-143022",
+            "html_url": "https://github.com/owner/repo/releases/tag/deploy-20260308-143022",
+            "name": "Deploy 20260308-143022",
+            "body": "chore: update Dockerfile",
+        }
+        mock_response = MagicMock()
+        mock_response.json.return_value = expected_response
+        mock_response.raise_for_status = MagicMock()
+
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(return_value=mock_response)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+
+        with patch("httpx.AsyncClient", return_value=mock_client):
+            result = await svc.create_release(
+                tag_name="deploy-20260308-143022",
+                target_commitish="abc123sha",
+                name="Deploy 20260308-143022",
+                body="chore: update Dockerfile",
+            )
+
+        # Verify the POST payload
+        call_kwargs = mock_client.post.call_args[1]
+        payload = call_kwargs.get("json", {})
+        assert payload["tag_name"] == "deploy-20260308-143022"
+        assert payload["target_commitish"] == "abc123sha"
+        assert payload["name"] == "Deploy 20260308-143022"
+        assert payload["body"] == "chore: update Dockerfile"
+        assert payload["draft"] is False
+        assert payload["prerelease"] is False
+
+    @pytest.mark.asyncio
+    async def test_create_release_returns_full_json_response(self):
+        from services.github_service import GitHubService
+        svc = GitHubService("tok", "owner/repo", "main")
+
+        expected_response = {
+            "id": 42,
+            "tag_name": "deploy-20260308-150000",
+            "html_url": "https://github.com/owner/repo/releases/tag/deploy-20260308-150000",
+        }
+        mock_response = MagicMock()
+        mock_response.json.return_value = expected_response
+        mock_response.raise_for_status = MagicMock()
+
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(return_value=mock_response)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+
+        with patch("httpx.AsyncClient", return_value=mock_client):
+            result = await svc.create_release(
+                tag_name="deploy-20260308-150000",
+                target_commitish="def456",
+                name="Deploy 20260308-150000",
+            )
+
+        assert result == expected_response
+
+    @pytest.mark.asyncio
+    async def test_create_release_calls_raise_for_status(self):
+        from services.github_service import GitHubService
+        import httpx
+
+        svc = GitHubService("tok", "owner/repo", "main")
+
+        mock_response = MagicMock()
+        mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "Server Error",
+            request=MagicMock(),
+            response=MagicMock(status_code=500),
+        )
+
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(return_value=mock_response)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+
+        with patch("httpx.AsyncClient", return_value=mock_client):
+            with pytest.raises(httpx.HTTPStatusError):
+                await svc.create_release(
+                    tag_name="deploy-test",
+                    target_commitish="sha123",
+                    name="Deploy test",
+                )
+
+    @pytest.mark.asyncio
+    async def test_create_release_uses_auth_headers(self):
+        from services.github_service import GitHubService
+        svc = GitHubService("my-secret-token", "owner/repo", "main")
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"id": 1, "tag_name": "v1"}
+        mock_response.raise_for_status = MagicMock()
+
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(return_value=mock_response)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+
+        with patch("httpx.AsyncClient", return_value=mock_client):
+            await svc.create_release(
+                tag_name="v1",
+                target_commitish="sha",
+                name="Release v1",
+            )
+
+        call_kwargs = mock_client.post.call_args[1]
+        headers = call_kwargs.get("headers", {})
+        assert headers.get("Authorization") == "Bearer my-secret-token"
+
+    @pytest.mark.asyncio
+    async def test_create_release_422_duplicate_tag_raises(self):
+        from services.github_service import GitHubService
+        import httpx
+
+        svc = GitHubService("tok", "owner/repo", "main")
+
+        mock_response = MagicMock()
+        mock_response.status_code = 422
+        mock_response.text = "Validation Failed"
+        mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "Validation Failed",
+            request=MagicMock(),
+            response=MagicMock(status_code=422, text="Validation Failed"),
+        )
+
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(return_value=mock_response)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+
+        with patch("httpx.AsyncClient", return_value=mock_client):
+            with pytest.raises(httpx.HTTPStatusError):
+                await svc.create_release(
+                    tag_name="existing-tag",
+                    target_commitish="sha",
+                    name="Duplicate",
+                )
+
+    @pytest.mark.asyncio
+    async def test_create_release_posts_to_correct_url(self):
+        from services.github_service import GitHubService
+        svc = GitHubService("tok", "myorg/myrepo", "dev")
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"id": 1, "tag_name": "v1"}
+        mock_response.raise_for_status = MagicMock()
+
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(return_value=mock_response)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+
+        with patch("httpx.AsyncClient", return_value=mock_client):
+            await svc.create_release(
+                tag_name="v1",
+                target_commitish="sha",
+                name="Release",
+            )
+
+        call_args = mock_client.post.call_args
+        called_url = call_args[0][0] if call_args[0] else call_args[1].get("url", "")
+        assert "https://api.github.com/repos/myorg/myrepo/releases" == called_url
