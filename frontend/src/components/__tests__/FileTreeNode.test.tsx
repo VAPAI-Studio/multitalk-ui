@@ -183,4 +183,34 @@ describe('FileTreeNode', () => {
       expect(screen.getByText('Empty folder')).toBeInTheDocument();
     });
   });
+
+  it('shows Load more button inside expanded folder when hasMore is true', async () => {
+    const folderItem = {
+      type: 'folder' as const,
+      name: 'big-folder',
+      path: 'big-folder',
+      size: null,
+      sizeHuman: null,
+      lastModified: null,
+      childCount: null
+    };
+
+    vi.mocked(apiClient.listFiles).mockResolvedValue({
+      items: [
+        { type: 'file' as const, name: 'child.bin', path: 'big-folder/child.bin', size: 100, sizeHuman: '100 B', lastModified: null, childCount: null }
+      ],
+      totalItems: 1,
+      hasMore: true,
+      continuationToken: 'tok2'
+    });
+
+    render(<FileTreeNode item={folderItem} depth={0} />);
+
+    fireEvent.click(screen.getByText('big-folder'));
+
+    await waitFor(() => {
+      expect(screen.getByText('child.bin')).toBeInTheDocument();
+      expect(screen.getByText('Load more')).toBeInTheDocument();
+    });
+  });
 });
