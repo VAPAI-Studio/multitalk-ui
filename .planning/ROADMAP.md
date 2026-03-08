@@ -130,10 +130,10 @@ Plans:
   1. Admin sees a "Load more" control when a directory has more than 200 items
   2. Clicking "Load more" appends the next page of items to the existing tree without losing expanded state
   3. File operations (delete/rename/move) trigger exactly one GET /files reload, not two
-**Plans**: TBD
+**Plans**: 1 plan in 1 wave
 
 Plans:
-- [ ] 06.1-01: TBD
+- [ ] 06.1-01-PLAN.md — FileTree + FileTreeNode pagination state and Load more buttons; Infrastructure.tsx refreshId fix replacing key remount (Wave 1)
 
 ### Phase 6.2: Verification Documentation (INSERTED — gap closure)
 **Goal**: Create missing VERIFICATION.md files for phases 02, 03, and 06 — all were human-verified via checkpoint but lack formal documentation
