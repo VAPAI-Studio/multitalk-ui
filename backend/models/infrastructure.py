@@ -113,3 +113,4 @@ class DockerfileSaveRequest(BaseModel):
     content: str
     sha: str
     commit_message: str  # Non-empty required; validation happens in the API layer
+    trigger_deploy: bool = False  # When True, creates a GitHub release after commit to trigger RunPod rebuild

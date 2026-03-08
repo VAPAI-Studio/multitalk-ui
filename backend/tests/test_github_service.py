@@ -296,6 +296,25 @@ class TestInfrastructureModels:
         with pytest.raises(ValidationError):
             DockerfileSaveRequest(content="x", sha="y")
 
+    def test_dockerfile_save_request_trigger_deploy_defaults_false(self):
+        from models.infrastructure import DockerfileSaveRequest
+        obj = DockerfileSaveRequest(
+            content="FROM python:3.11\n",
+            sha="abc123",
+            commit_message="chore: update Dockerfile",
+        )
+        assert obj.trigger_deploy is False
+
+    def test_dockerfile_save_request_trigger_deploy_accepts_true(self):
+        from models.infrastructure import DockerfileSaveRequest
+        obj = DockerfileSaveRequest(
+            content="FROM python:3.11\n",
+            sha="abc123",
+            commit_message="chore: update Dockerfile",
+            trigger_deploy=True,
+        )
+        assert obj.trigger_deploy is True
+
 
 class TestGitHubServiceCreateRelease:
     """Test create_release async method."""

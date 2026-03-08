@@ -489,7 +489,36 @@ async def save_dockerfile(
             payload.sha,
             payload.commit_message.strip(),
         )
-        return {"success": True, "commit_sha": result["commit"]["sha"]}
+        commit_sha = result["commit"]["sha"]
+
+        # Optionally create GitHub release to trigger RunPod rebuild
+        release_info = None
+        deploy_error = None
+        if payload.trigger_deploy:
+            from datetime import datetime
+            timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+            tag_name = f"deploy-{timestamp}"
+            try:
+                release_result = await service.create_release(
+                    tag_name=tag_name,
+                    target_commitish=commit_sha,
+                    name=f"Deploy {timestamp}",
+                    body=payload.commit_message.strip(),
+                )
+                release_info = {
+                    "tag_name": release_result["tag_name"],
+                    "html_url": release_result.get("html_url", ""),
+                }
+            except httpx.HTTPStatusError as release_err:
+                deploy_error = f"Commit succeeded but release creation failed: {release_err.response.text}"
+
+        return {
+            "success": True,
+            "commit_sha": commit_sha,
+            "deploy_triggered": bool(payload.trigger_deploy and release_info),
+            "release": release_info,
+            "deploy_error": deploy_error,
+        }
     except httpx.HTTPStatusError as e:
         status = e.response.status_code
         if status == 409:
