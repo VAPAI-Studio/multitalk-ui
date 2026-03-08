@@ -24,6 +24,11 @@ export function FileTreeNode({ item, depth, onOperationComplete }: Props) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>("");
 
+  // Child pagination state
+  const [childrenHasMore, setChildrenHasMore] = useState(false);
+  const [childrenContinuationToken, setChildrenContinuationToken] = useState<string | null>(null);
+  const [isLoadingMoreChildren, setIsLoadingMoreChildren] = useState(false);
+
   // Download state
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string>("");
@@ -59,6 +64,8 @@ export function FileTreeNode({ item, depth, onOperationComplete }: Props) {
       try {
         const response = await apiClient.listFiles(item.path, 200);
         setChildren(response.items);
+        setChildrenHasMore(response.hasMore);
+        setChildrenContinuationToken(response.continuationToken);
         setIsExpanded(true);
       } catch (err: any) {
         setError(err.message || "Failed to load folder contents");
@@ -145,6 +152,8 @@ export function FileTreeNode({ item, depth, onOperationComplete }: Props) {
       if (isExpanded) {
         const response = await apiClient.listFiles(item.path, 200);
         setChildren(response.items);
+        setChildrenHasMore(response.hasMore);
+        setChildrenContinuationToken(response.continuationToken);
       }
       onOperationComplete?.();
     } catch (err: any) {
@@ -154,6 +163,22 @@ export function FileTreeNode({ item, depth, onOperationComplete }: Props) {
       setShowCreateFolderModal(false);
     } finally {
       setIsOperating(false);
+    }
+  };
+
+  const loadMoreChildren = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!childrenContinuationToken || isLoadingMoreChildren) return;
+    setIsLoadingMoreChildren(true);
+    try {
+      const response = await apiClient.listFiles(item.path, 200, childrenContinuationToken);
+      setChildren(prev => [...prev, ...response.items]);
+      setChildrenHasMore(response.hasMore);
+      setChildrenContinuationToken(response.continuationToken);
+    } catch (err: any) {
+      setError(err.message || "Failed to load more items");
+    } finally {
+      setIsLoadingMoreChildren(false);
     }
   };
 
@@ -332,6 +357,24 @@ export function FileTreeNode({ item, depth, onOperationComplete }: Props) {
               onOperationComplete={onOperationComplete}
             />
           ))}
+        </div>
+      )}
+      {isExpanded && childrenHasMore && (
+        <div className="py-1" style={{ paddingLeft: `${indentPadding + 32}px` }}>
+          <button
+            onClick={loadMoreChildren}
+            disabled={isLoadingMoreChildren}
+            className="py-1 px-3 text-xs font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50"
+          >
+            {isLoadingMoreChildren ? (
+              <>
+                <div className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                Loading more...
+              </>
+            ) : (
+              "Load more"
+            )}
+          </button>
         </div>
       )}
       {isExpanded && children.length === 0 && !isLoading && !error && (

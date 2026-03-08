@@ -8,12 +8,7 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
-    pool: 'vmThreads',
-    css: {
-      modules: {
-        classNameStrategy: 'non-scoped',
-      },
-    },
+    css: false,
   },
   resolve: {
     alias: {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { apiClient } from "../lib/apiClient";
 import { FileTreeNode } from "./FileTreeNode";
 import { Breadcrumb } from "./Breadcrumb";
@@ -16,14 +16,20 @@ interface FileSystemItem {
 interface FileTreeProps {
   currentPath?: string;                    // controlled from Infrastructure.tsx
   onNavigate?: (path: string) => void;     // called when user navigates
-  onRefreshRequest?: () => void;           // called when refresh button clicked
+  onRefreshRequest?: () => void;           // kept for backward compat; handleRefresh no longer calls it
+  refreshId?: number;                      // increment to request an internal reload without remounting
 }
 
-export function FileTree({ currentPath: externalPath, onNavigate, onRefreshRequest }: FileTreeProps = {}) {
+export function FileTree({ currentPath: externalPath, onNavigate, onRefreshRequest: _onRefreshRequest, refreshId }: FileTreeProps = {}) {
   const [rootItems, setRootItems] = useState<FileSystemItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string>("");
   const [currentPath, setCurrentPath] = useState<string>(externalPath ?? "");
+
+  // Pagination state
+  const [hasMore, setHasMore] = useState(false);
+  const [continuationToken, setContinuationToken] = useState<string | null>(null);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   // Load root directory on mount
   useEffect(() => {
@@ -39,12 +45,26 @@ export function FileTree({ currentPath: externalPath, onNavigate, onRefreshReque
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [externalPath]);
 
+  // Reload when refreshId changes (without remounting)
+  const prevRefreshId = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    if (refreshId !== undefined && refreshId > 0) {
+      prevRefreshId.current = refreshId;
+      loadDirectory(currentPath);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshId]);
+
   const loadDirectory = async (path: string = "") => {
     setIsLoading(true);
     setError("");
+    setHasMore(false);
+    setContinuationToken(null);
     try {
       const response = await apiClient.listFiles(path, 200);
       setRootItems(response.items);
+      setHasMore(response.hasMore);
+      setContinuationToken(response.continuationToken);
       setCurrentPath(path);
       onNavigate?.(path);
     } catch (err: any) {
@@ -54,9 +74,23 @@ export function FileTree({ currentPath: externalPath, onNavigate, onRefreshReque
     }
   };
 
+  const loadMore = async () => {
+    if (!continuationToken || isLoadingMore) return;
+    setIsLoadingMore(true);
+    try {
+      const response = await apiClient.listFiles(currentPath, 200, continuationToken);
+      setRootItems(prev => [...prev, ...response.items]);
+      setHasMore(response.hasMore);
+      setContinuationToken(response.continuationToken);
+    } catch (err: any) {
+      setError(err.message || "Failed to load more items");
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
+
   const handleRefresh = () => {
     loadDirectory(currentPath);
-    onRefreshRequest?.();
   };
 
   return (
@@ -130,6 +164,25 @@ export function FileTree({ currentPath: externalPath, onNavigate, onRefreshReque
             {rootItems.map((item) => (
               <FileTreeNode key={item.path} item={item} depth={0} onOperationComplete={handleRefresh} />
             ))}
+          </div>
+        )}
+
+        {!isLoading && !error && hasMore && (
+          <div className="px-6 py-3 border-t border-gray-100">
+            <button
+              onClick={loadMore}
+              disabled={isLoadingMore}
+              className="w-full py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {isLoadingMore ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                  Loading more...
+                </>
+              ) : (
+                "Load more"
+              )}
+            </button>
           </div>
         )}
       </div>

@@ -12,7 +12,7 @@ interface Props {
 export default function Infrastructure({ comfyUrl: _comfyUrl }: Props) {
   const { isAdmin } = useAuth();
   const [currentPath, setCurrentPath] = useState<string>("");
-  const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
+  const [fileTreeRefreshId, setFileTreeRefreshId] = useState(0);
 
   // Admin-only access control
   if (!isAdmin) {
@@ -29,7 +29,7 @@ export default function Infrastructure({ comfyUrl: _comfyUrl }: Props) {
     );
   }
 
-  const handleTreeRefresh = () => setRefreshTrigger(t => t + 1);
+  const handleTreeRefresh = () => setFileTreeRefreshId(id => id + 1);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-gray-50">
@@ -46,13 +46,12 @@ export default function Infrastructure({ comfyUrl: _comfyUrl }: Props) {
             </p>
           </div>
 
-          {/* File Browser — remounts on refreshTrigger change to force reload */}
+          {/* File Browser — refreshId prop triggers internal reload without remounting */}
           <div className="space-y-4">
             <FileTree
-              key={refreshTrigger}
+              refreshId={fileTreeRefreshId}
               currentPath={currentPath}
               onNavigate={setCurrentPath}
-              onRefreshRequest={handleTreeRefresh}
             />
           </div>
 
