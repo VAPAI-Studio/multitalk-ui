@@ -351,8 +351,8 @@ class ImageJobService:
         Returns: (jobs_dict_list, total_count, error_message)
         """
         try:
-            # Minimal columns for feed display
-            feed_columns = "id, status, created_at, workflow_id, output_image_urls, prompt, comfy_job_id, error_message, width, height"
+            # Minimal columns for feed display (includes parameters and input_image_urls for features like Virtual Set)
+            feed_columns = "id, status, created_at, workflow_id, output_image_urls, input_image_urls, prompt, comfy_job_id, error_message, width, height, parameters"
 
             query = self.supabase.table("image_jobs").select(feed_columns, count="exact")
 

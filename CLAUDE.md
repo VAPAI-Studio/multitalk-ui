@@ -153,12 +153,93 @@ ComfyUI server URL is configurable in the UI header.
 
 **See [WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md) for detailed documentation on the workflow system, including how to create and use workflow templates.**
 
+### RunPod Serverless Integration
+
+The app supports dual execution backends — users can choose between local ComfyUI or cloud-based RunPod serverless:
+
+**Features:**
+- **User Toggle**: Each user can switch between ComfyUI (local) and RunPod (cloud) execution
+- **Feature Flag**: `ENABLE_RUNPOD=true` to enable (disabled by default)
+- **Single Credential**: Global RunPod API key (not per-user)
+- **Single Endpoint**: One universal ComfyUI endpoint handles all workflows
+- **Unified Monitoring**: Same job tracking system for both backends
+
+**Architecture:**
+
+One RunPod serverless endpoint runs ComfyUI. All workflows use this same endpoint:
+1. Backend loads the workflow template and fills parameters (same as local ComfyUI path)
+2. Backend sends the **full workflow JSON** to the universal RunPod endpoint
+3. The universal handler (`backend/runpod_handlers/universal_handler.py`) forwards it to internal ComfyUI
+4. Models live on the **network volume** (not in the Docker image) — managed via the Infrastructure file browser
+5. Only Dockerfile changes are needed when adding new **custom nodes**
+
+**How it works:**
+1. User selects execution backend via toggle (🖥️ Local / ☁️ Cloud)
+2. Frontend checks ExecutionBackendContext for user preference
+3. For RunPod: Backend loads workflow template, fills params, sends full JSON to `RUNPOD_ENDPOINT_ID`
+4. RunPod handler passes workflow JSON to its internal ComfyUI instance
+5. Jobs tracked in database with `execution_backend` field
+6. RunPod jobs polled every 3s (similar to ComfyUI monitoring)
+7. Outputs returned as base64, uploaded to Supabase Storage
+
+**Configuration (.env):**
+```bash
+# Feature flag (default: false)
+ENABLE_RUNPOD=true
+
+# RunPod credentials
+RUNPOD_API_KEY=your-runpod-api-key
+
+# Universal ComfyUI serverless endpoint — one endpoint for all workflows
+RUNPOD_ENDPOINT_ID=your-universal-comfyui-endpoint-id
+
+# Optional timeout (default: 600 seconds)
+RUNPOD_TIMEOUT=600
+```
+
+**Deployment Process:**
+
+1. Deploy `backend/runpod_handlers/universal_handler.py` to a RunPod serverless endpoint
+   - Handler accepts `{"input": {"workflow": {...full ComfyUI workflow JSON...}}}`
+   - Handler runs ComfyUI internally, polls for completion, returns base64 outputs
+2. Mount the network volume to the endpoint — models are managed via the Infrastructure file browser
+3. For new custom nodes: update the Dockerfile, rebuild and redeploy the single endpoint
+4. Set `RUNPOD_ENDPOINT_ID` in `.env` to the deployed endpoint ID
+
+**Database Schema:**
+- `execution_backend` ENUM ('comfyui', 'runpod') - tracks which backend was used
+- `runpod_job_id` TEXT - RunPod job ID (null for ComfyUI jobs)
+- `runpod_endpoint_id` TEXT - RunPod endpoint used
+
+**Frontend:**
+- `ExecutionBackendContext` - manages user preference (persisted in localStorage + Supabase user_metadata)
+- `ExecutionBackendToggle` - UI toggle component in header
+- Toggle only shows if RunPod is enabled and configured
+
+**API Endpoints:**
+- `POST /api/runpod/submit-workflow` - Submit workflow to RunPod (loads template, fills params, sends full JSON)
+- `GET /api/runpod/status/{job_id}` - Check RunPod job status
+- `POST /api/runpod/cancel/{job_id}` - Cancel RunPod job
+- `GET /api/runpod/health` - Check RunPod configuration
+
+**Backend Implementation:**
+- `backend/services/runpod_service.py` - Builds workflow JSON via WorkflowService, submits to RUNPOD_ENDPOINT_ID
+- `backend/api/runpod.py` - API routes for RunPod operations
+- `backend/runpod_handlers/universal_handler.py` - Deployable handler (proxies workflow JSON to local ComfyUI)
+
+**Migration:**
+Run `backend/migrations/004_add_runpod_support.sql` to add required database fields.
+
 ### Environment Configuration
 
 **Backend (.env):**
 - `SUPABASE_URL` and `SUPABASE_ANON_KEY` - Required for auth and storage
 - `OPENROUTER_API_KEY` - For AI model API calls
 - `COMFYUI_SERVER_URL` - Default ComfyUI server
+- `ENABLE_RUNPOD` - Feature flag for RunPod integration (default: false)
+- `RUNPOD_API_KEY` - RunPod API key (required if ENABLE_RUNPOD=true)
+- `RUNPOD_ENDPOINT_ID` - RunPod endpoint ID (required if ENABLE_RUNPOD=true)
+- `RUNPOD_TIMEOUT` - RunPod request timeout in seconds (default: 600)
 - Heroku deployment: Uses Heroku config vars instead of .env
 
 **Frontend:**
