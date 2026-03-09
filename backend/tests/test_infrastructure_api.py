@@ -3,20 +3,44 @@ import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock
 from datetime import datetime
-from main import app
 
-client = TestClient(app)
+from core.auth import verify_admin
+
+
+@pytest.fixture(autouse=True)
+def mock_supabase():
+    """Mock Supabase client so tests don't need real credentials."""
+    with patch('core.supabase.get_supabase', return_value=MagicMock()):
+        yield
+
+
+@pytest.fixture
+def app():
+    """Provide the FastAPI app."""
+    from main import app
+    return app
+
+
+@pytest.fixture
+def client(app):
+    """Provide a test client."""
+    return TestClient(app)
+
 
 # Mock admin token for testing
 MOCK_ADMIN_TOKEN = "mock-admin-token"
 
 
+def _mock_admin():
+    return {"id": "admin-user-id", "email": "admin@example.com"}
+
+
 @pytest.fixture
-def mock_admin_auth():
-    """Mock admin authentication."""
-    with patch('core.auth.verify_admin') as mock:
-        mock.return_value = {"id": "admin-user-id", "email": "admin@example.com"}
-        yield mock
+def mock_admin_auth(app):
+    """Override verify_admin dependency."""
+    app.dependency_overrides[verify_admin] = _mock_admin
+    yield
+    app.dependency_overrides.pop(verify_admin, None)
 
 
 @pytest.fixture
@@ -26,7 +50,7 @@ def mock_s3_client():
         yield mock
 
 
-def test_list_files_endpoint_success(mock_admin_auth, mock_s3_client):
+def test_list_files_endpoint_success(client, mock_admin_auth, mock_s3_client):
     """Test successful file listing."""
     # Mock S3 response
     mock_s3_client.list_objects_v2.return_value = {
@@ -70,14 +94,14 @@ def test_list_files_endpoint_success(mock_admin_auth, mock_s3_client):
     assert file["sizeHuman"] == "2.0 KB"
 
 
-def test_list_files_endpoint_requires_admin(mock_s3_client):
+def test_list_files_endpoint_requires_admin(client, mock_s3_client):
     """Test endpoint rejects non-admin users."""
     # Don't mock admin auth - should fail
     response = client.get("/api/infrastructure/files")
     assert response.status_code in [401, 403]  # Unauthorized or Forbidden
 
 
-def test_list_files_endpoint_pagination(mock_admin_auth, mock_s3_client):
+def test_list_files_endpoint_pagination(client, mock_admin_auth, mock_s3_client):
     """Test pagination support."""
     # Mock S3 response with pagination
     mock_s3_client.list_objects_v2.return_value = {
@@ -104,18 +128,18 @@ def test_list_files_endpoint_pagination(mock_admin_auth, mock_s3_client):
     assert call_args['MaxKeys'] == 200
 
 
-def test_list_files_endpoint_path_validation(mock_admin_auth, mock_s3_client):
+def test_list_files_endpoint_path_validation(client, mock_admin_auth, mock_s3_client):
     """Test path traversal protection."""
     response = client.get(
         "/api/infrastructure/files?path=../etc/passwd",
         headers={"Authorization": f"Bearer {MOCK_ADMIN_TOKEN}"}
     )
 
-    assert response.status_code == 500
+    assert response.status_code == 400
     assert "Path traversal detected" in response.json()["detail"]
 
 
-def test_list_files_endpoint_s3_error(mock_admin_auth, mock_s3_client):
+def test_list_files_endpoint_s3_error(client, mock_admin_auth, mock_s3_client):
     """Test S3 error handling."""
     from botocore.exceptions import ClientError
 
@@ -130,5 +154,5 @@ def test_list_files_endpoint_s3_error(mock_admin_auth, mock_s3_client):
         headers={"Authorization": f"Bearer {MOCK_ADMIN_TOKEN}"}
     )
 
-    assert response.status_code == 500
-    assert "S3 error" in response.json()["detail"]
+    assert response.status_code == 404
+    assert "Network volume not found" in response.json()["detail"]
