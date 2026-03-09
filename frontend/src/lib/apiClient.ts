@@ -122,7 +122,7 @@ class ApiClient {
             try {
               const body = await response.json()
               if (body?.detail) detail = typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail)
-            } catch {}
+            } catch { /* ignore JSON parse errors */ }
             const err = new Error(detail)
             ;(err as any).noRetry = true
             throw err

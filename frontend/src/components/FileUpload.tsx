@@ -253,7 +253,7 @@ export function FileUpload({ targetPath, onUploadComplete }: Props) {
             <input
               ref={folderInputRef}
               type="file"
-              // @ts-ignore — non-standard but widely supported
+              // @ts-expect-error — non-standard but widely supported
               webkitdirectory=""
               disabled={isRunning}
               onChange={(e) => addFiles(e.target.files, true)}
