@@ -1,36 +1,57 @@
-"""Authentication utilities for JWT verification and user management."""
+"""Authentication utilities for JWT verification, API key auth, and user management."""
 from typing import Optional
-from fastapi import HTTPException, Security, Depends
+from fastapi import HTTPException, Security, Depends, Header
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from core.supabase import get_supabase
 from supabase import Client
-import jwt
-import os
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
+
+
+def _lookup_api_key_user(api_key: str):
+    """Look up a user by API key. Returns Supabase User object or None."""
+    from services.api_key_service import ApiKeyService
+    service = ApiKeyService()
+    return service.lookup_user_by_key(api_key)
 
 
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Security(security),
+    credentials: Optional[HTTPAuthorizationCredentials] = Security(security),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
     supabase: Client = Depends(get_supabase)
 ):
     """
-    Dependency to get the current authenticated user from JWT token.
-
-    Args:
-        credentials: Bearer token from request header
-        supabase: Supabase client instance
+    Dependency to get the current authenticated user.
+    Supports two auth methods:
+      1. X-API-Key header (per-user API key)
+      2. Authorization: Bearer <jwt> (Supabase JWT)
 
     Returns:
-        User object from Supabase auth
+        User object from Supabase auth (same shape for both methods)
 
     Raises:
-        HTTPException: If token is invalid or user not found
+        HTTPException: If no valid auth is provided
     """
+    # Path 1: API Key auth
+    if x_api_key:
+        user = _lookup_api_key_user(x_api_key)
+        if not user:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid or revoked API key"
+            )
+        return user
+
+    # Path 2: JWT Bearer auth (existing logic)
+    if not credentials:
+        raise HTTPException(
+            status_code=401,
+            detail="Missing authentication. Provide Authorization: Bearer <token> or X-API-Key header."
+        )
+
     token = credentials.credentials
 
     try:
-        # Verify the JWT token with Supabase
         user_response = supabase.auth.get_user(token)
 
         if not user_response or not user_response.user:
@@ -41,6 +62,8 @@ def get_current_user(
 
         return user_response.user
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=401,
@@ -50,24 +73,18 @@ def get_current_user(
 
 async def get_optional_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Security(security),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
     supabase: Client = Depends(get_supabase)
 ) -> Optional[dict]:
     """
     Optional authentication - returns user if authenticated, None otherwise.
-    Useful for endpoints that work both authenticated and unauthenticated.
-
-    Args:
-        credentials: Optional bearer token from request header
-        supabase: Supabase client instance
-
-    Returns:
-        User object if authenticated, None otherwise
+    Supports both JWT and API key auth.
     """
-    if not credentials:
+    if not credentials and not x_api_key:
         return None
 
     try:
-        return get_current_user(credentials, supabase)
+        return get_current_user(credentials, x_api_key, supabase)
     except HTTPException:
         return None
 
@@ -101,3 +118,35 @@ def verify_admin(user: dict = Depends(get_current_user)) -> dict:
         )
 
     return user
+
+
+def resolve_user_id(
+    authorization: Optional[str] = None,
+    x_api_key: Optional[str] = None,
+) -> Optional[str]:
+    """
+    Resolve a user_id from either a Bearer token or API key.
+    Used by Pattern B endpoints that use Header(None) instead of Depends(get_current_user).
+
+    Returns: user_id string or None
+    """
+    # Try API key first
+    if x_api_key:
+        user = _lookup_api_key_user(x_api_key)
+        if user:
+            return user.id
+        return None
+
+    # Try Bearer token
+    if authorization:
+        scheme, _, token = authorization.partition(" ")
+        if scheme.lower() == "bearer" and token:
+            try:
+                supabase = get_supabase()
+                user_response = supabase.auth.get_user(token)
+                if user_response and user_response.user:
+                    return user_response.user.id
+            except Exception:
+                pass
+
+    return None

@@ -1,3 +1,4 @@
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 from typing import List
 
@@ -22,10 +23,36 @@ class Settings(BaseSettings):
 
     # External APIs
     OPENROUTER_API_KEY: str = ""
+    WORLDLABS_API_KEY: str = ""
 
     # ComfyUI Configuration
     COMFYUI_SERVER_URL: str = "https://comfy.vapai.studio"
     COMFY_API_KEY: str = ""
+
+    # RunPod Configuration
+    ENABLE_RUNPOD: bool = False  # Feature flag - set to True to enable RunPod integration
+    RUNPOD_API_KEY: str = ""  # RunPod API key for serverless execution
+    RUNPOD_ENDPOINT_ID: str = ""  # RunPod endpoint ID (ComfyUI serverless deployment)
+    RUNPOD_TIMEOUT: int = 600  # Timeout in seconds for RunPod requests (default: 10 minutes)
+
+    # RunPod S3 API Configuration (for Network Volume access)
+    RUNPOD_S3_ACCESS_KEY: str = ""
+    RUNPOD_S3_SECRET_KEY: str = ""
+    RUNPOD_NETWORK_VOLUME_ID: str = ""
+    RUNPOD_S3_ENDPOINT_URL: str = "https://eu-ro-1.s3.runpod.io"
+    RUNPOD_S3_REGION: str = "eu-ro-1"
+    # HuggingFace access token (optional default; per-request token overrides)
+    HF_TOKEN: str = ""
+
+    # GitHub Integration (Dockerfile editor — Phase 6)
+    # Fine-grained PAT: Contents: read+write on the repo below (single repo only)
+    GITHUB_TOKEN: str = ""
+    # "owner/repo" — the repository containing the Dockerfile
+    GITHUB_REPO: str = ""
+    # Branch to read from and commit to (must exist)
+    GITHUB_BRANCH: str = "main"
+    # Exact path to the Dockerfile within the repo
+    GITHUB_DOCKERFILE_PATH: str = ""
 
     # Training Configuration (Flux/LoRA)
     TRAINING_WORKSPACE_DIR: str = "./training_workspace"
@@ -67,6 +94,13 @@ class Settings(BaseSettings):
     DEFAULT_PAGE_SIZE: int = 20
     MAX_PAGE_SIZE: int = 100
     
+    @field_validator('ALLOWED_ORIGINS', 'ALLOWED_EMAIL_DOMAINS', 'ALLOWED_IMAGE_TYPES', mode='before')
+    @classmethod
+    def parse_list_fields(cls, v):
+        if isinstance(v, str):
+            return [item.strip() for item in v.split(',') if item.strip()]
+        return v
+
     model_config = {
         "env_file": ".env",
         "case_sensitive": True,

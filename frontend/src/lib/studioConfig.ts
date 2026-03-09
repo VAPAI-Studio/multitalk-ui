@@ -19,6 +19,7 @@ export interface StudioConfig {
   description: string;
   apps: AppConfig[];
   comingSoon?: boolean;
+  adminOnly?: boolean;
 }
 
 // All available apps organized by studios
@@ -102,6 +103,23 @@ export const studios: StudioConfig[] = [
         gradient: 'from-teal-500 to-cyan-600',
         description: 'Generate a 3×3 grid of unique image variations from a single reference. Perfect for product photography and creative exploration.',
         features: ['9 unique angles', 'Subject-aware prompts', 'Model: Gemini Pro Image']
+      },
+    ]
+  },
+  {
+    id: 'virtual-set-studio',
+    title: 'Virtual Set',
+    icon: '🌐',
+    gradient: 'from-teal-500 to-emerald-600',
+    description: 'Transform images into explorable 3D worlds. Navigate freely and capture new camera angles.',
+    apps: [
+      {
+        id: 'virtual-set',
+        title: 'Virtual Set',
+        icon: '🌐',
+        gradient: 'from-teal-500 to-emerald-600',
+        description: 'Transform a single image into an explorable 3D world. Navigate freely and capture new camera angles, then reconstruct photorealistic images.',
+        features: ['3D Gaussian splat generation', 'Free camera navigation (WASD + mouse)', 'Model: World Labs Marble + OpenRouter AI']
       }
     ]
   },
@@ -186,6 +204,24 @@ export const studios: StudioConfig[] = [
         gradient: 'from-amber-500 to-orange-600',
         description: 'Train your own custom QWEN Image LoRA models with your datasets. Perfect for creating consistent characters, styles, or objects.',
         features: ['Custom LoRA training', 'Dataset-based', 'Advanced parameters', 'Model: QWEN Image via Musubi Tuner']
+      }
+    ]
+  },
+  {
+    id: 'infrastructure-studio',
+    title: 'Infrastructure',
+    icon: '🔧',
+    gradient: 'from-slate-500 to-gray-700',
+    description: 'Manage RunPod infrastructure, network volumes, and deployments.',
+    adminOnly: true,
+    apps: [
+      {
+        id: 'infrastructure',
+        title: 'Infrastructure Manager',
+        icon: '🔧',
+        gradient: 'from-slate-500 to-gray-700',
+        description: 'Browse files, manage volumes, and edit Dockerfiles.',
+        features: ['Volume browser', 'File operations', 'Dockerfile editor']
       }
     ]
   }
@@ -284,9 +320,11 @@ export type StudioPageType =
   | 'home'
   | 'lipsync-studio'
   | 'image-studio'
+  | 'virtual-set-studio'
   | 'video-studio'
   | 'audio-studio'
   | 'text-studio'
   | 'lora-studio'
+  | 'infrastructure-studio'
   | 'history'
   | 'profile-settings';

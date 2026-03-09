@@ -117,7 +117,15 @@ class ApiClient {
 
           // Don't retry on client errors (4xx), only on server errors (5xx) and network issues
           if (response.status >= 400 && response.status < 500) {
-            throw new Error(`API request failed: ${response.status} ${response.statusText}`)
+            // Extract FastAPI error detail from response body
+            let detail = `${response.status} ${response.statusText}`
+            try {
+              const body = await response.json()
+              if (body?.detail) detail = typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail)
+            } catch { /* ignore JSON parse errors */ }
+            const err = new Error(detail)
+            ;(err as any).noRetry = true
+            throw err
           }
           throw new Error(`API request failed: ${response.status} ${response.statusText}`)
         }
@@ -126,9 +134,8 @@ class ApiClient {
       } catch (error) {
         clearTimeout(timeoutId)
 
-        // AbortError = intentional cancellation (React cleanup or timeout) - don't retry
-        if (error instanceof Error && error.name === 'AbortError') {
-          // Just re-throw silently - this is expected during component unmount
+        // AbortError or 4xx client errors = don't retry
+        if (error instanceof Error && (error.name === 'AbortError' || (error as any).noRetry)) {
           throw error
         }
 
@@ -1054,6 +1061,19 @@ class ApiClient {
     })
   }
 
+  // API Key management
+  async generateApiKey(): Promise<{ success: boolean; api_key?: string; message: string }> {
+    return this.request('/api-keys/generate', { method: 'POST' })
+  }
+
+  async getCurrentApiKey(): Promise<{ success: boolean; has_key: boolean; key_info?: { key_prefix: string; name: string; created_at: string; last_used_at?: string } }> {
+    return this.request('/api-keys/current')
+  }
+
+  async revokeApiKey(): Promise<{ success: boolean; message: string }> {
+    return this.request('/api-keys/revoke', { method: 'DELETE' })
+  }
+
   // Google Drive endpoints
   async checkGoogleDriveConnection() {
     return this.request('/google-drive/status')
@@ -1077,6 +1097,375 @@ class ApiClient {
 
   async getGoogleDriveFolder(folderId: string) {
     return this.request(`/google-drive/folders/${folderId}`)
+  }
+
+  // Virtual Set (World Labs / Marble API)
+  async generateVirtualSetWorld(imageData: string, displayName?: string, model?: string) {
+    return this.request('/virtual-set/generate', {
+      method: 'POST',
+      body: JSON.stringify({
+        image_data: imageData,
+        display_name: displayName || 'Virtual Set Scene',
+        model: model || 'Marble 0.1-plus',
+      }),
+    })
+  }
+
+  async getVirtualSetStatus(operationId: string) {
+    return this.request(`/virtual-set/status/${operationId}`)
+  }
+
+  async reconstructVirtualSet(screenshotData: string, originalImageData: string, prompt?: string) {
+    return this.request('/virtual-set/reconstruct', {
+      method: 'POST',
+      body: JSON.stringify({
+        screenshot_data: screenshotData,
+        original_image_data: originalImageData,
+        prompt: prompt || '',
+      }),
+    })
+  }
+
+  async saveVirtualSetWorld(imageData: string, splatUrl: string, worldId?: string, model?: string) {
+    return this.request('/virtual-set/save-world', {
+      method: 'POST',
+      body: JSON.stringify({
+        image_data: imageData,
+        splat_url: splatUrl,
+        world_id: worldId || null,
+        model: model || 'Marble 0.1-plus',
+      }),
+    })
+  }
+
+  async checkVirtualSetConfig() {
+    return this.request('/virtual-set/health')
+  }
+
+  // ============================================================================
+  // RunPod Serverless Methods
+  // ============================================================================
+
+  async submitWorkflowToRunPod(
+    workflowName: string,
+    parameters: Record<string, any>,
+    endpointId?: string
+  ) {
+    return this.request('/runpod/submit-workflow', {
+      method: 'POST',
+      body: JSON.stringify({
+        workflow_name: workflowName,
+        parameters,
+        endpoint_id: endpointId
+      })
+    })
+  }
+
+  async getRunPodJobStatus(jobId: string, endpointId?: string) {
+    const params = new URLSearchParams()
+    if (endpointId) params.append('endpoint_id', endpointId)
+
+    const query = params.toString()
+    return this.request(`/runpod/status/${jobId}${query ? `?${query}` : ''}`)
+  }
+
+  async cancelRunPodJob(jobId: string, endpointId?: string) {
+    const params = new URLSearchParams()
+    if (endpointId) params.append('endpoint_id', endpointId)
+
+    const query = params.toString()
+    return this.request(`/runpod/cancel/${jobId}${query ? `?${query}` : ''}`, {
+      method: 'POST'
+    })
+  }
+
+  async getRunPodHealth() {
+    return this.request('/runpod/health')
+  }
+
+  async getRunPodEndpointInfo(endpointId?: string) {
+    const params = new URLSearchParams()
+    if (endpointId) params.append('endpoint_id', endpointId)
+
+    const query = params.toString()
+    return this.request(`/runpod/endpoint-info${query ? `?${query}` : ''}`)
+  }
+
+  async updateUserMetadata(metadata: Record<string, any>) {
+    return this.request('/auth/update-metadata', {
+      method: 'PUT',
+      body: JSON.stringify(metadata)
+    })
+  }
+
+  // ============================================================================
+  // Infrastructure / Network Volume File Browser Methods
+  // ============================================================================
+
+  /**
+   * List files and folders on RunPod network volume
+   * @param path Directory path (empty string for root)
+   * @param limit Max items per page (default 200)
+   * @param continuationToken Pagination token from previous response
+   */
+  async listFiles(
+    path: string = "",
+    limit: number = 200,
+    continuationToken?: string
+  ): Promise<{
+    items: Array<{
+      type: "file" | "folder";
+      name: string;
+      path: string;
+      size: number | null;
+      sizeHuman: string | null;
+      lastModified: string | null;
+      childCount: number | null;
+    }>;
+    totalItems: number;
+    hasMore: boolean;
+    continuationToken: string | null;
+  }> {
+    const params = new URLSearchParams({
+      path,
+      limit: limit.toString(),
+    });
+    if (continuationToken) {
+      params.append("continuation_token", continuationToken);
+    }
+
+    return this.request(`/infrastructure/files?${params.toString()}`);
+  }
+
+  /**
+   * Step 1: Initialize a multipart upload. Returns upload_id, key, total_parts.
+   */
+  async initUpload(filename: string, targetPath: string, fileSize: number): Promise<{
+    upload_id: string; key: string; total_parts: number;
+  }> {
+    return this.request('/infrastructure/upload/init', {
+      method: 'POST',
+      body: JSON.stringify({ filename, target_path: targetPath, file_size: fileSize }),
+    });
+  }
+
+  /**
+   * Step 2: Upload one 5MB chunk via XHR for upload progress events.
+   * Returns the ETag — store it for the complete step.
+   */
+  uploadPart(
+    uploadId: string,
+    key: string,
+    partNumber: number,
+    chunk: Blob,
+    onProgress: (loaded: number, total: number) => void
+  ): Promise<{ part_number: number; etag: string }> {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      const formData = new FormData();
+      formData.append('chunk', chunk, `part-${partNumber}`);
+
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) onProgress(e.loaded, e.total);
+      };
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(JSON.parse(xhr.responseText));
+        } else {
+          reject(new Error(`Part ${partNumber} upload failed: ${xhr.status} ${xhr.statusText}`));
+        }
+      };
+      xhr.onerror = () => reject(new Error(`Network error on part ${partNumber}`));
+
+      const token = localStorage.getItem('vapai-auth-token');
+      xhr.open('PUT', `${this.baseURL}/infrastructure/upload/part?upload_id=${encodeURIComponent(uploadId)}&part_number=${partNumber}&key=${encodeURIComponent(key)}`);
+      if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      xhr.send(formData);
+    });
+  }
+
+  /**
+   * Step 3: Finalize the multipart upload.
+   */
+  async completeUpload(uploadId: string, key: string, parts: Array<{ part_number: number; etag: string }>): Promise<{ success: boolean; key: string }> {
+    return this.request('/infrastructure/upload/complete', {
+      method: 'POST',
+      body: JSON.stringify({ upload_id: uploadId, key, parts }),
+    });
+  }
+
+  /**
+   * Abort: MUST be called on any upload failure to prevent orphaned S3 parts and storage charges.
+   */
+  async abortUpload(uploadId: string, key: string): Promise<{ success: boolean }> {
+    return this.request('/infrastructure/upload/abort', {
+      method: 'POST',
+      body: JSON.stringify({ upload_id: uploadId, key }),
+    });
+  }
+
+  /**
+   * Download a file from the RunPod network volume.
+   * Streams through the authenticated backend proxy (RunPod S3 does not support presigned URLs).
+   * Uses fetch+blob — works for typical admin files. Large files (>1GB) may require
+   * significant browser memory; this is a known limitation of the fetch+blob approach.
+   * @param filePath  Full S3 key (e.g. "models/checkpoints/my-model.safetensors")
+   * @param filename  Filename for the browser save dialog
+   */
+  async downloadFile(filePath: string, filename: string): Promise<void> {
+    const token = this.getAuthToken();
+    const url = `${this.baseURL}/infrastructure/download?path=${encodeURIComponent(filePath)}`;
+
+    const response = await fetch(url, {
+      headers: {
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => response.statusText);
+      throw new Error(`Download failed: ${response.status} ${errorText}`);
+    }
+
+    // Stream to blob then trigger browser save dialog
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = objectUrl;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(objectUrl);
+  }
+
+  /**
+   * Delete a single file from the RunPod network volume.
+   * Returns 403 if path is a protected system directory.
+   */
+  async deleteFile(path: string): Promise<{ success: boolean; path: string }> {
+    return this.request(
+      `/infrastructure/files?path=${encodeURIComponent(path)}`,
+      { method: 'DELETE' }
+    );
+  }
+
+  /**
+   * Recursively delete all objects under a folder prefix.
+   * Returns deleted_count — number of S3 objects removed.
+   * WARNING: irreversible — use only after user confirmation.
+   */
+  async deleteFolder(path: string): Promise<{ success: boolean; path: string; deleted_count: number }> {
+    return this.request(
+      `/infrastructure/folders?path=${encodeURIComponent(path)}`,
+      { method: 'DELETE' }
+    );
+  }
+
+  /**
+   * Move or rename a single file via server-side S3 copy + delete.
+   * @param sourcePath Current S3 key
+   * @param destPath   New S3 key (may be in a different directory = move, or same dir = rename)
+   */
+  async moveFile(sourcePath: string, destPath: string): Promise<{ success: boolean; source_path: string; dest_path: string }> {
+    return this.request('/infrastructure/files/move', {
+      method: 'POST',
+      body: JSON.stringify({ source_path: sourcePath, dest_path: destPath }),
+    });
+  }
+
+  /**
+   * Move or rename a folder by recursively copying all objects then batch-deleting originals.
+   * Large folders (>1000 files) may be slow — Heroku 30s timeout applies.
+   */
+  async moveFolder(sourcePath: string, destPath: string): Promise<{ success: boolean; source_path: string; dest_path: string; moved_count: number }> {
+    return this.request('/infrastructure/folders/move', {
+      method: 'POST',
+      body: JSON.stringify({ source_path: sourcePath, dest_path: destPath }),
+    });
+  }
+
+  async createFolder(path: string): Promise<{ success: boolean; path: string }> {
+    return this.request('/infrastructure/folders', {
+      method: 'POST',
+      body: JSON.stringify({ path }),
+    });
+  }
+
+  // ============================================================================
+  // HuggingFace Download Methods
+  // ============================================================================
+
+  /**
+   * Start a HuggingFace model download to the RunPod network volume.
+   * Returns job_id immediately — poll getHFDownloadStatus for progress.
+   * @param url         Full HuggingFace URL (blob or resolve form)
+   * @param targetPath  Target directory on volume (e.g. "models/checkpoints")
+   * @param hfToken     Optional HF access token for gated/private repos
+   */
+  async startHFDownload(
+    url: string,
+    targetPath: string,
+    hfToken?: string
+  ): Promise<{ success: boolean; job_id: string; filename: string; s3_key: string }> {
+    return this.request('/infrastructure/hf-download', {
+      method: 'POST',
+      body: JSON.stringify({
+        url,
+        target_path: targetPath,
+        hf_token: hfToken || undefined,
+      }),
+    });
+  }
+
+  /**
+   * Poll the status of a HuggingFace download job.
+   * Call every 2-3 seconds until status === "done" or "error".
+   */
+  async getHFDownloadStatus(jobId: string): Promise<{
+    job_id: string;
+    status: 'pending' | 'downloading' | 'uploading' | 'done' | 'error';
+    progress_pct: number;
+    bytes_done: number;
+    total_bytes: number | null;
+    filename: string;
+    s3_key: string;
+    error: string | null;
+  }> {
+    return this.request(`/infrastructure/hf-download/${encodeURIComponent(jobId)}`);
+  }
+
+  // Dockerfile editor methods (Phase 6)
+  async getDockerfile(): Promise<{ success: boolean; content: string; sha: string; path: string }> {
+    return this.request('/infrastructure/dockerfiles/content')
+  }
+
+  async saveDockerfile(
+    content: string,
+    sha: string,
+    commitMessage: string,
+    triggerDeploy: boolean = false
+  ): Promise<{
+    success: boolean;
+    commit_sha: string;
+    deploy_triggered: boolean;
+    release?: { tag_name: string; html_url: string } | null;
+    deploy_error?: string | null;
+  }> {
+    return this.request('/infrastructure/dockerfiles/content', {
+      method: 'PUT',
+      body: JSON.stringify({
+        content,
+        sha,
+        commit_message: commitMessage,
+        trigger_deploy: triggerDeploy,
+      }),
+    })
+  }
+
+  // Helper method for authenticated requests (backward compatibility)
+  async fetchWithAuth(endpoint: string, options: RequestInit = {}) {
+    return this.request(endpoint, options);
   }
 }
 

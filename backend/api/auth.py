@@ -82,6 +82,11 @@ async def register(
                 detail="User registration failed"
             )
 
+        # Get metadata and extract role
+        user_metadata = auth_response.user.user_metadata or {}
+        app_metadata = auth_response.user.app_metadata or {}
+        role = app_metadata.get('role') or user_metadata.get('role')
+
         # Return token and user data
         return TokenResponse(
             access_token=auth_response.session.access_token,
@@ -92,6 +97,7 @@ async def register(
                 id=auth_response.user.id,
                 email=auth_response.user.email,
                 full_name=user_data.full_name,
+                role=role,
                 created_at=auth_response.user.created_at
             )
         )
@@ -145,6 +151,10 @@ async def login(
 
         # Get user metadata
         user_metadata = auth_response.user.user_metadata or {}
+        app_metadata = auth_response.user.app_metadata or {}
+
+        # Extract role (prefer app_metadata for security, fallback to user_metadata)
+        role = app_metadata.get('role') or user_metadata.get('role')
 
         return TokenResponse(
             access_token=auth_response.session.access_token,
@@ -155,6 +165,7 @@ async def login(
                 id=auth_response.user.id,
                 email=auth_response.user.email,
                 full_name=user_metadata.get("full_name"),
+                role=role,
                 created_at=auth_response.user.created_at
             )
         )
@@ -207,12 +218,17 @@ async def get_current_user_info(
         UserResponse with user data
     """
     user_metadata = current_user.user_metadata if hasattr(current_user, 'user_metadata') else {}
+    app_metadata = current_user.app_metadata if hasattr(current_user, 'app_metadata') else {}
+
+    # Extract role from metadata (prefer app_metadata over user_metadata)
+    role = app_metadata.get('role') or user_metadata.get('role')
 
     return UserResponse(
         id=current_user.id,
         email=current_user.email,
         full_name=user_metadata.get("full_name"),
         profile_picture_url=user_metadata.get("profile_picture_url"),
+        role=role,
         created_at=current_user.created_at if hasattr(current_user, 'created_at') else None
     )
 
@@ -245,6 +261,10 @@ async def refresh_token(
             )
 
         user_metadata = auth_response.user.user_metadata or {}
+        app_metadata = auth_response.user.app_metadata or {}
+
+        # Extract role (prefer app_metadata for security, fallback to user_metadata)
+        role = app_metadata.get('role') or user_metadata.get('role')
 
         return TokenResponse(
             access_token=auth_response.session.access_token,
@@ -255,6 +275,7 @@ async def refresh_token(
                 id=auth_response.user.id,
                 email=auth_response.user.email,
                 full_name=user_metadata.get("full_name"),
+                role=role,
                 created_at=auth_response.user.created_at
             )
         )

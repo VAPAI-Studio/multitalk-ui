@@ -3,6 +3,7 @@ from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime
 
 JobStatus = Literal['pending', 'processing', 'completed', 'failed', 'cancelled']
+ExecutionBackend = Literal['comfyui', 'runpod']
 
 class ImageJob(BaseModel):
     """Model for image generation jobs (img2img, style-transfer, image-edit, etc.)"""
@@ -24,9 +25,16 @@ class ImageJob(BaseModel):
     width: Optional[int] = Field(None, description="Image width in pixels")
     height: Optional[int] = Field(None, description="Image height in pixels")
 
+    # Execution backend
+    execution_backend: ExecutionBackend = Field('comfyui', description="Backend used: comfyui or runpod")
+
     # ComfyUI integration
     comfy_job_id: Optional[str] = Field(None, description="ComfyUI prompt ID")
     comfy_url: str = Field(..., description="ComfyUI server URL")
+
+    # RunPod integration
+    runpod_job_id: Optional[str] = Field(None, description="RunPod job ID (if execution_backend is runpod)")
+    runpod_endpoint_id: Optional[str] = Field(None, description="RunPod endpoint ID used for this job")
 
     # Google Drive integration
     project_id: Optional[str] = Field(None, description="Google Drive folder ID for saving outputs")
@@ -47,8 +55,17 @@ class CreateImageJobPayload(BaseModel):
     """Payload for creating a new image job"""
     user_id: str  # REQUIRED
     workflow_name: str  # Will be converted to workflow_id by service
+
+    # Execution backend
+    execution_backend: ExecutionBackend = 'comfyui'
+
+    # ComfyUI fields
     comfy_url: str
     comfy_job_id: Optional[str] = None
+
+    # RunPod fields
+    runpod_job_id: Optional[str] = None
+    runpod_endpoint_id: Optional[str] = None
 
     # Inputs
     input_image_urls: Optional[List[str]] = None

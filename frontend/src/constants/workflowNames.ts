@@ -23,6 +23,8 @@ export const WORKFLOW_DISPLAY_NAMES: Record<string, string> = {
   'camera-angle': 'Camera Angle',
   'multi-camera-angle': 'Multi Camera Angle',
   'character-caption': 'Character Caption',
+  'virtual-set': 'Virtual Set',
+  'virtual-set-world': '3D World',
 }
 
 // Video workflow names for type categorization
@@ -47,6 +49,8 @@ export const IMAGE_WORKFLOW_NAMES = [
   'camera-angle',
   'multi-camera-angle',
   'character-caption',
+  'virtual-set',
+  'virtual-set-world',
 ]
 
 /**

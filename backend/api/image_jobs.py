@@ -26,6 +26,13 @@ def _extract_bearer_token(authorization: Optional[str]) -> Optional[str]:
     return token
 
 
+def _resolve_token(authorization: Optional[str] = None, x_api_key: Optional[str] = None) -> Optional[str]:
+    """Resolve auth token from Bearer header or API key."""
+    if x_api_key:
+        return None
+    return _extract_bearer_token(authorization)
+
+
 def get_service(access_token: Optional[str] = None):
     supabase = get_supabase_for_token(access_token)
     return ImageJobService(supabase)
@@ -33,10 +40,11 @@ def get_service(access_token: Optional[str] = None):
 @router.post("/", response_model=ImageJobResponse)
 async def create_image_job(
     payload: CreateImageJobPayload,
-    authorization: Optional[str] = Header(None)
+    authorization: Optional[str] = Header(None),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):
     """Create a new image job"""
-    service = get_service(_extract_bearer_token(authorization))
+    service = get_service(_resolve_token(authorization, x_api_key))
     success, job_id, error = await service.create_job(payload)
 
     if not success:
@@ -55,10 +63,11 @@ async def get_image_jobs(
     offset: int = Query(0, ge=0),
     workflow_name: Optional[str] = Query(None, description="Filter by workflow name"),
     user_id: Optional[str] = Query(None, description="Filter by user ID"),
-    authorization: Optional[str] = Header(None)
+    authorization: Optional[str] = Header(None),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):
     """Get recent image jobs with optional filtering."""
-    service = get_service(_extract_bearer_token(authorization))
+    service = get_service(_resolve_token(authorization, x_api_key))
     jobs, total_count, error = await service.get_recent_jobs(
         limit=limit,
         offset=offset,
@@ -81,7 +90,8 @@ async def get_image_jobs_feed(
     workflow_name: Optional[str] = Query(None, description="Filter by workflow name"),
     user_id: Optional[str] = Query(None, description="Filter by user ID"),
     status: Optional[str] = Query(None, description="Filter by status"),
-    authorization: Optional[str] = Header(None)
+    authorization: Optional[str] = Header(None),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):
     """
     Optimized feed endpoint - minimal data, server-side caching.
@@ -95,7 +105,7 @@ async def get_image_jobs_feed(
     - user_id: Filter by user ID
     - status: Filter by status (pending, processing, completed, failed)
     """
-    service = get_service(_extract_bearer_token(authorization))
+    service = get_service(_resolve_token(authorization, x_api_key))
 
     jobs, total_count, error = await service.get_feed_jobs(
         limit=limit,
@@ -114,9 +124,9 @@ async def get_image_jobs_feed(
 
 
 @router.get("/{job_id}", response_model=ImageJobResponse)
-async def get_image_job(job_id: str, authorization: Optional[str] = Header(None)):
+async def get_image_job(job_id: str, authorization: Optional[str] = Header(None), x_api_key: Optional[str] = Header(None, alias="X-API-Key")):
     """Get a specific image job by ID"""
-    service = get_service(_extract_bearer_token(authorization))
+    service = get_service(_resolve_token(authorization, x_api_key))
     job, error = await service.get_job(job_id)
 
     return ImageJobResponse(
@@ -129,10 +139,11 @@ async def get_image_job(job_id: str, authorization: Optional[str] = Header(None)
 async def update_image_job(
     job_id: str,
     payload: UpdateImageJobPayload,
-    authorization: Optional[str] = Header(None)
+    authorization: Optional[str] = Header(None),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):
     """Update an image job"""
-    service = get_service(_extract_bearer_token(authorization))
+    service = get_service(_resolve_token(authorization, x_api_key))
     success, error = await service.update_job(job_id, payload)
 
     if success:
@@ -142,9 +153,9 @@ async def update_image_job(
         return ImageJobResponse(success=False, error=error)
 
 @router.put("/{job_id}/processing", response_model=ImageJobResponse)
-async def update_to_processing(job_id: str, authorization: Optional[str] = Header(None)):
+async def update_to_processing(job_id: str, authorization: Optional[str] = Header(None), x_api_key: Optional[str] = Header(None, alias="X-API-Key")):
     """Mark image job as processing"""
-    service = get_service(_extract_bearer_token(authorization))
+    service = get_service(_resolve_token(authorization, x_api_key))
     success, error = await service.update_to_processing(job_id)
 
     if success:
@@ -157,13 +168,14 @@ async def update_to_processing(job_id: str, authorization: Optional[str] = Heade
 async def complete_image_job(
     job_id: str,
     payload: CompleteImageJobPayload,
-    authorization: Optional[str] = Header(None)
+    authorization: Optional[str] = Header(None),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):
     """Complete an image job (mark as completed or failed)"""
     if payload.job_id != job_id:
         raise HTTPException(status_code=400, detail="Job ID mismatch")
 
-    service = get_service(_extract_bearer_token(authorization))
+    service = get_service(_resolve_token(authorization, x_api_key))
     storage_service = StorageService()
 
     # Get job to check for project_id and current status
@@ -264,10 +276,11 @@ async def get_completed_image_jobs(
     offset: int = Query(0, ge=0),
     workflow_name: Optional[str] = Query(None, description="Filter by workflow name"),
     user_id: Optional[str] = Query(None, description="Filter by user ID"),
-    authorization: Optional[str] = Header(None)
+    authorization: Optional[str] = Header(None),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):
     """Get completed image jobs"""
-    service = get_service(_extract_bearer_token(authorization))
+    service = get_service(_resolve_token(authorization, x_api_key))
     jobs, total_count, error = await service.get_completed_jobs(
         limit=limit,
         offset=offset,
@@ -286,10 +299,11 @@ async def get_completed_image_jobs(
 async def delete_image_job(
     job_id: str,
     user_id: str = Query(..., description="User ID (required for ownership verification)"),
-    authorization: Optional[str] = Header(None)
+    authorization: Optional[str] = Header(None),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):
     """Delete an image job (only if owned by user)"""
-    service = get_service(_extract_bearer_token(authorization))
+    service = get_service(_resolve_token(authorization, x_api_key))
     success, error = await service.delete_job(job_id, user_id)
 
     return ImageJobResponse(

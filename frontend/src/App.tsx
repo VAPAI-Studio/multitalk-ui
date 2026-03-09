@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 // Page components
 import Homepage from "./pages/Homepage";
 import GenerationFeed from "./pages/GenerationFeed";
 import ProfileSettings from "./ProfileSettings";
 import StudioPage from "./components/StudioPage";
+import Infrastructure from "./pages/Infrastructure";
 // UI Components
 import ComfyUIStatus from "./components/ComfyUIStatus";
 import ConsoleToggle from "./components/ConsoleToggle";
@@ -13,6 +14,9 @@ import ProjectSelector from "./components/ProjectSelector";
 // Contexts & Config
 import { useAuth } from "./contexts/AuthContext";
 import { ProjectProvider } from "./contexts/ProjectContext";
+import { ExecutionBackendProvider } from "./contexts/ExecutionBackendContext";
+import ExecutionBackendToggle from "./components/ExecutionBackendToggle";
+import AnnouncementBanner from "./components/AnnouncementBanner";
 import { studios, getStudioById, setLastUsedApp, type StudioPageType, type StudioConfig } from "./lib/studioConfig";
 
 // Collapsible Sidebar Group Component
@@ -97,7 +101,7 @@ function SidebarGroup({
 }
 
 export default function App() {
-  const { isAuthenticated, loading, user, logout } = useAuth();
+  const { isAuthenticated, loading, user, logout, isAdmin } = useAuth();
   const [currentPage, setCurrentPage] = useState<StudioPageType>("home");
   const [comfyUrl, setComfyUrl] = useState<string>("https://comfy.vapai.studio");
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
@@ -109,13 +113,26 @@ export default function App() {
     'home',
     'lipsync-studio',
     'image-studio',
+    'virtual-set-studio',
     'video-studio',
     'audio-studio',
     'text-studio',
     'lora-studio',
+    'infrastructure-studio',
     'history',
     'profile-settings'
   ];
+
+  // Filter studios based on admin status
+  const visibleStudios = useMemo(() => {
+    return studios.filter(studio => {
+      // Hide admin-only studios from non-admins
+      if (studio.adminOnly && !isAdmin) return false;
+      // Hide coming soon studios
+      if (studio.comingSoon) return false;
+      return true;
+    });
+  }, [isAdmin]);
 
   // Load saved page and ComfyUI URL from localStorage on mount
   useEffect(() => {
@@ -123,6 +140,11 @@ export default function App() {
     const savedComfyUrl = localStorage.getItem('vapai-comfy-url');
 
     if (savedPage && validPages.includes(savedPage)) {
+      // Validate admin-only pages
+      if (savedPage === 'infrastructure-studio' && !isAdmin) {
+        setCurrentPage('home');
+        return;
+      }
       setCurrentPage(savedPage);
     }
 
@@ -140,6 +162,7 @@ export default function App() {
       'wan-move': 'video-studio',
       'ltx2-i2v': 'video-studio',
       'audio-stem-separator': 'audio-studio',
+      'virtual-set': 'virtual-set-studio',
       'character-caption': 'lora-studio',
       'lora-trainer': 'lora-studio',
       'generation-feed': 'history',
@@ -154,7 +177,7 @@ export default function App() {
     if (savedComfyUrl) {
       setComfyUrl(savedComfyUrl);
     }
-  }, []);
+  }, [isAdmin]);
 
   // Save current page to localStorage when it changes
   const handlePageChange = (page: StudioPageType) => {
@@ -194,8 +217,9 @@ export default function App() {
   }
 
   return (
-    <ProjectProvider>
-    <div className="min-h-screen flex flex-col">
+    <ExecutionBackendProvider>
+      <ProjectProvider>
+      <div className="min-h-screen flex flex-col">
       {/* Header */}
       <header className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-lg border-b border-gray-200/50 dark:border-gray-700/50 sticky top-0 z-20 shadow-sm">
         <div className="max-w-7xl mx-auto px-6 py-4">
@@ -292,6 +316,11 @@ export default function App() {
                         <ThemeToggle />
                       </div>
 
+                      {/* Execution Backend Toggle */}
+                      <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+                        <ExecutionBackendToggle />
+                      </div>
+
                       {/* Profile Settings */}
                       <button
                         onClick={() => {
@@ -344,6 +373,8 @@ export default function App() {
         </div>
       </header>
 
+      <AnnouncementBanner />
+
       <div className="flex flex-1">
         {/* Sidebar */}
         <div className={`fixed inset-y-0 left-0 z-50 flex transition-all duration-300 ease-in-out ${
@@ -379,7 +410,7 @@ export default function App() {
               {/* Studio Groups */}
               <div className="mt-4 pt-4 border-t border-gray-200/50 dark:border-gray-700/50">
                 <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-4 mb-3 block">Studios</span>
-                {studios.map((studio) => (
+                {visibleStudios.map((studio) => (
                   <SidebarGroup
                     key={studio.id}
                     studio={studio}
@@ -478,6 +509,12 @@ export default function App() {
               comfyUrl={comfyUrl}
             />
           )}
+          {currentPage === "virtual-set-studio" && (
+            <StudioPage
+              studio={getStudioById("virtual-set-studio")!}
+              comfyUrl={comfyUrl}
+            />
+          )}
           {currentPage === "video-studio" && (
             <StudioPage
               studio={getStudioById("video-studio")!}
@@ -502,6 +539,9 @@ export default function App() {
               comfyUrl={comfyUrl}
             />
           )}
+          {currentPage === "infrastructure-studio" && (
+            <Infrastructure comfyUrl={comfyUrl} />
+          )}
 
           {/* Standalone Pages */}
           {currentPage === "history" && (
@@ -516,6 +556,7 @@ export default function App() {
       {/* Console Toggle */}
       <ConsoleToggle comfyUrl={comfyUrl} />
     </div>
-    </ProjectProvider>
+      </ProjectProvider>
+    </ExecutionBackendProvider>
   );
 }

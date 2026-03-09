@@ -80,6 +80,10 @@ export interface CreateJobPayload {
   user_id?: string
   workflow_name?: string
   workflow_type?: string
+  // RunPod fields
+  execution_backend?: 'comfyui' | 'runpod'
+  runpod_job_id?: string
+  runpod_endpoint_id?: string
 }
 
 // Job completion payload
