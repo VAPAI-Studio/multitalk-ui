@@ -135,7 +135,7 @@ function FeedGridItemComponent({ item, thumbnailSize, onClick }: FeedGridItemPro
       {/* Type icon (video/image) - show grid icon for multi-image */}
       <div className="absolute top-1 left-1">
         <span className="text-xs bg-black/60 text-white px-1 py-0.5 rounded">
-          {item.type === 'video' ? '🎬' : hasMultipleImages ? '🔲' : '🖼️'}
+          {item.type === 'video' ? '🎬' : hasMultipleImages ? '🔲' : item.workflow_name === 'virtual-set-world' ? '🌐' : '🖼️'}
         </span>
       </div>
 

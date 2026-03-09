@@ -16,6 +16,7 @@ import LTX2I2V from '../pages/LTX2I2V';
 import AudioStemSeparator from '../pages/AudioStemSeparator';
 import CharacterCaption from '../pages/CharacterCaption';
 import LoRATrainer from '../pages/LoraTrainer';
+import VirtualSet from '../pages/VirtualSet';
 
 interface StudioPageProps {
   studio: StudioConfig;
@@ -38,6 +39,7 @@ const appComponents: Record<string, React.ComponentType<{ comfyUrl: string }> | 
   'audio-stem-separator': AudioStemSeparator,
   'character-caption': CharacterCaption,
   'lora-trainer': LoRATrainer,
+  'virtual-set': VirtualSet,
 };
 
 export default function StudioPage({ studio, comfyUrl }: StudioPageProps) {

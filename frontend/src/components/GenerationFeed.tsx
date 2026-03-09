@@ -65,6 +65,9 @@ export interface GenerationFeedConfig {
 
   // ComfyUI integration
   comfyUrl?: string
+
+  // Custom click handler for feed items (return true to prevent default behavior)
+  onItemClick?: (item: any) => boolean
 }
 
 interface GenerationFeedProps {
@@ -742,6 +745,8 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
                     item={item}
                     thumbnailSize={displaySettings.thumbnailSize}
                     onClick={() => {
+                      // Custom click handler takes priority
+                      if (config.onItemClick && config.onItemClick(item)) return
                       if (item.type === 'image') {
                         setSelectedImage(toImageItem(item))
                       } else if (item.result_url) {
@@ -765,6 +770,8 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
                     fixingJobs={fixingJobs}
                     onFix={(jobId) => handleFixStuckJob(jobId, config.comfyUrl!)}
                     onImageClick={() => {
+                      // Custom click handler takes priority
+                      if (config.onItemClick && config.onItemClick(item)) return
                       if (item.type === 'image') {
                         setSelectedImage(toImageItem(item))
                       }
