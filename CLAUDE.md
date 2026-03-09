@@ -263,6 +263,17 @@ Authentication requires Supabase configuration:
 
 Create feature branches from dev, merge back to dev for testing, then dev to main for release.
 
+### Announcement Banner
+
+When committing user-facing changes (new features, bug fixes, UI changes), update `frontend/src/constants/changelog.ts`:
+1. Add a new entry at the top of the `announcements` array
+2. Use today's date in the `id` (e.g., `"2026-03-10-dark-mode"`)
+3. Write a brief, user-friendly `message` summarizing what changed (1 sentence, no technical jargon)
+4. Set `type` to `"feature"`, `"fix"`, or `"info"`
+5. Keep only the latest 5 entries (remove older ones)
+
+This ensures the in-app banner automatically shows users what's new after each deploy.
+
 ## Related Documentation
 
 For specialized topics, see these additional guides:

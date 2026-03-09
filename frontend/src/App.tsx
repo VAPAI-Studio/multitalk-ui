@@ -16,6 +16,7 @@ import { useAuth } from "./contexts/AuthContext";
 import { ProjectProvider } from "./contexts/ProjectContext";
 import { ExecutionBackendProvider } from "./contexts/ExecutionBackendContext";
 import ExecutionBackendToggle from "./components/ExecutionBackendToggle";
+import AnnouncementBanner from "./components/AnnouncementBanner";
 import { studios, getStudioById, setLastUsedApp, type StudioPageType, type StudioConfig } from "./lib/studioConfig";
 
 // Collapsible Sidebar Group Component
@@ -371,6 +372,8 @@ export default function App() {
           </div>
         </div>
       </header>
+
+      <AnnouncementBanner />
 
       <div className="flex flex-1">
         {/* Sidebar */}
