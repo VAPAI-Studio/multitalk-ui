@@ -682,6 +682,78 @@ export function base64PngToFile(base64Png: string, filename: string): File {
   }
   const byteArray = new Uint8Array(byteNumbers)
   const blob = new Blob([byteArray], { type: 'image/png' })
-  
+
   return new File([blob], filename, { type: 'image/png' })
+}
+
+/**
+ * Monitor RunPod job progress
+ * Similar to startJobMonitoring but for RunPod serverless backend
+ *
+ * @param jobId - RunPod job ID
+ * @param endpointId - RunPod endpoint ID
+ * @param onStatusUpdate - Callback for status updates
+ * @returns Cleanup function to stop monitoring
+ */
+export function startRunPodJobMonitoring(
+  jobId: string,
+  endpointId: string,
+  onStatusUpdate: (
+    status: 'processing' | 'completed' | 'error',
+    message?: string,
+    outputInfo?: any
+  ) => void
+): () => void {
+  const pollInterval = 3000 // 3 seconds
+  const maxDuration = 30 * 60 * 1000 // 30 minutes
+  const startTime = Date.now()
+
+  const intervalId = setInterval(async () => {
+    try {
+      // Check timeout
+      if (Date.now() - startTime > maxDuration) {
+        clearInterval(intervalId)
+        onStatusUpdate('error', 'RunPod job timed out after 30 minutes')
+        return
+      }
+
+      // Poll RunPod status
+      const response = await apiClient.getRunPodJobStatus(jobId, endpointId)
+
+      if (!response.success) {
+        onStatusUpdate('error', response.error || 'Failed to get RunPod status')
+        clearInterval(intervalId)
+        return
+      }
+
+      const status = response.status
+
+      if (status === 'COMPLETED') {
+        // Job completed successfully
+        clearInterval(intervalId)
+        onStatusUpdate('completed', 'RunPod job completed', response.output)
+      } else if (status === 'FAILED') {
+        // Job failed
+        clearInterval(intervalId)
+        const errorMsg = response.output?.error || 'RunPod job failed'
+        onStatusUpdate('error', errorMsg)
+      } else if (status === 'IN_PROGRESS') {
+        // Still processing
+        onStatusUpdate('processing', 'Processing on RunPod...')
+      } else if (status === 'IN_QUEUE') {
+        // Waiting in queue
+        onStatusUpdate('processing', 'Queued on RunPod...')
+      } else {
+        // Unknown status
+        onStatusUpdate('processing', `RunPod status: ${status}`)
+      }
+    } catch (error: any) {
+      console.error('Error polling RunPod status:', error)
+      // Don't stop monitoring on network errors, keep retrying
+      onStatusUpdate('processing', 'Checking status...')
+    }
+  }, pollInterval)
+
+  // Return cleanup function
+  return () => clearInterval(intervalId)
 }
