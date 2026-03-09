@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: in-progress
-stopped_at: Completed 07-01-PLAN.md (GitHubService.create_release + deploy trigger)
-last_updated: "2026-03-08T14:42:02Z"
+status: executing
+stopped_at: Completed 07-02-PLAN.md (Deploy toggle frontend -- Phase 7 and milestone complete)
+last_updated: "2026-03-09T17:42:52.694Z"
 last_activity: 2026-03-08 -- Completed Plan 07-01 (GitHubService.create_release + deploy trigger on save_dockerfile)
 progress:
   total_phases: 9
-  completed_phases: 8
+  completed_phases: 9
   total_plans: 23
-  completed_plans: 22
-  percent: 96
+  completed_plans: 23
+  percent: 100
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** Enable self-service infrastructure management for RunPod serverless workflows without leaving the application
-**Current focus:** Phase 07: GitHub Integration — In Progress (1/2 plans complete)
+**Current focus:** All phases complete -- v1.0 milestone delivered
 
 ## Current Position
 
-Phase: 07 (GitHub Integration) — In Progress
-Plan: 1 of 2 complete in current phase
-Status: In Progress
-Last activity: 2026-03-08 -- Completed Plan 07-01 (GitHubService.create_release + deploy trigger on save_dockerfile)
+Phase: 07 (GitHub Integration) — Complete
+Plan: 2 of 2 complete in current phase
+Status: Complete
+Last activity: 2026-03-09 -- Completed Plan 07-02 (Deploy toggle frontend -- Phase 7 and milestone complete)
 
-Progress: [█████████░] 96% (22/23 plans complete)
+Progress: [██████████] 100% (23/23 plans complete)
 
 ## Performance Metrics
 
@@ -76,6 +76,7 @@ Progress: [█████████░] 96% (22/23 plans complete)
 | Phase 06.1-file-tree-pagination P01 | 300 | 2 tasks | 7 files |
 | Phase 06.2 P01 | 427 | 3 tasks | 3 files |
 | Phase 07 P01 | 179 | 2 tasks | 4 files |
+| Phase 07 P02 | 120 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -139,6 +140,9 @@ Recent decisions affecting current work:
 - [Phase 07-01]: Timestamp-based release tags (deploy-YYYYMMDD-HHMMSS) avoid 422 duplicate tag errors without database
 - [Phase 07-01]: Partial success pattern — commit OK + release fail returns deploy_error without raising exception
 - [Phase 07-01]: trigger_deploy defaults to False for backward compatibility with existing frontend
+- [Phase 07-02]: Deploy checkbox unchecked by default -- admin must explicitly opt-in to trigger RunPod rebuild
+- [Phase 07-02]: Three-tier status color: green for full success, amber for partial (commit OK + deploy failed), red for errors
+- [Phase 07-02]: Button text toggles dynamically: Save & Commit vs Save, Commit & Deploy based on checkbox state
 
 ### Pending Todos
 
@@ -151,6 +155,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-03-08T14:42:02Z
-Stopped at: Completed 07-01-PLAN.md (GitHubService.create_release + deploy trigger)
+Last session: 2026-03-09T17:42:52.691Z
+Stopped at: Completed 07-02-PLAN.md (Deploy toggle frontend -- Phase 7 and milestone complete)
 Resume file: None

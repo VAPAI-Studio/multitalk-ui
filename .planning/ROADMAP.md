@@ -18,7 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4: File Operations** - Delete, move, and rename files and folders on the network volume (completed 2026-03-04)
 - [x] **Phase 5: HuggingFace Integration** - Download models from HuggingFace directly to the RunPod network volume (completed 2026-03-05)
 - [x] **Phase 6: Dockerfile Editor** - Edit workflow Dockerfiles in-browser with syntax highlighting (completed 2026-03-05)
-- [ ] **Phase 7: GitHub Integration** - Push Dockerfile changes to GitHub to trigger RunPod rebuilds
+- [x] **Phase 7: GitHub Integration** - Push Dockerfile changes to GitHub to trigger RunPod rebuilds (completed 2026-03-09)
 
 ## Phase Details
 
@@ -163,7 +163,7 @@ Plans:
 
 Plans:
 - [x] 07-01-PLAN.md — Backend: GitHubService.create_release() method, DockerfileSaveRequest.trigger_deploy field, extended save_dockerfile endpoint with optional release creation (Wave 1) [SUMMARY](07-01-SUMMARY.md)
-- [ ] 07-02-PLAN.md — Frontend: Deploy toggle checkbox in DockerfileEditor, apiClient.saveDockerfile() with triggerDeploy param, enhanced status messages + human checkpoint (Wave 2)
+- [x] 07-02-PLAN.md — Frontend: Deploy toggle checkbox in DockerfileEditor, apiClient.saveDockerfile() with triggerDeploy param, enhanced status messages + human checkpoint (Wave 2) [SUMMARY](07-02-SUMMARY.md)
 
 ## Progress
 
@@ -182,4 +182,4 @@ Note: Phases 6.1 and 6.2 are gap closure phases inserted after audit; they can r
 | 6. Dockerfile Editor | 2/2 | Complete   | 2026-03-05 |
 | 6.1. File Tree Pagination | 1/1 | Complete    | 2026-03-08 |
 | 6.2. Verification Documentation | 1/1 | Complete | 2026-03-08 |
-| 7. GitHub Integration | 1/2 | In progress | - |
+| 7. GitHub Integration | 2/2 | Complete | 2026-03-09 |
