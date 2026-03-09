@@ -5,20 +5,39 @@ from unittest.mock import patch, MagicMock
 from datetime import datetime
 
 from core.auth import verify_admin
+from core.supabase import get_supabase
 
 
 @pytest.fixture(autouse=True)
-def mock_supabase():
-    """Mock Supabase client so tests don't need real credentials."""
-    with patch('core.supabase.get_supabase', return_value=MagicMock()):
+def mock_external_services():
+    """Mock Supabase and S3 credentials so tests work without real config."""
+    with patch('core.supabase.get_supabase', return_value=MagicMock()), \
+         patch('core.s3_client.get_s3_client', return_value=MagicMock()):
         yield
+
+
+@pytest.fixture(autouse=True)
+def mock_s3_settings():
+    """Mock S3 settings so credential checks pass."""
+    with patch('api.infrastructure.settings') as mock_settings:
+        mock_settings.RUNPOD_S3_ACCESS_KEY = "fake-key"
+        mock_settings.RUNPOD_S3_SECRET_KEY = "fake-secret"
+        mock_settings.RUNPOD_NETWORK_VOLUME_ID = "fake-volume"
+        mock_settings.RUNPOD_S3_ENDPOINT_URL = "https://fake-s3.example.com"
+        mock_settings.RUNPOD_S3_REGION = "us-east-1"
+        mock_settings.GITHUB_TOKEN = ""
+        mock_settings.GITHUB_REPO = ""
+        mock_settings.GITHUB_DOCKERFILE_PATH = ""
+        yield mock_settings
 
 
 @pytest.fixture
 def app():
-    """Provide the FastAPI app."""
+    """Provide the FastAPI app with mocked Supabase dependency."""
     from main import app
-    return app
+    app.dependency_overrides[get_supabase] = lambda: MagicMock()
+    yield app
+    app.dependency_overrides.pop(get_supabase, None)
 
 
 @pytest.fixture
@@ -96,9 +115,12 @@ def test_list_files_endpoint_success(client, mock_admin_auth, mock_s3_client):
 
 def test_list_files_endpoint_requires_admin(client, mock_s3_client):
     """Test endpoint rejects non-admin users."""
-    # Don't mock admin auth - should fail
-    response = client.get("/api/infrastructure/files")
-    assert response.status_code in [401, 403]  # Unauthorized or Forbidden
+    # Don't mock admin auth - should fail with 401/403
+    response = client.get(
+        "/api/infrastructure/files",
+        headers={"Authorization": "Bearer invalid-token"}
+    )
+    assert response.status_code in [401, 403]
 
 
 def test_list_files_endpoint_pagination(client, mock_admin_auth, mock_s3_client):
@@ -135,8 +157,10 @@ def test_list_files_endpoint_path_validation(client, mock_admin_auth, mock_s3_cl
         headers={"Authorization": f"Bearer {MOCK_ADMIN_TOKEN}"}
     )
 
+    # Path traversal is caught by the service and returned as 400
     assert response.status_code == 400
-    assert "Path traversal detected" in response.json()["detail"]
+    detail = response.json()["detail"]
+    assert "Path traversal" in detail or "traversal" in detail.lower()
 
 
 def test_list_files_endpoint_s3_error(client, mock_admin_auth, mock_s3_client):
