@@ -153,6 +153,14 @@ export const studios: StudioConfig[] = [
         gradient: 'from-cyan-500 to-blue-600',
         description: 'Transform your images into high-quality videos with the LTX2 model. Adjustable strength and duration for precise control.',
         features: ['Image to video generation', 'Adjustable strength', 'Duration presets (3s, 5s, 10s)', 'Model: LTX2']
+      },
+      {
+        id: 'upscale-vid',
+        title: 'Video Upscale',
+        icon: '🔍',
+        gradient: 'from-green-500 to-emerald-600',
+        description: 'Upscale videos to higher resolutions with AI-powered super-resolution.',
+        features: ['AI video upscaling', 'Resolution presets (720p-4K)', 'Model: SeedVR2']
       }
     ]
   },
