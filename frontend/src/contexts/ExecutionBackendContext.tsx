@@ -26,7 +26,7 @@ export function ExecutionBackendProvider({ children }: { children: ReactNode }) 
   useEffect(() => {
     async function checkRunPodHealth() {
       try {
-        const response = await apiClient.getRunPodHealth();
+        const response: any = await apiClient.getRunPodHealth();
         setIsRunPodEnabled(response.enabled);
         setIsRunPodConfigured(response.configured);
       } catch (error) {

@@ -718,7 +718,7 @@ export function startRunPodJobMonitoring(
       }
 
       // Poll RunPod status
-      const response = await apiClient.getRunPodJobStatus(jobId, endpointId)
+      const response: any = await apiClient.getRunPodJobStatus(jobId, endpointId)
 
       if (!response.success) {
         onStatusUpdate('error', response.error || 'Failed to get RunPod status')

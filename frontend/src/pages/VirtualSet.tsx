@@ -23,7 +23,7 @@ export default function VirtualSet({ comfyUrl = "" }: Props) {
   const [worldModel, setWorldModel] = useState("Marble 0.1-plus");
 
   // Generation state
-  const [operationId, setOperationId] = useState("");
+  const [_operationId, setOperationId] = useState("");
   const [splatUrl, setSplatUrl] = useState("");
   const [generationStatus, setGenerationStatus] = useState("");
   const [generationStartTime, setGenerationStartTime] = useState(0);
