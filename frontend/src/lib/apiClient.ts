@@ -200,7 +200,7 @@ class ApiClient {
     const completePayload = {
       job_id: jobId,
       status: payload.status === 'error' ? 'failed' : payload.status,
-      output_video_urls: payload.video_url ? [payload.video_url] : undefined,
+      output_video_urls: payload.output_video_urls || (payload.video_url ? [payload.video_url] : undefined),
       error_message: payload.error_message,
     }
     return this.request(`/video-jobs/${jobId}/complete`, {

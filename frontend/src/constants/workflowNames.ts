@@ -11,6 +11,7 @@ export const WORKFLOW_DISPLAY_NAMES: Record<string, string> = {
   'wan-i2v': 'WAN I2V',
   'wan-move': 'WAN Move',
   'ltx2-i2v': 'LTX2 I2V',
+  'upscale-vid': 'Video Upscale',
   'legacy': 'Legacy',
 
   // Image workflows
@@ -35,6 +36,7 @@ export const VIDEO_WORKFLOW_NAMES = [
   'wan-i2v',
   'wan-move',
   'ltx2-i2v',
+  'upscale-vid',
   'legacy',
 ]
 

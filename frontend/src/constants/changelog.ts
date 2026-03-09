@@ -8,9 +8,9 @@ export interface Announcement {
 // When committing user-facing changes, add a new entry at the top.
 export const announcements: Announcement[] = [
   {
-    id: "2026-03-09-major-update",
+    id: "2026-03-09-video-upscale",
     message:
-      "New: RunPod Cloud execution, Virtual Set, Runpod integration.",
+      "New: Video Upscale in Video Studio, Runpod infrastructure integration, API key creation, 3D Virtual Set",
     type: "feature",
   },
 ];

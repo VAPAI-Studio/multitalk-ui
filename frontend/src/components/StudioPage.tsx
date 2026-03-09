@@ -13,6 +13,7 @@ import ImageGrid from '../pages/ImageGrid';
 import WANI2V from '../pages/WANI2V';
 import WANMove from '../pages/WANMove';
 import LTX2I2V from '../pages/LTX2I2V';
+import VideoUpscale from '../pages/VideoUpscale';
 import AudioStemSeparator from '../pages/AudioStemSeparator';
 import CharacterCaption from '../pages/CharacterCaption';
 import LoRATrainer from '../pages/LoraTrainer';
@@ -36,6 +37,7 @@ const appComponents: Record<string, React.ComponentType<{ comfyUrl: string }> | 
   'wan-i2v': WANI2V,
   'wan-move': WANMove,
   'ltx2-i2v': LTX2I2V,
+  'upscale-vid': VideoUpscale,
   'audio-stem-separator': AudioStemSeparator,
   'character-caption': CharacterCaption,
   'lora-trainer': LoRATrainer,
