@@ -24,11 +24,20 @@ def _extract_bearer_token(authorization: Optional[str]) -> Optional[str]:
         return authorization[7:]
     return None
 
+
+def _resolve_token(authorization: Optional[str] = None, x_api_key: Optional[str] = None) -> Optional[str]:
+    """Resolve auth token from Bearer header or API key."""
+    if x_api_key:
+        return None
+    return _extract_bearer_token(authorization)
+
+
 @router.post("/", response_model=ImageEditResponse)
 async def edit_image(
     edit_request: ImageEditRequest,
     request: Request,
-    authorization: Optional[str] = Header(None)
+    authorization: Optional[str] = Header(None),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):
     """Edit an image using OpenRouter's Gemini model with storage and database tracking"""
     start_time = time.time()
@@ -38,7 +47,7 @@ async def edit_image(
         # Initialize services
         openrouter_service = get_openrouter_service()
         storage_service = get_storage_service()
-        image_job_service = get_image_job_service(_extract_bearer_token(authorization))
+        image_job_service = get_image_job_service(_resolve_token(authorization, x_api_key))
 
         # Step 1: Upload source image to storage
         source_upload_success, source_storage_url, source_error = await storage_service.upload_image_from_data_url(
@@ -137,7 +146,7 @@ async def edit_image(
         # Mark image job as failed
         if image_job_id:
             try:
-                image_job_service_instance = get_image_job_service(_extract_bearer_token(authorization))
+                image_job_service_instance = get_image_job_service(_resolve_token(authorization, x_api_key))
                 fail_payload = CompleteImageJobPayload(
                     job_id=image_job_id,
                     status="failed",

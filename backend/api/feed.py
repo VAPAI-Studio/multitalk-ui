@@ -47,6 +47,13 @@ def _extract_bearer_token(authorization: Optional[str]) -> Optional[str]:
     return token
 
 
+def _resolve_token(authorization: Optional[str] = None, x_api_key: Optional[str] = None) -> Optional[str]:
+    """Resolve auth token from Bearer header or API key. Returns bearer token or None."""
+    if x_api_key:
+        return None  # API key auth doesn't use bearer tokens; supabase client uses service role
+    return _extract_bearer_token(authorization)
+
+
 def get_video_job_service(access_token: Optional[str] = None):
     supabase = get_supabase_for_token(access_token)
     return VideoJobService(supabase)
@@ -64,7 +71,8 @@ async def get_unified_feed(
     completed_only: bool = Query(default=False),
     types: Optional[str] = Query(default=None, description="Comma-separated list of types: video,image"),
     user_id: Optional[str] = Query(default=None, description="Filter by user ID"),
-    authorization: Optional[str] = Header(None)
+    authorization: Optional[str] = Header(None),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):
     """
     Get a unified feed of all generation types (videos and images).
@@ -75,7 +83,7 @@ async def get_unified_feed(
     Use the 'types' parameter to filter by specific types (video, image).
     """
     try:
-        token = _extract_bearer_token(authorization)
+        token = _resolve_token(authorization, x_api_key)
 
         # Parse types filter
         allowed_types = {'video', 'image'}
@@ -180,11 +188,12 @@ async def get_video_feed(
     completed_only: bool = Query(default=False),
     workflow_name: Optional[str] = Query(default=None),
     user_id: Optional[str] = Query(default=None),
-    authorization: Optional[str] = Header(None)
+    authorization: Optional[str] = Header(None),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):
     """Get video jobs feed."""
     try:
-        token = _extract_bearer_token(authorization)
+        token = _resolve_token(authorization, x_api_key)
         video_service = get_video_job_service(token)
 
         if completed_only:
@@ -235,11 +244,12 @@ async def get_images_feed(
     completed_only: bool = Query(default=False),
     workflow_name: Optional[str] = Query(default=None),
     user_id: Optional[str] = Query(default=None),
-    authorization: Optional[str] = Header(None)
+    authorization: Optional[str] = Header(None),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):
     """Get image jobs feed."""
     try:
-        token = _extract_bearer_token(authorization)
+        token = _resolve_token(authorization, x_api_key)
         image_service = get_image_job_service(token)
 
         if completed_only:

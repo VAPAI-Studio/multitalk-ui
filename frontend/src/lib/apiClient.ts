@@ -1061,6 +1061,19 @@ class ApiClient {
     })
   }
 
+  // API Key management
+  async generateApiKey(): Promise<{ success: boolean; api_key?: string; message: string }> {
+    return this.request('/api-keys/generate', { method: 'POST' })
+  }
+
+  async getCurrentApiKey(): Promise<{ success: boolean; has_key: boolean; key_info?: { key_prefix: string; name: string; created_at: string; last_used_at?: string } }> {
+    return this.request('/api-keys/current')
+  }
+
+  async revokeApiKey(): Promise<{ success: boolean; message: string }> {
+    return this.request('/api-keys/revoke', { method: 'DELETE' })
+  }
+
   // Google Drive endpoints
   async checkGoogleDriveConnection() {
     return this.request('/google-drive/status')

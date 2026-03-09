@@ -27,6 +27,13 @@ def _extract_bearer_token(authorization: Optional[str]) -> Optional[str]:
     return token
 
 
+def _resolve_token(authorization: Optional[str] = None, x_api_key: Optional[str] = None) -> Optional[str]:
+    """Resolve auth token from Bearer header or API key."""
+    if x_api_key:
+        return None  # API key auth uses service role client
+    return _extract_bearer_token(authorization)
+
+
 def get_service(access_token: Optional[str] = None):
     """Dependency to get VideoJobService instance."""
     supabase = get_supabase_for_token(access_token)
@@ -36,10 +43,11 @@ def get_service(access_token: Optional[str] = None):
 @router.post("/", response_model=VideoJobResponse)
 async def create_video_job(
     payload: CreateVideoJobPayload,
-    authorization: Optional[str] = Header(None)
+    authorization: Optional[str] = Header(None),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):
     """Create a new video job."""
-    service = get_service(_extract_bearer_token(authorization))
+    service = get_service(_resolve_token(authorization, x_api_key))
     success, job_id, error = await service.create_job(payload)
 
     if not success:
@@ -59,7 +67,8 @@ async def get_video_jobs(
     offset: int = Query(0, ge=0),
     workflow_name: Optional[str] = Query(None),
     user_id: Optional[str] = Query(None),
-    authorization: Optional[str] = Header(None)
+    authorization: Optional[str] = Header(None),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):
     """
     Get recent video jobs with optional filtering.
@@ -70,7 +79,7 @@ async def get_video_jobs(
     - workflow_name: Filter by workflow (lipsync-one, lipsync-multi, video-lipsync, wan-i2v)
     - user_id: Filter by user ID
     """
-    service = get_service(_extract_bearer_token(authorization))
+    service = get_service(_resolve_token(authorization, x_api_key))
 
     jobs, total_count, error = await service.get_recent_jobs(
         limit=limit,
@@ -94,7 +103,8 @@ async def get_video_jobs_feed(
     workflow_name: Optional[str] = Query(None),
     user_id: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
-    authorization: Optional[str] = Header(None)
+    authorization: Optional[str] = Header(None),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):
     """
     Optimized feed endpoint - minimal data, server-side caching.
@@ -108,7 +118,7 @@ async def get_video_jobs_feed(
     - user_id: Filter by user ID
     - status: Filter by status (pending, processing, completed, failed)
     """
-    service = get_service(_extract_bearer_token(authorization))
+    service = get_service(_resolve_token(authorization, x_api_key))
 
     jobs, total_count, error = await service.get_feed_jobs(
         limit=limit,
@@ -132,7 +142,8 @@ async def get_completed_video_jobs(
     offset: int = Query(0, ge=0),
     workflow_name: Optional[str] = Query(None),
     user_id: Optional[str] = Query(None),
-    authorization: Optional[str] = Header(None)
+    authorization: Optional[str] = Header(None),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):
     """
     Get recent completed video jobs with optional filtering.
@@ -143,7 +154,7 @@ async def get_completed_video_jobs(
     - workflow_name: Filter by workflow (lipsync-one, lipsync-multi, video-lipsync, wan-i2v)
     - user_id: Filter by user ID
     """
-    service = get_service(_extract_bearer_token(authorization))
+    service = get_service(_resolve_token(authorization, x_api_key))
     jobs, total_count, error = await service.get_completed_jobs(
         limit=limit,
         offset=offset,
@@ -168,9 +179,9 @@ async def get_completed_video_jobs(
 
 
 @router.get("/{job_id}", response_model=VideoJobResponse)
-async def get_video_job(job_id: str, authorization: Optional[str] = Header(None)):
+async def get_video_job(job_id: str, authorization: Optional[str] = Header(None), x_api_key: Optional[str] = Header(None, alias="X-API-Key")):
     """Get a single video job by UUID."""
-    service = get_service(_extract_bearer_token(authorization))
+    service = get_service(_resolve_token(authorization, x_api_key))
     job, error = await service.get_job(job_id)
 
     if error:
@@ -182,10 +193,11 @@ async def get_video_job(job_id: str, authorization: Optional[str] = Header(None)
 @router.get("/comfy/{comfy_job_id}", response_model=VideoJobResponse)
 async def get_video_job_by_comfy_id(
     comfy_job_id: str,
-    authorization: Optional[str] = Header(None)
+    authorization: Optional[str] = Header(None),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):
     """Get a single video job by ComfyUI job ID."""
-    service = get_service(_extract_bearer_token(authorization))
+    service = get_service(_resolve_token(authorization, x_api_key))
     job, error = await service.get_job_by_comfy_id(comfy_job_id)
 
     if error:
@@ -195,9 +207,9 @@ async def get_video_job_by_comfy_id(
 
 
 @router.put("/{job_id}/processing", response_model=VideoJobResponse)
-async def update_to_processing(job_id: str, authorization: Optional[str] = Header(None)):
+async def update_to_processing(job_id: str, authorization: Optional[str] = Header(None), x_api_key: Optional[str] = Header(None, alias="X-API-Key")):
     """Update job status to processing."""
-    service = get_service(_extract_bearer_token(authorization))
+    service = get_service(_resolve_token(authorization, x_api_key))
     success, error = await service.update_to_processing(job_id)
 
     if not success:
@@ -210,10 +222,11 @@ async def update_to_processing(job_id: str, authorization: Optional[str] = Heade
 async def update_video_job(
     job_id: str,
     payload: UpdateVideoJobPayload,
-    authorization: Optional[str] = Header(None)
+    authorization: Optional[str] = Header(None),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):
     """Update a video job."""
-    service = get_service(_extract_bearer_token(authorization))
+    service = get_service(_resolve_token(authorization, x_api_key))
     success, error = await service.update_job(job_id, payload)
 
     if not success:
@@ -226,13 +239,14 @@ async def update_video_job(
 async def complete_video_job(
     job_id: str,
     payload: CompleteVideoJobPayload,
-    authorization: Optional[str] = Header(None)
+    authorization: Optional[str] = Header(None),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):
     """Complete a video job (success or failure)."""
     # Override job_id from path parameter
     payload.job_id = job_id
 
-    service = get_service(_extract_bearer_token(authorization))
+    service = get_service(_resolve_token(authorization, x_api_key))
     storage_service = StorageService()
     thumbnail_service = ThumbnailService()
 
