@@ -21,7 +21,7 @@ Requirements for Batch Video Upscale milestone. Each maps to roadmap phases.
 
 ### Queue Processing
 
-- [ ] **QUEU-01**: Videos process sequentially one at a time through the Freepik API
+- [x] **QUEU-01**: Videos process sequentially one at a time through the Freepik API
 - [ ] **QUEU-02**: Queue is database-backed and processing continues when user navigates away or closes browser
 - [ ] **QUEU-03**: User can reorder pending videos in the queue via drag-and-drop
 
@@ -94,7 +94,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UPLD-04 | Phase 13 | Pending |
 | SETT-01 | Phase 10 | Complete |
 | SETT-02 | Phase 10 | Complete |
-| QUEU-01 | Phase 10 | Pending |
+| QUEU-01 | Phase 10 | Complete |
 | QUEU-02 | Phase 10 | Pending |
 | QUEU-03 | Phase 11 | Pending |
 | STAT-01 | Phase 13 | Pending |

@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Batch Video Upscale
 status: executing
-stopped_at: Completed 10-01-PLAN.md
+stopped_at: Completed 10-02-PLAN.md
 last_updated: "2026-03-11"
-last_activity: 2026-03-11 -- Executed plan 10-01 (database schema, models, settings)
+last_activity: 2026-03-11 -- Executed plan 10-02 (FreepikUpscalerService, UpscaleJobService)
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 10
-  completed_plans: 1
-  percent: 10
+  completed_plans: 2
+  percent: 20
 ---
 
 # Project State
@@ -26,28 +26,28 @@ See: .planning/PROJECT.md (updated 2026-03-11)
 ## Current Position
 
 Phase: 10 of 13 (Foundation)
-Plan: 1 of 3 in current phase
+Plan: 2 of 3 in current phase
 Status: Executing
-Last activity: 2026-03-11 -- Completed plan 10-01 (database schema, Pydantic models, Freepik settings)
+Last activity: 2026-03-11 -- Completed plan 10-02 (FreepikUpscalerService, UpscaleJobService, 24 tests)
 
-Progress: [#░░░░░░░░░] 10%
+Progress: [##░░░░░░░░] 20%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 1 (v1.1)
-- Average duration: 5 min
-- Total execution time: 5 min
+- Total plans completed: 2 (v1.1)
+- Average duration: 6.5 min
+- Total execution time: 13 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 10 | 1 | 5 min | 5 min |
+| 10 | 2 | 13 min | 6.5 min |
 
 **Recent Trend:**
-- Last 5 plans: 10-01 (5 min)
-- Trend: starting
+- Last 5 plans: 10-01 (5 min), 10-02 (8 min)
+- Trend: consistent
 
 *Updated after each plan completion*
 
@@ -67,6 +67,9 @@ v1.1 decisions made during execution:
 - [10-01] Individual columns for upscale settings (not JSONB) for DB-level defaults and queryability
 - [10-01] All Phase 10-12 columns in initial migration to avoid future ALTER TABLE migrations
 - [10-01] Pydantic Literal types for status types instead of Python Enum for simpler serialization
+- [10-02] Property-based settings access (not __init__ caching) for testability with mock patching
+- [10-02] Read-then-write pattern for counter increments (Supabase Python client lacks atomic RPC)
+- [10-02] Exponential backoff in poll_until_complete capped at 30s intervals
 
 ### Pending Todos
 
@@ -80,6 +83,6 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-11
-Stopped at: Completed 10-01-PLAN.md
+Stopped at: Completed 10-02-PLAN.md
 Resume file: None
-Next action: Execute 10-02-PLAN.md
+Next action: Execute 10-03-PLAN.md
