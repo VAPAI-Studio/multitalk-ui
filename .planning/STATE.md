@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Batch Video Upscale
-status: completed
-stopped_at: Completed 10-03-PLAN.md
-last_updated: "2026-03-11T18:10:41.517Z"
-last_activity: 2026-03-11 -- Completed plan 10-03 (API router, background processing, startup recovery, 25 tests)
+status: in_progress
+stopped_at: Completed 11-01-PLAN.md
+last_updated: "2026-03-11T18:37:00Z"
+last_activity: 2026-03-11 -- Completed plan 11-01 (service layer, error classification, 35 new tests)
 progress:
   total_phases: 4
   completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
-  percent: 30
+  total_plans: 5
+  completed_plans: 4
+  percent: 40
 ---
 
 # Project State
@@ -21,32 +21,33 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-11)
 
 **Core value:** Provide a unified platform for AI-powered media processing where users can generate, edit, upscale, and manage their content end-to-end
-**Current focus:** v1.1 Batch Video Upscale -- Phase 10 COMPLETE, Phase 11 next
+**Current focus:** v1.1 Batch Video Upscale -- Phase 11 in progress (1/2 plans done)
 
 ## Current Position
 
-Phase: 10 of 13 (Foundation) -- COMPLETE
-Plan: 3 of 3 in current phase (all done)
-Status: Phase 10 complete
-Last activity: 2026-03-11 -- Completed plan 10-03 (API router, background processing, startup recovery, 25 tests)
+Phase: 11 of 13 (Batch Processing)
+Plan: 1 of 2 in current phase
+Status: Plan 11-01 complete, 11-02 next
+Last activity: 2026-03-11 -- Completed plan 11-01 (service layer, error classification, 35 new tests)
 
-Progress: [###░░░░░░░] 30%
+Progress: [####░░░░░░] 40%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3 (v1.1)
-- Average duration: 9.3 min
-- Total execution time: 28 min
+- Total plans completed: 4 (v1.1)
+- Average duration: 8 min
+- Total execution time: 32 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 10 | 3 | 28 min | 9.3 min |
+| 11 | 1 | 4 min | 4 min |
 
 **Recent Trend:**
-- Last 5 plans: 10-01 (5 min), 10-02 (8 min), 10-03 (15 min)
+- Last 5 plans: 10-01 (5 min), 10-02 (8 min), 10-03 (15 min), 11-01 (4 min)
 - Trend: consistent
 
 *Updated after each plan completion*
@@ -72,6 +73,9 @@ v1.1 decisions made during execution:
 - [10-02] Exponential backoff in poll_until_complete capped at 30s intervals
 - [10-03] Used _get_batch_for_processing helper (no user_id filter) for background tasks without user context
 - [10-03] Lifespan recovery is non-fatal (try/except) so app always starts even if DB is down
+- [11-01] Python dataclass (not Pydantic) for ProcessingResult -- internal processing type, not request/response
+- [11-01] Compiled regex for credit keyword matching in _classify_error for performance
+- [11-01] Bulk pause/unpause return True on success even with zero matched rows (operation semantics)
 
 ### Pending Todos
 
@@ -84,7 +88,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-11T17:57:08.258Z
-Stopped at: Completed 10-03-PLAN.md
+Last session: 2026-03-11T18:37:00Z
+Stopped at: Completed 11-01-PLAN.md
 Resume file: None
-Next action: Plan Phase 11 (Batch Processing)
+Next action: Execute 11-02-PLAN.md (API endpoints and processing loop)

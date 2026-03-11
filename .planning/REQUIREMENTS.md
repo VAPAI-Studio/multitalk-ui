@@ -23,7 +23,7 @@ Requirements for Batch Video Upscale milestone. Each maps to roadmap phases.
 
 - [x] **QUEU-01**: Videos process sequentially one at a time through the Freepik API
 - [x] **QUEU-02**: Queue is database-backed and processing continues when user navigates away or closes browser
-- [ ] **QUEU-03**: User can reorder pending videos in the queue via drag-and-drop
+- [x] **QUEU-03**: User can reorder pending videos in the queue via drag-and-drop
 
 ### Status & Progress
 
@@ -42,11 +42,11 @@ Requirements for Batch Video Upscale milestone. Each maps to roadmap phases.
 
 ### Error Handling & Credits
 
-- [ ] **ERRR-01**: Failed videos show error message and a retry button
+- [x] **ERRR-01**: Failed videos show error message and a retry button
 - [ ] **ERRR-02**: Transient errors (network, 5xx) auto-retry up to 2 times with backoff
-- [ ] **ERRR-03**: Credit exhaustion is detected and batch pauses automatically (all remaining videos set to paused, not failed)
-- [ ] **ERRR-04**: User sees a clear notification explaining the pause with guidance to add Freepik credits
-- [ ] **ERRR-05**: User can resume a paused batch and processing continues from where it left off
+- [x] **ERRR-03**: Credit exhaustion is detected and batch pauses automatically (all remaining videos set to paused, not failed)
+- [x] **ERRR-04**: User sees a clear notification explaining the pause with guidance to add Freepik credits
+- [x] **ERRR-05**: User can resume a paused batch and processing continues from where it left off
 
 ### Infrastructure
 
@@ -96,7 +96,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SETT-02 | Phase 10 | Complete |
 | QUEU-01 | Phase 10 | Complete |
 | QUEU-02 | Phase 10 | Complete |
-| QUEU-03 | Phase 11 | Pending |
+| QUEU-03 | Phase 11 | Complete |
 | STAT-01 | Phase 13 | Pending |
 | STAT-02 | Phase 13 | Pending |
 | STAT-03 | Phase 13 | Pending |
@@ -106,11 +106,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DLVR-02 | Phase 12 | Pending |
 | DLVR-03 | Phase 12 | Pending |
 | DLVR-04 | Phase 12 | Pending |
-| ERRR-01 | Phase 11 | Pending |
+| ERRR-01 | Phase 11 | Complete |
 | ERRR-02 | Phase 11 | Pending |
-| ERRR-03 | Phase 11 | Pending |
-| ERRR-04 | Phase 11 | Pending |
-| ERRR-05 | Phase 11 | Pending |
+| ERRR-03 | Phase 11 | Complete |
+| ERRR-04 | Phase 11 | Complete |
+| ERRR-05 | Phase 11 | Complete |
 | INFR-01 | Phase 10 | Complete |
 | INFR-02 | Phase 10 | Complete |
 | INFR-03 | Phase 13 | Pending |
