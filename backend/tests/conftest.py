@@ -50,7 +50,9 @@ def sample_params():
 @pytest.fixture
 def mock_freepik_settings():
     """Patch settings with Freepik test configuration."""
-    with patch("config.settings.settings") as mock_settings:
+    # Import so the module is loaded before we patch its settings reference
+    from services import freepik_service as _fs_module  # noqa: F841
+    with patch("services.freepik_service.settings") as mock_settings:
         mock_settings.FREEPIK_API_KEY = "test-key"
         mock_settings.FREEPIK_API_BASE_URL = "https://api.freepik.com/v1/ai"
         mock_settings.FREEPIK_POLL_INTERVAL = 1  # fast for tests
