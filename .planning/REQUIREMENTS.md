@@ -22,7 +22,7 @@ Requirements for Batch Video Upscale milestone. Each maps to roadmap phases.
 ### Queue Processing
 
 - [x] **QUEU-01**: Videos process sequentially one at a time through the Freepik API
-- [ ] **QUEU-02**: Queue is database-backed and processing continues when user navigates away or closes browser
+- [x] **QUEU-02**: Queue is database-backed and processing continues when user navigates away or closes browser
 - [ ] **QUEU-03**: User can reorder pending videos in the queue via drag-and-drop
 
 ### Status & Progress
@@ -53,7 +53,7 @@ Requirements for Batch Video Upscale milestone. Each maps to roadmap phases.
 - [x] **INFR-01**: Database schema supports batch and per-video tracking (new tables/migration)
 - [x] **INFR-02**: Freepik API key stored as backend environment variable (FREEPIK_API_KEY)
 - [ ] **INFR-03**: New feature page linked from homepage, accessible to all authenticated users
-- [ ] **INFR-04**: Backend batch processor survives server restarts (resumes interrupted batches on startup)
+- [x] **INFR-04**: Backend batch processor survives server restarts (resumes interrupted batches on startup)
 
 ## Future Requirements
 
@@ -95,7 +95,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SETT-01 | Phase 10 | Complete |
 | SETT-02 | Phase 10 | Complete |
 | QUEU-01 | Phase 10 | Complete |
-| QUEU-02 | Phase 10 | Pending |
+| QUEU-02 | Phase 10 | Complete |
 | QUEU-03 | Phase 11 | Pending |
 | STAT-01 | Phase 13 | Pending |
 | STAT-02 | Phase 13 | Pending |
@@ -114,7 +114,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | INFR-01 | Phase 10 | Complete |
 | INFR-02 | Phase 10 | Complete |
 | INFR-03 | Phase 13 | Pending |
-| INFR-04 | Phase 10 | Pending |
+| INFR-04 | Phase 10 | Complete |
 
 **Coverage:**
 - v1.1 requirements: 27 total

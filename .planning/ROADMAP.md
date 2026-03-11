@@ -28,7 +28,7 @@ Full details: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
 
 **Milestone Goal:** Enable batch video upscaling via Freepik API with credit-aware queue management and dual output delivery (Supabase Storage + Google Drive).
 
-- [ ] **Phase 10: Foundation** - Database schema, Freepik service, API endpoints, settings model
+- [x] **Phase 10: Foundation** - Database schema, Freepik service, API endpoints, settings model (completed 2026-03-11)
 - [ ] **Phase 11: Batch Processing** - Sequential queue loop, credit exhaustion detection, pause/resume, error handling
 - [ ] **Phase 12: Output Delivery** - Streaming download from Freepik, upload to Supabase Storage + Google Drive, download endpoints
 - [ ] **Phase 13: Frontend** - Upload UI, progress display, batch history, homepage integration
@@ -48,9 +48,9 @@ Full details: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
 **Plans**: 3 plans
 
 Plans:
-- [ ] 10-01-PLAN.md -- Database schema, Pydantic models, and Freepik settings configuration
-- [ ] 10-02-PLAN.md -- FreepikUpscalerService and UpscaleJobService with tests
-- [ ] 10-03-PLAN.md -- API router, background processing, and startup recovery
+- [x] 10-01-PLAN.md -- Database schema, Pydantic models, and Freepik settings configuration
+- [x] 10-02-PLAN.md -- FreepikUpscalerService and UpscaleJobService with tests
+- [x] 10-03-PLAN.md -- API router, background processing, and startup recovery
 
 ### Phase 11: Batch Processing
 **Goal**: Multiple videos process sequentially with intelligent error handling that distinguishes transient failures from credit exhaustion
@@ -116,7 +116,7 @@ Phases execute in numeric order: 10 -> 11 -> 12 -> 13
 | 6.1. File Tree Pagination | v1.0 | 1/1 | Complete | 2026-03-08 |
 | 6.2. Verification Documentation | v1.0 | 1/1 | Complete | 2026-03-08 |
 | 7. GitHub Integration | v1.0 | 2/2 | Complete | 2026-03-09 |
-| 10. Foundation | 2/3 | In Progress|  | - |
+| 10. Foundation | v1.1 | 3/3 | Complete | 2026-03-11 |
 | 11. Batch Processing | v1.1 | 0/2 | Not started | - |
 | 12. Output Delivery | v1.1 | 0/2 | Not started | - |
 | 13. Frontend | v1.1 | 0/3 | Not started | - |
