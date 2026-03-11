@@ -395,3 +395,295 @@ class TestFailCurrentProcessingVideo:
         )
 
         assert result is True
+
+
+# ===========================================================================
+# Batch Processing Support (Phase 11)
+# ===========================================================================
+
+
+def _build_table_mock(data=None):
+    """Build a standalone chainable table mock (for table_side_effect patterns)."""
+    mock = MagicMock()
+    for method in ("select", "insert", "update", "delete", "upsert"):
+        getattr(mock, method).return_value = mock
+    for method in ("eq", "neq", "gt", "gte", "lt", "lte", "order", "limit", "range", "single", "is_"):
+        getattr(mock, method).return_value = mock
+    mock.execute.return_value = _make_execute_result(data=data)
+    return mock
+
+
+# ---------------------------------------------------------------------------
+# pause_all_pending_videos
+# ---------------------------------------------------------------------------
+
+class TestPauseAllPendingVideos:
+
+    @pytest.mark.asyncio
+    async def test_pauses_pending_videos(self, upscale_job_service, mock_supabase):
+        """pause_all_pending_videos sets status='paused' on pending videos for the batch."""
+        mock_supabase.table.return_value.execute.return_value = (
+            _make_execute_result(data=[_sample_video_row(status="paused")])
+        )
+
+        result = await upscale_job_service.pause_all_pending_videos("batch-001")
+
+        assert result is True
+        mock_supabase.table.assert_called_with("upscale_videos")
+        # Verify update was called with status='paused'
+        call_args = mock_supabase.table.return_value.update.call_args
+        update_dict = call_args[0][0]
+        assert update_dict["status"] == "paused"
+
+    @pytest.mark.asyncio
+    async def test_returns_false_on_error(self, upscale_job_service, mock_supabase):
+        """pause_all_pending_videos returns False on exception."""
+        mock_supabase.table.return_value.update.side_effect = Exception("DB error")
+
+        result = await upscale_job_service.pause_all_pending_videos("batch-001")
+
+        assert result is False
+
+
+# ---------------------------------------------------------------------------
+# pause_batch
+# ---------------------------------------------------------------------------
+
+class TestPauseBatch:
+
+    @pytest.mark.asyncio
+    async def test_pause_batch_sets_status_and_metadata(self, upscale_job_service, mock_supabase):
+        """pause_batch sets status='paused', paused_at, and pause_reason."""
+        mock_supabase.table.return_value.execute.return_value = (
+            _make_execute_result(data=[_sample_batch_row(status="paused")])
+        )
+
+        result = await upscale_job_service.pause_batch("batch-001", "credit_exhaustion")
+
+        assert result is True
+        mock_supabase.table.assert_called_with("upscale_batches")
+        call_args = mock_supabase.table.return_value.update.call_args
+        update_dict = call_args[0][0]
+        assert update_dict["status"] == "paused"
+        assert update_dict["pause_reason"] == "credit_exhaustion"
+        assert "paused_at" in update_dict
+
+    @pytest.mark.asyncio
+    async def test_returns_false_on_error(self, upscale_job_service, mock_supabase):
+        """pause_batch returns False on exception."""
+        mock_supabase.table.return_value.update.side_effect = Exception("DB error")
+
+        result = await upscale_job_service.pause_batch("batch-001", "test")
+
+        assert result is False
+
+
+# ---------------------------------------------------------------------------
+# unpause_videos
+# ---------------------------------------------------------------------------
+
+class TestUnpauseVideos:
+
+    @pytest.mark.asyncio
+    async def test_unpause_sets_paused_to_pending(self, upscale_job_service, mock_supabase):
+        """unpause_videos sets paused videos back to status='pending'."""
+        mock_supabase.table.return_value.execute.return_value = (
+            _make_execute_result(data=[_sample_video_row(status="pending")])
+        )
+
+        result = await upscale_job_service.unpause_videos("batch-001")
+
+        assert result is True
+        mock_supabase.table.assert_called_with("upscale_videos")
+        call_args = mock_supabase.table.return_value.update.call_args
+        update_dict = call_args[0][0]
+        assert update_dict["status"] == "pending"
+
+    @pytest.mark.asyncio
+    async def test_returns_false_on_error(self, upscale_job_service, mock_supabase):
+        """unpause_videos returns False on exception."""
+        mock_supabase.table.return_value.update.side_effect = Exception("DB error")
+
+        result = await upscale_job_service.unpause_videos("batch-001")
+
+        assert result is False
+
+
+# ---------------------------------------------------------------------------
+# clear_pause_metadata
+# ---------------------------------------------------------------------------
+
+class TestClearPauseMetadata:
+
+    @pytest.mark.asyncio
+    async def test_clears_paused_at_and_reason(self, upscale_job_service, mock_supabase):
+        """clear_pause_metadata sets paused_at=None and pause_reason=None."""
+        mock_supabase.table.return_value.execute.return_value = (
+            _make_execute_result(data=[_sample_batch_row()])
+        )
+
+        result = await upscale_job_service.clear_pause_metadata("batch-001")
+
+        assert result is True
+        mock_supabase.table.assert_called_with("upscale_batches")
+        call_args = mock_supabase.table.return_value.update.call_args
+        update_dict = call_args[0][0]
+        assert update_dict["paused_at"] is None
+        assert update_dict["pause_reason"] is None
+
+    @pytest.mark.asyncio
+    async def test_returns_false_on_error(self, upscale_job_service, mock_supabase):
+        """clear_pause_metadata returns False on exception."""
+        mock_supabase.table.return_value.update.side_effect = Exception("DB error")
+
+        result = await upscale_job_service.clear_pause_metadata("batch-001")
+
+        assert result is False
+
+
+# ---------------------------------------------------------------------------
+# reorder_videos
+# ---------------------------------------------------------------------------
+
+class TestReorderVideos:
+
+    @pytest.mark.asyncio
+    async def test_reorder_updates_queue_positions(self, upscale_job_service, mock_supabase):
+        """reorder_videos updates queue_position for each video_id."""
+        mock_supabase.table.return_value.execute.return_value = (
+            _make_execute_result(data=[_sample_video_row()])
+        )
+
+        result = await upscale_job_service.reorder_videos(
+            "batch-001", ["vid-3", "vid-1", "vid-2"]
+        )
+
+        assert result is True
+        # Should have called update 3 times
+        assert mock_supabase.table.return_value.update.call_count == 3
+
+    @pytest.mark.asyncio
+    async def test_returns_false_on_error(self, upscale_job_service, mock_supabase):
+        """reorder_videos returns False on exception."""
+        mock_supabase.table.return_value.update.side_effect = Exception("DB error")
+
+        result = await upscale_job_service.reorder_videos("batch-001", ["vid-1"])
+
+        assert result is False
+
+
+# ---------------------------------------------------------------------------
+# retry_video
+# ---------------------------------------------------------------------------
+
+class TestRetryVideo:
+
+    @pytest.mark.asyncio
+    async def test_retry_resets_failed_video(self, upscale_job_service, mock_supabase):
+        """retry_video resets a failed video to pending."""
+        mock_supabase.table.return_value.execute.return_value = (
+            _make_execute_result(data=[_sample_video_row(status="pending")])
+        )
+
+        result = await upscale_job_service.retry_video("video-001")
+
+        assert result is True
+        call_args = mock_supabase.table.return_value.update.call_args
+        update_dict = call_args[0][0]
+        assert update_dict["status"] == "pending"
+        assert update_dict["error_message"] is None
+        assert update_dict["freepik_task_id"] is None
+        assert update_dict["completed_at"] is None
+
+    @pytest.mark.asyncio
+    async def test_retry_returns_false_if_not_failed(self, upscale_job_service, mock_supabase):
+        """retry_video returns False if video is not in 'failed' status (no rows matched)."""
+        mock_supabase.table.return_value.execute.return_value = (
+            _make_execute_result(data=[])
+        )
+
+        result = await upscale_job_service.retry_video("video-001")
+
+        assert result is False
+
+
+# ---------------------------------------------------------------------------
+# update_video_retry_count
+# ---------------------------------------------------------------------------
+
+class TestUpdateVideoRetryCount:
+
+    @pytest.mark.asyncio
+    async def test_sets_retry_count(self, upscale_job_service, mock_supabase):
+        """update_video_retry_count sets retry_count on the video."""
+        mock_supabase.table.return_value.execute.return_value = (
+            _make_execute_result(data=[_sample_video_row()])
+        )
+
+        result = await upscale_job_service.update_video_retry_count("video-001", 2)
+
+        assert result is True
+        call_args = mock_supabase.table.return_value.update.call_args
+        update_dict = call_args[0][0]
+        assert update_dict["retry_count"] == 2
+
+    @pytest.mark.asyncio
+    async def test_returns_false_on_error(self, upscale_job_service, mock_supabase):
+        """update_video_retry_count returns False on exception."""
+        mock_supabase.table.return_value.update.side_effect = Exception("DB error")
+
+        result = await upscale_job_service.update_video_retry_count("video-001", 1)
+
+        assert result is False
+
+
+# ---------------------------------------------------------------------------
+# decrement_failed_count
+# ---------------------------------------------------------------------------
+
+class TestDecrementFailedCount:
+
+    @pytest.mark.asyncio
+    async def test_decrements_by_one(self, upscale_job_service, mock_supabase):
+        """decrement_failed_count decrements failed_videos by 1."""
+        batches_read = _build_table_mock(data=_sample_batch_row(failed_videos=3))
+        batches_write = _build_table_mock(data=[_sample_batch_row(failed_videos=2)])
+
+        call_count = [0]
+        def table_side_effect(name):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                return batches_read  # read
+            return batches_write  # write
+
+        mock_supabase.table.side_effect = table_side_effect
+
+        result = await upscale_job_service.decrement_failed_count("batch-001")
+
+        assert result is True
+        # Verify update was called with failed_videos=2
+        call_args = batches_write.update.call_args
+        update_dict = call_args[0][0]
+        assert update_dict["failed_videos"] == 2
+
+    @pytest.mark.asyncio
+    async def test_floors_at_zero(self, upscale_job_service, mock_supabase):
+        """decrement_failed_count floors at 0 (doesn't go negative)."""
+        batches_read = _build_table_mock(data=_sample_batch_row(failed_videos=0))
+        batches_write = _build_table_mock(data=[_sample_batch_row(failed_videos=0)])
+
+        call_count = [0]
+        def table_side_effect(name):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                return batches_read
+            return batches_write
+
+        mock_supabase.table.side_effect = table_side_effect
+
+        result = await upscale_job_service.decrement_failed_count("batch-001")
+
+        assert result is True
+        call_args = batches_write.update.call_args
+        update_dict = call_args[0][0]
+        assert update_dict["failed_videos"] == 0
