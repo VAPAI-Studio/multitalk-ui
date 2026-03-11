@@ -321,3 +321,249 @@ class TestListBatches:
         """GET returns 401 without auth token."""
         response = unauthenticated_client.get("/api/upscale/batches")
         assert response.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# POST /api/upscale/batches/{id}/resume -- Resume paused batch
+# ---------------------------------------------------------------------------
+
+class TestResumeBatch:
+    """Tests for POST /api/upscale/batches/{id}/resume."""
+
+    @patch("api.upscale.asyncio")
+    @patch("api.upscale.UpscaleJobService")
+    def test_resume_paused_batch(self, MockService, mock_asyncio, client):
+        """POST /api/upscale/batches/{id}/resume returns 200 with status='processing' when batch is paused."""
+        def _close_coro(coro):
+            coro.close()
+            return MagicMock()
+        mock_asyncio.create_task.side_effect = _close_coro
+
+        instance = MockService.return_value
+        instance.get_batch = AsyncMock(return_value={
+            "id": "batch-001",
+            "user_id": "test-user-id",
+            "status": "paused",
+            "total_videos": 3,
+            "videos": [],
+        })
+        instance.unpause_videos = AsyncMock(return_value=True)
+        instance.clear_pause_metadata = AsyncMock(return_value=True)
+        instance.update_batch_status = AsyncMock(return_value=True)
+
+        response = client.post("/api/upscale/batches/batch-001/resume")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["status"] == "processing"
+
+    @patch("api.upscale.UpscaleJobService")
+    def test_resume_returns_404_for_missing_batch(self, MockService, client):
+        """POST returns 404 when batch not found."""
+        instance = MockService.return_value
+        instance.get_batch = AsyncMock(return_value=None)
+
+        response = client.post("/api/upscale/batches/nonexistent/resume")
+        assert response.status_code == 404
+
+    @patch("api.upscale.UpscaleJobService")
+    def test_resume_returns_400_for_non_paused(self, MockService, client):
+        """POST returns 400 when batch is not paused (e.g., 'processing')."""
+        instance = MockService.return_value
+        instance.get_batch = AsyncMock(return_value={
+            "id": "batch-001",
+            "user_id": "test-user-id",
+            "status": "processing",
+            "total_videos": 1,
+            "videos": [],
+        })
+
+        response = client.post("/api/upscale/batches/batch-001/resume")
+        assert response.status_code == 400
+
+    @patch("api.upscale.asyncio")
+    @patch("api.upscale.UpscaleJobService")
+    def test_resume_calls_service_methods(self, MockService, mock_asyncio, client):
+        """Resume endpoint calls unpause_videos, clear_pause_metadata, update_batch_status."""
+        def _close_coro(coro):
+            coro.close()
+            return MagicMock()
+        mock_asyncio.create_task.side_effect = _close_coro
+
+        instance = MockService.return_value
+        instance.get_batch = AsyncMock(return_value={
+            "id": "batch-001",
+            "user_id": "test-user-id",
+            "status": "paused",
+            "total_videos": 3,
+            "videos": [],
+        })
+        instance.unpause_videos = AsyncMock(return_value=True)
+        instance.clear_pause_metadata = AsyncMock(return_value=True)
+        instance.update_batch_status = AsyncMock(return_value=True)
+
+        client.post("/api/upscale/batches/batch-001/resume")
+
+        instance.unpause_videos.assert_called_once_with("batch-001")
+        instance.clear_pause_metadata.assert_called_once_with("batch-001")
+        instance.update_batch_status.assert_called_once_with("batch-001", "processing")
+
+
+# ---------------------------------------------------------------------------
+# POST /api/upscale/batches/{id}/videos/{vid}/retry -- Retry failed video
+# ---------------------------------------------------------------------------
+
+class TestRetryVideo:
+    """Tests for POST /api/upscale/batches/{id}/videos/{vid}/retry."""
+
+    @patch("api.upscale.UpscaleJobService")
+    def test_retry_failed_video(self, MockService, client):
+        """POST returns 200 when video is successfully reset to pending."""
+        instance = MockService.return_value
+        instance.get_batch = AsyncMock(return_value={
+            "id": "batch-001",
+            "user_id": "test-user-id",
+            "status": "processing",
+            "total_videos": 1,
+            "videos": [],
+        })
+        instance.retry_video = AsyncMock(return_value=True)
+        instance.decrement_failed_count = AsyncMock(return_value=True)
+
+        response = client.post("/api/upscale/batches/batch-001/videos/video-001/retry")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["video_id"] == "video-001"
+        assert data["status"] == "pending"
+
+    @patch("api.upscale.UpscaleJobService")
+    def test_retry_returns_404_for_missing_batch(self, MockService, client):
+        """POST returns 404 when batch not found."""
+        instance = MockService.return_value
+        instance.get_batch = AsyncMock(return_value=None)
+
+        response = client.post("/api/upscale/batches/nonexistent/videos/video-001/retry")
+        assert response.status_code == 404
+
+    @patch("api.upscale.UpscaleJobService")
+    def test_retry_returns_400_for_non_failed(self, MockService, client):
+        """POST returns 400 when video is not in 'failed' status."""
+        instance = MockService.return_value
+        instance.get_batch = AsyncMock(return_value={
+            "id": "batch-001",
+            "user_id": "test-user-id",
+            "status": "processing",
+            "total_videos": 1,
+            "videos": [],
+        })
+        instance.retry_video = AsyncMock(return_value=False)
+
+        response = client.post("/api/upscale/batches/batch-001/videos/video-001/retry")
+        assert response.status_code == 400
+
+    @patch("api.upscale.UpscaleJobService")
+    def test_retry_decrements_failed_count(self, MockService, client):
+        """Retry endpoint decrements failed_videos count on the batch."""
+        instance = MockService.return_value
+        instance.get_batch = AsyncMock(return_value={
+            "id": "batch-001",
+            "user_id": "test-user-id",
+            "status": "processing",
+            "total_videos": 1,
+            "videos": [],
+        })
+        instance.retry_video = AsyncMock(return_value=True)
+        instance.decrement_failed_count = AsyncMock(return_value=True)
+
+        client.post("/api/upscale/batches/batch-001/videos/video-001/retry")
+
+        instance.decrement_failed_count.assert_called_once_with("batch-001")
+
+    @patch("api.upscale.asyncio")
+    @patch("api.upscale.UpscaleJobService")
+    def test_retry_relaunches_completed_batch(self, MockService, mock_asyncio, client):
+        """Retry endpoint sets completed batch back to processing and launches _process_batch."""
+        def _close_coro(coro):
+            coro.close()
+            return MagicMock()
+        mock_asyncio.create_task.side_effect = _close_coro
+
+        instance = MockService.return_value
+        instance.get_batch = AsyncMock(return_value={
+            "id": "batch-001",
+            "user_id": "test-user-id",
+            "status": "completed",
+            "total_videos": 2,
+            "videos": [],
+        })
+        instance.retry_video = AsyncMock(return_value=True)
+        instance.decrement_failed_count = AsyncMock(return_value=True)
+        instance.update_batch_status = AsyncMock(return_value=True)
+
+        response = client.post("/api/upscale/batches/batch-001/videos/video-001/retry")
+        assert response.status_code == 200
+
+        instance.update_batch_status.assert_called_once_with("batch-001", "processing")
+        mock_asyncio.create_task.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# PATCH /api/upscale/batches/{id}/reorder -- Reorder pending videos
+# ---------------------------------------------------------------------------
+
+class TestReorderQueue:
+    """Tests for PATCH /api/upscale/batches/{id}/reorder."""
+
+    @patch("api.upscale.UpscaleJobService")
+    def test_reorder_pending_videos(self, MockService, client):
+        """PATCH with video_ids returns 200 on success."""
+        instance = MockService.return_value
+        instance.get_batch = AsyncMock(return_value={
+            "id": "batch-001",
+            "user_id": "test-user-id",
+            "status": "pending",
+            "total_videos": 2,
+            "videos": [],
+        })
+        instance.reorder_videos = AsyncMock(return_value=True)
+
+        response = client.patch(
+            "/api/upscale/batches/batch-001/reorder",
+            json={"video_ids": ["video-002", "video-001"]},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+
+    @patch("api.upscale.UpscaleJobService")
+    def test_reorder_returns_404_for_missing_batch(self, MockService, client):
+        """PATCH returns 404 when batch not found."""
+        instance = MockService.return_value
+        instance.get_batch = AsyncMock(return_value=None)
+
+        response = client.patch(
+            "/api/upscale/batches/nonexistent/reorder",
+            json={"video_ids": ["video-001"]},
+        )
+        assert response.status_code == 404
+
+    @patch("api.upscale.UpscaleJobService")
+    def test_reorder_calls_service(self, MockService, client):
+        """Reorder endpoint calls reorder_videos with correct video_ids."""
+        instance = MockService.return_value
+        instance.get_batch = AsyncMock(return_value={
+            "id": "batch-001",
+            "user_id": "test-user-id",
+            "status": "pending",
+            "total_videos": 2,
+            "videos": [],
+        })
+        instance.reorder_videos = AsyncMock(return_value=True)
+
+        client.patch(
+            "/api/upscale/batches/batch-001/reorder",
+            json={"video_ids": ["video-002", "video-001"]},
+        )
+
+        instance.reorder_videos.assert_called_once_with("batch-001", ["video-002", "video-001"])
