@@ -62,11 +62,11 @@ Plans:
   3. When Freepik credits are exhausted, all remaining pending videos are set to "paused" (not failed) and a pause reason is recorded in the database
   4. A paused batch can be resumed via API and processing continues from the next pending video without re-processing completed ones
   5. The queue order of pending videos can be changed via API before they are processed
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 11-01: TBD
-- [ ] 11-02: TBD
+- [ ] 11-01-PLAN.md -- Service layer: ProcessingResult types, error classification, UpscaleJobService pause/resume/reorder/retry methods
+- [ ] 11-02-PLAN.md -- Processing loop: retry with backoff, credit exhaustion pause, resume/retry/reorder API endpoints
 
 ### Phase 12: Output Delivery
 **Goal**: Completed upscaled videos are automatically delivered to Supabase Storage and optionally to Google Drive, and are downloadable by the user
