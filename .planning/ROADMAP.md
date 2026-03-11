@@ -45,12 +45,12 @@ Full details: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
   3. Upscale settings (resolution, creativity, sharpen, grain, FPS boost, flavor) are accepted by the API with sensible defaults applied when omitted
   4. The batch submission endpoint returns immediately (under 1 second) and processing runs as a background task
   5. If the server restarts while a batch is processing, the interrupted batch resumes automatically on startup
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 10-01: TBD
-- [ ] 10-02: TBD
-- [ ] 10-03: TBD
+- [ ] 10-01-PLAN.md -- Database schema, Pydantic models, and Freepik settings configuration
+- [ ] 10-02-PLAN.md -- FreepikUpscalerService and UpscaleJobService with tests
+- [ ] 10-03-PLAN.md -- API router, background processing, and startup recovery
 
 ### Phase 11: Batch Processing
 **Goal**: Multiple videos process sequentially with intelligent error handling that distinguishes transient failures from credit exhaustion
@@ -116,7 +116,7 @@ Phases execute in numeric order: 10 -> 11 -> 12 -> 13
 | 6.1. File Tree Pagination | v1.0 | 1/1 | Complete | 2026-03-08 |
 | 6.2. Verification Documentation | v1.0 | 1/1 | Complete | 2026-03-08 |
 | 7. GitHub Integration | v1.0 | 2/2 | Complete | 2026-03-09 |
-| 10. Foundation | v1.1 | 0/3 | Not started | - |
+| 10. Foundation | v1.1 | 0/3 | Planned | - |
 | 11. Batch Processing | v1.1 | 0/2 | Not started | - |
 | 12. Output Delivery | v1.1 | 0/2 | Not started | - |
 | 13. Frontend | v1.1 | 0/3 | Not started | - |
