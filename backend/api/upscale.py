@@ -149,6 +149,93 @@ async def list_batches(
 
 
 # ---------------------------------------------------------------------------
+# Batch Operations: Resume, Retry, Reorder
+# ---------------------------------------------------------------------------
+
+
+@router.post("/batches/{batch_id}/resume", response_model=BatchResponse)
+async def resume_batch(
+    batch_id: str,
+    user=Depends(get_current_user),
+):
+    """Resume a paused batch. Unpauses videos, clears pause metadata, restarts processing."""
+    service = UpscaleJobService()
+    batch = await service.get_batch(batch_id, user.id)
+
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+
+    if batch.get("status") != "paused":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Batch is '{batch.get('status')}', must be 'paused' to resume",
+        )
+
+    await service.unpause_videos(batch_id)
+    await service.clear_pause_metadata(batch_id)
+    await service.update_batch_status(batch_id, "processing")
+
+    # Relaunch background processing
+    asyncio.create_task(_process_batch(batch_id))
+
+    return BatchResponse(
+        success=True,
+        batch_id=batch_id,
+        status="processing",
+    )
+
+
+@router.post("/batches/{batch_id}/videos/{video_id}/retry")
+async def retry_video(
+    batch_id: str,
+    video_id: str,
+    user=Depends(get_current_user),
+):
+    """Retry a failed video. Resets it to pending and relaunches processing if batch is terminal."""
+    service = UpscaleJobService()
+    batch = await service.get_batch(batch_id, user.id)
+
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+
+    success = await service.retry_video(video_id)
+    if not success:
+        raise HTTPException(
+            status_code=400,
+            detail="Video not found or not in 'failed' status",
+        )
+
+    await service.decrement_failed_count(batch_id)
+
+    # If batch is in terminal state, relaunch processing
+    if batch.get("status") in ("completed", "failed"):
+        await service.update_batch_status(batch_id, "processing")
+        asyncio.create_task(_process_batch(batch_id))
+
+    return {"success": True, "video_id": video_id, "status": "pending"}
+
+
+@router.patch("/batches/{batch_id}/reorder")
+async def reorder_queue(
+    batch_id: str,
+    payload: ReorderPayload,
+    user=Depends(get_current_user),
+):
+    """Reorder pending videos in a batch by providing video_ids in desired order."""
+    service = UpscaleJobService()
+    batch = await service.get_batch(batch_id, user.id)
+
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+
+    success = await service.reorder_videos(batch_id, payload.video_ids)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to reorder videos")
+
+    return {"success": True}
+
+
+# ---------------------------------------------------------------------------
 # Background Processing
 # ---------------------------------------------------------------------------
 
