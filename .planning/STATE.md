@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: Infrastructure Management
-status: completed
-stopped_at: Milestone v1.0 archived and tagged
+milestone: v1.1
+milestone_name: Batch Video Upscale
+status: defining_requirements
+stopped_at: Milestone v1.1 started — defining requirements
 last_updated: "2026-03-11"
-last_activity: 2026-03-11 -- Milestone v1.0 completion archived
+last_activity: 2026-03-11 -- Milestone v1.1 started
 progress:
-  total_phases: 9
-  completed_phases: 9
-  total_plans: 23
-  completed_plans: 23
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -20,16 +20,15 @@ progress:
 
 See: .planning/PROJECT.md (updated 2026-03-11)
 
-**Core value:** Enable self-service infrastructure management for RunPod serverless workflows without leaving the application
-**Current focus:** v1.0 shipped — planning next milestone
+**Core value:** Provide a unified platform for AI-powered media processing where users can generate, edit, upscale, and manage their content end-to-end
+**Current focus:** v1.1 Batch Video Upscale — defining requirements
 
 ## Current Position
 
-Milestone: v1.0 Infrastructure Management — SHIPPED 2026-03-11
-Status: Complete (archived to .planning/milestones/)
-Tag: v1.0
-
-Progress: [██████████] 100% (23/23 plans, 44/44 requirements)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-11 — Milestone v1.1 started
 
 ## Accumulated Context
 
@@ -37,17 +36,19 @@ Progress: [██████████] 100% (23/23 plans, 44/44 requirements
 
 All v1.0 decisions finalized — see PROJECT.md Key Decisions table and milestones/v1.0-ROADMAP.md for full history.
 
+v1.1 decisions pending — Freepik API integration, sequential processing, pause-and-notify on credits.
+
 ### Pending Todos
 
-(None — milestone complete)
+(None — milestone just started)
 
 ### Blockers/Concerns
 
-(None — cleared for next milestone)
+(None)
 
 ## Session Continuity
 
 Last session: 2026-03-11
-Stopped at: Milestone v1.0 archived and tagged
+Stopped at: Milestone v1.1 started — defining requirements
 Resume file: None
-Next action: `/gsd:new-milestone` for next version
+Next action: Define requirements → create roadmap

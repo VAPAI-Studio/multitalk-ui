@@ -6,7 +6,19 @@ sideOUTsticks (multitalk-ui) is a full-stack web application for AI-powered vide
 
 ## Core Value
 
-Enable self-service infrastructure management for RunPod serverless workflows without leaving the application, making model deployment and Dockerfile editing as seamless as running a generation.
+Provide a unified platform for AI-powered media processing where users can generate, edit, upscale, and manage their content end-to-end — from creation through post-processing to organized storage.
+
+## Current Milestone: v1.1 Batch Video Upscale
+
+**Goal:** Enable users to batch-upscale videos using the Freepik Video Upscaler API with smart queue management, credit-aware pausing, and automatic output delivery to Supabase Storage + Google Drive.
+
+**Target features:**
+- Batch video upload with queue management (process one-by-one)
+- Freepik Video Upscaler API integration (resolution, creativity, sharpen, grain, FPS boost, flavor)
+- Credit exhaustion detection with pause-and-notify + resume capability
+- Output saved to Supabase Storage and Google Drive (using existing project folder picker)
+- Per-video status tracking (pending/processing/completed/failed/paused)
+- New feature page linked from homepage, accessible to all authenticated users
 
 ## Requirements
 
@@ -32,12 +44,19 @@ Enable self-service infrastructure management for RunPod serverless workflows wi
 
 ### Active
 
-<!-- Requirements for next milestone (to be defined via /gsd:new-milestone) -->
+<!-- Requirements for v1.1 Batch Video Upscale -->
 
-(None yet — define requirements for next milestone)
+- [ ] Batch video upscale page with multi-file upload
+- [ ] Freepik Video Upscaler API backend service
+- [ ] Queue management with sequential processing
+- [ ] Credit exhaustion pause-and-notify with resume
+- [ ] Output delivery to Supabase Storage + Google Drive
+- [ ] Database schema for batch/video job tracking
+- [ ] Per-video status tracking in UI
 
 ### Out of Scope
 
+- Upload videos from Google Drive — Planned for future milestone
 - Real-time collaborative editing — Single admin use case, not needed
 - Version control UI for Dockerfiles — GitHub handles this, just edit and push
 - RunPod dashboard recreation — Only need file management and Dockerfile editing, not full RunPod features
@@ -52,11 +71,13 @@ Enable self-service infrastructure management for RunPod serverless workflows wi
 
 ## Context
 
-**Current State (post v1.0):**
+**Current State (post v1.0, starting v1.1):**
 - Shipped v1.0 Infrastructure Management with 14,269 LOC Python + 28,415 LOC TypeScript
 - Tech stack: FastAPI, React/TypeScript, Supabase, S3 (RunPod), GitHub API, Monaco Editor
 - 9 phases, 23 plans, 44 requirements all satisfied
-- All 7 E2E flows verified (login→infra, browse, upload, download, file ops, HF download, Dockerfile edit+deploy)
+- Google Drive integration exists: ProjectContext with folder picker in header, service account auth, upload/list/folder operations
+- Freepik API: Video Upscaler at `api.freepik.com/v1/ai/video-upscaler` — async task-based (POST to create, GET to poll), supports resolution/creativity/sharpen/grain/fps_boost/flavor params
+- Freepik rate limits: Free=10/day, Tier 1=125/day. Frame-based pricing. Statuses: CREATED → IN_PROGRESS → COMPLETED/FAILED
 
 **Technical Environment:**
 - FastAPI backend (Python 3.11+) with React/TypeScript frontend
@@ -95,5 +116,10 @@ Enable self-service infrastructure management for RunPod serverless workflows wi
 | 5MB multipart chunk size | S3 minimum; consistent across upload and HF download pipelines | ✓ Good |
 | PROTECTED_PATHS frozenset | Guards ComfyUI/ and venv/ from all mutations; prevents accidental model deletion | ✓ Good |
 
+| Freepik API for video upscaling | External API with credit-based pricing; not ComfyUI — separate service layer needed | — Pending |
+| Sequential batch processing | One video at a time to Freepik; avoids rate limit bursts and simplifies credit tracking | — Pending |
+| Pause-and-notify on credit exhaustion | Better UX than silent failure; user can add credits and resume | — Pending |
+| Output to Supabase + Google Drive | Dual storage: Supabase for in-app viewing, Drive for organized project delivery | — Pending |
+
 ---
-*Last updated: 2026-03-11 after v1.0 milestone*
+*Last updated: 2026-03-11 after v1.1 milestone start*
