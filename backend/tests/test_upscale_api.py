@@ -183,6 +183,12 @@ class TestStartBatch:
     @patch("api.upscale.UpscaleJobService")
     def test_start_batch_returns_processing_status(self, MockService, mock_asyncio, client):
         """POST /api/upscale/batches/{id}/start returns immediately with status 'processing'."""
+        # Make mock create_task close the coroutine to prevent unawaited warnings
+        def _close_coro(coro):
+            coro.close()
+            return MagicMock()
+        mock_asyncio.create_task.side_effect = _close_coro
+
         instance = MockService.return_value
         instance.get_batch = AsyncMock(return_value={
             "id": "batch-001",
