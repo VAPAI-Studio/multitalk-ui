@@ -415,3 +415,197 @@ class UpscaleJobService:
 
         except Exception:
             return False
+
+    # ------------------------------------------------------------------
+    # Batch Processing Support
+    # ------------------------------------------------------------------
+
+    async def pause_all_pending_videos(self, batch_id: str) -> bool:
+        """
+        Set status='paused' on all videos with status='pending' for a batch.
+
+        Returns:
+            True on success.
+        """
+        try:
+            result = (
+                self.supabase.table("upscale_videos")
+                .update({"status": "paused"})
+                .eq("batch_id", batch_id)
+                .eq("status", "pending")
+                .execute()
+            )
+            return True
+
+        except Exception:
+            return False
+
+    async def pause_batch(self, batch_id: str, pause_reason: str) -> bool:
+        """
+        Pause a batch: set status='paused', record paused_at and pause_reason.
+
+        Returns:
+            True on success.
+        """
+        try:
+            now = datetime.now(timezone.utc).isoformat()
+            result = (
+                self.supabase.table("upscale_batches")
+                .update({
+                    "status": "paused",
+                    "paused_at": now,
+                    "pause_reason": pause_reason,
+                })
+                .eq("id", batch_id)
+                .execute()
+            )
+            return bool(result.data)
+
+        except Exception:
+            return False
+
+    async def unpause_videos(self, batch_id: str) -> bool:
+        """
+        Set all paused videos back to status='pending' for a batch.
+
+        Returns:
+            True on success.
+        """
+        try:
+            result = (
+                self.supabase.table("upscale_videos")
+                .update({"status": "pending"})
+                .eq("batch_id", batch_id)
+                .eq("status", "paused")
+                .execute()
+            )
+            return True
+
+        except Exception:
+            return False
+
+    async def clear_pause_metadata(self, batch_id: str) -> bool:
+        """
+        Clear pause metadata (paused_at, pause_reason) on a batch.
+
+        Returns:
+            True on success.
+        """
+        try:
+            result = (
+                self.supabase.table("upscale_batches")
+                .update({
+                    "paused_at": None,
+                    "pause_reason": None,
+                })
+                .eq("id", batch_id)
+                .execute()
+            )
+            return bool(result.data)
+
+        except Exception:
+            return False
+
+    async def reorder_videos(self, batch_id: str, video_ids: list) -> bool:
+        """
+        Update queue_position for each video_id in the ordered list.
+        Only applies to pending videos for the given batch.
+
+        Returns:
+            True on success.
+        """
+        try:
+            for position, video_id in enumerate(video_ids):
+                self.supabase.table("upscale_videos").update(
+                    {"queue_position": position}
+                ).eq("id", video_id).eq("batch_id", batch_id).eq(
+                    "status", "pending"
+                ).execute()
+
+            return True
+
+        except Exception:
+            return False
+
+    async def retry_video(self, video_id: str) -> bool:
+        """
+        Reset a failed video back to pending for retry.
+
+        Only succeeds if the video is currently in 'failed' status.
+
+        Returns:
+            True if a failed video was reset, False otherwise.
+        """
+        try:
+            result = (
+                self.supabase.table("upscale_videos")
+                .update({
+                    "status": "pending",
+                    "error_message": None,
+                    "freepik_task_id": None,
+                    "completed_at": None,
+                })
+                .eq("id", video_id)
+                .eq("status", "failed")
+                .execute()
+            )
+            return bool(result.data)
+
+        except Exception:
+            return False
+
+    async def update_video_retry_count(self, video_id: str, retry_count: int) -> bool:
+        """
+        Set retry_count on a video.
+
+        Returns:
+            True on success.
+        """
+        try:
+            result = (
+                self.supabase.table("upscale_videos")
+                .update({"retry_count": retry_count})
+                .eq("id", video_id)
+                .execute()
+            )
+            return bool(result.data)
+
+        except Exception:
+            return False
+
+    async def decrement_failed_count(self, batch_id: str) -> bool:
+        """
+        Decrement failed_videos count on a batch by 1, flooring at 0.
+
+        Uses the same read-then-write pattern as _increment_batch_field.
+
+        Returns:
+            True on success.
+        """
+        try:
+            # Read current value
+            read_result = (
+                self.supabase.table("upscale_batches")
+                .select("failed_videos")
+                .eq("id", batch_id)
+                .single()
+                .execute()
+            )
+            if not read_result.data:
+                return False
+
+            current = read_result.data
+            current_val = current.get("failed_videos", 0) if isinstance(current, dict) else 0
+            new_val = max(0, current_val - 1)
+
+            # Write decremented value
+            update_result = (
+                self.supabase.table("upscale_batches")
+                .update({"failed_videos": new_val})
+                .eq("id", batch_id)
+                .execute()
+            )
+            return bool(update_result.data)
+
+        except Exception:
+            return False
