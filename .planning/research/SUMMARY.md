@@ -1,179 +1,181 @@
 # Project Research Summary
 
-**Project:** sideOUTsticks -- Infrastructure Management Admin Interface
-**Domain:** Admin tooling for AI/ML serverless infrastructure (RunPod network volume management, Dockerfile CI/CD, HuggingFace model acquisition)
-**Researched:** 2026-03-04
-**Confidence:** MEDIUM-HIGH
+**Project:** sideOUTsticks — v1.1 Batch Video Upscale with Freepik API
+**Domain:** Batch video upscaling via external credit-based API integrated into an existing AI media processing platform
+**Researched:** 2026-03-11
+**Confidence:** MEDIUM (all internal architecture is HIGH; external Freepik API contract is the single LOW-confidence blocker)
 
 ## Executive Summary
 
-This project adds an infrastructure management layer to the existing sideOUTsticks AI media platform. The goal is to eliminate context switching between RunPod's web UI, GitHub, HuggingFace, and local IDEs by consolidating file browsing (S3-backed RunPod volumes), code editing (Dockerfiles with syntax highlighting), and GitHub push-to-deploy into a single admin-only interface within the existing React + FastAPI application. The target user is a single technical admin (or very small ops team), not end users -- this simplifies many design decisions around concurrency, RBAC, and real-time collaboration (all scoped out as anti-features).
+This milestone adds batch video upscaling to an existing, well-structured FastAPI + React platform that already handles ComfyUI and RunPod AI workflows, Supabase storage, and Google Drive delivery. The core work is a sequential batch queue processor that submits videos one-by-one to the Freepik Video Upscaler API, polls for completion, and delivers outputs to both Supabase Storage and Google Drive. No new npm or pip dependencies are required — the entire feature is built on patterns already proven in the codebase (httpx service layer, BackgroundTasks, Supabase state machine, StorageService and GoogleDriveService reuse).
 
-The recommended approach is backend-centric: all external service interactions (RunPod S3, GitHub API, HuggingFace Hub) happen server-side through new FastAPI services, with the React frontend providing the UI layer via Monaco Editor for code editing, react-arborist for the file tree, and react-resizable-panels for the IDE layout. The existing patterns (API routers delegating to services, Supabase auth, Pydantic models, job tracking) extend naturally to these new features with minimal architectural deviation. The most impactful differentiator is HuggingFace direct-to-volume downloads, which eliminates a 30-60 minute manual process.
+The recommended approach follows a strict backend-driven architecture: the batch processing loop runs as a server-side background task backed by persistent Supabase state, so processing continues when the user closes the browser and survives Heroku dyno restarts. The frontend's role is limited to initiating the batch, uploading source videos individually, and polling for status updates every 5 seconds. This design is non-negotiable given Heroku's 30-second request timeout and daily dyno cycling. Processing is sequential (one video at a time) because Freepik's credit-based pricing model and daily rate limits make parallelism counterproductive and complicate the critical pause-on-credit-exhaustion feature.
 
-The key risks are: (1) RunPod network volume S3 access may not be available via direct API -- this needs early validation as it underpins all file operations, (2) large file transfers (2-15 GB models) will hit Heroku's 30-second timeout if not implemented as async background jobs from the start, (3) GitHub push integration can trigger uncontrolled RunPod rebuilds without a confirmation/debounce mechanism, and (4) admin access control must be the very first thing built, not bolted on after features exist. All four risks have clear mitigation strategies documented in the research.
+The critical blocker before implementation can begin: the Freepik Video Upscaler API endpoint (`api.freepik.com/v1/ai/video-upscaler`) is referenced in PROJECT.md but is NOT publicly documented on docs.freepik.com as of March 2026. The project owner must confirm the API contract (endpoint URL, request parameters, response format, credit model, error codes) before Phase 1 can start. This is the only LOW-confidence item. Everything else — stack, architecture, feature scope, pitfall mitigations — is grounded in the existing codebase and established patterns.
 
 ## Key Findings
 
 ### Recommended Stack
 
-The stack additions integrate cleanly with the existing React 18 + TypeScript + Vite + TailwindCSS frontend and FastAPI + Python backend. No architectural departures are needed -- the new features follow existing patterns (API router -> service -> external API, Supabase auth, job tracking).
+The existing stack needs zero new dependencies. The pattern for integrating Freepik is identical to `runpod_service.py` and `worldlabs_service.py`: an httpx-based service class with tuple returns `(success, data, error)`, Settings-based API key configuration, and BackgroundTasks for fire-and-forget processing. The batch queue state lives in two new Supabase tables (`upscale_batches`, `upscale_videos`) rather than in memory — this is the single most important architectural departure from the existing HF download service pattern, which used an in-memory dict that would be fatal on Heroku for long-running user-facing batches.
 
 **Core technologies:**
-- `@monaco-editor/react` (v4.6.x): In-browser code editor -- industry standard (VS Code engine), first-class Dockerfile syntax highlighting, diff view for pre-commit review, rich API for themes and keybindings
-- `react-arborist` (v3.4.x): File tree component -- purpose-built for file browser UIs, headless rendering (works with TailwindCSS), drag-and-drop, virtualized for large directories, keyboard accessible
-- `react-resizable-panels`: IDE panel layout -- lightweight (~5KB), handles sidebar + editor + preview split pane pattern
-- `aiofiles` (Python): Async file I/O for FastAPI -- prevents blocking the event loop during file operations
-- `PyGithub` (v2.x) or `githubkit`: GitHub API interaction from backend -- PyGithub is established (10K+ stars), githubkit is async-first (better FastAPI fit)
-- `boto3`/`aiobotocore`: S3 access for RunPod volumes -- standard AWS SDK, full control over list/put/get/delete/multipart operations
-- `huggingface_hub` (Python): HuggingFace model downloads -- handles auth, LFS, URL resolution, gated models correctly (do NOT use raw HTTP)
+- **httpx** (0.28.1, already installed): Freepik API client — identical to the pattern already used in 3 existing services; handles async, streaming, connection pooling, and timeout configuration
+- **FastAPI BackgroundTasks / asyncio.create_task** (built-in, already used): Batch queue runner — fire-and-forget with DB-backed state for restart survival
+- **supabase-py** (>=2.3.0, already installed): Batch and video state persistence — survives restarts, supports pause/resume, enables multi-user concurrent batches
+- **StorageService** (existing, `backend/services/storage_service.py`): Output delivery to Supabase Storage via `upload_video_from_url()` — already handles the download-from-URL pattern; streaming modifications needed for large video files
+- **GoogleDriveService** (existing, `backend/services/google_drive_service.py`): Output delivery to Google Drive — zero modifications needed; reuse `get_or_create_folder()` and `upload_file()`
 
-**Critical exclusions (do NOT use):**
-- No Ace Editor (legacy), no CodeMirror 5 (superseded), no WebContainers (overkill), no isomorphic-git (unnecessary complexity), no Ant Design tree (TailwindCSS conflicts), no frontend-direct GitHub API calls (security risk)
+**No new pip or npm packages needed.** The entire feature uses existing installed libraries. See STACK.md for rationale on excluded technologies (Celery, RQ, aiohttp, ffmpeg, WebSockets, SQLAlchemy).
 
 ### Expected Features
 
-**Must have (table stakes -- without these, users stay in RunPod/GitHub/IDE):**
-- TS-1: File browser with tree navigation (S3 ListObjectsV2, pagination, lazy loading)
-- TS-2: File upload to volume (chunked/multipart for models up to 10GB)
-- TS-3: File download from volume (presigned URLs, streaming)
-- TS-4: File delete with confirmation
-- TS-5: Dockerfile editor with syntax highlighting (Monaco)
-- TS-6: GitHub push integration (commit + push triggers RunPod rebuild)
-- TS-7: File move and rename
-- TS-8: Admin access control (all features admin-only, server-enforced)
+**Must have (table stakes):**
+- Multi-file upload with video validation (type, size, 8-second duration limit per Freepik constraint) — "batch" implies multi-file; warn before submission, not after
+- Global settings panel (resolution, creativity, sharpen, grain, fps_boost, flavor) with preset buttons — configure once, apply to all
+- Sequential queue processing, database-backed and backend-driven — core state machine; queue must survive page close and server restart
+- Per-video status tracking (pending / processing / completed / failed / paused) with elapsed time and error messages
+- Output delivery to Supabase Storage + Google Drive `AI-Upscaled` subfolder — explicitly required by PROJECT.md; non-blocking Drive upload (failure does not fail the video)
+- Per-video error handling with manual retry (max 2 auto-retries for transient errors, then manual)
+- Batch summary view (total / completed / processing / pending / failed counts + progress bar + estimated time remaining)
 
-**Should have (differentiators that justify building this vs. using existing tools):**
-- D-1: HuggingFace direct download to volume (highest-value feature -- eliminates the biggest pain point)
-- D-2: Model-to-workflow assignment
-- D-3: Base template system for Dockerfiles (base + per-workflow customization)
-- D-4: File search and filtering
-- D-5: Deployment status dashboard (build status after push)
-- D-6: Bulk file operations (multi-select delete/move/download)
+**Should have (competitive differentiators):**
+- Credit exhaustion detection with pause-and-notify — batch pauses with a clear notification and Resume button instead of failing all remaining videos silently
+- Resume capability after credit recharge — re-queues all paused videos from where the batch left off, settings preserved, no re-uploading
+- Batch history with re-run — extends existing feed sidebar with batch grouping; "Re-run" creates new batch with same settings
+- Queue reordering via drag-and-drop for pending items only
+- Batch-level ZIP download of all completed videos
 
-**Defer (explicitly scoped out as anti-features):**
-- Real-time collaborative editing (single admin, not needed)
-- Full Git UI (branches, merge conflicts, history -- GitHub does this better)
-- RunPod dashboard recreation (GPU monitoring, scaling, billing)
-- Automated model optimization (quantization, pruning)
-- In-browser terminal/SSH
-- Multi-tenant admin RBAC (beyond admin/not-admin)
-- Dockerfile linting/security scanning
+**Defer to later milestone:**
+- Per-video settings override (global settings sufficient for v1; adds UI complexity without proportional value)
+- Video trimming/splitting to work around the 8-second limit (major scope increase — FFmpeg, segment management, audio sync)
+- Upload videos FROM Google Drive (explicitly out-of-scope per PROJECT.md)
+- Real-time credit balance display (Freepik API does not expose a balance endpoint)
+- Before/after video comparison viewer
 
 ### Architecture Approach
 
-The system decomposes into six components with clear boundaries: File Browser (read-only listing), File Operations (mutations), HuggingFace Download (server-to-server transfer with job tracking), Dockerfile Editor (Monaco + GitHub read/write), GitHub Integration Service (backend-only, all git operations server-side), and Admin Access Control (FastAPI dependency extending existing auth). All external service communication flows through the backend -- the frontend never directly contacts GitHub, S3, or HuggingFace.
+The feature decomposes into 7 components across a strictly backend-driven pipeline. The frontend initiates and observes; the backend orchestrates. Source videos flow: frontend local file -> individual backend upload -> Supabase Storage staging -> Freepik API (sequential) -> download result (streaming) -> re-upload to Supabase Storage + Google Drive. Two new Supabase tables provide the state machine backbone. Build order is a linear dependency chain — no parallel tracks are possible because each phase depends on the prior one being functional and testable.
 
 **Major components:**
-1. **Network Volume File Browser** -- Lists S3-backed volume contents via backend API; frontend renders tree with react-arborist; cursor-based pagination for large directories
-2. **File Operations Service** -- Upload (multipart streaming), download (presigned URLs), move/rename (S3 copy+delete), delete; all through FastAPI endpoints proxying to S3
-3. **HuggingFace Direct Download** -- Async background job that streams from HF CDN to S3 without buffering; uses `huggingface_hub` library; job tracking via existing pattern
-4. **Dockerfile Editor** -- Monaco editor loading content from GitHub via backend; save triggers commit+push; diff preview before deploy
-5. **GitHub Integration Service** -- Backend-only service wrapping GitHub API (Contents API for read/write); PAT or GitHub App credentials stored as env vars; never exposed to frontend
-6. **Admin Access Control** -- New `get_admin_user()` FastAPI dependency; `is_admin` in Supabase user_metadata; frontend AuthContext gets `isAdmin` derived property; all admin routes return 403 for non-admins
+1. **FreepikUpscalerService** (`backend/services/freepik_service.py`) — Freepik API wrapper: submit task, poll status, check credits. Single responsibility; isolated from batch logic so API changes are absorbed in one place.
+2. **BatchJobManager** (`backend/services/batch_manager.py`) — Sequential processing loop: pop next pending video, submit to Freepik, poll to completion, trigger output delivery, handle credit exhaustion with pause/resume. Heartbeat column in DB detects stale/crashed tasks.
+3. **Database schema** (`upscale_batches` + `upscale_videos`) — Persistent state machine for batch lifecycle and per-video status; `last_heartbeat` for stale-batch detection; per-destination upload status columns for atomicity tracking.
+4. **Output Delivery Pipeline** — Orchestration inside BatchJobManager calling existing StorageService and GoogleDriveService; streaming download from Freepik (no full-file buffering in memory); temp-file-based Google Drive upload to avoid MediaInMemoryUpload memory spike.
+5. **Backend API layer** (`backend/api/upscale.py`) — 8 HTTP endpoints for CRUD on batches and videos; all protected with existing `get_current_user()` auth dependency; registered in `main.py` with one `include_router` line.
+6. **Frontend page and state** (`frontend/src/pages/BatchUpscale.tsx` + `useBatchUpscale.ts`) — Multi-file upload zone, parameter controls, per-video status display, pause/resume UI; polls `GET /api/upscale/batches/{id}` every 5 seconds, stops on terminal states.
+7. **Credit monitoring and pause/resume** (behavior within BatchJobManager) — Classifies Freepik errors into three categories with distinct handlers: per-second rate limit (backoff + retry), credit exhaustion (pause batch + notify), daily RPD limit (pause + calculate reset time).
 
 ### Critical Pitfalls
 
-1. **S3 is not a filesystem** -- RunPod volumes are object stores with eventual consistency, no true directories, and copy+delete for "move." Design the file browser API with cursor-based pagination, optimistic UI updates, and async move/rename operations from day one.
-2. **Large file transfers will timeout** -- Multi-GB HuggingFace downloads and uploads cannot be synchronous HTTP requests. Heroku has a 30-second timeout. All large transfers must be fire-and-forget async jobs with polling-based progress tracking. Never buffer entire files in backend memory.
-3. **Admin access must come first** -- The codebase has no existing RBAC. Building features before access control leads to missed endpoints and false security. Create `get_admin_user()` dependency before the first admin endpoint exists. Use a `/api/admin/` prefix with middleware protection.
-4. **GitHub push triggers uncontrolled rebuilds** -- Without a confirmation dialog and deployment locking, rapid Dockerfile edits trigger multiple concurrent RunPod rebuilds (10-20 minutes each). Add diff preview, explicit deploy confirmation, and "Save Draft" vs "Deploy" distinction.
-5. **API client is already 1,181 lines** -- Adding volume, Dockerfile, and GitHub methods will push it past 1,500 lines. Refactor `apiClient.ts` into modular structure before adding new methods (or create separate `infraClient.ts`).
+1. **Batch state lost on Heroku dyno restart** — Never use in-memory job stores for batch state. ALL state goes to Supabase from day one. Add startup recovery (`@app.on_event("startup")`) that resumes interrupted batches. The existing `hf_download_service.py` in-memory dict pattern would be catastrophic here. (Affects Phase 1 schema design.)
+
+2. **Heroku 30-second timeout killing batch submissions** — The batch submission endpoint must return immediately with a `batch_id` and launch processing as a background task. No Freepik API calls inside request handlers. Frontend receives the batch ID instantly and starts polling. (Affects Phase 1 API design.)
+
+3. **Credit exhaustion treated as a regular per-video error** — Parse Freepik error responses to distinguish: (a) per-second rate limit (429) — exponential backoff and retry; (b) credit exhaustion (402 or custom error code) — pause entire batch and notify user; (c) daily RPD limit — pause and calculate reset time. Failing to separate these causes wasted credits and confusing UX. (Must be designed in Phase 1 FreepikUpscalerService, implemented in Phase 2.)
+
+4. **Large video downloads loaded into backend memory** — Existing `storage_service.py:98` loads full file content into memory (`video_response.content`). Acceptable for small ComfyUI outputs (5-20 MB), fatal for 50-200 MB upscaled videos on Heroku's 512 MB limit. Also: `google_drive_service.py:235` uses `MediaInMemoryUpload`. Both must use streaming equivalents for this feature. (Affects Phase 3 output delivery.)
+
+5. **Freepik API endpoint undocumented** — `api.freepik.com/v1/ai/video-upscaler` is not in public API docs as of March 2026. Validate manually before writing any code: make a live test call, confirm endpoint URL, parameters, response format, credit model, and error codes. Build the FreepikUpscalerService as a clean abstraction so any API changes are absorbed in one file. (Blocks Phase 0 validation gate.)
 
 ## Implications for Roadmap
 
-Based on combined research, the project has two independent tracks after a shared foundation phase, plus a polish phase. The dependency graph is clear:
+Based on combined research, the build order is a strict linear dependency chain with one pre-implementation validation gate and 4 build phases. The architecture research explicitly documents this as a linear dependency — unlike the v1.0 infrastructure milestone (which had two parallel tracks), this feature cannot be parallelized.
 
-### Phase 0: Prerequisites and Refactoring
-**Rationale:** Admin access control is a hard prerequisite for all infrastructure features (all four research files agree). The API client refactoring prevents the existing tech debt from compounding.
-**Delivers:** Admin role mechanism, `get_admin_user()` FastAPI dependency, `isAdmin` in AuthContext, refactored `apiClient.ts` into modular structure, admin navigation scaffolding in sidebar
-**Addresses:** TS-8 (Admin Access Control)
-**Avoids:** Pitfall #6 (access control bolted on after), Pitfall #8 (monolithic API client)
+### Phase 0: API Validation (Pre-implementation Gate)
 
-### Phase 1: Network Volume File Management
-**Rationale:** The file browser is the foundation for all volume operations (uploads, downloads, HuggingFace downloads, model assignment all depend on being able to see and navigate files). S3 access validation is also the biggest technical risk and should be proven early.
-**Delivers:** File browser with tree navigation, file upload (chunked), download (presigned URLs), delete, move/rename. Basic CRUD for RunPod network volume files.
-**Addresses:** TS-1, TS-2, TS-3, TS-4, TS-7
-**Avoids:** Pitfall #1 (S3 vs filesystem assumptions), Pitfall #7 (volume concurrency)
-**Uses:** react-arborist, react-resizable-panels, boto3/aiobotocore, aiofiles
+**Rationale:** The single highest-risk item in this entire feature is the unverified Freepik API endpoint. All subsequent phases depend on knowing the exact API contract. This is a required gate before any code is written — not optional research. A manual test call takes 30 minutes and eliminates all LOW-confidence items.
+**Delivers:** Confirmed API endpoint URL, parameter schema, response format, Freepik task status states, error codes (especially credit exhaustion), and credit consumption model per video.
+**Addresses:** Pitfall #8 (Freepik API documentation gap)
+**Avoids:** Building the FreepikUpscalerService against assumed parameters that may not match the real API
 
-### Phase 2: HuggingFace Integration
-**Rationale:** The highest-value differentiator. Depends on Phase 1 (volume service for S3 writes, file browser for destination selection). Introduces async job pattern for large transfers.
-**Delivers:** HuggingFace URL input, server-to-server download to volume, progress tracking, gated model support, download queue
-**Addresses:** D-1 (HuggingFace Direct Download), D-2 (Model-to-Workflow Assignment initial version)
-**Avoids:** Pitfall #2 (blocking UI during large transfers), Pitfall #10 (HuggingFace URL complexity)
-**Uses:** huggingface_hub (Python), existing job tracking pattern
+### Phase 1: Foundation — Database + Freepik Service + Basic API
 
-### Phase 3: Dockerfile Editor and GitHub Integration
-**Rationale:** Independent of Phases 1-2 (only needs Phase 0 admin auth). Can run in parallel with Phase 2 if resources allow. Tightly couples editor and GitHub push since the editor's value depends on deploy capability.
-**Delivers:** Monaco-based Dockerfile editor with syntax highlighting, GitHub read/write via backend, commit + push, diff preview before deploy, deployment confirmation dialog
-**Addresses:** TS-5 (Dockerfile Editor), TS-6 (GitHub Push), D-3 (Base Template System initial version)
-**Avoids:** Pitfall #3 (template pattern misunderstanding), Pitfall #4 (GitHub token security), Pitfall #5 (uncontrolled rebuilds), Pitfall #9 (editor bundle bloat -- use React.lazy)
-**Uses:** @monaco-editor/react, PyGithub or githubkit, GitHub App authentication
+**Rationale:** The database schema is the zero-dependency foundation. Everything else (batch manager, frontend, output delivery) depends on having the tables and the Freepik service working end-to-end with a single video. The schema must include ALL columns needed by later phases (heartbeat, per-destination upload status) to avoid mid-feature migrations.
+**Delivers:** Migration `007_add_upscale_batches.sql` applied; `freepik_service.py` tested with a real single-video end-to-end; `upscale_job_service.py` CRUD; `upscale.py` API routes for create batch, upload video, start batch; `FREEPIK_API_KEY` in Settings; fire-and-forget endpoint returning `batch_id` instantly.
+**Addresses:** TS-1 (upload validation), TS-2 (settings model), TS-3 (queue foundation)
+**Avoids:** Pitfall #1 (in-memory state), Pitfall #2 (30-second timeout)
 
-### Phase 4: Polish and Differentiators
-**Rationale:** These features improve efficiency but are not blocking. They depend on the infrastructure from Phases 1-3 being stable.
-**Delivers:** File search and filtering, bulk operations (multi-select delete/move), deployment status dashboard (GitHub Actions status after push), complete model-to-workflow assignment with validation
-**Addresses:** D-4 (File Search), D-5 (Deploy Status Dashboard), D-6 (Bulk Operations), D-2 (Model Assignment complete)
-**Avoids:** Pitfall #11 (model assignment disconnected from execution)
+### Phase 2: Batch Processing — Sequential Queue + Credit Management
+
+**Rationale:** Once single-video processing works end-to-end, add the sequential processing loop with the three-category error classification (rate limit, credit exhaustion, daily limit), heartbeat tracking, and pause/resume. This is the core differentiator and the most complex phase. Getting error classification right here prevents the cascade failure mode (all remaining videos failing when credits run out).
+**Delivers:** `batch_manager.py` with start/resume/cancel; three-category Freepik error handling; pause state in DB with `pause_reason`; resume and cancel endpoints; heartbeat column updated on every processing cycle; idempotent re-submission (check for existing `freepik_task_id` before submitting).
+**Addresses:** D-1 (credit exhaustion detection), D-2 (resume after recharge), TS-6 (error handling with retry)
+**Avoids:** Pitfall #3 (credit exhaustion as afterthought), Pitfall #6 (polling too aggressive or too lazy), Pitfall #9 (background task silent failure), Pitfall #10 (rate limit vs credit error conflation), Pitfall #11 (non-idempotent resume)
+
+### Phase 3: Output Delivery — Supabase Storage + Google Drive
+
+**Rationale:** With batch processing functional, add the output delivery step. This phase reuses existing services with minimal new code, but requires streaming download (not full-file-in-memory) and per-destination status tracking (for atomicity across two independent services). Requires a code spike to confirm Supabase Storage's Python SDK supports streaming upload of 50-200 MB files.
+**Delivers:** Streaming video download from Freepik (httpx chunk iteration); upload to Supabase Storage (streaming or temp-file path); Google Drive upload via temp file (replacing MediaInMemoryUpload); per-video `supabase_upload_status` and `drive_upload_status` tracking; startup recovery for interrupted batches at server restart; public or long-lived signed URLs for completed videos.
+**Addresses:** TS-5 (output delivery to Supabase + Drive)
+**Avoids:** Pitfall #4 (memory exhaustion on large videos), Pitfall #5 (dual-destination atomicity), Pitfall #12 (signed URL expiry), Pitfall #14 (Drive folder context persistence)
+
+### Phase 4: Frontend — Upload UI + Progress Display + Results
+
+**Rationale:** The backend is fully functional after Phase 3. The frontend can be built and tested against the working API without any backend unknowns remaining. All component patterns exist in the codebase (file upload, polling hooks, ProjectContext, ResizableFeedSidebar). No new libraries needed.
+**Delivers:** `BatchUpscale.tsx` main page with parameter controls and presets; `BatchUploadZone.tsx` multi-file drag-drop with per-file duration validation; `BatchProgress.tsx` per-video status with color-coded badges; `useBatchUpscale.ts` hook with 5-second polling and terminal state detection; navigation entry in `studioConfig.ts`; pause/resume banner UI; per-video preview and download; batch summary progress bar with estimated time remaining; cascade cleanup on batch deletion.
+**Addresses:** TS-1 through TS-7 (all table stakes), D-4 (queue reordering, stretch goal)
+**Avoids:** Pitfall #13 (unclear state visibility), Pitfall #15 (batch cleanup orphaning files and Freepik tasks)
 
 ### Phase Ordering Rationale
 
-- **Phase 0 before everything** because all research files independently flag admin access as a prerequisite, and the PITFALLS research specifically warns against bolting it on later (Pitfall #6)
-- **Phase 1 before Phase 2** because HuggingFace downloads write to the volume (needs volume service) and the admin needs to see downloaded files (needs file browser)
-- **Phase 3 can parallel Phase 2** because Dockerfile editing only needs admin auth (Phase 0), not volume management. This is explicitly noted in the Architecture research dependency graph
-- **Phase 4 last** because search, bulk ops, and deploy status are quality-of-life improvements on top of working infrastructure, not core functionality
+- **Phase 0 is a hard gate.** No code is written until the Freepik API contract is confirmed. This eliminates the only LOW-confidence item and prevents building against wrong assumptions.
+- **Phase 1 before everything else** because the DB schema underpins all state management. The schema must include ALL columns needed by Phases 2 and 3 (heartbeat, per-destination upload status, granular video statuses) to avoid mid-feature migrations.
+- **Phase 2 before Phase 3** because output delivery only has work to do if the batch manager is completing videos and triggering the delivery step.
+- **Phase 4 last** because it is pure frontend with zero backend unknowns at that point, minimizing rework.
+- **No parallel tracks.** Unlike the v1.0 infrastructure milestone, this feature is a single pipeline. A single developer or pair should move through the phases in order.
 
 ### Research Flags
 
 Phases likely needing deeper research during planning:
-- **Phase 1:** RunPod S3 access validation is critical -- need to confirm direct S3 credentials are available for network volumes. If not, architecture falls back to a "file management pod" approach which is significantly more complex. Run a spike/proof-of-concept before detailed planning.
-- **Phase 2:** HuggingFace download architecture has two viable approaches (RunPod job vs backend streaming). Need to prototype both to determine which works within Heroku constraints.
-- **Phase 3:** The existing Dockerfile template inheritance pattern needs documentation before building the editor. The exact structure (base template + per-workflow overrides) is mentioned in project docs but not fully specified.
+- **Phase 0 (API Validation):** Must confirm the Freepik video upscaler API contract before writing any code. Specifically needed: exact endpoint URL, parameter names and types, response body structure, error code for credit exhaustion (HTTP 402? body field?), credit consumption model (per-frame? per-video? capped?), daily quota reset time. Make a live test call — this is mandatory, not optional.
+- **Phase 3 (Streaming Uploads to Supabase):** The existing `storage_service.py` uses standard non-streaming uploads capped at 6 MB. The Supabase Python SDK's support for streaming or multipart upload of 50-200 MB videos needs a code spike before Phase 3 begins. If the SDK does not support it natively, the alternative is writing to a temp file and uploading from disk (Heroku dynos have ~4 GB ephemeral disk space).
 
-Phases with standard patterns (skip deep research):
-- **Phase 0:** Admin access control via Supabase user_metadata is well-documented, standard FastAPI dependency injection pattern. No research needed.
-- **Phase 4:** File search, bulk operations, and status dashboards are standard CRUD patterns with established UI patterns.
+Phases with standard patterns (skip research during planning):
+- **Phase 1 (DB + Service Layer):** Follows proven patterns from `runpod_service.py` and `hf_download_service.py`. Schema design is fully specified in ARCHITECTURE.md. No research needed beyond Phase 0 API validation.
+- **Phase 2 (Batch Manager):** Sequential state machine with DB-backed state is a well-understood pattern. Existing codebase has analogous implementations. No external library research needed.
+- **Phase 4 (Frontend):** All component patterns exist in the codebase. No new libraries needed. Standard React polling hook with cleanup. Direct implementation from ARCHITECTURE.md component spec.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | All recommended libraries are industry standards with large communities. Version numbers need verification (knowledge cutoff May 2025). |
-| Features | HIGH | Feature scope is well-defined with explicit anti-features. Feature dependency map is clear. Based on project documentation and domain analysis. |
-| Architecture | MEDIUM-HIGH | Component decomposition and data flows are well-defined. The one uncertainty is RunPod S3 API availability -- this could force a significant architecture change for the volume service. |
-| Pitfalls | HIGH | 12 pitfalls identified with concrete warning signs and prevention strategies. Many are based on known patterns in the existing codebase (CONCERNS.md referenced). |
+| Stack | HIGH | Zero new dependencies confirmed by reviewing requirements.txt and package.json. All patterns verified against 3 existing service files in codebase. |
+| Features | HIGH | Table stakes well-understood from Freepik product page, PROJECT.md requirements, and competitor analysis (Topaz batch queue community). Differentiators clearly defined with acceptance criteria. |
+| Architecture | HIGH | All component patterns derived from existing, working code. Interfaces follow established service layer conventions exactly. Build order validated with clear dependency chain. |
+| Pitfalls | HIGH | 15 pitfalls identified with codebase-specific evidence (specific file names and line numbers). Prevention strategies are concrete and actionable. |
+| Freepik API Contract | LOW | Video upscaler API not publicly documented. Parameters inferred from web UI and image upscaler API patterns. Must be validated with a live test call before Phase 1. |
 
-**Overall confidence:** MEDIUM-HIGH
-
-The downgrade from HIGH is due to the single critical unknown: whether RunPod provides direct S3 API access to network volumes. This underpins the entire file management track (Phases 1-2).
+**Overall confidence:** MEDIUM (all internal architecture is HIGH; external API contract is the single LOW-confidence blocker that a 30-minute validation call can resolve)
 
 ### Gaps to Address
 
-- **RunPod S3 API access:** Must be validated before Phase 1 planning. If direct S3 is unavailable, the file management architecture needs redesign (pod-based approach). Run a proof-of-concept during Phase 0.
-- **Heroku constraints for large transfers:** Heroku dynos have 512MB memory and 30-second timeouts. HuggingFace downloads and large file uploads need to be designed around these limits. Consider direct-to-S3 presigned URL uploads that bypass Heroku entirely.
-- **Dockerfile template inheritance structure:** The exact base-template-to-workflow-override mechanism needs documentation before Phase 3. This affects how the editor separates read-only (base) from editable (workflow-specific) sections.
-- **GitHub App vs PAT decision:** GitHub Apps provide better security (fine-grained permissions, auto-expiring tokens) but more setup complexity. Decision needed before Phase 3.
-- **Library version verification:** All npm/PyPI versions cited are approximate (knowledge cutoff May 2025). Verify latest stable versions before adding dependencies.
+- **Freepik video upscaler API contract:** Before writing any code, the project owner must make a live test call to confirm endpoint URL, parameter names, response format, error codes, and credit consumption model. Document findings to unblock Phase 1. This is the only gap that blocks implementation.
+- **Freepik credit exhaustion error signature:** The exact HTTP status code and response body for credit exhaustion is unknown. Research suggests HTTP 402 but the actual error must be discovered during Phase 0 validation (ideally by intentionally depleting credits on a low-balance test account, or from internal Freepik documentation the project owner may have access to).
+- **Supabase Storage streaming upload in Python:** The existing upload pattern handles small files. The SDK's support for streaming or multipart upload of 50-200 MB videos needs a code spike at the start of Phase 3 before committing to a full implementation.
+- **Freepik 8-second video duration limit enforcement:** The limit is stated on the product page but not confirmed in API documentation. Determine whether the API enforces it with a validation error or silently accepts longer videos (which affects whether the validation gate must be in the frontend, the backend, or both).
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- Project codebase analysis (CLAUDE.md, new_feature_guide.md, WORKFLOW_SYSTEM.md, TESTING.md) -- existing architecture patterns, established conventions
-- ComfyUI API documentation -- integration patterns already in use
-- Monaco Editor and react-arborist official documentation -- library capabilities and API
+- Codebase analysis: `backend/services/runpod_service.py`, `backend/services/worldlabs_service.py`, `backend/services/hf_download_service.py`, `backend/services/storage_service.py` (lines 28, 98, 116), `backend/services/google_drive_service.py` (line 235), `backend/api/video_jobs.py` (lines 263-344) — existing service patterns, output delivery pattern, memory usage risks
+- [Freepik API Documentation](https://docs.freepik.com/) — confirmed image upscaler endpoints; video upscaler NOT present as of 2026-03-11
+- [Freepik API rate limits](https://docs.freepik.com/ratelimits) — 10 hits/s sustained, 50 hits/s burst; tier-based daily limits (Free: 10/day, Tier 1: 125/day)
+- [Heroku request timeout docs](https://devcenter.heroku.com/articles/request-timeout) — 30-second hard limit (H12 error)
+- [Supabase storage upload limits](https://supabase.com/docs/guides/storage/uploads/file-limits) — 6 MB standard; resumable upload (TUS protocol) required for larger files
+- [FastAPI background tasks](https://fastapi.tiangolo.com/tutorial/background-tasks/) — fire-and-forget pattern, exception handling limitations
 
 ### Secondary (MEDIUM confidence)
-- Community consensus on library choices (npm download counts, GitHub stars, community posts)
-- S3 API patterns for object storage file management
-- GitHub API documentation for Contents API and commit creation
-- HuggingFace Hub library documentation for model downloads
+- [Freepik AI Video Upscaler product page](https://www.freepik.com/ai/video-upscaler) — parameters (resolution, creativity, sharpen, grain, fps_boost, flavor) and 8-second duration limit
+- [Freepik Image Upscaler Creative API](https://docs.freepik.com/api-reference/image-upscaler-creative/post-image-upscaler) — POST to submit + GET to poll pattern (CREATED/IN_PROGRESS/COMPLETED/FAILED statuses); closest documented analog to video upscaler
+- [Supabase resumable uploads blog](https://supabase.com/blog/storage-v3-resumable-uploads) — TUS protocol support for large file uploads
+- [Topaz Video AI batch queue community request](https://community.topazlabs.com/t/much-better-batch-control-of-all-items-in-queue-required/80123) — user demand evidence for better queue control features
+- [LogRocket: UI patterns for async workflows](https://blog.logrocket.com/ui-patterns-for-async-workflows-background-jobs-and-data-pipelines) — progress tracking and partial failure UX patterns
 
 ### Tertiary (LOW confidence)
-- RunPod network volume S3 API availability -- inferred from "S3-backed" description, not confirmed with RunPod documentation
-- Exact library version numbers -- based on knowledge through May 2025, need verification
-- Heroku-specific constraints for large file handling -- general knowledge, specific limits may have changed
+- PROJECT.md specification of `api.freepik.com/v1/ai/video-upscaler` as the endpoint — unverified against live API; requires owner validation before implementation
+- Freepik credit exhaustion HTTP status assumed to be 402 — inferred from REST conventions; actual error signature unknown
 
 ---
-*Research completed: 2026-03-04*
-*Ready for roadmap: yes*
+*Research completed: 2026-03-11*
+*Ready for roadmap: yes, pending Phase 0 API validation*

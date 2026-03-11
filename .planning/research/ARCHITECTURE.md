@@ -1,547 +1,832 @@
-# Architecture Research: Infrastructure Management Tools
+# Architecture Research: Batch Video Upscale with Freepik API
 
-**Research Date:** 2026-03-04
+**Research Date:** 2026-03-11
 **Dimension:** Architecture
-**Question:** How are infrastructure management tools typically structured? What are major components?
-**Milestone Context:** How do file browser, code editor, and GitHub integration features integrate with existing FastAPI + React architecture?
+**Question:** How does a batch video upscale feature with an external API (Freepik) integrate with the existing architecture?
+**Milestone Context:** v1.1 -- Adding batch video upscale to existing AI media processing app with FastAPI + React stack, Supabase DB/Storage, Google Drive integration.
 
 ---
 
 ## 1. Component Inventory
 
-The infrastructure management features decompose into six distinct components. Each is described with its boundaries, responsibilities, and integration surface.
+The batch video upscale feature decomposes into seven components. Each maps to existing architectural patterns or introduces a new pattern only where necessary.
 
-### Component A: Network Volume File Browser
+### Component A: Freepik Video Upscaler Service
 
-**Purpose:** Browse, navigate, and display the file/folder hierarchy of the RunPod S3-backed network volume.
+**Purpose:** Wrap the Freepik Video Upscaler API (`api.freepik.com/v1/ai/video-upscaler`) in a backend service class, handling authentication, submission, polling, and result retrieval.
 
 **Boundaries:**
-- Frontend: React tree/list view component rendering directory contents. Handles navigation, selection, breadcrumb trail.
-- Backend: FastAPI endpoint that proxies file listing requests to RunPod's network volume. RunPod network volumes are S3-backed, so the backend uses either RunPod's volume management API or direct S3 `ListObjectsV2` calls.
-- Does NOT perform file mutations (upload/delete/move are separate components).
+- Backend only. No frontend-to-Freepik communication.
+- Encapsulates all Freepik-specific logic: API key auth, request formatting, task status polling, output URL retrieval.
+- Does NOT manage batch sequencing (that is Component C's job).
+- Handles a single video upscale task: submit, poll, return result.
 
-**Inputs:** Directory path (string), pagination cursor (optional).
-**Outputs:** Array of file/folder entries (name, type, size, modified date, path).
+**Interface:**
+```python
+class FreepikUpscalerService:
+    async def submit_task(
+        self, video_url: str, params: UpscaleParams
+    ) -> Tuple[bool, Optional[str], Optional[str]]:
+        """Submit video to Freepik. Returns (success, task_id, error)."""
+
+    async def check_task_status(
+        self, task_id: str
+    ) -> Tuple[str, Optional[str], Optional[str]]:
+        """Poll task. Returns (status, output_url, error).
+        Statuses: CREATED, IN_PROGRESS, COMPLETED, FAILED."""
+
+    async def check_credits(self) -> Tuple[bool, Optional[int], Optional[str]]:
+        """Check remaining credits. Returns (success, credits_remaining, error)."""
+```
 
 **Integration with existing architecture:**
-- New API router: `backend/api/volume_browser.py` registered in `main.py`
-- New service: `backend/services/volume_service.py` handling S3/RunPod volume API calls
-- New frontend page: `frontend/src/pages/VolumeBrowser.tsx` (admin page)
-- Follows existing pattern: API router delegates to service, service returns `(success, data, error)` tuples
+- New service: `backend/services/freepik_service.py`
+- Follows existing service tuple-return pattern: `(success, data, error)`
+- Uses `httpx.AsyncClient` for API calls (same as `runpod_service.py`)
+- New config in `backend/config/settings.py`: `FREEPIK_API_KEY`
+- Auth: `x-freepik-api-key` header (stored server-side, never exposed to frontend)
+
+**Freepik API Pattern (based on PROJECT.md and image upscaler API pattern):**
+```
+POST api.freepik.com/v1/ai/video-upscaler
+Headers: x-freepik-api-key: <key>
+Body: { video (base64 or URL), resolution, creativity, sharpen, grain, fps_boost, flavor }
+Response: { data: { task_id, status: "CREATED" } }
+
+GET api.freepik.com/v1/ai/video-upscaler/{task_id}
+Response: { data: { task_id, status, generated: [{ url }] } }
+```
+
+**Confidence:** MEDIUM -- The Freepik video upscaler API endpoint path and parameters are specified in PROJECT.md but the API documentation is not publicly indexed. The architecture is designed to match the confirmed Freepik image upscaler API pattern (POST to submit, GET to poll with task_id, statuses CREATED/IN_PROGRESS/COMPLETED/FAILED). The exact video endpoint may differ in parameter naming; this should be validated during implementation.
 
 ---
 
-### Component B: File Operations Service
+### Component B: Batch Job Manager
 
-**Purpose:** Execute mutations on the network volume: upload files from local machine, download files to local machine, move/rename files, delete files.
+**Purpose:** Orchestrate sequential processing of a batch of videos. One video at a time to Freepik, advancing through a queue, detecting credit exhaustion, pausing, and resuming.
 
 **Boundaries:**
-- Frontend: Action buttons/menus in file browser UI. Upload uses drag-and-drop or file picker. Download triggers browser download.
-- Backend: FastAPI endpoints for each operation. Uploads go through backend (multipart form) which streams to S3/volume. Downloads serve presigned S3 URLs or stream through backend.
-- Large file handling: Multipart upload for files > 100MB. Chunked transfer encoding.
+- Backend. Runs as a background loop (FastAPI BackgroundTask or asyncio task).
+- Owns the batch lifecycle: pending -> processing -> completed/failed/paused.
+- Calls Component A (FreepikUpscalerService) for individual video tasks.
+- Calls Component D (Output Delivery) when a video completes.
+- Updates database records (Component E) as videos progress.
+- Does NOT handle HTTP requests directly (Component F does that).
 
-**Inputs:** Source path, destination path (for move), file bytes (for upload), file metadata.
-**Outputs:** Operation result (success/error), updated file entry.
+**Interface:**
+```python
+class BatchJobManager:
+    async def start_batch(self, batch_id: str) -> None:
+        """Begin processing videos in batch sequentially.
+        Runs as background task. Self-manages until batch completes or pauses."""
+
+    async def resume_batch(self, batch_id: str) -> None:
+        """Resume a paused batch (after credits refilled)."""
+
+    async def cancel_batch(self, batch_id: str) -> None:
+        """Cancel remaining unprocessed videos in batch."""
+```
+
+**Key behaviors:**
+1. Pop next pending video from batch queue
+2. Submit to Freepik via Component A
+3. Poll for completion (3-second intervals, matching RunPod pattern)
+4. On COMPLETED: trigger output delivery, mark video as completed, advance to next
+5. On FAILED: mark video as failed, advance to next (don't halt batch for single failures)
+6. On credit exhaustion (HTTP 402 or credit check returns 0): pause entire batch, notify frontend
+7. On resume: re-check credits, continue from where paused
 
 **Integration with existing architecture:**
-- Extends `backend/api/volume_browser.py` or separate `backend/api/volume_ops.py`
-- Uses `httpx.AsyncClient` for S3/RunPod API calls (same pattern as `runpod_service.py`)
-- Upload endpoint follows existing `backend/api/storage.py` multipart pattern
-- Reuses existing auth dependency `get_current_user` plus new admin check
+- New module: `backend/services/batch_manager.py`
+- Background task pattern: matches `hf_download_service.py` in-memory job tracking approach, except backed by Supabase (persistent across restarts since batches can run for hours)
+- Polling pattern: matches the existing ComfyUI and RunPod polling (3s intervals)
 
 ---
 
-### Component C: HuggingFace Direct Download
+### Component C: Database Schema (Batch + Video Tracking)
 
-**Purpose:** Download models directly from HuggingFace to the RunPod network volume, avoiding the local-machine intermediary.
+**Purpose:** Store batch metadata and per-video status in Supabase, enabling progress tracking, pause/resume, and history.
 
-**Boundaries:**
-- Frontend: Input field for HuggingFace URL/model ID, destination path selector (from file browser), download progress indicator.
-- Backend: FastAPI endpoint that receives HF URL + destination path, then orchestrates server-to-server transfer. Backend streams from HuggingFace CDN directly to S3/volume. No data flows through the user's browser.
-- Progress tracking: Backend creates an async job (similar to existing job tracking pattern) and frontend polls for progress.
+**Schema Design:**
 
-**Inputs:** HuggingFace model URL or `org/model` identifier, destination path on volume, optional filename override.
-**Outputs:** Job ID for tracking, completion status with file path.
+```sql
+-- Batch: groups multiple videos for a single upscale run
+CREATE TABLE upscale_batches (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES auth.users(id),
+    status TEXT NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'processing', 'completed', 'failed', 'paused', 'cancelled')),
+
+    -- Upscale parameters (shared across all videos in batch)
+    resolution TEXT,           -- e.g., '1080p', '4k'
+    creativity INTEGER DEFAULT 0,
+    sharpen BOOLEAN DEFAULT false,
+    grain TEXT DEFAULT 'none',
+    fps_boost BOOLEAN DEFAULT false,
+    flavor TEXT DEFAULT 'standard',
+
+    -- Google Drive output
+    project_id TEXT,           -- Google Drive folder ID (from ProjectContext)
+    drive_subfolder TEXT DEFAULT 'AI-Upscaled',
+
+    -- Counts (denormalized for fast reads)
+    total_videos INTEGER NOT NULL DEFAULT 0,
+    completed_videos INTEGER NOT NULL DEFAULT 0,
+    failed_videos INTEGER NOT NULL DEFAULT 0,
+
+    -- Timestamps
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    started_at TIMESTAMPTZ,
+    completed_at TIMESTAMPTZ,
+
+    -- Pause/resume
+    paused_at TIMESTAMPTZ,
+    pause_reason TEXT,         -- e.g., 'credit_exhaustion'
+
+    -- Error
+    error_message TEXT
+);
+
+-- Individual video within a batch
+CREATE TABLE upscale_videos (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    batch_id UUID NOT NULL REFERENCES upscale_batches(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES auth.users(id),
+
+    -- Status
+    status TEXT NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'processing', 'completed', 'failed', 'skipped')),
+    queue_position INTEGER NOT NULL,  -- Order within batch
+
+    -- Input
+    input_filename TEXT NOT NULL,
+    input_storage_url TEXT NOT NULL,  -- Supabase Storage URL of uploaded source video
+    input_file_size BIGINT,          -- bytes
+
+    -- Freepik tracking
+    freepik_task_id TEXT,
+
+    -- Output
+    output_storage_url TEXT,         -- Supabase Storage URL of upscaled video
+    output_drive_file_id TEXT,       -- Google Drive file ID (if uploaded)
+
+    -- Metadata
+    duration_seconds FLOAT,
+    width INTEGER,
+    height INTEGER,
+
+    -- Timestamps
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    started_at TIMESTAMPTZ,
+    completed_at TIMESTAMPTZ,
+
+    -- Error
+    error_message TEXT
+);
+
+-- Indexes for common queries
+CREATE INDEX idx_upscale_batches_user ON upscale_batches(user_id, created_at DESC);
+CREATE INDEX idx_upscale_batches_status ON upscale_batches(status);
+CREATE INDEX idx_upscale_videos_batch ON upscale_videos(batch_id, queue_position);
+CREATE INDEX idx_upscale_videos_status ON upscale_videos(batch_id, status);
+```
+
+**Why separate tables (not extending video_jobs):**
+- `video_jobs` is tightly coupled to ComfyUI/RunPod execution (comfy_job_id, comfy_url, workflow_id FK to workflows table). Batch upscale uses Freepik, not ComfyUI.
+- Batch concept (parent with ordered children) does not exist in the current flat `video_jobs` model.
+- The batch has its own lifecycle (pause/resume) that is architecturally distinct from single-job tracking.
+- Avoids schema pollution of the existing, working job system.
 
 **Integration with existing architecture:**
-- New service: `backend/services/huggingface_service.py` for HF API interaction and streaming download
-- Uses async streaming with `httpx.AsyncClient` for large model downloads (multi-GB)
-- Job tracking: Can reuse existing Supabase job tables (new job type) or simpler in-memory tracking for admin operations
-- New endpoint in volume operations router
+- New migration: `backend/migrations/007_add_upscale_batches.sql`
+- New Pydantic models: `backend/models/upscale.py`
+- New service: `backend/services/upscale_job_service.py` (CRUD operations, follows `VideoJobService` pattern)
+- Supabase client: reuses existing `core/supabase.py` singleton
 
 ---
 
-### Component D: Dockerfile Editor
+### Component D: Output Delivery Pipeline
 
-**Purpose:** In-browser code editor for viewing and modifying Dockerfile content for each workflow's RunPod handler.
+**Purpose:** When Freepik completes an upscaled video, download it and deliver to both Supabase Storage and Google Drive.
 
-**Boundaries:**
-- Frontend: Code editor component with syntax highlighting (using Monaco Editor or CodeMirror). Displays Dockerfile content, allows editing, shows diff preview before save.
-- Backend: FastAPI endpoints to read/write Dockerfile content. Dockerfiles are stored in a GitHub repository, so "read" fetches from GitHub API and "write" commits changes via GitHub API.
-- Does NOT build Docker images. Does NOT deploy to RunPod directly. Push-to-GitHub triggers the existing CI/CD pipeline.
-
-**Inputs:** Workflow name (to identify which Dockerfile), file content (on save).
-**Outputs:** Dockerfile content (on read), commit result (on save/push).
+**Data Flow:**
+```
+Freepik API (completed task)
+  |
+  | GET output URL from task status response
+  v
+Backend downloads video bytes (httpx streaming)
+  |
+  +---> Upload to Supabase Storage (multitalk-videos bucket)
+  |       Returns: public URL for in-app viewing
+  |
+  +---> Upload to Google Drive (if project_id set)
+          Uses existing GoogleDriveService
+          Creates "AI-Upscaled" subfolder in project folder
+          Returns: Drive file ID
+```
 
 **Integration with existing architecture:**
-- Frontend: New page `frontend/src/pages/DockerfileEditor.tsx` with embedded code editor
-- Code editor library: Add Monaco Editor (`@monaco-editor/react`) or CodeMirror to `frontend/package.json`
-- Backend: New service `backend/services/github_service.py` for GitHub API interaction
-- Backend: New router `backend/api/dockerfile.py` for read/write endpoints
-- Template management: Backend reads base template + per-workflow overrides from GitHub
+- Reuses `StorageService.upload_video_from_url()` -- already handles download-from-URL and upload-to-Supabase pattern (see existing `storage_service.py` line 386-467)
+- Reuses `GoogleDriveService.get_or_create_folder()` + `upload_file()` -- already handles folder creation and file upload to shared drive (see existing `google_drive_service.py`)
+- Pattern matches existing `video_jobs.py` complete endpoint (lines 263-344) which already does Supabase upload + Google Drive upload on job completion
+- Key difference: Freepik returns a URL (not ComfyUI view endpoint), so `upload_video_from_url()` is the right method
+
+**No new service needed.** This is orchestration logic inside `BatchJobManager`, calling existing services.
 
 ---
 
-### Component E: GitHub Integration Service
+### Component E: Backend API Layer
 
-**Purpose:** Manage GitHub repository interaction for Dockerfile storage and CI/CD triggering. Read files, create commits, push changes.
+**Purpose:** HTTP endpoints for the frontend to create batches, upload source videos, check status, pause/resume, and cancel.
 
-**Boundaries:**
-- Backend only (no direct frontend-to-GitHub communication).
-- Uses GitHub REST API v3 (or GraphQL v4) via `httpx.AsyncClient`.
-- Handles: file read (`GET /repos/.../contents/...`), file update/create (`PUT /repos/.../contents/...`), commit creation.
-- Stores GitHub Personal Access Token (PAT) or GitHub App credentials securely in environment variables.
-- Push triggers existing GitHub Actions / RunPod webhook pipeline (no new CI/CD setup needed).
+**Endpoints:**
 
-**Inputs:** Repository path, file path, file content, commit message.
-**Outputs:** Commit SHA, file content, push result.
+| Method | Path | Purpose |
+|--------|------|---------|
+| POST | `/api/upscale/batches` | Create batch with parameters, receive batch_id |
+| POST | `/api/upscale/batches/{batch_id}/videos` | Upload source video to batch (multipart) |
+| POST | `/api/upscale/batches/{batch_id}/start` | Start processing the batch |
+| GET | `/api/upscale/batches/{batch_id}` | Get batch status with all video statuses |
+| GET | `/api/upscale/batches` | List user's batches (paginated) |
+| POST | `/api/upscale/batches/{batch_id}/resume` | Resume paused batch |
+| POST | `/api/upscale/batches/{batch_id}/cancel` | Cancel remaining videos |
+| DELETE | `/api/upscale/batches/{batch_id}/videos/{video_id}` | Remove video from pending batch |
 
 **Integration with existing architecture:**
-- New config: `GITHUB_TOKEN`, `GITHUB_REPO_OWNER`, `GITHUB_REPO_NAME` in `backend/config/settings.py`
-- New service: `backend/services/github_service.py`
-- Used by: Dockerfile Editor (Component D) backend endpoints
-- Security: Token stored as env var (same pattern as `RUNPOD_API_KEY`, `OPENROUTER_API_KEY`)
-- Never exposed to frontend; all GitHub operations go through backend API
+- New router: `backend/api/upscale.py`
+- Registered in `main.py`: `app.include_router(upscale.router, prefix="/api")`
+- Auth: uses existing `get_current_user()` dependency (all authenticated users, not admin-only)
+- File upload: multipart form handling (same pattern as `storage.py`)
+- Source videos uploaded to Supabase Storage first (frontend -> backend -> Supabase), then Freepik processes from URL
+
+**Video upload flow (source videos):**
+```
+Frontend (multi-file picker)
+  |
+  | POST /api/upscale/batches/{batch_id}/videos
+  | Content-Type: multipart/form-data
+  | Body: video file
+  v
+Backend (upscale.py router)
+  |
+  | Auth check (get_current_user)
+  | Validate file type/size
+  v
+Backend uploads to Supabase Storage
+  | bucket: multitalk-videos, path: upscale-inputs/{batch_id}/{filename}
+  |
+  | Creates upscale_videos record with input_storage_url
+  v
+Returns: video_id, queue_position
+```
 
 ---
 
-### Component F: Admin Access Control
+### Component F: Frontend Page + State Management
 
-**Purpose:** Restrict infrastructure management features to admin users only.
+**Purpose:** Feature page for batch video upscale with file upload, parameter controls, batch progress display, and results.
 
-**Boundaries:**
-- Backend: New FastAPI dependency `get_admin_user()` that extends existing `get_current_user()` with admin role check.
-- Frontend: Conditional rendering of admin navigation items. Admin status checked via user metadata from AuthContext.
-- Admin determination: Supabase user_metadata field `is_admin: true` or email-domain-based (e.g., specific emails).
+**Component structure:**
+```
+frontend/src/pages/BatchUpscale.tsx        -- Main page component
+frontend/src/components/BatchUploadZone.tsx -- Multi-file upload with drag-drop
+frontend/src/components/BatchProgress.tsx   -- Batch status + per-video progress
+frontend/src/hooks/useBatchUpscale.ts       -- State management + polling hook
+```
 
-**Inputs:** JWT token (existing), user metadata.
-**Outputs:** Authorized admin user or 403 Forbidden.
+**State management approach:**
+
+```typescript
+interface BatchState {
+  // Batch metadata
+  batchId: string | null;
+  batchStatus: 'idle' | 'uploading' | 'pending' | 'processing' | 'completed' | 'paused' | 'failed';
+
+  // Videos in batch
+  videos: UpscaleVideo[];  // { id, filename, status, progress, outputUrl, error }
+
+  // Upscale parameters
+  params: {
+    resolution: string;
+    creativity: number;
+    sharpen: boolean;
+    grain: string;
+    fps_boost: boolean;
+    flavor: string;
+  };
+
+  // Progress summary
+  totalVideos: number;
+  completedVideos: number;
+  failedVideos: number;
+
+  // Pause state
+  isPaused: boolean;
+  pauseReason: string | null;
+}
+```
+
+**Polling strategy:**
+- When batch is `processing`: poll `GET /api/upscale/batches/{batch_id}` every 5 seconds
+- Response includes all video statuses, so a single poll updates the entire UI
+- Stop polling when batch reaches terminal state (completed, failed, cancelled)
+- Use `useEffect` cleanup to stop polling on unmount
 
 **Integration with existing architecture:**
-- Extends `backend/core/auth.py` with new `get_admin_user` dependency
-- Admin check queries Supabase `auth.users` metadata or a dedicated `admin_users` table
-- Frontend: AuthContext already provides user object; add `isAdmin` derived property
-- Navigation: `studioConfig.ts` gets new admin studio entry (conditionally rendered)
+- New studio entry in `studioConfig.ts` under Video Studio (alongside existing Video Upscale)
+- Or: replace existing `upscale-vid` app with enhanced batch version
+- Uses existing `ProjectContext` for Google Drive folder selection (already in header via `ProjectSelector`)
+- Uses existing `apiClient` for all backend calls (add new methods)
+- Page layout follows existing pattern: main content + ResizableFeedSidebar (though feed shows batch history, not ComfyUI jobs)
+- Navigation: added to Video Studio group in sidebar
+
+---
+
+### Component G: Credit Monitoring + Pause/Resume
+
+**Purpose:** Detect Freepik credit exhaustion and manage the pause-notify-resume cycle.
+
+**Detection strategy:**
+- Primary: HTTP 402 or 429 response from Freepik API on task submission = out of credits
+- Secondary: Explicit credit check endpoint (if Freepik provides one)
+- Tertiary: Rate limit tracking in-memory (count submissions, compare to known limits)
+
+**Pause flow:**
+```
+BatchJobManager detects credit exhaustion
+  |
+  | 1. Update batch status to 'paused' in DB
+  | 2. Set pause_reason = 'credit_exhaustion'
+  | 3. Set paused_at timestamp
+  v
+Frontend (polling) detects batch.status === 'paused'
+  |
+  | Show banner: "Credits exhausted. Add credits and click Resume."
+  | Show Resume button
+  v
+User clicks Resume
+  |
+  | POST /api/upscale/batches/{batch_id}/resume
+  v
+BatchJobManager.resume_batch()
+  |
+  | 1. Check credits (optional validation)
+  | 2. Update batch status to 'processing'
+  | 3. Restart background loop from next pending video
+  v
+Processing continues
+```
+
+**Integration with existing architecture:**
+- No new components needed. This is behavior within `BatchJobManager` + frontend polling.
+- Pause/resume is a state transition in the database, handled by existing CRUD patterns.
 
 ---
 
 ## 2. Data Flow
 
-### File Browser Flow
+### Complete Batch Upscale Flow (End-to-End)
 
 ```
 User (Browser)
   |
-  | GET /api/volume/browse?path=/models
+  | 1. Select videos (multi-file picker)
+  | 2. Set upscale parameters (resolution, creativity, etc.)
+  | 3. Confirm Google Drive project (ProjectContext in header)
+  | 4. Click "Start Batch"
   v
-Frontend (VolumeBrowser.tsx)
+Frontend (BatchUpscale.tsx)
   |
-  | HTTP GET via apiClient.ts
+  | POST /api/upscale/batches  (create batch with params)
+  | POST /api/upscale/batches/{id}/videos x N  (upload each video)
+  | POST /api/upscale/batches/{id}/start  (begin processing)
   v
-Backend (volume_browser.py router)
+Backend API (upscale.py)
   |
-  | Admin auth check (get_admin_user dependency)
+  | Creates batch + video records in Supabase
+  | Uploads source videos to Supabase Storage
+  | Spawns BatchJobManager.start_batch() as background task
   v
-Backend (volume_service.py)
+BatchJobManager (batch_manager.py)  [background loop]
   |
-  | S3 ListObjectsV2 or RunPod Volume API
-  v
-RunPod Network Volume (S3-backed)
+  | FOR EACH pending video (sequential):
+  |   |
+  |   | 1. Download source from Supabase Storage URL
+  |   | 2. Submit to Freepik API
+  |   |      POST api.freepik.com/v1/ai/video-upscaler
+  |   |      Body: { video, resolution, creativity, ... }
+  |   |      Response: { task_id }
+  |   |
+  |   | 3. Poll Freepik every 3s
+  |   |      GET api.freepik.com/v1/ai/video-upscaler/{task_id}
+  |   |      Until: COMPLETED or FAILED
+  |   |
+  |   | 4. On COMPLETED:
+  |   |      Download output from Freepik URL
+  |   |      Upload to Supabase Storage (StorageService.upload_video_from_url)
+  |   |      Upload to Google Drive (GoogleDriveService.upload_file) -- if project_id set
+  |   |      Update upscale_videos record (output URLs, status=completed)
+  |   |      Increment batch.completed_videos
+  |   |
+  |   | 5. On FAILED:
+  |   |      Update upscale_videos record (error, status=failed)
+  |   |      Increment batch.failed_videos
+  |   |      Continue to next video (don't halt batch)
+  |   |
+  |   | 6. On CREDIT EXHAUSTION (402/429):
+  |   |      Update batch status=paused, pause_reason=credit_exhaustion
+  |   |      EXIT loop (wait for resume)
   |
-  | Returns: file list (key, size, last_modified)
+  | After all videos: Update batch status=completed (or failed if all failed)
   v
-Backend transforms to FileEntry[] response
+Frontend (polling every 5s)
   |
+  | GET /api/upscale/batches/{id}
+  | Updates BatchProgress component with per-video statuses
+  | Shows completed video thumbnails/previews
+  | Handles pause state (resume button)
   v
-Frontend renders tree/list view
+User sees results in-app (Supabase URLs)
+User finds organized files in Google Drive (AI-Upscaled folder)
 ```
 
-**Direction:** Frontend --> Backend --> RunPod/S3. Unidirectional request-response.
-
-### File Upload Flow
+### Source Video Upload Flow
 
 ```
-User selects file(s)
-  |
-  | POST /api/volume/upload (multipart/form-data)
-  | body: file bytes + destination_path
-  v
-Backend (volume_ops.py router)
-  |
-  | Admin auth check
-  | Stream chunks (avoid loading entire file in memory)
-  v
-Backend (volume_service.py)
-  |
-  | S3 PutObject / Multipart Upload
-  v
-RunPod Network Volume
-  |
-  | Returns: success + file metadata
-  v
-Backend returns FileEntry response
+User drags videos into upload zone
   |
   v
-Frontend updates file browser view
+Frontend (BatchUploadZone.tsx)
+  |
+  | For each file (sequential or parallel with limit):
+  |   POST /api/upscale/batches/{batch_id}/videos
+  |   Content-Type: multipart/form-data
+  |   Body: video file bytes
+  v
+Backend (upscale.py)
+  |
+  | Validate: file type (mp4, mov, webm, avi, mkv), size limit
+  | Upload to Supabase Storage: multitalk-videos/upscale-inputs/{batch_id}/{filename}
+  v
+Supabase Storage
+  |
+  | Returns: public URL
+  v
+Backend creates upscale_videos record
+  | { batch_id, input_filename, input_storage_url, queue_position, status: 'pending' }
+  v
+Frontend adds video to local state list
 ```
 
-**Direction:** Frontend --> Backend --> S3. Streaming upload.
-
-### HuggingFace Download Flow
+### Output Delivery Flow (per video)
 
 ```
-User pastes HF URL + selects destination
+Freepik COMPLETED status
   |
-  | POST /api/volume/hf-download
-  | body: { hf_url, destination_path }
+  | task status response contains output URL
   v
-Backend (volume_ops.py router)
+BatchJobManager
   |
-  | Admin auth check
-  | Creates download job record
-  v
-Backend (huggingface_service.py) [async background task]
+  +---> StorageService.upload_video_from_url(freepik_output_url)
+  |       |
+  |       | Downloads video bytes from Freepik
+  |       | Uploads to Supabase: multitalk-videos/upscale-outputs/{date}/{batch_id}_{filename}
+  |       | Returns: Supabase public URL
+  |       v
+  |     Update upscale_videos.output_storage_url
   |
-  | 1. Resolve HF model files (HF API)
-  | 2. Stream download from HF CDN
-  | 3. Stream upload to S3/volume
-  v
-HuggingFace CDN  -->  RunPod Network Volume (S3)
-                      (server-to-server, no browser involvement)
-  |
-  | Progress updates stored in job record
-  v
-Frontend polls GET /api/volume/hf-download/{job_id}/status
-  |
-  v
-UI shows progress bar
-```
-
-**Direction:** Backend orchestrates HF --> S3 transfer. Frontend only sends command and polls status.
-
-### Dockerfile Edit and Deploy Flow
-
-```
-User opens Dockerfile Editor
-  |
-  | GET /api/dockerfile/{workflow_name}
-  v
-Backend (dockerfile.py router)
-  |
-  | Admin auth check
-  v
-Backend (github_service.py)
-  |
-  | GitHub API: GET /repos/{owner}/{repo}/contents/{path}
-  v
-GitHub Repository
-  |
-  | Returns: file content (base64 encoded), SHA
-  v
-Backend decodes, returns content string
-  |
-  v
-Frontend renders in Monaco/CodeMirror editor
-
-... User edits ...
-
-User clicks "Save & Deploy"
-  |
-  | PUT /api/dockerfile/{workflow_name}
-  | body: { content, commit_message }
-  v
-Backend (dockerfile.py router)
-  |
-  | Admin auth check
-  v
-Backend (github_service.py)
-  |
-  | GitHub API: PUT /repos/{owner}/{repo}/contents/{path}
-  | (includes file SHA for conflict detection)
-  v
-GitHub Repository
-  |
-  | Commit created, push triggers CI/CD
-  v
-GitHub Actions / RunPod webhook
-  |
-  | Automatic Docker build + deploy
-  v
-RunPod Serverless Endpoint updated
-
-Backend returns { success, commit_sha }
-  |
-  v
-Frontend shows "Deployed successfully" with commit link
-```
-
-**Direction:** Frontend <--> Backend <--> GitHub --> RunPod (async CI/CD).
-
-### State Management Flow (Frontend)
-
-```
-AuthContext (existing)
-  |
-  | Provides: user, token, isAdmin (new property)
-  v
-App.tsx
-  |
-  | Conditional admin navigation in sidebar
-  | (only if user.isAdmin === true)
-  v
-Admin Pages (VolumeBrowser, DockerfileEditor)
-  |
-  | Use apiClient for all backend calls
-  | Admin endpoints return 403 for non-admin users
-  v
-Volume state managed locally in page components
-(no new React Context needed - admin pages are independent)
+  +---> GoogleDriveService (if batch.project_id is set)
+          |
+          | get_or_create_folder(project_id, "AI-Upscaled")
+          | upload_file(video_bytes, filename, folder_id)
+          | Returns: Drive file ID
+          v
+        Update upscale_videos.output_drive_file_id
 ```
 
 ---
 
 ## 3. Integration Surface with Existing Architecture
 
-### Backend Integration Points
+### Backend: What Already Exists and Gets Reused
 
-| Existing Layer | New Addition | Integration Method |
+| Existing Component | How It's Reused | Modification Needed |
 |---|---|---|
-| `main.py` (router registration) | `volume_browser.py`, `volume_ops.py`, `dockerfile.py` routers | `app.include_router(router, prefix="/api")` |
-| `config/settings.py` | New env vars: `GITHUB_TOKEN`, `GITHUB_REPO_*`, `RUNPOD_VOLUME_*`, S3 credentials | Add properties to `Settings` class |
-| `core/auth.py` | `get_admin_user()` dependency | New function using existing `get_current_user()` + admin check |
-| `services/` directory | `volume_service.py`, `github_service.py`, `huggingface_service.py` | New service classes following existing `(success, data, error)` tuple pattern |
-| `models/` directory | `volume.py` (FileEntry, UploadRequest, etc.) | New Pydantic models following existing naming patterns |
+| `core/supabase.py` | DB client for batch/video records | None |
+| `config/settings.py` | New `FREEPIK_API_KEY` config | Add one field |
+| `services/storage_service.py` | `upload_video_from_url()` for output delivery | None |
+| `services/google_drive_service.py` | `get_or_create_folder()` + `upload_file()` for Drive output | None |
+| `core/auth.py` | `get_current_user()` for endpoint protection | None |
+| `main.py` | Router registration | Add one `include_router` line |
 
-### Frontend Integration Points
+### Backend: What's New
 
-| Existing Layer | New Addition | Integration Method |
+| New Component | File | Purpose |
 |---|---|---|
-| `lib/studioConfig.ts` | Admin studio config entry | New studio with conditional visibility based on `isAdmin` |
-| `lib/apiClient.ts` | Volume/Dockerfile/GitHub API methods | Add methods to existing `ApiClient` class |
-| `contexts/AuthContext.tsx` | `isAdmin` property on user state | Derive from user metadata in existing auth state |
-| `App.tsx` | Admin page routing | Add to `validPages` type and conditional rendering |
-| `package.json` | Monaco Editor dependency | `npm install @monaco-editor/react` |
+| Freepik service | `backend/services/freepik_service.py` | Freepik API wrapper (submit, poll, credit check) |
+| Batch manager | `backend/services/batch_manager.py` | Sequential processing loop, pause/resume logic |
+| Upscale job service | `backend/services/upscale_job_service.py` | CRUD for batch + video records in Supabase |
+| API router | `backend/api/upscale.py` | HTTP endpoints for frontend |
+| Pydantic models | `backend/models/upscale.py` | Request/response models |
+| DB migration | `backend/migrations/007_add_upscale_batches.sql` | Tables + indexes |
 
-### External Service Integration Points
+### Frontend: What Already Exists and Gets Reused
 
-| Service | Access Method | Credentials |
+| Existing Component | How It's Reused | Modification Needed |
 |---|---|---|
-| RunPod Network Volume (S3) | `boto3` or `httpx` with S3-compatible API | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_ENDPOINT_URL` for RunPod S3 |
-| GitHub API | `httpx.AsyncClient` to `api.github.com` | `GITHUB_TOKEN` (PAT or App token) |
-| HuggingFace Hub | `httpx.AsyncClient` to `huggingface.co` | `HF_TOKEN` (optional, for gated models) |
+| `contexts/ProjectContext.tsx` | Google Drive folder selection | None |
+| `lib/apiClient.ts` | HTTP client with auth | Add new methods |
+| `lib/studioConfig.ts` | Navigation config | Add app entry or modify existing |
+| `components/ResizableFeedSidebar.tsx` | Sidebar for batch history | None (configure with new context) |
+| `contexts/AuthContext.tsx` | User identity for batch ownership | None |
+
+### Frontend: What's New
+
+| New Component | File | Purpose |
+|---|---|---|
+| Batch upscale page | `frontend/src/pages/BatchUpscale.tsx` | Main feature page |
+| Upload zone | `frontend/src/components/BatchUploadZone.tsx` | Multi-file drag-drop upload |
+| Batch progress | `frontend/src/components/BatchProgress.tsx` | Per-video status display |
+| Batch hook | `frontend/src/hooks/useBatchUpscale.ts` | State management + polling |
+
+### External Service: Freepik API
+
+| Concern | Detail |
+|---|---|
+| Auth | `x-freepik-api-key` header, single global key (like RunPod pattern) |
+| Rate limits | Free=10/day, Tier 1=125/day (from PROJECT.md) |
+| Async pattern | POST to submit, GET to poll with task_id |
+| Statuses | CREATED -> IN_PROGRESS -> COMPLETED/FAILED |
+| Credit pricing | Frame-based (longer/higher-res videos cost more) |
+| Video limits | Up to 8 seconds per video (Freepik constraint) |
 
 ---
 
-## 4. Suggested Build Order
+## 4. Patterns to Follow
 
-The components have clear dependencies that dictate build order. Each phase below can be completed and tested independently before starting the next.
+### Pattern 1: Service Tuple Returns
 
-### Phase 1: Foundation (Admin Access + Volume Service)
+All existing services return `Tuple[bool, Optional[T], Optional[str]]` for `(success, data, error)`. The new Freepik and upscale services must follow this.
 
-**Build:** Component F (Admin Access Control) + Component A (File Browser) core backend
+```python
+# Good - matches existing pattern
+async def submit_task(self, ...) -> Tuple[bool, Optional[str], Optional[str]]:
+    try:
+        ...
+        return True, task_id, None
+    except Exception as e:
+        return False, None, str(e)
+```
 
-**Rationale:** Admin access control is a prerequisite for all other components. The volume service establishes the S3/RunPod connection that file operations, HuggingFace downloads, and model assignment all depend on.
+### Pattern 2: Background Task with DB-Backed State
 
-**Dependencies:** None (uses existing auth system as base).
+The HF download service uses in-memory job tracking (acceptable for single-admin). Batch upscale needs DB-backed state because:
+- Batches can run for hours (10+ videos at ~3-5 min each)
+- Must survive server restarts
+- Multiple users can have concurrent batches
+- Pause/resume requires persistent state
 
-**Deliverables:**
-1. `get_admin_user()` backend dependency
-2. `isAdmin` frontend property in AuthContext
-3. `volume_service.py` with S3 list/browse operations
-4. `volume_browser.py` API router with browse endpoint
-5. Basic `VolumeBrowser.tsx` page with directory listing
-6. Admin navigation entry in `studioConfig.ts`
+```python
+# Pattern: Background task that updates DB
+async def start_batch(self, batch_id: str):
+    """Spawned via BackgroundTasks. Self-manages via DB state."""
+    while True:
+        video = await self._get_next_pending_video(batch_id)
+        if not video:
+            break
 
-**Testing checkpoint:** Admin user can browse network volume directory tree. Non-admin users get 403.
+        await self._process_single_video(batch_id, video)
+
+        # Check if batch was cancelled/paused externally
+        batch = await self._get_batch(batch_id)
+        if batch.status in ('cancelled', 'paused'):
+            break
+```
+
+### Pattern 3: Polling from Frontend
+
+Existing RunPod jobs poll every 3 seconds. Batch upscale should poll less aggressively since individual videos take minutes, not seconds.
+
+```typescript
+// 5-second polling interval for batch status
+useEffect(() => {
+    if (!batchId || terminalStates.includes(batchStatus)) return;
+
+    const interval = setInterval(async () => {
+        const response = await apiClient.getBatchStatus(batchId);
+        updateBatchState(response);
+    }, 5000);
+
+    return () => clearInterval(interval);
+}, [batchId, batchStatus]);
+```
+
+### Pattern 4: Non-Blocking Output Delivery
+
+The existing `video_jobs.py` complete endpoint (lines 305-344) treats Google Drive upload as non-blocking. Batch upscale follows the same pattern:
+
+```python
+# Google Drive upload is best-effort, does not fail the video
+try:
+    await drive_service.upload_file(...)
+except Exception as e:
+    print(f"[UPSCALE] Drive upload failed (non-blocking): {e}")
+    # Video is still marked completed with Supabase URL
+```
 
 ---
 
-### Phase 2: File Operations
+## 5. Anti-Patterns to Avoid
 
-**Build:** Component B (File Operations Service)
+### Anti-Pattern 1: Extending video_jobs Table
 
-**Rationale:** Once browsing works, add mutations: upload, download, move, rename, delete. These are self-contained operations on the same S3 backend.
+**What:** Adding batch columns to the existing `video_jobs` table.
+**Why bad:** `video_jobs` has FK to `workflows` table (ComfyUI-specific), requires `comfy_url` (non-nullable), and has no concept of parent-child batch relationships. Forcing batch upscale into this model creates nullable-everything and confusing data.
+**Instead:** Separate `upscale_batches` + `upscale_videos` tables with clean schema.
 
-**Dependencies:** Phase 1 (volume service + admin auth + file browser UI).
+### Anti-Pattern 2: Frontend-Driven Sequential Processing
 
-**Deliverables:**
-1. Upload endpoint with multipart streaming
-2. Download endpoint (presigned URL or stream)
-3. Move/rename endpoint
-4. Delete endpoint (with confirmation)
-5. UI actions in file browser (context menu, drag-and-drop upload)
+**What:** Frontend submits one video at a time, waits for completion, then submits next.
+**Why bad:** Requires browser to stay open for hours. Page navigation, tab closure, or sleep kills the batch. No pause/resume possible.
+**Instead:** Backend-driven background loop. Frontend only observes via polling.
 
-**Testing checkpoint:** Admin can upload a file, see it in the browser, rename it, move it to a different directory, download it, and delete it.
+### Anti-Pattern 3: Parallel Freepik Submissions
 
----
+**What:** Submitting all videos to Freepik simultaneously.
+**Why bad:** Burns through daily credit quota instantly. No ability to pause. Freepik rate limits cause failures.
+**Instead:** Sequential processing with credit awareness between each submission.
 
-### Phase 3: HuggingFace Integration
+### Anti-Pattern 4: Storing Freepik Output URLs as Permanent References
 
-**Build:** Component C (HuggingFace Direct Download)
-
-**Rationale:** Builds on the volume service (Phase 1) and file operations (Phase 2). Adds server-to-server streaming and async job tracking.
-
-**Dependencies:** Phase 1 (volume service for S3 write), Phase 2 (file browser for destination selection and verification).
-
-**Deliverables:**
-1. `huggingface_service.py` with model resolution and streaming download
-2. HF download endpoint with async background task
-3. Progress tracking (job-based or in-memory)
-4. UI: HF URL input, destination selector, progress bar
-5. Model assignment metadata (which workflows use which models)
-
-**Testing checkpoint:** Admin pastes a HuggingFace model URL, selects destination folder, initiates download, sees progress, and finds the file in the volume browser after completion.
+**What:** Saving the Freepik-provided output URL as the permanent result.
+**Why bad:** Freepik URLs are temporary (likely 24-48 hour expiry like similar services). Link rot.
+**Instead:** Always download and re-upload to Supabase Storage for permanent access.
 
 ---
 
-### Phase 4: GitHub Integration + Dockerfile Editor
+## 6. Suggested Build Order
 
-**Build:** Component E (GitHub Integration) + Component D (Dockerfile Editor)
+Components have clear dependencies that dictate build order. Each phase can be completed and tested independently.
 
-**Rationale:** These two components are tightly coupled (editor reads/writes via GitHub service). They are independent of the volume management components (Phases 1-3), so they could theoretically be built in parallel with Phase 2-3, but sequential ordering is simpler for a single developer.
+### Phase 1: Foundation (DB + Freepik Service + Basic API)
 
-**Dependencies:** Phase 1 (admin auth only). Does NOT depend on Phases 2-3.
+**Build:** Component C (Database Schema) + Component A (Freepik Service) + minimal Component E (API)
+
+**Rationale:** The database schema and Freepik API wrapper are zero-dependency foundations. A minimal API endpoint allows testing Freepik integration end-to-end with a single video before building batch logic.
 
 **Deliverables:**
-1. `github_service.py` with read/write/commit operations
-2. `dockerfile.py` API router for Dockerfile CRUD
-3. Base template + per-workflow override reading
-4. `DockerfileEditor.tsx` page with Monaco Editor
-5. Save & commit with auto-push to trigger CI/CD
-6. Diff preview before committing
-7. Commit history viewer (last N commits for the Dockerfile)
+1. Migration `007_add_upscale_batches.sql` applied
+2. `backend/models/upscale.py` with Pydantic models
+3. `backend/services/freepik_service.py` (submit + poll + credit check)
+4. `backend/services/upscale_job_service.py` (CRUD for batches/videos)
+5. `backend/api/upscale.py` with create batch + upload video + start endpoints
+6. `FREEPIK_API_KEY` in `config/settings.py`
 
-**Testing checkpoint:** Admin opens a workflow's Dockerfile, edits it, previews the diff, commits with a message, and sees the commit appear in GitHub. RunPod rebuild triggers automatically.
+**Testing checkpoint:** Backend can create a batch, upload a video, submit to Freepik, poll for completion, and store the result URL in the database.
+
+---
+
+### Phase 2: Batch Processing (Sequential Queue + Pause/Resume)
+
+**Build:** Component B (Batch Job Manager) + Component G (Credit Monitoring)
+
+**Rationale:** Once single-video processing works, add the sequential queue loop, credit detection, and pause/resume. This is the core differentiator from a simple "upscale one video" feature.
+
+**Dependencies:** Phase 1 (Freepik service + DB + API)
+
+**Deliverables:**
+1. `backend/services/batch_manager.py` with start/resume/cancel
+2. Credit exhaustion detection (402/429 handling)
+3. Pause state management in DB
+4. Resume endpoint in API
+5. Cancel endpoint in API
+
+**Testing checkpoint:** Backend processes 3+ videos sequentially, handles one failing without stopping, pauses on simulated credit exhaustion, and resumes successfully.
+
+---
+
+### Phase 3: Output Delivery (Supabase + Google Drive)
+
+**Build:** Component D (Output Delivery Pipeline)
+
+**Rationale:** Once batch processing works, add the output delivery step. This reuses existing services (`StorageService`, `GoogleDriveService`) and follows the proven pattern from `video_jobs.py`.
+
+**Dependencies:** Phase 2 (batch processing must complete videos) + Phase 1
+
+**Deliverables:**
+1. Output download from Freepik + upload to Supabase Storage
+2. Google Drive upload to AI-Upscaled subfolder (when project_id set)
+3. DB updates with output URLs and Drive file IDs
+
+**Testing checkpoint:** Completed upscaled video appears in Supabase Storage with valid public URL. If project is selected, video also appears in Google Drive under AI-Upscaled folder.
+
+---
+
+### Phase 4: Frontend (Upload + Progress + Results)
+
+**Build:** Component F (Frontend Page + State Management)
+
+**Rationale:** Backend is fully functional at this point. Frontend can be built and tested against the working API.
+
+**Dependencies:** Phase 3 (complete backend flow)
+
+**Deliverables:**
+1. `BatchUpscale.tsx` page with parameter controls
+2. `BatchUploadZone.tsx` for multi-file upload
+3. `BatchProgress.tsx` for per-video status display
+4. `useBatchUpscale.ts` hook for state + polling
+5. Navigation entry in `studioConfig.ts`
+6. ApiClient methods for all upscale endpoints
+7. Pause/resume UI (banner + button)
+8. Completed results with preview and download
+
+**Testing checkpoint:** User can upload multiple videos, configure parameters, start batch, watch progress update in real-time, see pause notification, resume, and view/download completed results.
 
 ---
 
 ### Dependency Graph
 
 ```
-Phase 1: Admin Access + Volume Browse
+Phase 1: DB Schema + Freepik Service + Basic API
     |
-    +---> Phase 2: File Operations
-    |         |
-    |         +---> Phase 3: HuggingFace Download
-    |
-    +---> Phase 4: GitHub + Dockerfile Editor
-              (independent of Phases 2-3)
+    +---> Phase 2: Batch Processing + Credit Management
+              |
+              +---> Phase 3: Output Delivery (Supabase + Drive)
+                        |
+                        +---> Phase 4: Frontend Page + UX
 ```
 
-**Critical path:** Phase 1 --> Phase 2 --> Phase 3 (volume management track)
-**Parallel track:** Phase 1 --> Phase 4 (Dockerfile track, can run alongside Phase 2-3)
+**Critical path:** Entirely linear. Each phase depends on the previous one.
+**No parallel tracks** -- unlike the infrastructure milestone, this feature is a single pipeline.
 
 ---
 
-## 5. Technical Decisions and Patterns
+## 7. Scalability Considerations
 
-### S3 Access Strategy
-
-RunPod network volumes are S3-compatible. Two approaches:
-
-**Option A: Direct S3 Access (Recommended)**
-- Use `boto3` or `aiobotocore` with RunPod's S3 endpoint
-- Full control over operations (list, put, get, delete, multipart upload)
-- Better performance for large file transfers
-- Requires S3 credentials (access key, secret key, endpoint URL)
-
-**Option B: RunPod Pod-Based Access**
-- Spin up a temporary pod with volume mounted
-- Execute file operations via SSH/exec
-- More complex, slower, costly (pod compute charges)
-- Only needed if S3 API is not available
-
-Decision should be validated: confirm RunPod provides direct S3 credentials for network volumes.
-
-### Code Editor Library
-
-**Monaco Editor (Recommended)**
-- Same editor as VS Code, rich feature set
-- Dockerfile syntax highlighting built-in
-- `@monaco-editor/react` package (well maintained, 1.5M+ weekly downloads)
-- Adds ~2MB to bundle (acceptable for admin-only page, can be lazy-loaded)
-
-**Alternative: CodeMirror 6**
-- Lighter weight (~500KB)
-- Good Dockerfile support via language package
-- More modular, but more setup required
-
-### Background Task Pattern for HF Downloads
-
-Large model downloads (multi-GB) cannot be synchronous HTTP requests. Options:
-
-**Option A: FastAPI BackgroundTasks (Simple, Recommended for MVP)**
-- Use `BackgroundTasks` from FastAPI
-- Store progress in in-memory dict (admin is single-user, no persistence needed)
-- Frontend polls a status endpoint
-- Limitation: Progress lost on server restart
-
-**Option B: Celery/Redis Task Queue (Production-grade)**
-- More robust, survives restarts
-- Overkill for single-admin use case
-- Adds infrastructure dependencies (Redis)
-
-**Recommendation:** Start with Option A. Migrate to Option B only if multiple admins or reliability becomes critical.
-
-### Admin Role Storage
-
-**Option A: Supabase user_metadata (Recommended)**
-- Store `{ "is_admin": true }` in existing `auth.users.raw_user_meta_data`
-- No new tables needed
-- Set via Supabase dashboard or migration
-- AuthContext already reads user metadata
-
-**Option B: Dedicated admin_users table**
-- Separate table with user IDs
-- More flexible (roles, permissions)
-- Overkill for current binary admin/non-admin requirement
+| Concern | Current Scale (1-5 users) | At 50 users | Mitigation |
+|---|---|---|---|
+| Concurrent batches | 1-2 active | 10-20 active | Background tasks are lightweight (just polling). Freepik rate limits are the bottleneck, not server resources |
+| Freepik credits | 10-125/day shared | Insufficient | Per-user API keys or Freepik enterprise plan needed. Current architecture supports single shared key |
+| Supabase Storage | ~500MB/day | ~5GB/day | Supabase Pro plan handles this. Add cleanup job for old input files |
+| Google Drive | Minimal | 15GB/day | Service account quota may need increase |
+| DB connections | 1-2 concurrent | 10-20 concurrent | Supabase connection pooling handles this |
+| Background tasks | 1-2 loops | 10-20 loops | asyncio handles concurrent coroutines well. Add max concurrent limit if needed |
+| Heroku memory | ~100MB for polling | ~200MB | Polling is lightweight (no video data in memory during poll phase) |
 
 ---
 
-## 6. Risk Areas
+## 8. Heroku-Specific Constraints
 
-### Network Volume S3 Access Uncertainty
+| Constraint | Impact | Mitigation |
+|---|---|---|
+| 30-second request timeout | Source video upload for large files may timeout | Upload to Supabase Storage first (frontend -> Supabase direct, or chunked upload through backend) |
+| 512MB memory limit | Large video download/upload during output delivery | Stream in chunks, never buffer entire video in memory |
+| Dyno cycling (free tier) | Background tasks killed on restart | DB-backed state means batch manager can resume where it left off. Add startup recovery: check for `processing` batches and restart their loops |
+| No persistent filesystem | Cannot cache videos locally | All storage is external (Supabase Storage, Google Drive). Already the pattern for this app |
 
-RunPod's S3 API availability for network volumes needs validation. If direct S3 access is not available, the fallback is a "file management pod" approach which significantly complicates the architecture.
+### Startup Recovery Pattern
 
-**Mitigation:** Validate S3 access first (Phase 1 spike). If unavailable, consider a lightweight persistent pod approach with a file management API.
-
-### Large File Upload Memory Pressure
-
-Uploading multi-GB model files through the FastAPI backend could exhaust server memory if not streamed properly.
-
-**Mitigation:** Use streaming uploads with `httpx` and `python-multipart`. Never load entire file into memory. Set upload size limits in Nginx/proxy layer.
-
-### GitHub API Rate Limits
-
-GitHub API has rate limits (5000 requests/hour for authenticated users). Dockerfile reads/writes are low-volume but should be cached.
-
-**Mitigation:** Cache Dockerfile content on read (invalidate on write). Single admin user won't hit limits under normal use.
-
-### Heroku Deployment Constraints
-
-Heroku dynos have 30-second request timeout and 512MB memory. Large file uploads and HuggingFace downloads will exceed these.
-
-**Mitigation:** HF downloads use background tasks (not HTTP request duration). File uploads may need chunked approach or direct-to-S3 presigned URL pattern (frontend uploads directly to S3, bypassing Heroku).
+```python
+# In main.py or app startup
+@app.on_event("startup")
+async def recover_interrupted_batches():
+    """Resume any batches that were processing when server restarted."""
+    service = UpscaleJobService()
+    interrupted = await service.get_batches_by_status('processing')
+    for batch in interrupted:
+        # Mark current video as failed (it was interrupted)
+        await service.fail_current_video(batch.id, "Server restart")
+        # Resume from next pending video
+        asyncio.create_task(batch_manager.start_batch(batch.id))
+```
 
 ---
 
 ## Quality Gate Checklist
 
-- [x] Components clearly defined with boundaries (6 components with explicit inputs/outputs/boundaries)
-- [x] Data flow direction explicit (5 detailed flow diagrams with directional arrows)
-- [x] Build order implications noted (4 phases with dependency graph and critical path)
+- [x] Integration points with existing system identified (Section 3: 6 reused backend components, 5 reused frontend components)
+- [x] New vs modified components explicit (Section 3: tables showing reused vs new)
+- [x] Build order considers dependencies (Section 6: 4 phases with linear dependency chain)
+- [x] Data flow direction explicit (Section 2: 3 detailed flow diagrams)
+- [x] Component boundaries clear (Section 1: 7 components with interfaces)
+- [x] Anti-patterns documented (Section 5: 4 anti-patterns with alternatives)
+- [x] Heroku constraints addressed (Section 8: 4 constraints with mitigations)
 
 ---
 
-*Research completed: 2026-03-04*
+## Confidence Assessment
+
+| Area | Confidence | Reason |
+|---|---|---|
+| Architecture pattern | HIGH | Follows proven patterns already in codebase (service layer, tuple returns, background tasks, output delivery pipeline) |
+| DB schema | HIGH | Clean separation matches domain model, indexes support query patterns |
+| Freepik API shape | MEDIUM | Based on confirmed image upscaler API pattern + PROJECT.md specification. Exact video endpoint parameters need validation |
+| Build order | HIGH | Linear dependency chain is straightforward, each phase testable independently |
+| Output delivery | HIGH | Reuses existing, working StorageService + GoogleDriveService with zero modifications |
+| Credit exhaustion detection | MEDIUM | Assumed HTTP 402/429 response. Actual Freepik credit error responses need validation |
+| Frontend integration | HIGH | Follows established page + hook + component pattern used by all other features |
+
+---
+
+*Research completed: 2026-03-11*
