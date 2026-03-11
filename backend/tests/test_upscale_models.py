@@ -346,3 +346,118 @@ class TestResponseModels:
         assert r.success is False
         assert r.batch is None
         assert r.error == 'Not found'
+
+
+# ---------------------------------------------------------------------------
+# ProcessingResult dataclass
+# ---------------------------------------------------------------------------
+
+class TestProcessingResult:
+    """Test ProcessingResult dataclass instantiation and defaults."""
+
+    def test_success_result(self):
+        from models.upscale import ProcessingResult
+        r = ProcessingResult(success=True)
+        assert r.success is True
+        assert r.failure_type is None
+        assert r.should_pause_batch is False
+        assert r.error_message is None
+
+    def test_transient_failure(self):
+        from models.upscale import ProcessingResult
+        r = ProcessingResult(success=False, failure_type="transient", error_message="timeout")
+        assert r.success is False
+        assert r.failure_type == "transient"
+        assert r.should_pause_batch is False
+
+    def test_credit_exhaustion_failure(self):
+        from models.upscale import ProcessingResult
+        r = ProcessingResult(success=False, failure_type="credit_exhaustion", should_pause_batch=True)
+        assert r.success is False
+        assert r.failure_type == "credit_exhaustion"
+        assert r.should_pause_batch is True
+
+    def test_permanent_failure(self):
+        from models.upscale import ProcessingResult
+        r = ProcessingResult(success=False, failure_type="permanent", error_message="bad input")
+        assert r.success is False
+        assert r.failure_type == "permanent"
+        assert r.should_pause_batch is False
+
+
+# ---------------------------------------------------------------------------
+# _classify_error function
+# ---------------------------------------------------------------------------
+
+class TestClassifyError:
+    """Test _classify_error classifies error messages into failure types."""
+
+    def test_402_payment_required(self):
+        from models.upscale import _classify_error
+        assert _classify_error("HTTP error 402 Payment Required") == "credit_exhaustion"
+
+    def test_429_quota_exceeded(self):
+        from models.upscale import _classify_error
+        assert _classify_error("429 quota exceeded") == "credit_exhaustion"
+
+    def test_429_limit_exceeded(self):
+        from models.upscale import _classify_error
+        assert _classify_error("429 limit exceeded for account") == "credit_exhaustion"
+
+    def test_429_insufficient_credits(self):
+        from models.upscale import _classify_error
+        assert _classify_error("429 insufficient credits") == "credit_exhaustion"
+
+    def test_500_internal_server_error(self):
+        from models.upscale import _classify_error
+        assert _classify_error("HTTP 500 Internal Server Error") == "transient"
+
+    def test_502_bad_gateway(self):
+        from models.upscale import _classify_error
+        assert _classify_error("HTTP 502 Bad Gateway") == "transient"
+
+    def test_503_service_unavailable(self):
+        from models.upscale import _classify_error
+        assert _classify_error("HTTP 503 Service Unavailable") == "transient"
+
+    def test_request_timed_out(self):
+        from models.upscale import _classify_error
+        assert _classify_error("Request timed out") == "transient"
+
+    def test_connection_refused(self):
+        from models.upscale import _classify_error
+        assert _classify_error("Connection refused") == "transient"
+
+    def test_429_generic_too_many_requests(self):
+        from models.upscale import _classify_error
+        assert _classify_error("429 Too Many Requests") == "transient"
+
+    def test_400_bad_request(self):
+        from models.upscale import _classify_error
+        assert _classify_error("HTTP 400 Bad Request") == "permanent"
+
+    def test_401_unauthorized(self):
+        from models.upscale import _classify_error
+        assert _classify_error("HTTP 401 Unauthorized") == "permanent"
+
+    def test_unknown_error(self):
+        from models.upscale import _classify_error
+        assert _classify_error("Unknown error occurred") == "permanent"
+
+
+# ---------------------------------------------------------------------------
+# ReorderPayload model
+# ---------------------------------------------------------------------------
+
+class TestReorderPayload:
+    """Test ReorderPayload Pydantic model."""
+
+    def test_valid_payload(self):
+        from models.upscale import ReorderPayload
+        p = ReorderPayload(video_ids=["id1", "id2"])
+        assert p.video_ids == ["id1", "id2"]
+
+    def test_empty_list_valid(self):
+        from models.upscale import ReorderPayload
+        p = ReorderPayload(video_ids=[])
+        assert p.video_ids == []
