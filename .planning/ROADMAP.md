@@ -65,8 +65,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 11-01-PLAN.md -- Service layer: ProcessingResult types, error classification, UpscaleJobService pause/resume/reorder/retry methods
-- [ ] 11-02-PLAN.md -- Processing loop: retry with backoff, credit exhaustion pause, resume/retry/reorder API endpoints
+- [x] 11-01-PLAN.md -- Service layer: ProcessingResult types, error classification, UpscaleJobService pause/resume/reorder/retry methods
+- [x] 11-02-PLAN.md -- Processing loop: retry with backoff, credit exhaustion pause, resume/retry/reorder API endpoints
 
 ### Phase 12: Output Delivery
 **Goal**: Completed upscaled videos are automatically delivered to Supabase Storage and optionally to Google Drive, and are downloadable by the user
@@ -77,11 +77,11 @@ Plans:
   2. If a Google Drive project folder is selected, the upscaled video is also uploaded to a subfolder in that project (failure does not fail the video)
   3. Individual completed videos can be downloaded from the UI via a direct URL
   4. All completed videos in a batch can be downloaded together as a single ZIP file
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 12-01: TBD
-- [ ] 12-02: TBD
+- [ ] 12-01-PLAN.md -- Delivery pipeline: Supabase upload + Google Drive upload wired into _process_single_video
+- [ ] 12-02-PLAN.md -- Batch ZIP download: background job with in-memory store, 3 API endpoints
 
 ### Phase 13: Frontend
 **Goal**: Users can upload, configure, monitor, and retrieve batch video upscales through a complete feature page integrated into the app
