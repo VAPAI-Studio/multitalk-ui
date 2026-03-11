@@ -16,8 +16,8 @@ Requirements for Batch Video Upscale milestone. Each maps to roadmap phases.
 
 ### Settings
 
-- [ ] **SETT-01**: User can configure global upscale settings: resolution (1k/2k/4k), creativity (0-100), sharpen (0-100), smart grain (0-100), FPS boost (on/off), flavor (vivid/natural)
-- [ ] **SETT-02**: Settings default to sensible values (2k, creativity=0, sharpen=0, grain=0, FPS boost=off, vivid)
+- [x] **SETT-01**: User can configure global upscale settings: resolution (1k/2k/4k), creativity (0-100), sharpen (0-100), smart grain (0-100), FPS boost (on/off), flavor (vivid/natural)
+- [x] **SETT-02**: Settings default to sensible values (2k, creativity=0, sharpen=0, grain=0, FPS boost=off, vivid)
 
 ### Queue Processing
 
@@ -50,8 +50,8 @@ Requirements for Batch Video Upscale milestone. Each maps to roadmap phases.
 
 ### Infrastructure
 
-- [ ] **INFR-01**: Database schema supports batch and per-video tracking (new tables/migration)
-- [ ] **INFR-02**: Freepik API key stored as backend environment variable (FREEPIK_API_KEY)
+- [x] **INFR-01**: Database schema supports batch and per-video tracking (new tables/migration)
+- [x] **INFR-02**: Freepik API key stored as backend environment variable (FREEPIK_API_KEY)
 - [ ] **INFR-03**: New feature page linked from homepage, accessible to all authenticated users
 - [ ] **INFR-04**: Backend batch processor survives server restarts (resumes interrupted batches on startup)
 
@@ -92,8 +92,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UPLD-02 | Phase 13 | Pending |
 | UPLD-03 | Phase 13 | Pending |
 | UPLD-04 | Phase 13 | Pending |
-| SETT-01 | Phase 10 | Pending |
-| SETT-02 | Phase 10 | Pending |
+| SETT-01 | Phase 10 | Complete |
+| SETT-02 | Phase 10 | Complete |
 | QUEU-01 | Phase 10 | Pending |
 | QUEU-02 | Phase 10 | Pending |
 | QUEU-03 | Phase 11 | Pending |
@@ -111,8 +111,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ERRR-03 | Phase 11 | Pending |
 | ERRR-04 | Phase 11 | Pending |
 | ERRR-05 | Phase 11 | Pending |
-| INFR-01 | Phase 10 | Pending |
-| INFR-02 | Phase 10 | Pending |
+| INFR-01 | Phase 10 | Complete |
+| INFR-02 | Phase 10 | Complete |
 | INFR-03 | Phase 13 | Pending |
 | INFR-04 | Phase 10 | Pending |
 
