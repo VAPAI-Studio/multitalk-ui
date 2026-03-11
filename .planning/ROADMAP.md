@@ -29,7 +29,7 @@ Full details: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
 **Milestone Goal:** Enable batch video upscaling via Freepik API with credit-aware queue management and dual output delivery (Supabase Storage + Google Drive).
 
 - [x] **Phase 10: Foundation** - Database schema, Freepik service, API endpoints, settings model (completed 2026-03-11)
-- [ ] **Phase 11: Batch Processing** - Sequential queue loop, credit exhaustion detection, pause/resume, error handling
+- [x] **Phase 11: Batch Processing** - Sequential queue loop, credit exhaustion detection, pause/resume, error handling (completed 2026-03-11)
 - [ ] **Phase 12: Output Delivery** - Streaming download from Freepik, upload to Supabase Storage + Google Drive, download endpoints
 - [ ] **Phase 13: Frontend** - Upload UI, progress display, batch history, homepage integration
 
@@ -117,6 +117,6 @@ Phases execute in numeric order: 10 -> 11 -> 12 -> 13
 | 6.2. Verification Documentation | v1.0 | 1/1 | Complete | 2026-03-08 |
 | 7. GitHub Integration | v1.0 | 2/2 | Complete | 2026-03-09 |
 | 10. Foundation | v1.1 | Complete    | 2026-03-11 | 2026-03-11 |
-| 11. Batch Processing | 1/2 | In Progress|  | - |
+| 11. Batch Processing | 2/2 | Complete   | 2026-03-11 | - |
 | 12. Output Delivery | v1.1 | 0/2 | Not started | - |
 | 13. Frontend | v1.1 | 0/3 | Not started | - |

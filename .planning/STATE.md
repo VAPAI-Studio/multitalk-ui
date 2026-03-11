@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Batch Video Upscale
 status: in_progress
-stopped_at: Completed 11-01-PLAN.md
-last_updated: "2026-03-11T18:37:00Z"
-last_activity: 2026-03-11 -- Completed plan 11-01 (service layer, error classification, 35 new tests)
+stopped_at: Completed 11-02-PLAN.md
+last_updated: "2026-03-11T18:44:30Z"
+last_activity: 2026-03-11 -- Completed plan 11-02 (retry logic, credit pause, 3 API endpoints, 26 new tests)
 progress:
   total_phases: 4
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 5
-  completed_plans: 4
-  percent: 40
+  completed_plans: 5
+  percent: 50
 ---
 
 # Project State
@@ -21,34 +21,34 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-11)
 
 **Core value:** Provide a unified platform for AI-powered media processing where users can generate, edit, upscale, and manage their content end-to-end
-**Current focus:** v1.1 Batch Video Upscale -- Phase 11 in progress (1/2 plans done)
+**Current focus:** v1.1 Batch Video Upscale -- Phase 11 complete (2/2 plans done), Phase 12 next
 
 ## Current Position
 
-Phase: 11 of 13 (Batch Processing)
-Plan: 1 of 2 in current phase
-Status: Plan 11-01 complete, 11-02 next
-Last activity: 2026-03-11 -- Completed plan 11-01 (service layer, error classification, 35 new tests)
+Phase: 12 of 13 (Storage & Delivery)
+Plan: 0 of 0 in current phase (awaiting planning)
+Status: Phase 11 complete, Phase 12 next
+Last activity: 2026-03-11 -- Completed plan 11-02 (retry logic, credit pause, 3 API endpoints, 26 new tests)
 
-Progress: [####░░░░░░] 40%
+Progress: [#####░░░░░] 50%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4 (v1.1)
-- Average duration: 8 min
-- Total execution time: 32 min
+- Total plans completed: 5 (v1.1)
+- Average duration: 7.2 min
+- Total execution time: 36 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 10 | 3 | 28 min | 9.3 min |
-| 11 | 1 | 4 min | 4 min |
+| 11 | 2 | 8 min | 4 min |
 
 **Recent Trend:**
-- Last 5 plans: 10-01 (5 min), 10-02 (8 min), 10-03 (15 min), 11-01 (4 min)
-- Trend: consistent
+- Last 5 plans: 10-01 (5 min), 10-02 (8 min), 10-03 (15 min), 11-01 (4 min), 11-02 (4 min)
+- Trend: consistent, Phase 11 completing fast
 
 *Updated after each plan completion*
 
@@ -76,6 +76,10 @@ v1.1 decisions made during execution:
 - [11-01] Python dataclass (not Pydantic) for ProcessingResult -- internal processing type, not request/response
 - [11-01] Compiled regex for credit keyword matching in _classify_error for performance
 - [11-01] Bulk pause/unpause return True on success even with zero matched rows (operation semantics)
+- [11-02] _process_single_video returns ProcessingResult directly with _classify_error at point of failure
+- [11-02] Exponential backoff BASE_DELAY * 2^attempt (2s, 4s) for simplicity
+- [11-02] Batch status re-check after each video via _get_batch_for_processing to detect external pause
+- [11-02] Terminal batch relaunch on retry: set to processing + create_task for automatic resume
 
 ### Pending Todos
 
@@ -88,7 +92,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-11T18:37:00Z
-Stopped at: Completed 11-01-PLAN.md
+Last session: 2026-03-11T18:44:30Z
+Stopped at: Completed 11-02-PLAN.md
 Resume file: None
-Next action: Execute 11-02-PLAN.md (API endpoints and processing loop)
+Next action: Plan and execute Phase 12 (Storage & Delivery)

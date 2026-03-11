@@ -43,7 +43,7 @@ Requirements for Batch Video Upscale milestone. Each maps to roadmap phases.
 ### Error Handling & Credits
 
 - [x] **ERRR-01**: Failed videos show error message and a retry button
-- [ ] **ERRR-02**: Transient errors (network, 5xx) auto-retry up to 2 times with backoff
+- [x] **ERRR-02**: Transient errors (network, 5xx) auto-retry up to 2 times with backoff
 - [x] **ERRR-03**: Credit exhaustion is detected and batch pauses automatically (all remaining videos set to paused, not failed)
 - [x] **ERRR-04**: User sees a clear notification explaining the pause with guidance to add Freepik credits
 - [x] **ERRR-05**: User can resume a paused batch and processing continues from where it left off
@@ -107,7 +107,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DLVR-03 | Phase 12 | Pending |
 | DLVR-04 | Phase 12 | Pending |
 | ERRR-01 | Phase 11 | Complete |
-| ERRR-02 | Phase 11 | Pending |
+| ERRR-02 | Phase 11 | Complete |
 | ERRR-03 | Phase 11 | Complete |
 | ERRR-04 | Phase 11 | Complete |
 | ERRR-05 | Phase 11 | Complete |
