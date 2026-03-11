@@ -15,12 +15,18 @@ from models.upscale import (
     BatchDetailResponse,
     BatchResponse,
     CreateBatchPayload,
+    ProcessingResult,
+    ReorderPayload,
     UpscaleBatch,
+    _classify_error,
 )
 from services.freepik_service import FreepikUpscalerService
 from services.upscale_job_service import UpscaleJobService
 
 router = APIRouter(prefix="/upscale", tags=["upscale"])
+
+MAX_RETRIES = 2
+BASE_DELAY = 2  # seconds
 
 
 # ---------------------------------------------------------------------------
@@ -147,11 +153,11 @@ async def list_batches(
 # ---------------------------------------------------------------------------
 
 
-async def _process_single_video(video: dict, batch: dict) -> bool:
+async def _process_single_video(video: dict, batch: dict) -> ProcessingResult:
     """
     Process a single video through Freepik upscaling.
 
-    Returns True if completed, False if failed.
+    Returns ProcessingResult with success status and error classification.
     """
     job_service = UpscaleJobService()
     freepik = FreepikUpscalerService()
@@ -174,11 +180,17 @@ async def _process_single_video(video: dict, batch: dict) -> bool:
     )
 
     if not success:
+        failure_type = _classify_error(error or "Unknown error")
         await job_service.update_video_status(
             video_id, "failed", error_message=error,
         )
         await job_service.increment_failed_count(batch_id)
-        return False
+        return ProcessingResult(
+            success=False,
+            failure_type=failure_type,
+            error_message=error,
+            should_pause_batch=(failure_type == "credit_exhaustion"),
+        )
 
     # Record freepik task id
     await job_service.update_video_status(
@@ -193,19 +205,59 @@ async def _process_single_video(video: dict, batch: dict) -> bool:
             video_id, "completed", output_url=output_url,
         )
         await job_service.increment_completed_count(batch_id)
-        return True
+        return ProcessingResult(success=True)
     else:
         err_msg = poll_error or f"Freepik task ended with status: {status}"
+        failure_type = _classify_error(err_msg)
         await job_service.update_video_status(
             video_id, "failed", error_message=err_msg,
         )
         await job_service.increment_failed_count(batch_id)
-        return False
+        return ProcessingResult(
+            success=False,
+            failure_type=failure_type,
+            error_message=err_msg,
+            should_pause_batch=(failure_type == "credit_exhaustion"),
+        )
+
+
+async def _process_video_with_retry(video: dict, batch: dict) -> ProcessingResult:
+    """
+    Retry wrapper around _process_single_video.
+
+    Retries transient failures up to MAX_RETRIES times with exponential backoff.
+    Does NOT retry credit_exhaustion or permanent errors.
+    """
+    job_service = UpscaleJobService()
+    video_id = video["id"]
+
+    for attempt in range(MAX_RETRIES + 1):
+        result = await _process_single_video(video, batch)
+
+        if result.success:
+            return result
+
+        # Don't retry credit exhaustion or permanent errors
+        if result.failure_type in ("credit_exhaustion", "permanent"):
+            return result
+
+        # Transient failure -- retry if attempts remain
+        if attempt < MAX_RETRIES:
+            delay = BASE_DELAY * (2 ** attempt)
+            await asyncio.sleep(delay)
+            await job_service.update_video_retry_count(video_id, attempt + 1)
+
+    return result
 
 
 async def _process_batch(batch_id: str) -> None:
     """
     Process all pending videos in a batch sequentially.
+
+    Features:
+    - Uses _process_video_with_retry for automatic retry of transient errors
+    - Pauses batch and remaining videos on credit exhaustion
+    - Re-checks batch status each iteration to handle external pause/cancel
 
     Wrapped entirely in try/except to prevent silent background task failure.
     """
@@ -229,7 +281,18 @@ async def _process_batch(batch_id: str) -> None:
                 break
 
             await job_service.update_batch_heartbeat(batch_id)
-            await _process_single_video(video, batch)
+            result = await _process_video_with_retry(video, batch)
+
+            # Handle credit exhaustion: pause batch and remaining videos
+            if result.should_pause_batch:
+                await job_service.pause_all_pending_videos(batch_id)
+                await job_service.pause_batch(batch_id, "credit_exhaustion")
+                break
+
+            # Re-check batch status to handle external pause/cancel
+            batch = await _get_batch_for_processing(job_service, batch_id)
+            if not batch or batch.get("status") != "processing":
+                break
 
     except Exception as e:
         print(f"[UPSCALE] Batch {batch_id} processing error: {e}")
