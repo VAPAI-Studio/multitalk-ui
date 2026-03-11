@@ -5,14 +5,18 @@ Defines settings, request/response payloads, and data models for the
 upscale_batches and upscale_videos tables. Used by the API router,
 job service, and background processing task.
 """
-from pydantic import BaseModel, Field
+import re
+from dataclasses import dataclass, field
 from typing import Optional, List, Literal
+
+from pydantic import BaseModel, Field
 from datetime import datetime
 
 # --- Status types ---
 
 BatchStatus = Literal['pending', 'processing', 'completed', 'failed', 'paused', 'cancelled']
 VideoStatus = Literal['pending', 'processing', 'completed', 'failed', 'paused']
+FailureType = Literal['transient', 'credit_exhaustion', 'permanent']
 
 # --- Settings ---
 
@@ -112,3 +116,73 @@ class BatchDetailResponse(BaseModel):
     success: bool
     batch: Optional[UpscaleBatch] = None
     error: Optional[str] = None
+
+
+# --- Batch processing support ---
+
+
+@dataclass
+class ProcessingResult:
+    """Result of processing a single video in a batch.
+
+    Used by the background processor to communicate outcome and whether
+    the batch should be paused (e.g. on credit exhaustion).
+    """
+    success: bool
+    failure_type: Optional[FailureType] = None
+    error_message: Optional[str] = None
+    should_pause_batch: bool = field(default=False)
+
+
+# Patterns for credit-exhaustion keywords (used with 429 status)
+_CREDIT_KEYWORDS = re.compile(
+    r"quota|limit\s+exceeded|insufficient|credit|budget",
+    re.IGNORECASE,
+)
+
+
+def _classify_error(error_message: str) -> FailureType:
+    """Classify an error message into a FailureType.
+
+    Classification rules (evaluated in order):
+    1. 402 -> credit_exhaustion
+    2. 429 + quota/limit/insufficient/credit/budget keyword -> credit_exhaustion
+    3. 500/502/503/504 -> transient
+    4. timeout / timed out -> transient
+    5. connection / request failed -> transient
+    6. generic 429 (no credit keywords) -> transient
+    7. everything else -> permanent
+    """
+    msg = error_message.lower()
+
+    # 1. HTTP 402 always means payment/credit issue
+    if "402" in msg:
+        return "credit_exhaustion"
+
+    # 2. 429 with credit-related keywords
+    if "429" in msg and _CREDIT_KEYWORDS.search(error_message):
+        return "credit_exhaustion"
+
+    # 3. Server errors (5xx)
+    if re.search(r"50[0-4]", msg):
+        return "transient"
+
+    # 4. Timeout
+    if "timeout" in msg or "timed out" in msg:
+        return "transient"
+
+    # 5. Connection errors
+    if "connection" in msg or "request failed" in msg:
+        return "transient"
+
+    # 6. Generic 429 (rate limit, no credit keywords)
+    if "429" in msg:
+        return "transient"
+
+    # 7. Default: permanent
+    return "permanent"
+
+
+class ReorderPayload(BaseModel):
+    """Payload for reordering pending videos in a batch."""
+    video_ids: List[str]
