@@ -3,10 +3,11 @@ API endpoint tests for the upscale router.
 
 Tests all CRUD endpoints for batch and video management
 with mocked authentication and service dependencies.
+Includes delivery pipeline tests (Phase 12).
 """
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch, call
 
 
 # ---------------------------------------------------------------------------
@@ -567,3 +568,379 @@ class TestReorderQueue:
         )
 
         instance.reorder_videos.assert_called_once_with("batch-001", ["video-002", "video-001"])
+
+
+# ---------------------------------------------------------------------------
+# Delivery Pipeline Tests (Phase 12)
+# ---------------------------------------------------------------------------
+
+def _make_video_dict(**overrides):
+    """Return a sample video dict for _process_single_video."""
+    d = {
+        "id": "video-001",
+        "batch_id": "batch-001",
+        "status": "pending",
+        "queue_position": 1,
+        "input_filename": "my_clip.mp4",
+        "input_storage_url": "https://storage.example.com/my_clip.mp4",
+    }
+    d.update(overrides)
+    return d
+
+
+def _make_batch_dict(**overrides):
+    """Return a sample batch dict for _process_single_video."""
+    d = {
+        "id": "batch-001",
+        "user_id": "user-abc",
+        "status": "processing",
+        "resolution": "2k",
+        "creativity": 0,
+        "sharpen": 0,
+        "grain": 0,
+        "fps_boost": False,
+        "flavor": "vivid",
+        "project_id": None,
+    }
+    d.update(overrides)
+    return d
+
+
+class TestDeliveryPipeline:
+    """Tests for the delivery pipeline wired into _process_single_video."""
+
+    @pytest.mark.asyncio
+    @patch("api.upscale.StorageService")
+    @patch("api.upscale.UpscaleJobService")
+    @patch("api.upscale.FreepikUpscalerService")
+    async def test_delivery_supabase_upload_success(
+        self, MockFreepik, MockJobService, MockStorage
+    ):
+        """When Freepik returns COMPLETED, Supabase upload succeeds -- supabase_upload_status='completed' and output_storage_url is the public URL."""
+        from api.upscale import _process_single_video
+
+        # Freepik: submit succeeds, poll returns COMPLETED
+        freepik = MockFreepik.return_value
+        freepik.submit_task = AsyncMock(return_value=(True, "task-123", None))
+        freepik.poll_until_complete = AsyncMock(return_value=(
+            "COMPLETED", "https://freepik.example.com/output.mp4", None
+        ))
+
+        # Job service
+        job = MockJobService.return_value
+        job.update_video_status = AsyncMock(return_value=True)
+        job.update_video_upload_status = AsyncMock(return_value=True)
+        job.increment_completed_count = AsyncMock(return_value=True)
+
+        # Storage: upload succeeds
+        storage = MockStorage.return_value
+        storage.upload_upscaled_video = AsyncMock(return_value=(
+            True, "https://supabase.example.com/public/upscaled.mp4", None
+        ))
+
+        video = _make_video_dict()
+        batch = _make_batch_dict()
+
+        result = await _process_single_video(video, batch)
+
+        assert result.success is True
+
+        # Verify Supabase upload was called
+        storage.upload_upscaled_video.assert_called_once_with(
+            source_url="https://freepik.example.com/output.mp4",
+            user_id="user-abc",
+            batch_id="batch-001",
+            original_filename="my_clip.mp4",
+        )
+
+        # Verify upload status was recorded as completed
+        upload_calls = job.update_video_upload_status.call_args_list
+        # First call: Supabase status
+        supabase_call = upload_calls[0]
+        assert supabase_call[0][0] == "video-001"
+        assert supabase_call[1]["supabase_upload_status"] == "completed"
+        assert supabase_call[1]["output_storage_url"] == "https://supabase.example.com/public/upscaled.mp4"
+
+        # Verify video completed with Supabase URL (not Freepik URL)
+        final_status_call = job.update_video_status.call_args_list[-1]
+        assert final_status_call[1].get("output_url") == "https://supabase.example.com/public/upscaled.mp4"
+
+    @pytest.mark.asyncio
+    @patch("api.upscale.StorageService")
+    @patch("api.upscale.UpscaleJobService")
+    @patch("api.upscale.FreepikUpscalerService")
+    async def test_delivery_supabase_failure_preserves_freepik_url(
+        self, MockFreepik, MockJobService, MockStorage
+    ):
+        """When Supabase upload fails, supabase_upload_status='failed' and Freepik temp URL preserved in output_storage_url."""
+        from api.upscale import _process_single_video
+
+        freepik = MockFreepik.return_value
+        freepik.submit_task = AsyncMock(return_value=(True, "task-123", None))
+        freepik.poll_until_complete = AsyncMock(return_value=(
+            "COMPLETED", "https://freepik.example.com/output.mp4", None
+        ))
+
+        job = MockJobService.return_value
+        job.update_video_status = AsyncMock(return_value=True)
+        job.update_video_upload_status = AsyncMock(return_value=True)
+        job.increment_completed_count = AsyncMock(return_value=True)
+
+        # Storage: upload FAILS
+        storage = MockStorage.return_value
+        storage.upload_upscaled_video = AsyncMock(return_value=(
+            False, None, "Supabase upload failed: timeout"
+        ))
+
+        video = _make_video_dict()
+        batch = _make_batch_dict()
+
+        result = await _process_single_video(video, batch)
+
+        # Video still completes (upscaling succeeded)
+        assert result.success is True
+
+        # Verify Supabase status recorded as failed
+        upload_calls = job.update_video_upload_status.call_args_list
+        supabase_call = upload_calls[0]
+        assert supabase_call[1]["supabase_upload_status"] == "failed"
+        # Freepik temp URL preserved
+        assert supabase_call[1]["output_storage_url"] == "https://freepik.example.com/output.mp4"
+
+    @pytest.mark.asyncio
+    @patch("api.upscale.is_drive_configured")
+    @patch("api.upscale.GoogleDriveService")
+    @patch("api.upscale.StorageService")
+    @patch("api.upscale.UpscaleJobService")
+    @patch("api.upscale.FreepikUpscalerService")
+    async def test_delivery_drive_upload_success(
+        self, MockFreepik, MockJobService, MockStorage, MockDrive, mock_is_configured
+    ):
+        """When batch has project_id and Drive is configured, upload to Drive succeeds -- drive_upload_status='completed'."""
+        from api.upscale import _process_single_video
+
+        freepik = MockFreepik.return_value
+        freepik.submit_task = AsyncMock(return_value=(True, "task-123", None))
+        freepik.poll_until_complete = AsyncMock(return_value=(
+            "COMPLETED", "https://freepik.example.com/output.mp4", None
+        ))
+
+        job = MockJobService.return_value
+        job.update_video_status = AsyncMock(return_value=True)
+        job.update_video_upload_status = AsyncMock(return_value=True)
+        job.increment_completed_count = AsyncMock(return_value=True)
+
+        # Storage: upload succeeds; also mock the HTTP client for Drive re-download
+        storage = MockStorage.return_value
+        storage.upload_upscaled_video = AsyncMock(return_value=(
+            True, "https://supabase.example.com/public/upscaled.mp4", None
+        ))
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.content = b"video-bytes-here"
+        mock_http_client = AsyncMock()
+        mock_http_client.get = AsyncMock(return_value=mock_response)
+        mock_http_client.__aenter__ = AsyncMock(return_value=mock_http_client)
+        mock_http_client.__aexit__ = AsyncMock(return_value=None)
+        storage._get_fresh_http_client = AsyncMock(return_value=mock_http_client)
+
+        # Drive: configured and upload succeeds
+        mock_is_configured.return_value = True
+        drive = MockDrive.return_value
+        drive.get_or_create_folder = AsyncMock(return_value=(True, "folder-xyz", None))
+        drive.upload_file = AsyncMock(return_value=(True, "drive-file-789", None))
+
+        video = _make_video_dict()
+        batch = _make_batch_dict(project_id="project-folder-123")
+
+        result = await _process_single_video(video, batch)
+
+        assert result.success is True
+
+        # Verify Drive upload was attempted
+        drive.get_or_create_folder.assert_called_once()
+        drive.upload_file.assert_called_once()
+
+        # Verify drive status recorded
+        upload_calls = job.update_video_upload_status.call_args_list
+        drive_call = upload_calls[1]  # Second call is for Drive status
+        assert drive_call[1]["drive_upload_status"] == "completed"
+        assert drive_call[1]["output_drive_file_id"] == "drive-file-789"
+
+    @pytest.mark.asyncio
+    @patch("api.upscale.is_drive_configured")
+    @patch("api.upscale.GoogleDriveService")
+    @patch("api.upscale.StorageService")
+    @patch("api.upscale.UpscaleJobService")
+    @patch("api.upscale.FreepikUpscalerService")
+    async def test_delivery_drive_failure_nonfatal(
+        self, MockFreepik, MockJobService, MockStorage, MockDrive, mock_is_configured
+    ):
+        """When Drive upload fails, video still 'completed', drive_upload_status='failed'."""
+        from api.upscale import _process_single_video
+
+        freepik = MockFreepik.return_value
+        freepik.submit_task = AsyncMock(return_value=(True, "task-123", None))
+        freepik.poll_until_complete = AsyncMock(return_value=(
+            "COMPLETED", "https://freepik.example.com/output.mp4", None
+        ))
+
+        job = MockJobService.return_value
+        job.update_video_status = AsyncMock(return_value=True)
+        job.update_video_upload_status = AsyncMock(return_value=True)
+        job.increment_completed_count = AsyncMock(return_value=True)
+
+        # Storage: upload succeeds; mock HTTP client for Drive re-download
+        storage = MockStorage.return_value
+        storage.upload_upscaled_video = AsyncMock(return_value=(
+            True, "https://supabase.example.com/public/upscaled.mp4", None
+        ))
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.content = b"video-bytes-here"
+        mock_http_client = AsyncMock()
+        mock_http_client.get = AsyncMock(return_value=mock_response)
+        mock_http_client.__aenter__ = AsyncMock(return_value=mock_http_client)
+        mock_http_client.__aexit__ = AsyncMock(return_value=None)
+        storage._get_fresh_http_client = AsyncMock(return_value=mock_http_client)
+
+        # Drive: configured but upload fails
+        mock_is_configured.return_value = True
+        drive = MockDrive.return_value
+        drive.get_or_create_folder = AsyncMock(return_value=(True, "folder-xyz", None))
+        drive.upload_file = AsyncMock(return_value=(False, None, "Drive quota exceeded"))
+
+        video = _make_video_dict()
+        batch = _make_batch_dict(project_id="project-folder-123")
+
+        result = await _process_single_video(video, batch)
+
+        # Video still completes
+        assert result.success is True
+
+        # Drive status is "failed"
+        upload_calls = job.update_video_upload_status.call_args_list
+        drive_call = upload_calls[1]
+        assert drive_call[1]["drive_upload_status"] == "failed"
+
+    @pytest.mark.asyncio
+    @patch("api.upscale.StorageService")
+    @patch("api.upscale.UpscaleJobService")
+    @patch("api.upscale.FreepikUpscalerService")
+    async def test_delivery_drive_skipped_no_project_id(
+        self, MockFreepik, MockJobService, MockStorage
+    ):
+        """When batch has no project_id, drive_upload_status='skipped'."""
+        from api.upscale import _process_single_video
+
+        freepik = MockFreepik.return_value
+        freepik.submit_task = AsyncMock(return_value=(True, "task-123", None))
+        freepik.poll_until_complete = AsyncMock(return_value=(
+            "COMPLETED", "https://freepik.example.com/output.mp4", None
+        ))
+
+        job = MockJobService.return_value
+        job.update_video_status = AsyncMock(return_value=True)
+        job.update_video_upload_status = AsyncMock(return_value=True)
+        job.increment_completed_count = AsyncMock(return_value=True)
+
+        storage = MockStorage.return_value
+        storage.upload_upscaled_video = AsyncMock(return_value=(
+            True, "https://supabase.example.com/public/upscaled.mp4", None
+        ))
+
+        video = _make_video_dict()
+        batch = _make_batch_dict(project_id=None)
+
+        result = await _process_single_video(video, batch)
+
+        assert result.success is True
+
+        # Drive status should be "skipped"
+        upload_calls = job.update_video_upload_status.call_args_list
+        drive_call = upload_calls[1]
+        assert drive_call[1]["drive_upload_status"] == "skipped"
+
+    @pytest.mark.asyncio
+    @patch("api.upscale.is_drive_configured")
+    @patch("api.upscale.StorageService")
+    @patch("api.upscale.UpscaleJobService")
+    @patch("api.upscale.FreepikUpscalerService")
+    async def test_delivery_drive_skipped_not_configured(
+        self, MockFreepik, MockJobService, MockStorage, mock_is_configured
+    ):
+        """When Drive is not configured, drive_upload_status='skipped' even with project_id."""
+        from api.upscale import _process_single_video
+
+        freepik = MockFreepik.return_value
+        freepik.submit_task = AsyncMock(return_value=(True, "task-123", None))
+        freepik.poll_until_complete = AsyncMock(return_value=(
+            "COMPLETED", "https://freepik.example.com/output.mp4", None
+        ))
+
+        job = MockJobService.return_value
+        job.update_video_status = AsyncMock(return_value=True)
+        job.update_video_upload_status = AsyncMock(return_value=True)
+        job.increment_completed_count = AsyncMock(return_value=True)
+
+        storage = MockStorage.return_value
+        storage.upload_upscaled_video = AsyncMock(return_value=(
+            True, "https://supabase.example.com/public/upscaled.mp4", None
+        ))
+
+        # Drive NOT configured
+        mock_is_configured.return_value = False
+
+        video = _make_video_dict()
+        batch = _make_batch_dict(project_id="project-folder-123")
+
+        result = await _process_single_video(video, batch)
+
+        assert result.success is True
+
+        upload_calls = job.update_video_upload_status.call_args_list
+        drive_call = upload_calls[1]
+        assert drive_call[1]["drive_upload_status"] == "skipped"
+
+    @patch("api.upscale.UpscaleJobService")
+    def test_batch_detail_includes_upload_status_fields(self, MockService, client):
+        """GET /api/upscale/batches/{id} returns videos with upload status fields."""
+        instance = MockService.return_value
+        instance.get_batch = AsyncMock(return_value={
+            "id": "batch-001",
+            "user_id": "test-user-id",
+            "status": "completed",
+            "resolution": "2k",
+            "creativity": 0,
+            "sharpen": 0,
+            "grain": 0,
+            "fps_boost": False,
+            "flavor": "vivid",
+            "total_videos": 1,
+            "completed_videos": 1,
+            "failed_videos": 0,
+            "created_at": "2026-03-11T10:00:00Z",
+            "videos": [
+                {
+                    "id": "video-001",
+                    "batch_id": "batch-001",
+                    "status": "completed",
+                    "queue_position": 1,
+                    "input_filename": "test.mp4",
+                    "input_storage_url": "https://example.com/test.mp4",
+                    "output_storage_url": "https://supabase.example.com/public/upscaled.mp4",
+                    "supabase_upload_status": "completed",
+                    "drive_upload_status": "skipped",
+                    "output_drive_file_id": None,
+                    "created_at": "2026-03-11T10:00:00Z",
+                }
+            ],
+        })
+
+        response = client.get("/api/upscale/batches/batch-001")
+        assert response.status_code == 200
+        data = response.json()
+        video = data["batch"]["videos"][0]
+        assert video["supabase_upload_status"] == "completed"
+        assert video["drive_upload_status"] == "skipped"
+        assert video["output_drive_file_id"] is None
