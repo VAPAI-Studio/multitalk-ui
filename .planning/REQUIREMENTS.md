@@ -10,9 +10,9 @@ Requirements for Batch Video Upscale milestone. Each maps to roadmap phases.
 ### Upload & Validation
 
 - [x] **UPLD-01**: User can upload multiple video files via file picker or drag-and-drop
-- [ ] **UPLD-02**: System validates video format (MP4, MOV, AVI, WebM) and shows clear error for invalid files
-- [ ] **UPLD-03**: System shows preview thumbnail, filename, duration, resolution, and file size for each queued video
-- [ ] **UPLD-04**: System warns user if video exceeds Freepik duration/size limits before submission
+- [x] **UPLD-02**: System validates video format (MP4, MOV, AVI, WebM) and shows clear error for invalid files
+- [x] **UPLD-03**: System shows preview thumbnail, filename, duration, resolution, and file size for each queued video
+- [x] **UPLD-04**: System warns user if video exceeds Freepik duration/size limits before submission
 
 ### Settings
 
@@ -27,9 +27,9 @@ Requirements for Batch Video Upscale milestone. Each maps to roadmap phases.
 
 ### Status & Progress
 
-- [ ] **STAT-01**: Each video displays its current status with visual indicator (pending/processing/completed/failed/paused)
-- [ ] **STAT-02**: Batch summary shows total, completed, processing, pending, and failed counts with progress bar
-- [ ] **STAT-03**: Estimated time remaining displayed after at least one video completes
+- [x] **STAT-01**: Each video displays its current status with visual indicator (pending/processing/completed/failed/paused)
+- [x] **STAT-02**: Batch summary shows total, completed, processing, pending, and failed counts with progress bar
+- [x] **STAT-03**: Estimated time remaining displayed after at least one video completes
 - [ ] **STAT-04**: User can view past batches grouped in a feed/history view
 - [ ] **STAT-05**: User can re-run a past batch with the same settings
 
@@ -89,17 +89,17 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | UPLD-01 | Phase 13 | Complete |
-| UPLD-02 | Phase 13 | Pending |
-| UPLD-03 | Phase 13 | Pending |
-| UPLD-04 | Phase 13 | Pending |
+| UPLD-02 | Phase 13 | Complete |
+| UPLD-03 | Phase 13 | Complete |
+| UPLD-04 | Phase 13 | Complete |
 | SETT-01 | Phase 10 | Complete |
 | SETT-02 | Phase 10 | Complete |
 | QUEU-01 | Phase 10 | Complete |
 | QUEU-02 | Phase 10 | Complete |
 | QUEU-03 | Phase 11 | Complete |
-| STAT-01 | Phase 13 | Pending |
-| STAT-02 | Phase 13 | Pending |
-| STAT-03 | Phase 13 | Pending |
+| STAT-01 | Phase 13 | Complete |
+| STAT-02 | Phase 13 | Complete |
+| STAT-03 | Phase 13 | Complete |
 | STAT-04 | Phase 13 | Pending |
 | STAT-05 | Phase 13 | Pending |
 | DLVR-01 | Phase 12 | Complete |
