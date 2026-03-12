@@ -5,6 +5,7 @@ import base64
 import uuid
 import time
 from datetime import datetime
+from pathlib import Path
 from urllib.parse import urlparse, urlencode
 from concurrent.futures import ThreadPoolExecutor
 
@@ -231,6 +232,86 @@ class StorageService:
         elif isinstance(url_response, str):
             return url_response
         return None
+
+    async def upload_upscaled_video(
+        self,
+        source_url: str,
+        user_id: str,
+        batch_id: str,
+        original_filename: str,
+    ) -> Tuple[bool, Optional[str], Optional[str]]:
+        """Download a completed upscaled video and upload to Supabase Storage.
+
+        Returns:
+            (success, public_url, error_message)
+        """
+        start_time = time.time()
+        try:
+            # Download video from source URL (Freepik output)
+            print(f"[UPSCALE] Downloading upscaled video from: {source_url}")
+            client = await self._get_fresh_http_client(timeout=300.0)
+            async with client:
+                response = await client.get(source_url)
+
+                if response.status_code != 200:
+                    return False, None, f"Download failed: HTTP {response.status_code}"
+
+                video_content = response.content
+                if not video_content:
+                    return False, None, "Downloaded video is empty"
+
+            download_time = time.time() - start_time
+            print(f"[UPSCALE] Downloaded {len(video_content) / 1024 / 1024:.2f}MB in {download_time:.2f}s")
+
+            # Build storage path: upscaled/{user_id}/{batch_id}/{stem}_upscaled.mp4
+            stem = Path(original_filename).stem
+            storage_path = f"upscaled/{user_id}/{batch_id}/{stem}_upscaled.mp4"
+
+            # Upload to Supabase Storage via thread pool
+            print(f"[UPSCALE] Uploading to Supabase Storage: {storage_path}")
+            upload_start = time.time()
+
+            loop = asyncio.get_event_loop()
+            upload_response = await loop.run_in_executor(
+                _supabase_executor,
+                lambda: self.supabase.storage
+                .from_('multitalk-videos')
+                .upload(
+                    storage_path,
+                    video_content,
+                    file_options={
+                        'content-type': 'video/mp4',
+                        'cache-control': '3600',
+                        'upsert': 'true',
+                    }
+                )
+            )
+
+            upload_time = time.time() - upload_start
+            print(f"[UPSCALE] Upload completed in {upload_time:.2f}s")
+
+            # Check upload errors
+            if hasattr(upload_response, 'error') and upload_response.error:
+                return False, None, f"Supabase upload failed: {upload_response.error}"
+            elif isinstance(upload_response, dict) and upload_response.get('error'):
+                return False, None, f"Supabase upload failed: {upload_response['error']}"
+            elif not upload_response:
+                return False, None, "Supabase upload failed: no response"
+
+            # Get permanent public URL
+            url_response = self.supabase.storage.from_('multitalk-videos').get_public_url(storage_path)
+            public_url = self._extract_public_url(url_response)
+
+            if not public_url:
+                return False, None, "Failed to get public URL from Supabase Storage"
+
+            total_time = time.time() - start_time
+            print(f"[UPSCALE] Total upload time: {total_time:.2f}s")
+
+            return True, public_url, None
+
+        except Exception as error:
+            return False, None, str(error)
 
     async def upload_image_from_data_url(self, data_url: str, folder: str = "images") -> Tuple[bool, Optional[str], Optional[str]]:
         """Upload an image from base64 data URL to Supabase Storage"""

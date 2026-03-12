@@ -44,6 +44,12 @@ class Settings(BaseSettings):
     # HuggingFace access token (optional default; per-request token overrides)
     HF_TOKEN: str = ""
 
+    # Freepik Video Upscaler Configuration
+    FREEPIK_API_KEY: str = ""
+    FREEPIK_API_BASE_URL: str = "https://api.freepik.com/v1/ai"
+    FREEPIK_POLL_INTERVAL: int = 10      # seconds between status checks
+    FREEPIK_TASK_TIMEOUT: int = 1200     # max seconds per video (20 min)
+
     # GitHub Integration (Dockerfile editor — Phase 6)
     # Fine-grained PAT: Contents: read+write on the repo below (single repo only)
     GITHUB_TOKEN: str = ""

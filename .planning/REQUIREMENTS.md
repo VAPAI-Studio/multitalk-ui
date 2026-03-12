@@ -1,122 +1,74 @@
-# Requirements: sideOUTsticks Infrastructure Management
+# Requirements: sideOUTsticks v1.1 Batch Video Upscale
 
-**Defined:** 2026-03-04
-**Core Value:** Enable self-service infrastructure management for RunPod serverless workflows without leaving the application
+**Defined:** 2026-03-11
+**Core Value:** Enable batch video upscaling with smart credit management and organized output delivery
 
-## v1 Requirements
+## v1.1 Requirements
 
-Requirements for initial release. Each maps to roadmap phases.
+Requirements for Batch Video Upscale milestone. Each maps to roadmap phases.
 
-### Admin Access Control
+### Upload & Validation
 
-- [x] **ADMIN-01**: Admin user can access infrastructure management pages
-- [x] **ADMIN-02**: Non-admin users cannot see or access infrastructure management features
-- [x] **ADMIN-03**: Admin role is determined by Supabase user metadata flag
-- [x] **ADMIN-04**: Backend API endpoints enforce admin-only access with 403 responses for non-admins
+- [x] **UPLD-01**: User can upload multiple video files via file picker or drag-and-drop
+- [x] **UPLD-02**: System validates video format (MP4, MOV, AVI, WebM) and shows clear error for invalid files
+- [x] **UPLD-03**: System shows preview thumbnail, filename, duration, resolution, and file size for each queued video
+- [x] **UPLD-04**: System warns user if video exceeds Freepik duration/size limits before submission
 
-### Network Volume File Browser
+### Settings
 
-- [x] **VOL-01**: Admin can view hierarchical tree of files and folders on RunPod network volume
-- [x] **VOL-02**: File browser displays file name, size (human-readable), and last modified date
-- [x] **VOL-03**: Admin can expand and collapse folders without page reload
-- [x] **VOL-04**: File browser handles directories with 10,000+ files without crashing (pagination)
-- [x] **VOL-05**: Admin can navigate to any path level in the volume
+- [x] **SETT-01**: User can configure global upscale settings: resolution (1k/2k/4k), creativity (0-100), sharpen (0-100), smart grain (0-100), FPS boost (on/off), flavor (vivid/natural)
+- [x] **SETT-02**: Settings default to sensible values (2k, creativity=0, sharpen=0, grain=0, FPS boost=off, vivid)
 
-### File Upload
+### Queue Processing
 
-- [x] **UPLOAD-01**: Admin can upload files from local machine to RunPod network volume
-- [x] **UPLOAD-02**: File upload supports files up to 10GB using chunked/multipart upload
-- [x] **UPLOAD-03**: Upload progress indicator shows percentage and estimated time remaining
-- [x] **UPLOAD-04**: Admin can select target directory before uploading
-- [x] **UPLOAD-05**: Upload handles network interruptions gracefully (retry or resume)
+- [x] **QUEU-01**: Videos process sequentially one at a time through the Freepik API
+- [x] **QUEU-02**: Queue is database-backed and processing continues when user navigates away or closes browser
+- [x] **QUEU-03**: User can reorder pending videos in the queue via drag-and-drop
 
-### File Download
+### Status & Progress
 
-- [x] **DWNLD-01**: Admin can download files from RunPod network volume to local machine
-- [x] **DWNLD-02**: Download uses presigned S3 URLs with streaming (no backend buffering)
-- [x] **DWNLD-03**: Admin receives download initiation confirmation
-- [x] **DWNLD-04**: Download works for files of any size without timeout
+- [x] **STAT-01**: Each video displays its current status with visual indicator (pending/processing/completed/failed/paused)
+- [x] **STAT-02**: Batch summary shows total, completed, processing, pending, and failed counts with progress bar
+- [x] **STAT-03**: Estimated time remaining displayed after at least one video completes
+- [ ] **STAT-04**: User can view past batches grouped in a feed/history view
+- [ ] **STAT-05**: User can re-run a past batch with the same settings
 
-### File Operations
+### Output Delivery
 
-- [x] **FILEOP-01**: Admin can delete individual files with confirmation dialog
-- [x] **FILEOP-02**: Admin can delete folders with recursive deletion warning
-- [x] **FILEOP-03**: Critical system paths are protected from accidental deletion
-- [x] **FILEOP-04**: Admin can move files between directories on the volume
-- [x] **FILEOP-05**: Admin can rename files and folders
-- [x] **FILEOP-06**: File operations show success/failure feedback to admin
+- [x] **DLVR-01**: Completed upscaled videos automatically saved to Supabase Storage
+- [x] **DLVR-02**: If a Google Drive project is selected, completed videos also uploaded to the project folder
+- [x] **DLVR-03**: User can download individual completed videos from the UI
+- [x] **DLVR-04**: User can download all completed videos from a batch as a ZIP file
 
-### HuggingFace Integration
+### Error Handling & Credits
 
-- [x] **HF-01**: Admin can paste HuggingFace model URL into download interface
-- [x] **HF-02**: System validates HuggingFace URL before starting download
-- [x] **HF-03**: System downloads HuggingFace model directly to RunPod network volume (no local intermediary)
-- [x] **HF-04**: Download progress shows percentage and file size being downloaded
-- [x] **HF-05**: HuggingFace downloads run as background jobs (not blocking HTTP requests)
-- [x] **HF-06**: Admin can select target directory on volume for downloaded model
-- [x] **HF-07**: System handles HuggingFace authentication for gated models
+- [x] **ERRR-01**: Failed videos show error message and a retry button
+- [x] **ERRR-02**: Transient errors (network, 5xx) auto-retry up to 2 times with backoff
+- [x] **ERRR-03**: Credit exhaustion is detected and batch pauses automatically (all remaining videos set to paused, not failed)
+- [x] **ERRR-04**: User sees a clear notification explaining the pause with guidance to add Freepik credits
+- [x] **ERRR-05**: User can resume a paused batch and processing continues from where it left off
 
-### Dockerfile Editor
+### Infrastructure
 
-- [x] **DOCKER-01**: Admin can view the configured Dockerfile from GitHub repository
-- [x] **DOCKER-02**: Admin can open Dockerfile in in-browser code editor
-- [x] **DOCKER-03**: Code editor displays Dockerfile syntax highlighting (FROM, RUN, COPY, ENV, etc.)
-- [x] **DOCKER-04**: Code editor shows line numbers
-- [x] **DOCKER-05**: Code editor supports undo/redo operations
-- [x] **DOCKER-06**: Editor indicates when file has unsaved changes
-- [x] **DOCKER-07**: Admin can save Dockerfile changes with custom commit message
+- [x] **INFR-01**: Database schema supports batch and per-video tracking (new tables/migration)
+- [x] **INFR-02**: Freepik API key stored as backend environment variable (FREEPIK_API_KEY)
+- [x] **INFR-03**: New feature page linked from homepage, accessible to all authenticated users
+- [x] **INFR-04**: Backend batch processor survives server restarts (resumes interrupted batches on startup)
 
-### GitHub Integration
+## Future Requirements
 
-- [x] **GIT-01**: System commits Dockerfile changes to GitHub repository
-- [x] **GIT-02**: System pushes commit to correct branch (triggers RunPod rebuild)
-- [x] **GIT-03**: GitHub credentials stored securely (encrypted, server-side only)
-- [x] **GIT-04**: System detects merge conflicts and aborts with error message
-- [x] **GIT-05**: Admin receives confirmation when push succeeds
-- [x] **GIT-06**: System provides meaningful error message if push fails
+Deferred to future milestone. Tracked but not in current roadmap.
 
-## v2 Requirements
+### Upload Enhancements
 
-Deferred to future release. Tracked but not in current roadmap.
+- **UPLD-05**: User can upload videos directly from Google Drive (browse and select)
+- **UPLD-06**: Per-video settings override (expand panel on each queue item to customize individual settings)
 
-### Dockerfile Templates
+### UX Enhancements
 
-- **TMPL-01**: System provides base Dockerfile template
-- **TMPL-02**: Admin can create per-workflow customizations on top of base template
-- **TMPL-03**: System shows diff between base and customized template
-
-### Model Management
-
-- **MODEL-01**: Admin can assign downloaded models to specific workflows
-- **MODEL-02**: Admin can view which models are used by which workflows
-- **MODEL-03**: System warns before deleting models that are assigned to workflows
-
-### Advanced File Operations
-
-- **BULK-01**: Admin can select multiple files for bulk operations
-- **BULK-02**: Admin can delete multiple files in one operation
-- **BULK-03**: Admin can move multiple files to different directory
-- **SEARCH-01**: Admin can search files by name
-- **SEARCH-02**: Admin can filter files by type or modification date
-- **FOLDER-01**: Admin can create new folders on network volume
-
-### Auditing
-
-- **AUDIT-01**: System logs all file operations (who, what, when)
-- **AUDIT-02**: System logs all Dockerfile edits and GitHub pushes
-- **AUDIT-03**: Admin can view audit log with filters
-
-### Deployment Tracking
-
-- **DEPLOY-01**: System shows GitHub commit status (pending/success/failure)
-- **DEPLOY-02**: System shows RunPod rebuild progress after GitHub push
-- **DEPLOY-03**: Admin receives notification when rebuild completes
-
-### Editor Enhancements
-
-- **EDIT-01**: Editor shows diff view before committing changes
-- **EDIT-02**: System validates Dockerfile syntax before allowing commit
-- **EDIT-03**: Editor supports multiple tabs for editing multiple Dockerfiles
+- **UX-01**: Preset buttons for common configurations ("Standard", "Cinematic", "Animation")
+- **UX-02**: Before/after video comparison viewer (side-by-side or slider)
+- **UX-03**: Video trimming to work around duration limits
 
 ## Out of Scope
 
@@ -124,14 +76,11 @@ Explicitly excluded. Documented to prevent scope creep.
 
 | Feature | Reason |
 |---------|--------|
-| Real-time collaborative editing | Single admin use case, no multi-user editing needed |
-| Version control UI (history, branches, PRs) | GitHub already provides this, just edit and push |
-| Full RunPod dashboard recreation | Only need file management and Dockerfile editing, not metrics/logs/billing |
-| Automated model optimization or conversion | Manual download and deployment is sufficient |
-| RunPod job orchestration | Out of scope - app already has job tracking for AI workflows |
-| Direct S3 bucket management | Only managing RunPod network volume, not arbitrary S3 buckets |
-| File preview/rendering (images, PDFs) | Not needed for model files and Dockerfiles |
-| Drag-and-drop file upload from desktop | Standard file picker is sufficient |
+| Parallel API submissions | Sequential required per PROJECT.md; rate limits make parallelism counterproductive |
+| Real-time credit balance display | Freepik API does not expose a balance endpoint |
+| Multi-API backend support | This milestone is specifically Freepik; ComfyUI upscale already exists separately |
+| Freepik account management UI | API key is a backend env var; credit management done on Freepik's site |
+| Upload from Google Drive | Planned for future milestone |
 
 ## Traceability
 
@@ -139,56 +88,39 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ADMIN-01 | Phase 1 | Complete |
-| ADMIN-02 | Phase 1 | Complete |
-| ADMIN-03 | Phase 1 | Complete |
-| ADMIN-04 | Phase 1 | Complete |
-| VOL-01 | Phase 2 | Complete |
-| VOL-02 | Phase 2 | Complete |
-| VOL-03 | Phase 2 | Complete |
-| VOL-04 | Phase 6.1 (gap closure) | Complete |
-| VOL-05 | Phase 2 | Complete |
-| UPLOAD-01 | Phase 3 | Complete |
-| UPLOAD-02 | Phase 3 | Complete |
-| UPLOAD-03 | Phase 3 | Complete |
-| UPLOAD-04 | Phase 3 | Complete |
-| UPLOAD-05 | Phase 3 | Complete |
-| DWNLD-01 | Phase 3 | Complete |
-| DWNLD-02 | Phase 3 | Complete |
-| DWNLD-03 | Phase 3 | Complete |
-| DWNLD-04 | Phase 3 | Complete |
-| FILEOP-01 | Phase 4 | Complete |
-| FILEOP-02 | Phase 4 | Complete |
-| FILEOP-03 | Phase 4 | Complete |
-| FILEOP-04 | Phase 4 | Complete |
-| FILEOP-05 | Phase 4 | Complete |
-| FILEOP-06 | Phase 4 | Complete |
-| HF-01 | Phase 5 | Complete |
-| HF-02 | Phase 5 | Complete |
-| HF-03 | Phase 5 | Complete |
-| HF-04 | Phase 5 | Complete |
-| HF-05 | Phase 5 | Complete |
-| HF-06 | Phase 5 | Complete |
-| HF-07 | Phase 5 | Complete |
-| DOCKER-01 | Phase 6 | Complete |
-| DOCKER-02 | Phase 6 | Complete |
-| DOCKER-03 | Phase 6 | Complete |
-| DOCKER-04 | Phase 6 | Complete |
-| DOCKER-05 | Phase 6 | Complete |
-| DOCKER-06 | Phase 6 | Complete |
-| DOCKER-07 | Phase 6 | Complete |
-| GIT-01 | Phase 7 | Complete |
-| GIT-02 | Phase 7 | Complete |
-| GIT-03 | Phase 7 | Complete |
-| GIT-04 | Phase 7 | Complete |
-| GIT-05 | Phase 7 | Complete |
-| GIT-06 | Phase 7 | Complete |
+| UPLD-01 | Phase 13 | Complete |
+| UPLD-02 | Phase 13 | Complete |
+| UPLD-03 | Phase 13 | Complete |
+| UPLD-04 | Phase 13 | Complete |
+| SETT-01 | Phase 10 | Complete |
+| SETT-02 | Phase 10 | Complete |
+| QUEU-01 | Phase 10 | Complete |
+| QUEU-02 | Phase 10 | Complete |
+| QUEU-03 | Phase 11 | Complete |
+| STAT-01 | Phase 13 | Complete |
+| STAT-02 | Phase 13 | Complete |
+| STAT-03 | Phase 13 | Complete |
+| STAT-04 | Phase 13 | Pending |
+| STAT-05 | Phase 13 | Pending |
+| DLVR-01 | Phase 12 | Complete |
+| DLVR-02 | Phase 12 | Complete |
+| DLVR-03 | Phase 12 | Complete |
+| DLVR-04 | Phase 12 | Complete |
+| ERRR-01 | Phase 11 | Complete |
+| ERRR-02 | Phase 11 | Complete |
+| ERRR-03 | Phase 11 | Complete |
+| ERRR-04 | Phase 11 | Complete |
+| ERRR-05 | Phase 11 | Complete |
+| INFR-01 | Phase 10 | Complete |
+| INFR-02 | Phase 10 | Complete |
+| INFR-03 | Phase 13 | Complete |
+| INFR-04 | Phase 10 | Complete |
 
 **Coverage:**
-- v1 requirements: 44 total
-- Mapped to phases: 44
+- v1.1 requirements: 27 total
+- Mapped to phases: 27
 - Unmapped: 0
 
 ---
-*Requirements defined: 2026-03-04*
-*Last updated: 2026-03-04 after roadmap creation*
+*Requirements defined: 2026-03-11*
+*Last updated: 2026-03-11 after roadmap creation*

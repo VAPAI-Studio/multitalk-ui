@@ -1,290 +1,449 @@
-# Pitfalls Research: Infrastructure Management for sideOUTsticks
+# Domain Pitfalls: Batch Video Upscale with Freepik API
 
-**Research Date:** 2026-03-04
-**Domain:** File browser, code editor, and GitHub integration for RunPod infrastructure management
-**Downstream Consumer:** Roadmap/planning — prevention strategies for each phase
+**Domain:** Batch video upscaling via external credit-based API on Heroku-hosted FastAPI app
+**Researched:** 2026-03-11
+**Milestone:** v1.1 Batch Video Upscale
+**Overall confidence:** HIGH (based on codebase analysis, existing patterns, official Heroku/Supabase docs, and Freepik API documentation)
 
 ---
 
-## Pitfall 1: Treating the Network Volume File Browser Like a Local Filesystem
+## Critical Pitfalls
 
-**What goes wrong:** Teams build file browsers against S3-backed storage (like RunPod network volumes) as if they are local filesystems with instant operations. S3 is an object store with eventual consistency for listing operations, no true directory concept (prefixes simulate folders), and latency on operations that users expect to be instant (rename, move). The UI freezes or returns stale results when navigating deep folder structures containing thousands of model files (safetensors, checkpoints, LoRA weights often numbering 10,000+ files across nested directories).
+Mistakes that cause rewrites, data loss, or broken user experience at the architectural level.
+
+---
+
+### Pitfall 1: Batch State Lost on Heroku Dyno Restart
+
+**What goes wrong:** The app currently uses in-memory job stores for background processing (see `hf_download_service.py` lines 22-23: `_HF_JOBS: dict[str, dict] = {}`). If the same pattern is used for the batch upscale queue, all batch state -- which videos are pending, which is currently processing, what the overall batch progress is -- vanishes whenever Heroku restarts the dyno. Heroku performs at least one daily restart ("dyno cycling"), plus restarts on deploy, config var changes, or scaling events. A user who queues 10 videos goes to bed, and wakes up to find 3 completed, 7 vanished, and no record of the batch ever existing.
+
+**Why it happens:** The in-memory pattern was acceptable for HuggingFace downloads because that was a single-admin, opportunistic use case. Batch video upscale is a multi-user, mission-critical workflow where users expect reliability. The architectural shortcut that worked for v1.0 infrastructure management becomes a critical flaw for v1.1.
+
+**Consequences:**
+- Users lose queued videos mid-batch with no recovery path
+- Credit spent on completed-but-untracked videos is wasted (no record of output URLs)
+- Resuming after restart is impossible because the batch context is gone
+- Pause-and-notify feature is meaningless if the "paused" state does not survive restart
 
 **Warning signs:**
-- File listing calls take >2 seconds after initial load
-- "Rename" or "move" operations take noticeably longer than expected (they are copy + delete under the hood in S3)
-- Users see stale directory listings after uploads complete
-- Frontend paginated list shows inconsistent item counts between refreshes
-- Delete operations appear to succeed but files reappear on refresh
+- Using `dict` or module-level variables to track batch/queue state
+- No database table for batch metadata (only individual video jobs)
+- Background tasks launched via `asyncio.create_task()` without persistence
+- Tests pass locally but production users report "disappeared" jobs
 
-**Prevention strategy:**
-- Design the file browser API with explicit pagination and cursor-based listing from day one (not offset-based)
-- Implement server-side caching of directory listings with cache invalidation on mutation operations
-- Use a loading/skeleton UI for directory contents rather than blocking render
-- Implement optimistic UI updates: when user deletes/renames a file, immediately update the frontend list and reconcile on next fetch
-- Make "move" and "rename" async operations with progress indicators since they are copy+delete on S3
-- Limit initial listing depth to 1 level; lazy-load subdirectories on expand
+**Prevention:**
+- Store ALL batch and queue state in Supabase from the start: a `batches` table (batch_id, user_id, status, total_videos, completed_count, paused_at, resumed_at) and a `batch_videos` table (batch_video_id, batch_id, video_index, status, freepik_task_id, input_url, output_url, error_message, credits_used)
+- The batch processing loop must be re-entrant: on startup, query for batches with status "processing" or "paused" and resume them
+- Use `@app.on_event("startup")` to scan for orphaned batches and either resume or mark them as "interrupted"
+- Each state transition (pending -> uploading -> submitted -> processing -> completed/failed) must be a database write BEFORE the next action
 
-**Phase:** Phase 1 (Network Volume File Browser) — must be addressed in initial API design
+**Detection:** Check if batch state survives `heroku ps:restart`. If not, this pitfall is active.
+
+**Phase:** Phase 1 (Database Schema + Batch Service) -- foundational, must be the first thing built
 
 ---
 
-## Pitfall 2: Blocking the UI During Large File Transfers to RunPod Volumes
+### Pitfall 2: Heroku 30-Second Timeout Killing Batch Submission Requests
 
-**What goes wrong:** HuggingFace model downloads (safetensors, GGUF files) commonly range from 2-15 GB per file. Teams implement download-to-volume as a synchronous backend request that either times out (60-second default in the existing apiClient) or blocks the user from doing anything else. The FastAPI endpoint holds the request open while streaming gigabytes, consuming server resources and hitting Heroku's 30-second request timeout.
+**What goes wrong:** The user uploads 10 videos, the frontend sends them to the backend, and the backend tries to validate all files, upload each to Freepik, and start the batch -- all within a single HTTP request. This request easily exceeds Heroku's hard 30-second router timeout (H12 error). The request is terminated mid-processing, and the user sees a generic error. Some videos may have been submitted to Freepik but the response never reaches the client, creating orphaned tasks consuming credits.
+
+**Why it happens:** The existing workflow submission pattern (see `runpod_service.py`, `comfyui_service.py`) handles single-item submissions that complete in <5 seconds. Developers apply the same single-request pattern to batch operations without accounting for the multiplicative time cost.
+
+**Consequences:**
+- H12 timeout errors for batches larger than 2-3 videos
+- Orphaned Freepik tasks consuming credits without tracking
+- Inconsistent state: some videos submitted, others not, user does not know which
+- Users retry the submission, creating duplicate Freepik tasks and burning more credits
 
 **Warning signs:**
-- HTTP 504 Gateway Timeout errors on large model downloads
-- Heroku H12 Request Timeout errors in logs
-- Users refreshing the page thinking the download is stuck, causing duplicate downloads
-- Backend memory consumption spikes during file transfers
-- Frontend timeout at 60 seconds (current apiClient.ts timeout) kills in-progress transfers
+- Batch submission endpoint does more than accept-and-acknowledge
+- No immediate HTTP response with batch ID before processing begins
+- Freepik API calls happening inside the request handler (not in a background task)
+- Any single endpoint exceeding 5-second response time
 
-**Prevention strategy:**
-- Model downloads must be fire-and-forget async jobs, not synchronous HTTP requests
-- Create a `download_jobs` table or reuse the existing job tracking pattern to track download progress
-- Backend endpoint accepts the HuggingFace URL, validates it, creates a job record, and returns immediately with a job ID
-- A background task (asyncio.create_task or a queue worker) handles the actual download, streaming directly from HuggingFace to the RunPod volume without buffering the full file in memory
-- Frontend polls the job status (or uses SSE) to show download progress with percentage, speed, and ETA
-- Implement cancellation support so users can abort a stuck download
-- Never proxy large files through the backend; use presigned URLs or direct server-to-server transfer where possible
+**Prevention:**
+- The batch submission endpoint must follow a fire-and-forget pattern:
+  1. Accept the video list and parameters (validate input format only)
+  2. Create the batch record and individual video records in Supabase with status "pending"
+  3. Return immediately with the batch ID (response time <1 second)
+  4. Launch the batch processing loop as a background task
+- Frontend receives the batch ID instantly and starts polling for status
+- Each video upload to Freepik happens sequentially in the background task, not in the request handler
+- The background task updates the database after each individual video submission
 
-**Phase:** Phase 1 (File Upload/Download + HuggingFace Direct Download) — architectural decision needed before any implementation
+**Detection:** Time the batch submission endpoint. If it takes more than 2 seconds for 5+ videos, this pitfall is active.
+
+**Phase:** Phase 1 (API Design) -- the endpoint contract must be fire-and-forget from day one
 
 ---
 
-## Pitfall 3: Building the Dockerfile Editor Without Understanding the Existing Template Pattern
+### Pitfall 3: Credit Exhaustion Detection as an Afterthought
 
-**What goes wrong:** The project already has a "base template + per-workflow customization" pattern for Dockerfiles, stored in GitHub. Teams build a generic code editor that lets users edit arbitrary Dockerfile content, then discover that edits break the base template inheritance, or that the editor does not understand which lines come from the base template (read-only) vs. which are per-workflow customizations (editable). Users overwrite shared base layers, causing all workflow images to rebuild from scratch.
+**What goes wrong:** The batch processor submits videos to Freepik one by one. Video #6 out of 10 fails with a credit exhaustion error (likely HTTP 402 or 429 with a specific error body). But the error handling treats this like any other failure -- marks video #6 as "failed" and moves to video #7, which also fails, and #8, and so on. The user sees 6 individual failures instead of one clear "credits exhausted -- batch paused" message. Worse, each failed submission may still consume an API request against rate limits.
+
+**Why it happens:** Credit exhaustion is a fundamentally different error category from other API failures (network timeout, invalid parameters, server error). It affects ALL remaining videos in the batch, not just the current one. Treating it as a per-video error loses the ability to pause-and-resume intelligently.
+
+**Consequences:**
+- Remaining credits wasted on guaranteed-to-fail API calls
+- User sees N individual error messages instead of one actionable "credits exhausted" notification
+- No resume capability because the system does not distinguish "paused due to credits" from "failed due to error"
+- Rate limit quota consumed by submissions that will be rejected
 
 **Warning signs:**
-- Users accidentally editing base template content that should be shared across workflows
-- Docker builds taking 30+ minutes because base layer cache was invalidated by a small change
-- Merge conflicts when multiple workflows customize the same base template section
-- No visual distinction in the editor between inherited content and customizable content
-- Push to GitHub triggers rebuild of all workflow images instead of just the changed one
+- Error handling uses a generic `except Exception` for all Freepik API errors
+- No distinct batch status for "paused_credit_exhaustion"
+- The batch processor does not check remaining credits before each submission
+- No notification mechanism when the batch pauses
 
-**Prevention strategy:**
-- Before building the editor, document the exact structure of the Dockerfile template pattern: what is the base template, how do per-workflow customizations layer on top, and which sections are mutable
-- Design the editor UI to show base template content as read-only (grayed out or locked) with clearly marked editable sections
-- Validate Dockerfile syntax before allowing push (use a Dockerfile linter like hadolint or at minimum validate basic FROM/RUN/COPY structure)
-- Implement a preview/diff view showing what changed before pushing to GitHub
-- Consider a structured form-based approach for common customizations (add model path, add pip package) rather than free-text Dockerfile editing, reducing the risk of syntax errors
+**Prevention:**
+- Classify Freepik API errors into three categories:
+  1. **Retryable** (429 rate limit, 500/502/503 server errors) -- retry with exponential backoff
+  2. **Credit exhaustion** (402 or specific error code/message) -- pause the entire batch, notify user
+  3. **Permanent failure** (400 bad request, 422 validation error) -- mark this video as failed, continue to next
+- Add a `paused_credit_exhaustion` status to the batch, distinct from `paused` (user-initiated) and `failed`
+- Before each submission, optionally check a credits-remaining endpoint if Freepik provides one
+- When credit exhaustion is detected:
+  1. Update batch status to `paused_credit_exhaustion`
+  2. Store the index of the next video to process (resume point)
+  3. Send a notification to the user (store in database, show in UI on next poll)
+  4. Provide a "Resume" button that re-checks credits and continues from where it paused
 
-**Phase:** Phase 2 (Dockerfile Editor) — design decision needed before UI implementation
+**Detection:** Simulate credit exhaustion in tests by mocking a 402 response on video #3 of a 5-video batch. Verify the batch pauses and videos #4-5 remain "pending" (not "failed").
+
+**Phase:** Phase 2 (Credit Management) -- but the error classification must be designed in Phase 1's Freepik service
 
 ---
 
-## Pitfall 4: Storing GitHub Tokens Insecurely
+### Pitfall 4: Downloading Upscaled Videos Into Backend Memory Before Uploading
 
-**What goes wrong:** The GitHub integration requires push access to the repository containing Dockerfiles. Teams store the GitHub Personal Access Token (PAT) or GitHub App credentials in the same `.env` file alongside other secrets, log it in error messages (the existing codebase already has this pattern with RunPod API keys per CONCERNS.md), or worse, store it in the database or expose it to the frontend. A leaked GitHub token with push access allows arbitrary code execution in the CI/CD pipeline.
+**What goes wrong:** When Freepik completes a video upscale, the result is available as a download URL. The backend downloads the full upscaled video into memory (using `httpx.get()` returning `.content`), then uploads it to Supabase Storage, then uploads it again to Google Drive. The existing `storage_service.py` does exactly this pattern (line 98: `video_content = video_response.content`) and the `google_drive_service.py` uses `MediaInMemoryUpload` (line 235). A 4K upscaled video can be 50-200 MB. Processing 3-4 such videos concurrently on Heroku's 512 MB memory limit causes OOM crashes (R14/R15 errors), killing the dyno and all running batch operations.
+
+**Why it happens:** The existing upload pattern was designed for ComfyUI outputs that are typically small (5-20 MB). Video upscaling outputs are an order of magnitude larger. The same code patterns that work for small files cause memory exhaustion for large files.
+
+**Consequences:**
+- R14 (Memory Quota Exceeded) warnings, then R15 (Memory Quota Vastly Exceeded) dyno kills
+- All in-progress requests fail when the dyno crashes
+- Other users' operations are affected (not just the upscale user)
+- If batch state is in-memory, all progress is lost (compounds Pitfall 1)
 
 **Warning signs:**
-- GitHub PAT appears in backend error logs or Heroku log drain
-- Token stored in Supabase database rather than environment variables
-- Frontend code contains or receives the GitHub token
-- Token has overly broad scopes (repo:admin instead of just contents:write on a single repo)
-- No token rotation strategy; same token used for months
+- `video_response.content` used to download large files (loads entire response into memory)
+- `MediaInMemoryUpload` used for Google Drive uploads of large files
+- Memory usage spikes during video download/upload operations
+- R14 errors in Heroku logs during batch processing
 
-**Prevention strategy:**
-- Use a GitHub App with minimal scopes (contents:write on the specific repository only) instead of a personal access token
-- Store credentials exclusively in environment variables (Heroku config vars for production), never in the database
-- Implement the secret redaction pattern recommended in CONCERNS.md before adding the GitHub integration
-- The backend GitHub service must never include tokens in error messages, log entries, or API responses
-- Add the GitHub token to a deny-list in any structured logging implementation
-- Document token rotation procedure and set calendar reminders
-- Frontend must never receive or handle GitHub credentials; all Git operations happen server-side
+**Prevention:**
+- Stream the upscaled video download using `httpx` streaming: `async with client.stream("GET", url) as response: async for chunk in response.aiter_bytes(chunk_size=1_048_576):`
+- For Supabase Storage: use streaming upload or write to a temporary file and upload from disk (Heroku dynos have ~4 GB ephemeral disk space, far more than memory)
+- For Google Drive: replace `MediaInMemoryUpload` with `MediaFileUpload` using a temporary file, or use `MediaIoBaseUpload` with a streaming wrapper
+- Process batch videos strictly one at a time (never concurrent downloads/uploads)
+- Add memory monitoring: log process memory before and after each video processing cycle
+- Set a maximum file size guard: if the upscaled video exceeds a configurable limit (e.g., 300 MB), warn the user or refuse the operation
 
-**Phase:** Phase 2 (GitHub Integration) — must be resolved before any code that touches GitHub credentials
+**Detection:** Monitor Heroku memory usage during upscale processing. If memory exceeds 400 MB during a single video download, this pitfall is active.
+
+**Phase:** Phase 3 (Output Delivery) -- but the streaming architecture decision must be made in Phase 1
 
 ---
 
-## Pitfall 5: The GitHub Push Triggering Uncontrolled RunPod Rebuilds
+### Pitfall 5: Dual-Destination Upload Without Atomicity
 
-**What goes wrong:** The Dockerfile editor pushes to GitHub, which triggers a CI/CD pipeline that rebuilds and deploys the RunPod serverless endpoint. If there is no confirmation step, a user making rapid iterative edits triggers multiple concurrent builds. RunPod endpoint deployments can take 10-20 minutes per workflow, and concurrent deployments can leave endpoints in an inconsistent state where some requests go to the old version and some to the new.
+**What goes wrong:** Each completed video must be uploaded to both Supabase Storage (for in-app viewing) and Google Drive (for project delivery). The implementation uploads to Supabase first, succeeds, then uploads to Google Drive, which fails (network timeout, Google API rate limit, Drive quota exceeded). Now the video exists in Supabase but not in Drive. The system marks the video as "completed" because the Supabase upload worked, but the user's Google Drive project folder is missing the video. Or worse: Supabase upload fails, Google Drive upload succeeds, and the video is in Drive but not viewable in the app.
+
+**Why it happens:** Distributed systems cannot guarantee atomicity across two independent storage services without a coordination mechanism. Developers treat the dual upload as a simple sequential operation, but partial failures create inconsistent state.
+
+**Consequences:**
+- Videos missing from one storage destination with no indication to the user
+- Manual intervention required to fix inconsistent state
+- If the video is marked "completed" after the first upload, retrying only uploads to the second destination is complex
+- Google Drive failures may be transient but are not retried
 
 **Warning signs:**
-- Multiple GitHub Actions runs queued for the same workflow within minutes
-- RunPod endpoint returning mixed results (old handler vs new handler)
-- Build costs spiking because every small edit triggers a full Docker rebuild
-- Users confused about which version is deployed
-- No way to roll back a bad deployment
+- Sequential upload to Supabase then Drive with a single "completed" status at the end
+- No per-destination upload status tracking
+- No retry mechanism for the second upload if the first succeeds
+- Google Drive errors logged but not surfaced to the user
 
-**Prevention strategy:**
-- Add a confirmation dialog before push: show the diff, list which workflows will be affected, and require explicit user confirmation
-- Implement a debounce mechanism: allow multiple edits but only push after a configurable delay (e.g., "Save Draft" vs "Deploy")
-- Track deployment state in the UI: show which version is currently deployed, which is building, and whether it succeeded or failed
-- Implement deployment locking: prevent new pushes while a build is in progress for the same workflow
-- Add a rollback mechanism: store the previous Dockerfile version so users can revert if a deployment breaks
-- Consider a "staging" branch pattern: push to a staging branch, validate the build, then promote to production branch
+**Prevention:**
+- Track upload status per destination: `supabase_upload_status` and `drive_upload_status` columns on the batch_videos table
+- Mark the video as "completed" only when BOTH uploads succeed (or when Drive is not configured)
+- Implement independent retry for each destination: if Supabase succeeds but Drive fails, retry Drive without re-downloading the video
+- Use a temporary file on disk as an intermediary: download once, upload to both destinations from the temp file, then clean up
+- Add a "repair" mechanism: an endpoint or background job that finds videos with partial upload status and retries the missing destination
+- Make Google Drive upload optional (graceful degradation): if Drive is not configured or the user has no project context, skip Drive upload without failing the entire operation
 
-**Phase:** Phase 2 (GitHub Integration) — must be designed into the push workflow from the start
+**Detection:** Simulate a Google Drive API failure during upload. Verify that the video appears in Supabase and that Drive upload is retried on the next processing cycle.
+
+**Phase:** Phase 3 (Output Delivery) -- the per-destination status tracking must be in the database schema from Phase 1
 
 ---
 
-## Pitfall 6: Admin Access Control Bolted On After Features Are Built
+## Moderate Pitfalls
 
-**What goes wrong:** The new features (file browser, Dockerfile editor, GitHub push) are built first, then admin-only access control is added as an afterthought. The existing codebase has no role-based access control (CONCERNS.md confirms RLS is disabled and there is no admin role). Retrofitting access control after endpoints exist leads to missed routes, inconsistent enforcement, and a false sense of security where some admin endpoints are protected but others are forgotten.
+Mistakes that cause degraded experience, wasted resources, or technical debt.
+
+---
+
+### Pitfall 6: Polling Freepik Status Too Aggressively or Too Lazily
+
+**What goes wrong:** Freepik's video upscaler is async: you submit a task and poll for completion. Two failure modes exist. **Too aggressive:** Polling every 1-2 seconds burns through rate limits (Freepik allows 50 hits/second burst, 10 hits/second sustained) and provides no benefit since video upscaling takes minutes. With a batch of 10 videos, aggressive polling generates 600+ requests per minute. **Too lazy:** Polling every 60 seconds means the user waits up to 60 seconds after completion before seeing their result, and the batch sits idle between videos unnecessarily.
+
+**Why it happens:** The existing ComfyUI polling in `startJobMonitoring` (frontend) and RunPod polling (3-second intervals per PROJECT.md) were tuned for fast operations. Developers copy these intervals without considering that Freepik video upscaling takes 2-10 minutes per video.
+
+**Consequences:**
+- Aggressive: Rate limit exhaustion (429 errors), Freepik may throttle or block the API key
+- Aggressive: Unnecessary load on Heroku dyno spending CPU on HTTP requests
+- Lazy: Poor user experience, batch throughput reduced due to idle time between videos
+- Both: Credits potentially wasted if rate limits interfere with task submission
+
+**Prevention:**
+- Use exponential backoff polling: start at 5-second intervals, increase to 10, 20, 30 seconds, cap at 30 seconds
+- Alternatively, use adaptive polling: poll at 5-second intervals for the first 30 seconds, then 15-second intervals thereafter
+- If Freepik supports webhooks (the image upscaler has an optional `webhook_url` parameter), investigate whether the video upscaler supports them too -- this eliminates polling entirely
+- Track the average processing time per resolution/settings combination and use it to estimate when to start polling
+- Backend does the polling (not the frontend), updating the database. Frontend polls the backend at a reasonable interval (3-5 seconds) for UI updates
+
+**Detection:** Count Freepik API status-check calls per video. If >50 calls per video, polling is too aggressive. If average idle time after completion is >30 seconds, polling is too lazy.
+
+**Phase:** Phase 2 (Freepik Service Implementation)
+
+---
+
+### Pitfall 7: Frontend Upload of Large Video Files Hitting Heroku Timeout
+
+**What goes wrong:** Users select 10 videos (each 50-100 MB) for batch upload. The frontend sends them to the backend in a single multipart POST request. Heroku's 30-second timeout kills the upload before all files transfer. Even if sent as individual uploads, each large video upload can exceed 30 seconds on slower connections.
+
+**Why it happens:** The existing file upload patterns handle small images (<10 MB) and audio files. Video files for upscaling are substantially larger, and batch upload multiplies the problem.
+
+**Consequences:**
+- Upload failures for batches with large or numerous videos
+- Users unsure which files were received and which were not
+- Retry uploads the entire batch, including already-uploaded files
+
+**Prevention:**
+- Upload videos individually, not as a batch: frontend sends each video as a separate upload request, tracking upload progress per video
+- Use chunked/resumable uploads for large videos (Supabase Storage supports TUS protocol for resumable uploads up to 50 GB)
+- Store uploaded videos in a staging area (Supabase Storage or temp bucket) before batch submission
+- The batch submission request sends only the storage references (URLs or paths), not the actual video data
+- Frontend shows per-video upload progress with the ability to retry individual failed uploads
+- Set file size limits: validate on the frontend before upload begins (e.g., max 500 MB per video, max 2 GB total batch)
+
+**Detection:** Test uploading a 100 MB video file through the backend on Heroku. If it returns H12, this pitfall is active.
+
+**Phase:** Phase 1 (Frontend Upload Component + Backend Upload Endpoint)
+
+---
+
+### Pitfall 8: Freepik API Documentation Gap for Video Upscaler
+
+**What goes wrong:** Research shows that Freepik's API documentation (docs.freepik.com) extensively covers the image upscaler endpoints but has limited or no public documentation for a dedicated video upscaler API endpoint. The PROJECT.md references `api.freepik.com/v1/ai/video-upscaler` as the endpoint, but this may be based on internal knowledge, early API access, or an endpoint that is not yet publicly documented. Building against an undocumented or beta API means the endpoint behavior, error codes, rate limits, and pricing may change without notice.
+
+**Why it happens:** Freepik launched the video upscaler as a UI product (freepik.com/ai/video-upscaler) powered by Topaz technology. The API access may be newer or restricted to certain tiers. The llms-full.txt documentation dump does not mention a video upscaler endpoint.
+
+**Consequences:**
+- API endpoint URL, parameters, or response format may differ from assumptions
+- Credit consumption per video may be higher than expected (frame-based pricing for video can be 10-50x more than a single image upscale)
+- Rate limits specific to the video upscaler may be stricter than the general API rate limits
+- Breaking changes without deprecation notices (beta/undocumented APIs have no stability guarantees)
+
+**Prevention:**
+- Before writing any code, verify the exact API contract: make a manual test call to `api.freepik.com/v1/ai/video-upscaler` with a real API key and a test video
+- Document the actual request/response format, error codes, and credit consumption from the test
+- Build the Freepik service layer with an abstraction that isolates API-specific details (endpoint URL, parameter names, response parsing) so changes can be absorbed in one place
+- Implement a health check endpoint that verifies the Freepik video upscaler API is accessible and the API key is valid
+- Add defensive parsing for the API response: do not assume field names or structure, validate and log unexpected responses
+- Pin to a specific API version if Freepik supports versioning
+
+**Detection:** The very first integration task should be a standalone script that submits a test video and polls to completion. If this fails, escalate before building the full service.
+
+**Phase:** Phase 0 (Pre-implementation validation) -- must be verified before any development begins
+
+---
+
+### Pitfall 9: Batch Processing Loop Not Surviving Background Task Failures
+
+**What goes wrong:** The batch processor runs as a Python `asyncio.create_task()` background task. If any unhandled exception occurs (network error, JSON parse error, unexpected API response structure), the entire task crashes. The batch is now stuck: some videos processed, the rest in "pending" forever. No error is logged because the task's exception is only raised if you `await` it, and fire-and-forget tasks do not do this.
+
+**Why it happens:** Python's `asyncio.create_task()` silently swallows exceptions from unawaited tasks (only emitting a warning on garbage collection). The existing HuggingFace download service wraps the blocking function in `asyncio.to_thread()` which provides better exception isolation, but a pure-async batch loop has this vulnerability.
+
+**Consequences:**
+- Batch silently stops processing with no error visible to the user
+- "Pending" videos remain pending indefinitely
+- Python emits "Task exception was never retrieved" warning to stderr, which may not be monitored
+- User has no way to restart or resume the batch because the system thinks it is still "processing"
 
 **Warning signs:**
-- Some infrastructure management endpoints accessible without admin check
-- `get_current_user()` dependency does not distinguish admin from regular user
-- No database field or Supabase metadata marking users as admin
-- Frontend shows admin UI elements to non-admin users (just hidden behind a feature flag, not access-controlled)
-- Test suite does not verify that non-admin users are rejected from admin endpoints
+- `asyncio.create_task()` called without storing the task reference
+- No `try/except` wrapping the entire batch processing loop
+- No "heartbeat" or "last_updated_at" timestamp on the batch record
+- No stale-batch detection on server startup
 
-**Prevention strategy:**
-- Define the admin role mechanism before building any infrastructure management feature: add an `is_admin` field to user metadata in Supabase, or use Supabase custom claims
-- Create a `get_admin_user()` FastAPI dependency that extends `get_current_user()` with an admin check, returning 403 Forbidden for non-admins
-- Apply `get_admin_user()` to every infrastructure management endpoint from the very first endpoint created
-- Frontend must check admin status before rendering infrastructure management UI (not just hiding elements with CSS)
-- Write tests that verify non-admin users receive 403 on all admin endpoints
-- Consider a middleware approach that protects all routes under `/api/admin/` prefix, so new endpoints automatically inherit protection
+**Prevention:**
+- Wrap the entire batch processing loop in a top-level `try/except Exception` that catches ALL errors, logs them, and updates the batch status to "error" in the database
+- Store the task reference and add a `done_callback` that checks for exceptions: `task.add_done_callback(lambda t: handle_task_error(t, batch_id))`
+- Update a `last_heartbeat` timestamp on the batch record every processing cycle (every 30-60 seconds)
+- Add a startup check that finds batches with status "processing" but `last_heartbeat` older than 5 minutes, and either resumes or marks them as "interrupted"
+- Each individual video processing step should have its own try/except so one video failure does not crash the loop
+- Log every state transition with batch_id and video_id for debugging
 
-**Phase:** Phase 1 (before any infrastructure feature) — foundational requirement
+**Detection:** Kill the batch processing task mid-execution (e.g., raise an exception in a mock). Verify that the batch is marked as "error" or "interrupted" and can be resumed.
 
----
-
-## Pitfall 7: File Browser Not Handling RunPod Volume Concurrency
-
-**What goes wrong:** The RunPod network volume is shared across multiple serverless workers and potentially multiple workflow endpoints. While a user is browsing files or uploading a model, a RunPod worker may be reading the same files for inference, or another admin session may be modifying the same directory. Teams build the file browser assuming exclusive access, leading to operations that fail silently or corrupt files when concurrent access occurs.
-
-**Warning signs:**
-- File deletion succeeds in UI but RunPod worker fails with "file not found" mid-inference
-- Upload appears complete but file is truncated (worker was reading during write)
-- Directory listing shows files that were just deleted (caching + concurrent modification)
-- Two admin sessions move the same file to different locations simultaneously
-
-**Prevention strategy:**
-- Display clear warnings when modifying files that are part of active workflow configurations (cross-reference the model assignment database)
-- Implement advisory locking at the application level: when an admin starts a file operation, mark the path as "in use" and prevent concurrent modifications
-- Never delete model files that are currently assigned to active workflows without explicit confirmation
-- Add a "models in use" indicator in the file browser that shows which files are referenced by workflow configurations
-- Design uploads to use a temporary location (upload to `.tmp/` prefix, then atomic rename on completion) to prevent workers from reading partial files
-- Consider making destructive operations (delete, move) require a second confirmation if the file is large or referenced by workflows
-
-**Phase:** Phase 1 (File Operations) — must be considered during file operation API design
+**Phase:** Phase 2 (Batch Processing Loop) -- but the heartbeat column must be in the Phase 1 schema
 
 ---
 
-## Pitfall 8: Monolithic API Client Growing Unmanageable
+### Pitfall 10: Rate Limit Handling Conflated with Credit Exhaustion
 
-**What goes wrong:** The existing `apiClient.ts` is already 1,181 lines (flagged in CONCERNS.md). Adding file browser methods (list, upload, download, move, rename, delete), Dockerfile editor methods (load, save, push), and GitHub integration methods (status, push, rollback) will push it well past 1,500 lines. The file becomes impossible to review, test, or maintain. Every new feature adds to a single God object.
+**What goes wrong:** Freepik has two distinct limit systems: (1) rate limits (requests per second/day: 10 hits/s sustained, 50 hits/s burst; RPD varies by plan) and (2) credit-based pricing (per-frame costs). Developers treat both as the same error and either retry credit exhaustion (wasteful, will never succeed without adding credits) or pause-on-rate-limit (unnecessarily halts the batch when a simple backoff would resolve it).
 
-**Warning signs:**
-- `apiClient.ts` exceeding 1,500 lines
-- Merge conflicts on every PR because multiple features modify the same file
-- Methods with completely different error handling patterns coexisting in the same class
-- Difficulty writing focused unit tests because the class has too many responsibilities
-- Import of apiClient pulls in types and utilities for features the importing component does not use
+**Why it happens:** Both manifest as HTTP error responses (likely 429 for rate limits, 402 or a custom error for credits). Without parsing the response body or distinguishing the error codes, the handler cannot tell which limit was hit.
 
-**Prevention strategy:**
-- Before adding infrastructure management methods, refactor `apiClient.ts` into a modular structure: `apiClient/base.ts` (core request/retry/cache logic), `apiClient/jobs.ts` (job tracking), `apiClient/infrastructure.ts` (file browser + Dockerfile), `apiClient/github.ts` (GitHub operations)
-- Each module exports functions that use the shared base client
-- Re-export from `apiClient/index.ts` for backward compatibility
-- Alternatively, create a separate `infraClient.ts` for all infrastructure management API calls
-- Set a maximum file size linting rule (e.g., 500 lines per file) to prevent future growth
+**Consequences:**
+- Rate limit hit: batch pauses and notifies user to "add credits" (wrong -- just needs to wait)
+- Credit exhaustion: batch retries every 30 seconds for hours (wrong -- needs user action)
+- RPD (requests per day) limit exhaustion at 125/day (Tier 1): batch fails entirely with no explanation
 
-**Phase:** Phase 1 (before adding any new API methods) — refactoring prerequisite
+**Prevention:**
+- Parse the Freepik error response to distinguish rate limit (temporary) from credit exhaustion (requires user action) from RPD exhaustion (wait until tomorrow)
+- Implement three distinct handlers:
+  1. **Rate limit (per-second):** Exponential backoff, retry automatically (max 3 retries)
+  2. **Credit exhaustion:** Pause batch, notify user, wait for explicit resume
+  3. **RPD exhaustion:** Pause batch, calculate time until reset (midnight?), auto-resume or notify user
+- Track the daily request count locally to preemptively avoid RPD exhaustion (if at 120/125, pause and warn rather than hitting the 126th request and getting blocked)
+- Store the last rate limit error timestamp to calculate safe retry windows
 
----
+**Detection:** Mock three different error responses (429 rate limit, 402 no credits, 429 daily limit exceeded) and verify each triggers the correct handler.
 
-## Pitfall 9: Code Editor Integration Bloating the Frontend Bundle
-
-**What goes wrong:** Adding an in-browser code editor with Dockerfile syntax highlighting typically means adding Monaco Editor (~4 MB) or CodeMirror (~500 KB-1.5 MB with extensions). The existing frontend already has large un-code-split files (CONCERNS.md). Adding a heavyweight editor library without lazy loading causes initial page load to balloon, affecting all users even if they never use the Dockerfile editor (which is admin-only).
-
-**Warning signs:**
-- Frontend bundle size increases by >1 MB after adding editor
-- Time to interactive increases by >2 seconds
-- All users (including non-admin regular users) download the editor library on page load
-- Vite build warnings about chunk size exceeding recommended limits
-
-**Prevention strategy:**
-- Use `React.lazy()` and `Suspense` to lazy-load the editor component only when the admin navigates to the Dockerfile editor page
-- Choose CodeMirror 6 over Monaco Editor for smaller bundle size (CodeMirror with Dockerfile syntax is ~200 KB gzipped vs Monaco at ~1.5 MB gzipped)
-- If using Monaco, configure custom build to include only Dockerfile language support, excluding unused languages
-- Gate the editor route behind admin check so the code split chunk is never even fetched for non-admin users
-- Measure bundle size before and after adding the editor; set a budget (e.g., max 200 KB increase for non-admin routes)
-
-**Phase:** Phase 2 (Dockerfile Editor) — architecture decision before choosing the editor library
+**Phase:** Phase 2 (Freepik Service Error Handling)
 
 ---
 
-## Pitfall 10: HuggingFace Download Assuming Simple URL Patterns
+### Pitfall 11: No Idempotency on Batch Resume
 
-**What goes wrong:** Teams implement HuggingFace download by parsing a URL like `https://huggingface.co/org/model/blob/main/model.safetensors` and constructing a download link. But HuggingFace has multiple URL patterns (models, datasets, spaces), gated models requiring authentication tokens, large file storage (LFS) with redirect chains, and rate limiting. The download feature works for public models but fails silently for gated models (Llama, Mistral), returns HTML instead of binary for incorrect URL parsing, or gets rate-limited after a few downloads.
+**What goes wrong:** The user pauses a batch (or credits are exhausted), adds credits, and clicks "Resume." The resume logic reprocesses the batch from the beginning or from the wrong index, re-submitting videos that were already completed. This wastes credits on duplicate upscaling and creates duplicate outputs in Supabase Storage and Google Drive.
 
-**Warning signs:**
-- Downloads returning HTML content (the HuggingFace web page) instead of binary model data
-- Gated model downloads failing with 401 or 403 without a clear error message
-- Downloads succeeding for small files but failing for large (>5 GB) files due to LFS redirect handling
-- Rate limiting after downloading 3-5 models in succession
-- URL parsing breaking when model names contain special characters or nested paths
+**Why it happens:** The resume logic queries for videos with status "pending" but does not account for videos that were submitted to Freepik but not yet polled to completion (status "submitted" or "processing"). On resume, these in-flight videos are treated as pending and re-submitted.
 
-**Prevention strategy:**
-- Use the `huggingface_hub` Python library for server-side downloads instead of raw HTTP requests; it handles authentication, LFS, and URL resolution correctly
-- Support optional HuggingFace token input for gated models (stored securely as an environment variable, never in the database)
-- Validate the HuggingFace URL server-side before starting the download: check that the repository exists, the file exists, and whether it requires authentication
-- Implement proper error messages: "This model requires a HuggingFace token", "File not found", "Rate limited, retry in X minutes"
-- Handle LFS files correctly: `huggingface_hub` automatically follows LFS pointers
-- Add a download queue (max 1-2 concurrent downloads) to avoid rate limiting
+**Consequences:**
+- Double credit consumption for already-submitted videos
+- Duplicate files in Supabase Storage and Google Drive
+- Conflicting Freepik task IDs: old task completes after new task is submitted, causing state confusion
 
-**Phase:** Phase 1 (HuggingFace Direct Download) — use the right library from the start
+**Prevention:**
+- Use granular per-video statuses: `pending`, `uploading`, `submitted` (has Freepik task_id), `processing` (Freepik confirmed in progress), `completed`, `failed`, `skipped`
+- On resume: only process videos with status `pending`. Videos with status `submitted` or `processing` should be polled (not re-submitted)
+- Store the `freepik_task_id` on each video record immediately after submission. If a task_id exists, never re-submit -- only poll
+- Make video submission idempotent: before submitting, check if a Freepik task_id already exists for this video. If yes, poll instead of submitting
+- Add a "retry failed" action distinct from "resume paused" -- retry re-submits only videos with status `failed`
 
----
+**Detection:** Pause and resume a batch. Check Freepik API call count against expected count. If any video is submitted twice, this pitfall is active.
 
-## Pitfall 11: Model Assignment Disconnected from Workflow Execution
-
-**What goes wrong:** Teams build a model assignment UI that lets admins associate downloaded models with workflows, but the assignment metadata lives in a separate database table that is not consulted during actual workflow execution. The RunPod handler has model paths hardcoded or configured via environment variables, and changing the assignment in the UI does not actually change which model the workflow uses. Users think they switched models but get results from the old one.
-
-**Warning signs:**
-- Model assignment UI shows Model B assigned, but workflow still uses Model A
-- No mechanism to propagate assignment changes to the RunPod handler configuration
-- Assignment stored in Supabase but RunPod handler reads from local filesystem path or Dockerfile COPY statement
-- No validation that the assigned model file actually exists on the network volume
-- Assignment change has no visible effect until the next Docker rebuild
-
-**Prevention strategy:**
-- Map out the complete flow: where does the RunPod handler get its model path? Is it from an environment variable, a Dockerfile COPY path, a volume mount path, or hardcoded?
-- Design model assignment to modify the actual configuration that the handler reads, whether that means updating an environment variable in the RunPod endpoint config, modifying the Dockerfile, or writing a config file to the network volume
-- Validate on assignment that the model file exists at the expected path on the network volume
-- Show the user the current effective model (what the handler is actually using) alongside the assigned model
-- If assignment requires a Docker rebuild, make this clear in the UI: "Assigning this model will trigger a rebuild (~15 minutes)"
-
-**Phase:** Phase 1 (Model Assignment) + Phase 2 (Dockerfile Editor) — spans both phases, needs upfront design
+**Phase:** Phase 2 (Batch Processing Logic + Resume Implementation)
 
 ---
 
-## Pitfall 12: Not Testing Infrastructure Features Against Real RunPod Volumes
+## Minor Pitfalls
 
-**What goes wrong:** The existing codebase already has a "RunPod integration not fully tested" concern (CONCERNS.md). Adding file browser, download, and management features that interact with RunPod's API and S3-backed volumes without integration tests means bugs are only discovered in production. Mock-based tests pass but real operations fail due to RunPod API quirks, S3 eventual consistency, or permission issues.
-
-**Warning signs:**
-- All tests pass but file listing returns empty in production
-- Upload tests pass with mock but fail with actual RunPod volume due to size limits or path restrictions
-- Delete operation works in tests but RunPod API returns 403 due to volume permissions
-- HuggingFace download tests mock the download but never verify the file lands on the volume
-
-**Prevention strategy:**
-- Create a dedicated test RunPod volume (small, cheap) for integration testing
-- Write a small set of smoke tests that run against the real RunPod API: list files, upload a small file, download it, delete it, verify deletion
-- Run these smoke tests in CI on a schedule (not on every PR, but nightly or weekly)
-- Add a health check endpoint for the infrastructure features: `GET /api/admin/health` that verifies RunPod volume access, GitHub token validity, and HuggingFace connectivity
-- Use the existing contract testing pattern (`backend/tests/workflows/test_contract_*.py`) as a model for infrastructure integration contracts
-
-**Phase:** All phases — start integration testing from Phase 1
+Mistakes that cause friction, confusion, or minor bugs.
 
 ---
 
-## Summary: Phase Mapping
+### Pitfall 12: Signed URLs Expiring Before User Downloads Upscaled Videos
 
-| Phase | Pitfalls to Address |
-|-------|-------------------|
-| **Pre-Phase 1** | #6 (Admin Access Control), #8 (API Client Refactoring) |
-| **Phase 1: File Browser + Downloads** | #1 (S3 Object Store), #2 (Large File Transfers), #7 (Volume Concurrency), #10 (HuggingFace URLs), #11 (Model Assignment Flow), #12 (Integration Testing) |
-| **Phase 2: Dockerfile Editor + GitHub** | #3 (Template Pattern), #4 (GitHub Token Security), #5 (Uncontrolled Rebuilds), #9 (Editor Bundle Size) |
-| **Cross-Phase** | #11 (Model Assignment spans Phase 1 + 2), #12 (Testing spans all phases) |
+**What goes wrong:** The existing `storage_service.py` creates Supabase signed URLs with 7-day expiry (line 145). If a batch completes on Monday and the user tries to download the videos on the following Monday, the signed URLs have expired. The video exists in storage but the URL in the database is dead.
+
+**Prevention:**
+- Use public URLs for completed upscaled videos (they are the user's content, not sensitive)
+- Or use longer-lived signed URLs (30 days)
+- Or implement on-demand URL regeneration: when a user requests a video, check if the URL is expired and generate a new signed URL
+
+**Phase:** Phase 3 (Output Delivery)
 
 ---
 
-*Research completed: 2026-03-04*
+### Pitfall 13: Batch UI Not Distinguishing Video States Clearly
+
+**What goes wrong:** The batch shows a progress bar (e.g., "5/10 complete") but does not distinguish between videos that are pending, submitted-but-waiting, actively processing, completed, failed, or skipped. Users cannot tell if the batch is stuck or just slow. They cannot identify which specific video failed or why.
+
+**Prevention:**
+- Show per-video status with individual progress indicators (icon or color per status)
+- Display the current action: "Uploading video 3..." vs "Waiting for Freepik to process video 3..." vs "Downloading result for video 3..."
+- Show estimated time remaining based on average processing time of completed videos
+- Allow clicking on a failed video to see the specific error message
+- Show credit consumption: "X credits used so far, estimated Y credits remaining for this batch"
+
+**Phase:** Phase 4 (Frontend UI)
+
+---
+
+### Pitfall 14: Google Drive Folder Picker Context Lost Between Sessions
+
+**What goes wrong:** The app has an existing ProjectContext with folder picker in the header (per PROJECT.md). Users select a Google Drive folder for one batch, navigate away, come back, and the folder selection is gone. They submit a new batch without realizing no Drive folder is selected, and videos are uploaded to Supabase only (or worse, the upload fails silently because the Drive folder ID is null).
+
+**Prevention:**
+- Persist the Drive folder selection in the batch record at submission time (not just in localStorage or context)
+- Validate that the Drive folder exists and is accessible before starting the batch
+- Show the selected Drive folder prominently in the batch submission form
+- If no Drive folder is selected, clearly indicate that videos will be saved to Supabase only (not silently skip Drive)
+- Allow changing the Drive destination for future videos in a batch without re-processing completed ones
+
+**Phase:** Phase 3 (Output Delivery) + Phase 4 (Frontend UI)
+
+---
+
+### Pitfall 15: Batch Cleanup Not Handling Partial State
+
+**What goes wrong:** A user deletes a batch from the UI. The deletion removes the batch record and video records from the database but does not clean up: (1) the original uploaded videos in the staging area, (2) the completed upscaled videos in Supabase Storage, (3) the upscaled videos in Google Drive, or (4) in-progress Freepik tasks that are still processing. Orphaned files accumulate, consuming storage quota. Orphaned Freepik tasks continue to run and consume credits.
+
+**Prevention:**
+- Implement cascade cleanup: deleting a batch should cancel any in-progress Freepik tasks (if the API supports cancellation), delete staging files, and optionally delete output files (with user confirmation)
+- Do not auto-delete output files -- ask the user: "Delete output files too, or keep them?"
+- Track Freepik task IDs in the database so they can be cancelled on batch deletion
+- Add a periodic cleanup job that finds orphaned staging files (uploads older than 24 hours with no associated batch) and deletes them
+
+**Phase:** Phase 4 (Polish and Cleanup)
+
+---
+
+## Phase-Specific Warnings
+
+| Phase Topic | Likely Pitfall | Mitigation |
+|-------------|---------------|------------|
+| **Phase 0: API Validation** | #8 (Freepik API docs gap) | Manual test call before writing any code |
+| **Phase 1: Database + Upload** | #1 (State persistence), #2 (30s timeout), #7 (Large file upload) | Database-first design, fire-and-forget endpoints, chunked upload |
+| **Phase 2: Freepik Integration** | #3 (Credit exhaustion), #6 (Polling strategy), #9 (Background task failure), #10 (Rate vs credit errors), #11 (Idempotent resume) | Error classification, exponential backoff, heartbeat, granular status |
+| **Phase 3: Output Delivery** | #4 (Memory exhaustion), #5 (Dual-destination atomicity), #12 (URL expiry), #14 (Drive folder context) | Streaming downloads, per-destination status, temp files |
+| **Phase 4: Frontend UI** | #13 (State visibility), #15 (Cleanup) | Per-video status display, cascade cleanup |
+
+---
+
+## Existing Codebase Risk Amplifiers
+
+These are not new pitfalls but existing patterns that amplify the risks above.
+
+| Existing Pattern | Where | Risk for v1.1 |
+|------------------|-------|---------------|
+| In-memory job store | `hf_download_service.py:22` | Amplifies Pitfall 1 if copied |
+| Full-file-in-memory download | `storage_service.py:98` | Amplifies Pitfall 4 if reused for upscaled videos |
+| `MediaInMemoryUpload` for Drive | `google_drive_service.py:235` | Amplifies Pitfall 4 for Drive uploads |
+| 60-second httpx timeout | `storage_service.py:28` | May be too short for downloading 4K upscaled videos |
+| No streaming upload to Supabase | `storage_service.py:116` | Standard upload limited to 6 MB; upscaled videos will be 50-200 MB |
+| Single `comfy_job_id` keying | `video_job_service.py:163` | Need different keying for Freepik (freepik_task_id, not comfy_job_id) |
+
+---
+
+## Sources
+
+- Heroku request timeout documentation: [Request Timeout | Heroku Dev Center](https://devcenter.heroku.com/articles/request-timeout)
+- Heroku H12 prevention: [Preventing H12 Errors | Heroku Dev Center](https://devcenter.heroku.com/articles/preventing-h12-errors-request-timeouts)
+- Freepik API rate limits: [Rate limiting - Freepik API](https://docs.freepik.com/ratelimits)
+- Freepik image upscaler API (closest documented analog): [Upscale image - Freepik API](https://docs.freepik.com/api-reference/image-upscaler-creative/post-image-upscaler)
+- Supabase storage upload limits: [File Limits | Supabase Docs](https://supabase.com/docs/guides/storage/uploads/file-limits)
+- Supabase resumable uploads: [Storage v3: Resumable Uploads](https://supabase.com/blog/storage-v3-resumable-uploads)
+- Google Drive resumable uploads: [Manage Uploads | Google for Developers](https://developers.google.com/drive/api/guides/manage-uploads)
+- FastAPI background tasks limitations: [Background Tasks - FastAPI](https://fastapi.tiangolo.com/tutorial/background-tasks/)
+- Codebase analysis: `hf_download_service.py`, `storage_service.py`, `google_drive_service.py`, `video_job_service.py`, `runpod_service.py`, `config/settings.py`
+
+---
+
+*Research completed: 2026-03-11*

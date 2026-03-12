@@ -4,6 +4,7 @@ Shared pytest fixtures and configuration for all tests
 import pytest
 import sys
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 # Add backend to Python path for imports
 backend_dir = Path(__file__).parent.parent
@@ -42,3 +43,61 @@ def sample_params():
         "subject_image": "subject.png",
         "style_image": "style.png"
     }
+
+
+# --- Freepik service fixtures ---
+
+@pytest.fixture
+def mock_freepik_settings():
+    """Patch settings with Freepik test configuration."""
+    # Import so the module is loaded before we patch its settings reference
+    from services import freepik_service as _fs_module  # noqa: F841
+    with patch("services.freepik_service.settings") as mock_settings:
+        mock_settings.FREEPIK_API_KEY = "test-key"
+        mock_settings.FREEPIK_API_BASE_URL = "https://api.freepik.com/v1/ai"
+        mock_settings.FREEPIK_POLL_INTERVAL = 1  # fast for tests
+        mock_settings.FREEPIK_TASK_TIMEOUT = 10  # short timeout for tests
+        yield mock_settings
+
+
+@pytest.fixture
+def freepik_service(mock_freepik_settings):
+    """Provide a FreepikUpscalerService instance with mocked settings."""
+    from services.freepik_service import FreepikUpscalerService
+    return FreepikUpscalerService()
+
+
+# --- Supabase mock fixtures ---
+
+def _build_chainable_mock():
+    """Build a MagicMock with chainable .table().select/insert/update/delete().eq().order().limit().execute() pattern."""
+    mock_client = MagicMock()
+    mock_table = MagicMock()
+    mock_client.table.return_value = mock_table
+
+    # Each query method returns the mock_table itself for chaining
+    for method in ("select", "insert", "update", "delete", "upsert"):
+        getattr(mock_table, method).return_value = mock_table
+    for method in ("eq", "neq", "gt", "gte", "lt", "lte", "order", "limit", "range", "single", "is_"):
+        getattr(mock_table, method).return_value = mock_table
+
+    # Default execute returns empty data
+    mock_execute = MagicMock()
+    mock_execute.data = []
+    mock_execute.count = 0
+    mock_table.execute.return_value = mock_execute
+
+    return mock_client
+
+
+@pytest.fixture
+def mock_supabase():
+    """Provide a chainable MagicMock Supabase client."""
+    return _build_chainable_mock()
+
+
+@pytest.fixture
+def upscale_job_service(mock_supabase):
+    """Provide an UpscaleJobService instance with mocked Supabase client."""
+    from services.upscale_job_service import UpscaleJobService
+    return UpscaleJobService(supabase=mock_supabase)

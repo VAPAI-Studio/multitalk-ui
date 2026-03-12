@@ -1,8 +1,12 @@
+import asyncio
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import os
 
-from api import storage, datasets, image_edit, comfyui, multitalk, auth, image_jobs, video_jobs, flux_trainer, lora_trainer, feed, google_drive, virtual_set, runpod, infrastructure, api_keys
+from api import storage, datasets, image_edit, comfyui, multitalk, auth, image_jobs, video_jobs, flux_trainer, lora_trainer, feed, google_drive, virtual_set, runpod, infrastructure, api_keys, upscale
+from services.upscale_job_service import UpscaleJobService
 
 # Only load .env file if not running on Heroku
 if not os.getenv("DYNO"):  # DYNO is a Heroku-specific environment variable
@@ -12,7 +16,30 @@ if not os.getenv("DYNO"):  # DYNO is a Heroku-specific environment variable
 else:
     print("☁️ Running on Heroku: Using environment variables")
 
-app = FastAPI(title="MultiTalk API", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Startup: recover interrupted upscale batches. Shutdown: no-op (state is in DB)."""
+    from api.upscale import _process_batch
+
+    try:
+        service = UpscaleJobService()
+        interrupted = await service.get_batches_by_status("processing")
+        for batch in interrupted:
+            batch_id = batch.get("id") or batch.get("batch_id")
+            await service.fail_current_processing_video(
+                batch_id, "Server restart interrupted processing"
+            )
+            asyncio.create_task(_process_batch(batch_id))
+            print(f"[UPSCALE] Resumed interrupted batch {batch_id}")
+    except Exception as e:
+        print(f"[UPSCALE] Startup recovery error (non-fatal): {e}")
+
+    yield
+    # Shutdown: nothing to clean up (state is in DB)
+
+
+app = FastAPI(title="MultiTalk API", version="1.0.0", lifespan=lifespan)
 
 # Configure CORS
 app.add_middleware(
@@ -40,6 +67,7 @@ app.include_router(virtual_set.router, prefix="/api")
 app.include_router(runpod.router, prefix="/api")
 app.include_router(api_keys.router, prefix="/api")
 app.include_router(infrastructure.router)
+app.include_router(upscale.router, prefix="/api")
 
 @app.get("/")
 async def root():

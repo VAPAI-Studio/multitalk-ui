@@ -18,6 +18,7 @@ import AudioStemSeparator from '../pages/AudioStemSeparator';
 import CharacterCaption from '../pages/CharacterCaption';
 import LoRATrainer from '../pages/LoraTrainer';
 import VirtualSet from '../pages/VirtualSet';
+import BatchVideoUpscale from '../pages/BatchVideoUpscale';
 
 interface StudioPageProps {
   studio: StudioConfig;
@@ -42,6 +43,7 @@ const appComponents: Record<string, React.ComponentType<{ comfyUrl: string }> | 
   'character-caption': CharacterCaption,
   'lora-trainer': LoRATrainer,
   'virtual-set': VirtualSet,
+  'batch-upscale': BatchVideoUpscale,
 };
 
 export default function StudioPage({ studio, comfyUrl }: StudioPageProps) {
