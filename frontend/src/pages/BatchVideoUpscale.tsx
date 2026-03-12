@@ -292,7 +292,7 @@ export default function BatchVideoUpscale() {
 
   // Polling state
   const [pollVersion, setPollVersion] = useState(0);
-  const batchStartRef = useRef<number | null>(null);
+  const firstCompletionRef = useRef<number | null>(null);
 
   // ZIP download state
   const [, setZipJobId] = useState<string | null>(null);
@@ -305,16 +305,21 @@ export default function BatchVideoUpscale() {
   useEffect(() => {
     if (!activeBatchId) return;
 
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+    let cancelled = false;
+
     const poll = async () => {
       try {
         const response = await apiClient.getUpscaleBatchDetail(activeBatchId) as { success: boolean; batch?: UpscaleBatchData };
+        if (cancelled) return;
         if (response.success && response.batch) {
           setBatch(response.batch);
-          if (response.batch.status === 'processing' && !batchStartRef.current) {
-            batchStartRef.current = Date.now();
+          // Track first video completion for ETA
+          if (response.batch.completed_videos >= 1 && !firstCompletionRef.current) {
+            firstCompletionRef.current = Date.now();
           }
           if (['completed', 'failed', 'paused', 'cancelled'].includes(response.batch.status)) {
-            clearInterval(intervalId);
+            if (intervalId) clearInterval(intervalId);
           }
         }
       } catch {
@@ -323,9 +328,12 @@ export default function BatchVideoUpscale() {
     };
 
     poll();
-    const intervalId = setInterval(poll, 4000);
+    intervalId = setInterval(poll, 4000);
 
-    return () => clearInterval(intervalId);
+    return () => {
+      cancelled = true;
+      if (intervalId) clearInterval(intervalId);
+    };
   }, [activeBatchId, pollVersion]);
 
   // --- File handling ---
@@ -435,7 +443,7 @@ export default function BatchVideoUpscale() {
 
       // 4. Switch to monitoring view
       setActiveBatchId(batchId);
-      batchStartRef.current = Date.now();
+      firstCompletionRef.current = null;
       setQueuedVideos([]);
       setUploadProgress({});
     } catch (err: unknown) {
@@ -452,7 +460,7 @@ export default function BatchVideoUpscale() {
     if (!activeBatchId) return;
     try {
       await apiClient.resumeUpscaleBatch(activeBatchId);
-      batchStartRef.current = Date.now();
+      firstCompletionRef.current = null;
       setPollVersion((v) => v + 1);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to resume';
@@ -523,7 +531,7 @@ export default function BatchVideoUpscale() {
   function handleNewBatch() {
     setActiveBatchId(null);
     setBatch(null);
-    batchStartRef.current = null;
+    firstCompletionRef.current = null;
     setError('');
     setZipProgress('');
     setZipJobId(null);
@@ -532,10 +540,10 @@ export default function BatchVideoUpscale() {
 
   // --- ETA calculation ---
   function getETA(): string | null {
-    if (!batch || batch.status !== 'processing' || batch.completed_videos < 1 || !batchStartRef.current) {
+    if (!batch || batch.status !== 'processing' || batch.completed_videos < 1 || !firstCompletionRef.current) {
       return null;
     }
-    const elapsed = (Date.now() - batchStartRef.current) / 1000;
+    const elapsed = (Date.now() - firstCompletionRef.current) / 1000;
     const avgPerVideo = elapsed / batch.completed_videos;
     const remaining = batch.total_videos - batch.completed_videos - batch.failed_videos;
     if (remaining <= 0) return null;
