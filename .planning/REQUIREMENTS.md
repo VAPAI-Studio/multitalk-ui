@@ -9,7 +9,7 @@ Requirements for Batch Video Upscale milestone. Each maps to roadmap phases.
 
 ### Upload & Validation
 
-- [ ] **UPLD-01**: User can upload multiple video files via file picker or drag-and-drop
+- [x] **UPLD-01**: User can upload multiple video files via file picker or drag-and-drop
 - [ ] **UPLD-02**: System validates video format (MP4, MOV, AVI, WebM) and shows clear error for invalid files
 - [ ] **UPLD-03**: System shows preview thumbnail, filename, duration, resolution, and file size for each queued video
 - [ ] **UPLD-04**: System warns user if video exceeds Freepik duration/size limits before submission
@@ -52,7 +52,7 @@ Requirements for Batch Video Upscale milestone. Each maps to roadmap phases.
 
 - [x] **INFR-01**: Database schema supports batch and per-video tracking (new tables/migration)
 - [x] **INFR-02**: Freepik API key stored as backend environment variable (FREEPIK_API_KEY)
-- [ ] **INFR-03**: New feature page linked from homepage, accessible to all authenticated users
+- [x] **INFR-03**: New feature page linked from homepage, accessible to all authenticated users
 - [x] **INFR-04**: Backend batch processor survives server restarts (resumes interrupted batches on startup)
 
 ## Future Requirements
@@ -88,7 +88,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| UPLD-01 | Phase 13 | Pending |
+| UPLD-01 | Phase 13 | Complete |
 | UPLD-02 | Phase 13 | Pending |
 | UPLD-03 | Phase 13 | Pending |
 | UPLD-04 | Phase 13 | Pending |
@@ -113,7 +113,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ERRR-05 | Phase 11 | Complete |
 | INFR-01 | Phase 10 | Complete |
 | INFR-02 | Phase 10 | Complete |
-| INFR-03 | Phase 13 | Pending |
+| INFR-03 | Phase 13 | Complete |
 | INFR-04 | Phase 10 | Complete |
 
 **Coverage:**
