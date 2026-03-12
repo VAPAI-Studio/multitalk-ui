@@ -378,7 +378,7 @@ export default function BatchVideoUpscale() {
     sharpen: 0,
     grain: 0,
     fps_boost: false,
-    flavor: 'vivid',
+    flavor: 'natural',
   });
   const [activeBatchId, setActiveBatchId] = useState<string | null>(null);
   const [batch, setBatch] = useState<UpscaleBatchData | null>(null);
@@ -386,6 +386,7 @@ export default function BatchVideoUpscale() {
   const [uploadProgress, setUploadProgress] = useState<Record<string, string>>({});
   const [error, setError] = useState<string>('');
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [activePreset, setActivePreset] = useState<'realistic' | 'animation' | 'artistic' | null>('realistic');
   const [isDragging, setIsDragging] = useState(false);
   const [fileError, setFileError] = useState<string>('');
 
@@ -399,7 +400,7 @@ export default function BatchVideoUpscale() {
 
   // Polling state
   const [pollVersion, setPollVersion] = useState(0);
-  const firstCompletionRef = useRef<number | null>(null);
+
 
   // ZIP download state
   const [, setZipJobId] = useState<string | null>(null);
@@ -421,10 +422,6 @@ export default function BatchVideoUpscale() {
         if (cancelled) return;
         if (response.success && response.batch) {
           setBatch(response.batch);
-          // Track first video completion for ETA
-          if (response.batch.completed_videos >= 1 && !firstCompletionRef.current) {
-            firstCompletionRef.current = Date.now();
-          }
           if (['completed', 'failed', 'paused', 'cancelled'].includes(response.batch.status)) {
             if (intervalId) clearInterval(intervalId);
             loadHistory();
@@ -573,7 +570,7 @@ export default function BatchVideoUpscale() {
 
       // 4. Switch to monitoring view
       setActiveBatchId(batchId);
-      firstCompletionRef.current = null;
+
       setQueuedVideos([]);
       setUploadProgress({});
     } catch (err: unknown) {
@@ -590,7 +587,7 @@ export default function BatchVideoUpscale() {
     if (!activeBatchId) return;
     try {
       await apiClient.resumeUpscaleBatch(activeBatchId);
-      firstCompletionRef.current = null;
+
       setPollVersion((v) => v + 1);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to resume';
@@ -661,7 +658,7 @@ export default function BatchVideoUpscale() {
   function handleNewBatch() {
     setActiveBatchId(null);
     setBatch(null);
-    firstCompletionRef.current = null;
+
     setError('');
     setZipProgress('');
     setZipJobId(null);
@@ -673,7 +670,7 @@ export default function BatchVideoUpscale() {
 
   function handleViewBatch(batchId: string) {
     setActiveBatchId(batchId);
-    firstCompletionRef.current = null;
+
     setPollVersion((v) => v + 1);
   }
 
@@ -695,22 +692,6 @@ export default function BatchVideoUpscale() {
     setTimeout(() => {
       uploadSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 100);
-  }
-
-  // --- ETA calculation ---
-  function getETA(): string | null {
-    if (!batch || batch.status !== 'processing' || batch.completed_videos < 1 || !firstCompletionRef.current) {
-      return null;
-    }
-    const elapsed = (Date.now() - firstCompletionRef.current) / 1000;
-    const avgPerVideo = elapsed / batch.completed_videos;
-    const remaining = batch.total_videos - batch.completed_videos - batch.failed_videos;
-    if (remaining <= 0) return null;
-    const etaSeconds = avgPerVideo * remaining;
-    const mins = Math.floor(etaSeconds / 60);
-    const secs = Math.floor(etaSeconds % 60);
-    if (mins > 0) return `Est. ${mins} min ${secs} sec remaining`;
-    return `Est. ${secs} sec remaining`;
   }
 
   // --- Render ---
@@ -889,6 +870,41 @@ export default function BatchVideoUpscale() {
                 </div>
               </Field>
 
+              {/* Style Presets */}
+              <Field>
+                <Label>Style Preset</Label>
+                <div className="grid grid-cols-3 gap-3">
+                  {([
+                    { key: 'realistic' as const, label: 'Realistic', desc: 'Faithful to source', icon: '🎬' },
+                    { key: 'animation' as const, label: 'Animation & 3D', desc: 'Vivid colors & detail', icon: '🎨' },
+                    { key: 'artistic' as const, label: 'Artistic', desc: 'Maximum creative freedom', icon: '✨' },
+                  ]).map(({ key, label, desc, icon }) => (
+                    <button
+                      key={key}
+                      onClick={() => {
+                        setActivePreset(key);
+                        if (key === 'realistic') {
+                          setSettings((s) => ({ ...s, creativity: 0, sharpen: 0, grain: 0, flavor: 'natural' }));
+                        } else if (key === 'animation') {
+                          setSettings((s) => ({ ...s, creativity: 0, sharpen: 0, grain: 0, flavor: 'vivid' }));
+                        } else {
+                          setSettings((s) => ({ ...s, creativity: 100, sharpen: 50, grain: 30, flavor: 'vivid' }));
+                        }
+                      }}
+                      className={`flex flex-col items-center gap-1 px-3 py-4 rounded-2xl font-semibold transition-all duration-200 ${
+                        activePreset === key
+                          ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-lg scale-[1.02]'
+                          : 'border-2 border-gray-200 dark:border-dark-border-primary bg-white dark:bg-dark-surface-secondary text-gray-700 dark:text-dark-text-secondary hover:border-amber-400 dark:hover:border-amber-600'
+                      }`}
+                    >
+                      <span className="text-xl">{icon}</span>
+                      <span className="text-sm">{label}</span>
+                      <span className={`text-xs font-normal ${activePreset === key ? 'text-white/80' : 'text-gray-400 dark:text-dark-text-muted'}`}>{desc}</span>
+                    </button>
+                  ))}
+                </div>
+              </Field>
+
               {/* Advanced Settings Toggle */}
               <div>
                 <button
@@ -910,7 +926,7 @@ export default function BatchVideoUpscale() {
                       min="0"
                       max="100"
                       value={settings.creativity}
-                      onChange={(e) => setSettings((s) => ({ ...s, creativity: parseInt(e.target.value) }))}
+                      onChange={(e) => { setActivePreset(null); setSettings((s) => ({ ...s, creativity: parseInt(e.target.value) })); }}
                       className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-amber-500"
                     />
                   </Field>
@@ -923,7 +939,7 @@ export default function BatchVideoUpscale() {
                       min="0"
                       max="100"
                       value={settings.sharpen}
-                      onChange={(e) => setSettings((s) => ({ ...s, sharpen: parseInt(e.target.value) }))}
+                      onChange={(e) => { setActivePreset(null); setSettings((s) => ({ ...s, sharpen: parseInt(e.target.value) })); }}
                       className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-amber-500"
                     />
                   </Field>
@@ -936,7 +952,7 @@ export default function BatchVideoUpscale() {
                       min="0"
                       max="100"
                       value={settings.grain}
-                      onChange={(e) => setSettings((s) => ({ ...s, grain: parseInt(e.target.value) }))}
+                      onChange={(e) => { setActivePreset(null); setSettings((s) => ({ ...s, grain: parseInt(e.target.value) })); }}
                       className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-amber-500"
                     />
                   </Field>
@@ -945,7 +961,7 @@ export default function BatchVideoUpscale() {
                   <Field>
                     <div className="flex items-center gap-3">
                       <button
-                        onClick={() => setSettings((s) => ({ ...s, fps_boost: !s.fps_boost }))}
+                        onClick={() => { setActivePreset(null); setSettings((s) => ({ ...s, fps_boost: !s.fps_boost })); }}
                         className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${
                           settings.fps_boost
                             ? 'bg-amber-500'
@@ -969,7 +985,7 @@ export default function BatchVideoUpscale() {
                       {(['vivid', 'natural'] as const).map((f) => (
                         <button
                           key={f}
-                          onClick={() => setSettings((s) => ({ ...s, flavor: f }))}
+                          onClick={() => { setActivePreset(null); setSettings((s) => ({ ...s, flavor: f })); }}
                           className={`px-6 py-3 rounded-2xl font-semibold transition-all duration-200 ${
                             settings.flavor === f
                               ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-lg scale-[1.02]'
@@ -1077,16 +1093,6 @@ export default function BatchVideoUpscale() {
                 </div>
 
                 <BatchProgress batch={batch} />
-
-                {/* ETA */}
-                {(() => {
-                  const eta = getETA();
-                  return eta ? (
-                    <p className="text-sm text-amber-600 dark:text-amber-400 font-medium">
-                      {eta}
-                    </p>
-                  ) : null;
-                })()}
 
                 {/* Batch actions */}
                 <div className="flex items-center gap-3 pt-2">
