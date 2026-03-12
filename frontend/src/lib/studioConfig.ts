@@ -161,6 +161,14 @@ export const studios: StudioConfig[] = [
         gradient: 'from-green-500 to-emerald-600',
         description: 'Upscale videos to higher resolutions with AI-powered super-resolution.',
         features: ['AI video upscaling', 'Resolution presets (720p-4K)', 'Model: SeedVR2']
+      },
+      {
+        id: 'batch-upscale',
+        title: 'Batch Upscale',
+        icon: '📦',
+        gradient: 'from-amber-500 to-orange-600',
+        description: 'Upscale multiple videos at once with Freepik AI. Configure settings, queue videos, and download results.',
+        features: ['Multi-video batch processing', 'Queue management', 'API: Freepik Video Upscaler']
       }
     ]
   },
