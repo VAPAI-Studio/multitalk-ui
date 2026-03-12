@@ -461,3 +461,69 @@ class TestReorderPayload:
         from models.upscale import ReorderPayload
         p = ReorderPayload(video_ids=[])
         assert p.video_ids == []
+
+
+# ---------------------------------------------------------------------------
+# UpscaleVideo upload status fields (Phase 12)
+# ---------------------------------------------------------------------------
+
+class TestUpscaleVideoUploadStatusFields:
+    """Test UpscaleVideo includes upload status fields for delivery tracking."""
+
+    def test_supabase_upload_status_defaults_none(self):
+        from models.upscale import UpscaleVideo
+        v = UpscaleVideo(
+            id='v1', batch_id='b1', status='completed', queue_position=1,
+            input_filename='vid.mp4', input_storage_url='https://example.com/vid.mp4',
+            created_at=datetime(2026, 3, 11),
+        )
+        assert v.supabase_upload_status is None
+
+    def test_drive_upload_status_defaults_none(self):
+        from models.upscale import UpscaleVideo
+        v = UpscaleVideo(
+            id='v1', batch_id='b1', status='completed', queue_position=1,
+            input_filename='vid.mp4', input_storage_url='https://example.com/vid.mp4',
+            created_at=datetime(2026, 3, 11),
+        )
+        assert v.drive_upload_status is None
+
+    def test_output_drive_file_id_defaults_none(self):
+        from models.upscale import UpscaleVideo
+        v = UpscaleVideo(
+            id='v1', batch_id='b1', status='completed', queue_position=1,
+            input_filename='vid.mp4', input_storage_url='https://example.com/vid.mp4',
+            created_at=datetime(2026, 3, 11),
+        )
+        assert v.output_drive_file_id is None
+
+    def test_upload_status_fields_can_be_set(self):
+        from models.upscale import UpscaleVideo
+        v = UpscaleVideo(
+            id='v1', batch_id='b1', status='completed', queue_position=1,
+            input_filename='vid.mp4', input_storage_url='https://example.com/vid.mp4',
+            created_at=datetime(2026, 3, 11),
+            supabase_upload_status='completed',
+            drive_upload_status='failed',
+            output_drive_file_id='drive-file-abc',
+        )
+        assert v.supabase_upload_status == 'completed'
+        assert v.drive_upload_status == 'failed'
+        assert v.output_drive_file_id == 'drive-file-abc'
+
+    def test_upload_status_fields_in_model_dump(self):
+        from models.upscale import UpscaleVideo
+        v = UpscaleVideo(
+            id='v1', batch_id='b1', status='completed', queue_position=1,
+            input_filename='vid.mp4', input_storage_url='https://example.com/vid.mp4',
+            created_at=datetime(2026, 3, 11),
+            supabase_upload_status='completed',
+            drive_upload_status='skipped',
+            output_drive_file_id=None,
+        )
+        d = v.model_dump()
+        assert 'supabase_upload_status' in d
+        assert 'drive_upload_status' in d
+        assert 'output_drive_file_id' in d
+        assert d['supabase_upload_status'] == 'completed'
+        assert d['drive_upload_status'] == 'skipped'

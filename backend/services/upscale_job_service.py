@@ -302,6 +302,46 @@ class UpscaleJobService:
         except Exception:
             return False
 
+    async def update_video_upload_status(
+        self,
+        video_id: str,
+        *,
+        supabase_upload_status: Optional[str] = None,
+        drive_upload_status: Optional[str] = None,
+        output_storage_url: Optional[str] = None,
+        output_drive_file_id: Optional[str] = None,
+    ) -> bool:
+        """
+        Update upload status fields on a video (partial update).
+
+        Only non-None fields are included in the update. Returns False
+        if no fields are provided or on error.
+        """
+        try:
+            update_data: dict = {}
+            if supabase_upload_status is not None:
+                update_data["supabase_upload_status"] = supabase_upload_status
+            if drive_upload_status is not None:
+                update_data["drive_upload_status"] = drive_upload_status
+            if output_storage_url is not None:
+                update_data["output_storage_url"] = output_storage_url
+            if output_drive_file_id is not None:
+                update_data["output_drive_file_id"] = output_drive_file_id
+
+            if not update_data:
+                return False
+
+            result = (
+                self.supabase.table("upscale_videos")
+                .update(update_data)
+                .eq("id", video_id)
+                .execute()
+            )
+            return bool(result.data)
+
+        except Exception:
+            return False
+
     async def get_next_pending_video(self, batch_id: str) -> Optional[dict]:
         """
         Get the next pending video (lowest queue_position) for a batch.

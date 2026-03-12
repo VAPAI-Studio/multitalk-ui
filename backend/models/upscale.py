@@ -84,6 +84,9 @@ class UpscaleVideo(BaseModel):
     freepik_task_id: Optional[str] = None
     output_storage_url: Optional[str] = None
     error_message: Optional[str] = None
+    supabase_upload_status: Optional[str] = None
+    drive_upload_status: Optional[str] = None
+    output_drive_file_id: Optional[str] = None
     created_at: datetime
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None

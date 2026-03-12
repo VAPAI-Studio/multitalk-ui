@@ -638,6 +638,92 @@ class TestUpdateVideoRetryCount:
 
 
 # ---------------------------------------------------------------------------
+# update_video_upload_status (Phase 12)
+# ---------------------------------------------------------------------------
+
+class TestUpdateVideoUploadStatus:
+
+    @pytest.mark.asyncio
+    async def test_partial_update_supabase_only(self, upscale_job_service, mock_supabase):
+        """update_video_upload_status updates only supabase_upload_status when only that field is provided."""
+        mock_supabase.table.return_value.execute.return_value = (
+            _make_execute_result(data=[_sample_video_row()])
+        )
+
+        result = await upscale_job_service.update_video_upload_status(
+            "video-001",
+            supabase_upload_status="completed",
+        )
+
+        assert result is True
+        mock_supabase.table.assert_called_with("upscale_videos")
+        call_args = mock_supabase.table.return_value.update.call_args
+        update_dict = call_args[0][0]
+        assert update_dict == {"supabase_upload_status": "completed"}
+
+    @pytest.mark.asyncio
+    async def test_partial_update_drive_only(self, upscale_job_service, mock_supabase):
+        """update_video_upload_status updates only drive fields when provided."""
+        mock_supabase.table.return_value.execute.return_value = (
+            _make_execute_result(data=[_sample_video_row()])
+        )
+
+        result = await upscale_job_service.update_video_upload_status(
+            "video-001",
+            drive_upload_status="failed",
+            output_drive_file_id=None,
+        )
+
+        assert result is True
+        call_args = mock_supabase.table.return_value.update.call_args
+        update_dict = call_args[0][0]
+        assert update_dict == {"drive_upload_status": "failed"}
+
+    @pytest.mark.asyncio
+    async def test_full_update_all_fields(self, upscale_job_service, mock_supabase):
+        """update_video_upload_status updates all four fields when all provided."""
+        mock_supabase.table.return_value.execute.return_value = (
+            _make_execute_result(data=[_sample_video_row()])
+        )
+
+        result = await upscale_job_service.update_video_upload_status(
+            "video-001",
+            supabase_upload_status="completed",
+            drive_upload_status="completed",
+            output_storage_url="https://supabase.example.com/public/upscaled.mp4",
+            output_drive_file_id="drive-file-xyz",
+        )
+
+        assert result is True
+        call_args = mock_supabase.table.return_value.update.call_args
+        update_dict = call_args[0][0]
+        assert update_dict == {
+            "supabase_upload_status": "completed",
+            "drive_upload_status": "completed",
+            "output_storage_url": "https://supabase.example.com/public/upscaled.mp4",
+            "output_drive_file_id": "drive-file-xyz",
+        }
+
+    @pytest.mark.asyncio
+    async def test_returns_false_when_no_fields_provided(self, upscale_job_service, mock_supabase):
+        """update_video_upload_status returns False when no fields are provided (empty update)."""
+        result = await upscale_job_service.update_video_upload_status("video-001")
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_returns_false_on_error(self, upscale_job_service, mock_supabase):
+        """update_video_upload_status returns False on exception."""
+        mock_supabase.table.return_value.update.side_effect = Exception("DB error")
+
+        result = await upscale_job_service.update_video_upload_status(
+            "video-001",
+            supabase_upload_status="completed",
+        )
+
+        assert result is False
+
+
+# ---------------------------------------------------------------------------
 # decrement_failed_count
 # ---------------------------------------------------------------------------
 
