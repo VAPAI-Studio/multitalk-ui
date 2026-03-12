@@ -38,7 +38,7 @@ Requirements for Batch Video Upscale milestone. Each maps to roadmap phases.
 - [x] **DLVR-01**: Completed upscaled videos automatically saved to Supabase Storage
 - [x] **DLVR-02**: If a Google Drive project is selected, completed videos also uploaded to the project folder
 - [x] **DLVR-03**: User can download individual completed videos from the UI
-- [ ] **DLVR-04**: User can download all completed videos from a batch as a ZIP file
+- [x] **DLVR-04**: User can download all completed videos from a batch as a ZIP file
 
 ### Error Handling & Credits
 
@@ -105,7 +105,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DLVR-01 | Phase 12 | Complete |
 | DLVR-02 | Phase 12 | Complete |
 | DLVR-03 | Phase 12 | Complete |
-| DLVR-04 | Phase 12 | Pending |
+| DLVR-04 | Phase 12 | Complete |
 | ERRR-01 | Phase 11 | Complete |
 | ERRR-02 | Phase 11 | Complete |
 | ERRR-03 | Phase 11 | Complete |

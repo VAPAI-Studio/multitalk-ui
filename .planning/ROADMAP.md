@@ -30,7 +30,7 @@ Full details: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
 
 - [x] **Phase 10: Foundation** - Database schema, Freepik service, API endpoints, settings model (completed 2026-03-11)
 - [x] **Phase 11: Batch Processing** - Sequential queue loop, credit exhaustion detection, pause/resume, error handling (completed 2026-03-11)
-- [ ] **Phase 12: Output Delivery** - Streaming download from Freepik, upload to Supabase Storage + Google Drive, download endpoints
+- [x] **Phase 12: Output Delivery** - Streaming download from Freepik, upload to Supabase Storage + Google Drive, download endpoints (completed 2026-03-12)
 - [ ] **Phase 13: Frontend** - Upload UI, progress display, batch history, homepage integration
 
 ## Phase Details
@@ -81,7 +81,7 @@ Plans:
 
 Plans:
 - [x] 12-01-PLAN.md -- Delivery pipeline: Supabase upload + Google Drive upload wired into _process_single_video
-- [ ] 12-02-PLAN.md -- Batch ZIP download: background job with in-memory store, 3 API endpoints
+- [x] 12-02-PLAN.md -- Batch ZIP download: background job with in-memory store, 3 API endpoints
 
 ### Phase 13: Frontend
 **Goal**: Users can upload, configure, monitor, and retrieve batch video upscales through a complete feature page integrated into the app
@@ -118,5 +118,5 @@ Phases execute in numeric order: 10 -> 11 -> 12 -> 13
 | 7. GitHub Integration | v1.0 | 2/2 | Complete | 2026-03-09 |
 | 10. Foundation | v1.1 | Complete    | 2026-03-11 | 2026-03-11 |
 | 11. Batch Processing | 2/2 | Complete    | 2026-03-11 | - |
-| 12. Output Delivery | v1.1 | 1/2 | In progress | - |
+| 12. Output Delivery | v1.1 | 2/2 | Complete | 2026-03-12 |
 | 13. Frontend | v1.1 | 0/3 | Not started | - |
