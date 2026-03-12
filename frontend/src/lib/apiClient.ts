@@ -1463,6 +1463,98 @@ class ApiClient {
     })
   }
 
+  // ============================================================================
+  // Batch Video Upscale Methods (Phase 13)
+  // ============================================================================
+
+  async uploadVideoForUpscale(formData: FormData): Promise<{ success: boolean; storage_url?: string; filename?: string; error?: string }> {
+    const token = this.getAuthToken()
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 300000) // 5 min timeout for large files
+    try {
+      const response = await fetch(`${this.baseURL}/upscale/upload-video`, {
+        method: 'POST',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        body: formData,
+        signal: controller.signal,
+      })
+      clearTimeout(timeoutId)
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ detail: 'Upload failed' }))
+        return { success: false, error: err.detail || 'Upload failed' }
+      }
+      return response.json()
+    } catch (error) {
+      clearTimeout(timeoutId)
+      if (error instanceof Error && error.name === 'AbortError') {
+        return { success: false, error: 'Upload timed out' }
+      }
+      throw error
+    }
+  }
+
+  async createUpscaleBatch(settings: Record<string, any>, projectId?: string) {
+    return this.request('/upscale/batches', {
+      method: 'POST',
+      body: JSON.stringify({ settings, project_id: projectId || null }),
+    })
+  }
+
+  async addVideoToBatch(batchId: string, payload: {
+    input_filename: string; input_storage_url: string;
+    input_file_size?: number; duration_seconds?: number;
+    width?: number; height?: number;
+  }) {
+    return this.request(`/upscale/batches/${batchId}/videos`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  }
+
+  async startUpscaleBatch(batchId: string) {
+    return this.request(`/upscale/batches/${batchId}/start`, { method: 'POST' })
+  }
+
+  async getUpscaleBatchDetail(batchId: string) {
+    return this.request(`/upscale/batches/${batchId}`)
+  }
+
+  async listUpscaleBatches() {
+    return this.request('/upscale/batches')
+  }
+
+  async resumeUpscaleBatch(batchId: string) {
+    return this.request(`/upscale/batches/${batchId}/resume`, { method: 'POST' })
+  }
+
+  async retryUpscaleVideo(batchId: string, videoId: string) {
+    return this.request(`/upscale/batches/${batchId}/videos/${videoId}/retry`, { method: 'POST' })
+  }
+
+  async reorderUpscaleQueue(batchId: string, videoIds: string[]) {
+    return this.request(`/upscale/batches/${batchId}/reorder`, {
+      method: 'PATCH',
+      body: JSON.stringify({ video_ids: videoIds }),
+    })
+  }
+
+  async createUpscaleZipDownload(batchId: string) {
+    return this.request(`/upscale/batches/${batchId}/download-zip`, { method: 'POST' })
+  }
+
+  async getUpscaleZipJobStatus(jobId: string) {
+    return this.request(`/upscale/zip-jobs/${jobId}/status`)
+  }
+
+  async downloadUpscaleZip(jobId: string): Promise<Blob> {
+    const token = this.getAuthToken()
+    const response = await fetch(`${this.baseURL}/upscale/zip-jobs/${jobId}/download`, {
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+    })
+    if (!response.ok) throw new Error('ZIP download failed')
+    return response.blob()
+  }
+
   // Helper method for authenticated requests (backward compatibility)
   async fetchWithAuth(endpoint: string, options: RequestInit = {}) {
     return this.request(endpoint, options);

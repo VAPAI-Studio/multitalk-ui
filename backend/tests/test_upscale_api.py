@@ -1378,7 +1378,9 @@ class TestUploadVideo:
         storage = MockStorage.return_value
         storage.supabase = MagicMock()
         mock_bucket = MagicMock()
-        mock_bucket.upload.return_value = MagicMock()
+        mock_upload_response = MagicMock()
+        mock_upload_response.error = None  # Explicitly no error
+        mock_bucket.upload.return_value = mock_upload_response
         mock_bucket.get_public_url.return_value = "https://supabase.example.com/public/upscale-inputs/test-user-id/batch-001/test_video.mp4"
         storage.supabase.storage.from_.return_value = mock_bucket
 

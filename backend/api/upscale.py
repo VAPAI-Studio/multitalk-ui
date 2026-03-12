@@ -16,7 +16,7 @@ from datetime import datetime as _dt
 from pathlib import Path
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 
 from core.auth import get_current_user
@@ -101,6 +101,54 @@ async def _build_zip(job_id: str, videos: list[dict]) -> None:
 # ---------------------------------------------------------------------------
 # API Endpoints
 # ---------------------------------------------------------------------------
+
+
+@router.post("/upload-video")
+async def upload_video(
+    file: UploadFile,
+    batch_id: str = Form(...),
+    user=Depends(get_current_user),
+):
+    """Upload a video file to Supabase Storage for a batch.
+
+    Accepts multipart form data with a video file and batch_id.
+    Validates the batch exists and belongs to the user, then uploads
+    the file to Supabase Storage and returns the public URL.
+    """
+    service = UpscaleJobService()
+    batch = await service.get_batch(batch_id, user.id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+
+    try:
+        content = await file.read()
+        storage = StorageService()
+        path = f"upscale-inputs/{user.id}/{batch_id}/{file.filename}"
+        content_type = file.content_type or "video/mp4"
+
+        loop = asyncio.get_event_loop()
+        upload_response = await loop.run_in_executor(
+            None,
+            lambda: storage.supabase.storage
+            .from_("multitalk-videos")
+            .upload(path, content, {"content-type": content_type}),
+        )
+
+        # Check for upload errors
+        if hasattr(upload_response, "error") and upload_response.error:
+            return {"success": False, "error": f"Upload failed: {upload_response.error}"}
+        elif isinstance(upload_response, dict) and upload_response.get("error"):
+            return {"success": False, "error": f"Upload failed: {upload_response['error']}"}
+
+        public_url = storage.supabase.storage.from_("multitalk-videos").get_public_url(path)
+        # Handle various public_url response formats
+        if isinstance(public_url, dict):
+            public_url = public_url.get("publicUrl") or public_url.get("public_url") or str(public_url)
+
+        return {"success": True, "storage_url": public_url, "filename": file.filename}
+
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 
 @router.post("/batches", response_model=BatchResponse)
