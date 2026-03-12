@@ -1351,3 +1351,74 @@ class TestZipDownload:
         """GET zip-jobs download returns 401 without auth token."""
         response = unauthenticated_client.get("/api/upscale/zip-jobs/some-id/download")
         assert response.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# Upload Video Tests (Phase 13 Plan 01)
+# ---------------------------------------------------------------------------
+
+
+class TestUploadVideo:
+    """Tests for POST /api/upscale/upload-video."""
+
+    @patch("api.upscale.StorageService")
+    @patch("api.upscale.UpscaleJobService")
+    def test_upload_video_returns_storage_url(self, MockJobService, MockStorage, client):
+        """POST /api/upscale/upload-video with valid file returns 200 with storage_url."""
+        # Mock batch exists
+        instance = MockJobService.return_value
+        instance.get_batch = AsyncMock(return_value={
+            "id": "batch-001",
+            "user_id": "test-user-id",
+            "status": "pending",
+            "total_videos": 0,
+        })
+
+        # Mock storage upload
+        storage = MockStorage.return_value
+        storage.supabase = MagicMock()
+        mock_bucket = MagicMock()
+        mock_bucket.upload.return_value = MagicMock()
+        mock_bucket.get_public_url.return_value = "https://supabase.example.com/public/upscale-inputs/test-user-id/batch-001/test_video.mp4"
+        storage.supabase.storage.from_.return_value = mock_bucket
+
+        response = client.post(
+            "/api/upscale/upload-video",
+            data={"batch_id": "batch-001"},
+            files={"file": ("test_video.mp4", b"fake-video-content", "video/mp4")},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert "storage_url" in data
+        assert data["filename"] == "test_video.mp4"
+
+    def test_upload_video_without_file_returns_422(self, client):
+        """POST /api/upscale/upload-video without file returns 422."""
+        response = client.post(
+            "/api/upscale/upload-video",
+            data={"batch_id": "batch-001"},
+        )
+        assert response.status_code == 422
+
+    @patch("api.upscale.UpscaleJobService")
+    def test_upload_video_nonexistent_batch_returns_404(self, MockJobService, client):
+        """POST /api/upscale/upload-video with non-existent batch_id returns 404."""
+        instance = MockJobService.return_value
+        instance.get_batch = AsyncMock(return_value=None)
+
+        response = client.post(
+            "/api/upscale/upload-video",
+            data={"batch_id": "nonexistent-batch"},
+            files={"file": ("test_video.mp4", b"fake-video-content", "video/mp4")},
+        )
+        assert response.status_code == 404
+
+    def test_upload_video_requires_auth(self, unauthenticated_client):
+        """POST /api/upscale/upload-video without auth token returns 401."""
+        response = unauthenticated_client.post(
+            "/api/upscale/upload-video",
+            data={"batch_id": "batch-001"},
+            files={"file": ("test_video.mp4", b"fake-video-content", "video/mp4")},
+        )
+        assert response.status_code == 401
