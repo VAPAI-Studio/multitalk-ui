@@ -48,7 +48,7 @@ class Settings(BaseSettings):
     FREEPIK_API_KEY: str = ""
     FREEPIK_API_BASE_URL: str = "https://api.freepik.com/v1/ai"
     FREEPIK_POLL_INTERVAL: int = 10      # seconds between status checks
-    FREEPIK_TASK_TIMEOUT: int = 600      # max seconds per video (10 min)
+    FREEPIK_TASK_TIMEOUT: int = 1200     # max seconds per video (20 min)
 
     # GitHub Integration (Dockerfile editor — Phase 6)
     # Fine-grained PAT: Contents: read+write on the repo below (single repo only)
