@@ -450,12 +450,10 @@ export default function BatchVideoUpscale() {
     setHistoryLoading(true);
     setHistoryError('');
     try {
-      const response = await apiClient.listUpscaleBatches() as { success: boolean; batches?: UpscaleBatchSummary[]; error?: string };
-      if (response.success && response.batches) {
-        setBatchHistory(response.batches);
-      } else {
-        setHistoryError(response.error || 'Failed to load history');
-      }
+      const response = await apiClient.listUpscaleBatches();
+      // Backend returns a raw array of batches
+      const batches = Array.isArray(response) ? response : [];
+      setBatchHistory(batches as UpscaleBatchSummary[]);
     } catch {
       setHistoryError('Failed to load history');
     } finally {
