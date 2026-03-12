@@ -226,6 +226,11 @@ function StatusBadge({ status }: { status: string }) {
       text: 'text-amber-700 dark:text-amber-300',
       dot: 'bg-amber-500',
     },
+    cancelled: {
+      bg: 'bg-gray-100 dark:bg-gray-800',
+      text: 'text-gray-600 dark:text-gray-400',
+      dot: 'bg-gray-500',
+    },
   };
 
   const colors = colorMap[status] || colorMap.pending;
@@ -267,6 +272,99 @@ function BatchProgress({ batch }: { batch: UpscaleBatchData }) {
   );
 }
 
+// --- UpscaleBatchSummary for history ---
+
+interface UpscaleBatchSummary {
+  id: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'paused' | 'cancelled';
+  resolution: string;
+  creativity: number;
+  sharpen: number;
+  grain: number;
+  fps_boost: boolean;
+  flavor: string;
+  total_videos: number;
+  completed_videos: number;
+  failed_videos: number;
+  created_at: string;
+}
+
+function formatHistoryDate(dateStr: string): string {
+  const d = new Date(dateStr);
+  const date = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  return `${date} at ${time}`;
+}
+
+// --- BatchHistoryCard Sub-component ---
+
+function BatchHistoryCard({
+  batch,
+  onView,
+  onRerun,
+}: {
+  batch: UpscaleBatchSummary;
+  onView: (batchId: string) => void;
+  onRerun: (batch: UpscaleBatchSummary) => void;
+}) {
+  const isProcessing = batch.status === 'processing';
+  const total = batch.total_videos;
+  const completed = batch.completed_videos;
+  const failed = batch.failed_videos;
+  const percentage = total > 0 ? Math.round(((completed + failed) / total) * 100) : 0;
+
+  return (
+    <div className="p-4 rounded-2xl bg-white dark:bg-dark-surface-secondary border border-gray-100 dark:border-dark-border-primary space-y-3">
+      {/* Top row: status + date */}
+      <div className="flex items-center justify-between">
+        <StatusBadge status={batch.status} />
+        <span className="text-xs text-gray-500 dark:text-gray-400">
+          {formatHistoryDate(batch.created_at)}
+        </span>
+      </div>
+
+      {/* Video counts */}
+      <p className="text-sm text-gray-700 dark:text-gray-300">
+        {total} video{total !== 1 ? 's' : ''}{' '}
+        <span className="text-gray-500 dark:text-gray-400">
+          ({completed} completed{failed > 0 ? `, ${failed} failed` : ''})
+        </span>
+      </p>
+
+      {/* Settings summary */}
+      <p className="text-xs text-gray-500 dark:text-gray-400">
+        {batch.resolution.toUpperCase()}, {batch.flavor}{batch.fps_boost ? ', FPS boost' : ''}
+      </p>
+
+      {/* Progress bar (if processing) */}
+      {isProcessing && (
+        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+          <div
+            className="bg-gradient-to-r from-amber-500 to-orange-600 h-2 rounded-full transition-all duration-500"
+            style={{ width: `${percentage}%` }}
+          ></div>
+        </div>
+      )}
+
+      {/* Action buttons */}
+      <div className="flex items-center gap-2 pt-1">
+        <button
+          onClick={() => onView(batch.id)}
+          className="px-4 py-2 rounded-xl text-xs font-semibold bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+        >
+          View
+        </button>
+        <button
+          onClick={() => onRerun(batch)}
+          className="px-4 py-2 rounded-xl text-xs font-semibold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors"
+        >
+          Re-run with same settings
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // --- Main Component ---
 
 export default function BatchVideoUpscale() {
@@ -289,6 +387,14 @@ export default function BatchVideoUpscale() {
   const [error, setError] = useState<string>('');
   const [isDragging, setIsDragging] = useState(false);
   const [fileError, setFileError] = useState<string>('');
+
+  // History state
+  const [batchHistory, setBatchHistory] = useState<UpscaleBatchSummary[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string>('');
+  const [historyLimit, setHistoryLimit] = useState(20);
+  const [rerunNotice, setRerunNotice] = useState<string>('');
+  const uploadSectionRef = useRef<HTMLDivElement>(null);
 
   // Polling state
   const [pollVersion, setPollVersion] = useState(0);
@@ -320,6 +426,7 @@ export default function BatchVideoUpscale() {
           }
           if (['completed', 'failed', 'paused', 'cancelled'].includes(response.batch.status)) {
             if (intervalId) clearInterval(intervalId);
+            loadHistory();
           }
         }
       } catch {
@@ -335,6 +442,30 @@ export default function BatchVideoUpscale() {
       if (intervalId) clearInterval(intervalId);
     };
   }, [activeBatchId, pollVersion]);
+
+  // --- History loading ---
+
+  const loadHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    setHistoryError('');
+    try {
+      const response = await apiClient.listUpscaleBatches() as { success: boolean; batches?: UpscaleBatchSummary[]; error?: string };
+      if (response.success && response.batches) {
+        setBatchHistory(response.batches);
+      } else {
+        setHistoryError(response.error || 'Failed to load history');
+      }
+    } catch {
+      setHistoryError('Failed to load history');
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
+
+  // Load history on mount
+  useEffect(() => {
+    loadHistory();
+  }, [loadHistory]);
 
   // --- File handling ---
 
@@ -536,6 +667,35 @@ export default function BatchVideoUpscale() {
     setZipProgress('');
     setZipJobId(null);
     setIsDownloadingZip(false);
+    loadHistory();
+  }
+
+  // --- History actions ---
+
+  function handleViewBatch(batchId: string) {
+    setActiveBatchId(batchId);
+    firstCompletionRef.current = null;
+    setPollVersion((v) => v + 1);
+  }
+
+  function handleRerun(historyBatch: UpscaleBatchSummary) {
+    setSettings({
+      resolution: historyBatch.resolution as UpscaleSettings['resolution'],
+      creativity: historyBatch.creativity,
+      sharpen: historyBatch.sharpen,
+      grain: historyBatch.grain,
+      fps_boost: historyBatch.fps_boost,
+      flavor: historyBatch.flavor as UpscaleSettings['flavor'],
+    });
+    setActiveBatchId(null);
+    setBatch(null);
+    setRerunNotice('Settings loaded from previous batch. Upload new videos to start.');
+    // Clear notice after 5 seconds
+    setTimeout(() => setRerunNotice(''), 5000);
+    // Scroll to upload section
+    setTimeout(() => {
+      uploadSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
   }
 
   // --- ETA calculation ---
@@ -578,10 +738,26 @@ export default function BatchVideoUpscale() {
           </div>
         )}
 
+        {/* Re-run notice */}
+        {rerunNotice && (
+          <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 text-sm flex items-center justify-between">
+            <span>{rerunNotice}</span>
+            <button
+              onClick={() => setRerunNotice('')}
+              className="ml-3 text-amber-500 hover:text-amber-700 dark:hover:text-amber-200 flex-shrink-0"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        )}
+
         {/* === UPLOAD & SETTINGS VIEW === */}
         {!showMonitoring && (
           <>
             {/* Upload Section */}
+            <div ref={uploadSectionRef}>
             <Section title="Upload Videos">
               <div
                 onDragOver={handleDragOver}
@@ -619,6 +795,7 @@ export default function BatchVideoUpscale() {
                 <p className="mt-3 text-sm text-red-600 dark:text-red-400">{fileError}</p>
               )}
             </Section>
+            </div>
 
             {/* Video Queue */}
             {queuedVideos.length > 0 && (
@@ -828,6 +1005,44 @@ export default function BatchVideoUpscale() {
                       </div>
                     ))}
                   </div>
+                </div>
+              )}
+            </Section>
+
+            {/* Batch History */}
+            <Section title="Batch History">
+              {historyLoading ? (
+                <p className="text-gray-500 dark:text-gray-400">Loading history...</p>
+              ) : historyError ? (
+                <div className="flex items-center gap-3">
+                  <p className="text-sm text-red-600 dark:text-red-400">{historyError}</p>
+                  <button
+                    onClick={loadHistory}
+                    className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : batchHistory.length === 0 ? (
+                <p className="text-gray-500 dark:text-gray-400">No previous batches. Upload videos above to get started.</p>
+              ) : (
+                <div className="space-y-4">
+                  {batchHistory.slice(0, historyLimit).map((hBatch) => (
+                    <BatchHistoryCard
+                      key={hBatch.id}
+                      batch={hBatch}
+                      onView={handleViewBatch}
+                      onRerun={handleRerun}
+                    />
+                  ))}
+                  {batchHistory.length > historyLimit && (
+                    <button
+                      onClick={() => setHistoryLimit((l) => l + 20)}
+                      className="w-full py-3 rounded-2xl border-2 border-dashed border-gray-300 dark:border-gray-600 text-sm font-medium text-gray-500 dark:text-gray-400 hover:border-amber-400 dark:hover:border-amber-500 hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
+                    >
+                      Show more ({batchHistory.length - historyLimit} remaining)
+                    </button>
+                  )}
                 </div>
               )}
             </Section>
