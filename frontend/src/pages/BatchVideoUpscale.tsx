@@ -385,6 +385,7 @@ export default function BatchVideoUpscale() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<Record<string, string>>({});
   const [error, setError] = useState<string>('');
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [fileError, setFileError] = useState<string>('');
 
@@ -890,85 +891,100 @@ export default function BatchVideoUpscale() {
                 </div>
               </Field>
 
-              {/* Creativity */}
-              <Field>
-                <Label>Creativity: {settings.creativity}</Label>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={settings.creativity}
-                  onChange={(e) => setSettings((s) => ({ ...s, creativity: parseInt(e.target.value) }))}
-                  className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-amber-500"
-                />
-              </Field>
+              {/* Advanced Settings Toggle */}
+              <div>
+                <button
+                  onClick={() => setShowAdvanced((v) => !v)}
+                  className="flex items-center gap-2 text-sm font-semibold text-gray-600 dark:text-dark-text-secondary hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
+                >
+                  <span className={`transition-transform duration-200 ${showAdvanced ? 'rotate-90' : ''}`}>&#9654;</span>
+                  Advanced Settings
+                </button>
+              </div>
 
-              {/* Sharpen */}
-              <Field>
-                <Label>Sharpen: {settings.sharpen}</Label>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={settings.sharpen}
-                  onChange={(e) => setSettings((s) => ({ ...s, sharpen: parseInt(e.target.value) }))}
-                  className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-amber-500"
-                />
-              </Field>
+              {showAdvanced && (
+                <>
+                  {/* Creativity */}
+                  <Field>
+                    <Label>Creativity: {settings.creativity}</Label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={settings.creativity}
+                      onChange={(e) => setSettings((s) => ({ ...s, creativity: parseInt(e.target.value) }))}
+                      className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                    />
+                  </Field>
 
-              {/* Smart Grain */}
-              <Field>
-                <Label>Smart Grain: {settings.grain}</Label>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={settings.grain}
-                  onChange={(e) => setSettings((s) => ({ ...s, grain: parseInt(e.target.value) }))}
-                  className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-amber-500"
-                />
-              </Field>
+                  {/* Sharpen */}
+                  <Field>
+                    <Label>Sharpen: {settings.sharpen}</Label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={settings.sharpen}
+                      onChange={(e) => setSettings((s) => ({ ...s, sharpen: parseInt(e.target.value) }))}
+                      className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                    />
+                  </Field>
 
-              {/* FPS Boost */}
-              <Field>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => setSettings((s) => ({ ...s, fps_boost: !s.fps_boost }))}
-                    className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${
-                      settings.fps_boost
-                        ? 'bg-amber-500'
-                        : 'bg-gray-300 dark:bg-gray-600'
-                    }`}
-                  >
-                    <span
-                      className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200 ${
-                        settings.fps_boost ? 'translate-x-6' : 'translate-x-0'
-                      }`}
-                    ></span>
-                  </button>
-                  <Label className="text-sm font-semibold text-gray-800 dark:text-dark-text-primary mb-0">FPS Boost</Label>
-                </div>
-              </Field>
+                  {/* Smart Grain */}
+                  <Field>
+                    <Label>Smart Grain: {settings.grain}</Label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={settings.grain}
+                      onChange={(e) => setSettings((s) => ({ ...s, grain: parseInt(e.target.value) }))}
+                      className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                    />
+                  </Field>
 
-              {/* Flavor */}
-              <Field>
-                <Label>Flavor</Label>
-                <div className="flex gap-3">
-                  {(['vivid', 'natural'] as const).map((f) => (
-                    <button
-                      key={f}
-                      onClick={() => setSettings((s) => ({ ...s, flavor: f }))}
-                      className={`px-6 py-3 rounded-2xl font-semibold transition-all duration-200 ${
-                        settings.flavor === f
-                          ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-lg scale-[1.02]'
-                          : 'border-2 border-gray-200 dark:border-dark-border-primary bg-white dark:bg-dark-surface-secondary text-gray-700 dark:text-dark-text-secondary hover:border-amber-400 dark:hover:border-amber-600'
-                      }`}
-                    >
-                      {f.charAt(0).toUpperCase() + f.slice(1)}
-                    </button>
-                  ))}
-                </div>
-              </Field>
+                  {/* FPS Boost */}
+                  <Field>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => setSettings((s) => ({ ...s, fps_boost: !s.fps_boost }))}
+                        className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${
+                          settings.fps_boost
+                            ? 'bg-amber-500'
+                            : 'bg-gray-300 dark:bg-gray-600'
+                        }`}
+                      >
+                        <span
+                          className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200 ${
+                            settings.fps_boost ? 'translate-x-6' : 'translate-x-0'
+                          }`}
+                        ></span>
+                      </button>
+                      <Label className="text-sm font-semibold text-gray-800 dark:text-dark-text-primary mb-0">FPS Boost</Label>
+                    </div>
+                  </Field>
+
+                  {/* Flavor */}
+                  <Field>
+                    <Label>Flavor</Label>
+                    <div className="flex gap-3">
+                      {(['vivid', 'natural'] as const).map((f) => (
+                        <button
+                          key={f}
+                          onClick={() => setSettings((s) => ({ ...s, flavor: f }))}
+                          className={`px-6 py-3 rounded-2xl font-semibold transition-all duration-200 ${
+                            settings.flavor === f
+                              ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-lg scale-[1.02]'
+                              : 'border-2 border-gray-200 dark:border-dark-border-primary bg-white dark:bg-dark-surface-secondary text-gray-700 dark:text-dark-text-secondary hover:border-amber-400 dark:hover:border-amber-600'
+                          }`}
+                        >
+                          {f.charAt(0).toUpperCase() + f.slice(1)}
+                        </button>
+                      ))}
+                    </div>
+                  </Field>
+                </>
+              )}
             </Section>
 
             {/* Start Processing */}
