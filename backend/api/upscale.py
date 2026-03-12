@@ -453,9 +453,115 @@ async def download_zip(
 # ---------------------------------------------------------------------------
 
 
+async def _deliver_completed_video(
+    video: dict,
+    batch: dict,
+    task_id: str,
+    output_url: str,
+    job_service: UpscaleJobService,
+) -> ProcessingResult:
+    """
+    Handle delivery of a completed Freepik video: upload to Supabase Storage
+    and optionally to Google Drive, then mark the video as completed.
+
+    Extracted so both fresh-poll and timeout-recovery paths can share it.
+    """
+    video_id = video["id"]
+    batch_id = batch["id"]
+
+    # --- Delivery Step A: Supabase Upload ---
+    storage_url = output_url  # default to Freepik temp URL
+    supabase_status = "pending"
+    try:
+        storage = StorageService()
+        up_success, public_url, up_error = await storage.upload_upscaled_video(
+            source_url=output_url,
+            user_id=batch.get("user_id", "unknown"),
+            batch_id=batch["id"],
+            original_filename=video["input_filename"],
+        )
+        if up_success:
+            storage_url = public_url
+            supabase_status = "completed"
+        else:
+            supabase_status = "failed"
+            print(f"[UPSCALE] Supabase upload failed for {video_id}: {up_error}")
+    except Exception as e:
+        supabase_status = "failed"
+        print(f"[UPSCALE] Supabase upload exception for {video_id}: {e}")
+
+    await job_service.update_video_upload_status(
+        video_id,
+        supabase_upload_status=supabase_status,
+        output_storage_url=storage_url,
+    )
+
+    # --- Delivery Step B: Google Drive Upload (optional, never fails the video) ---
+    drive_status = "skipped"
+    drive_file_id = None
+    project_id = batch.get("project_id")
+
+    if project_id:
+        try:
+            if is_drive_configured():
+                drive = GoogleDriveService()
+                subfolder_name = f"Upscaled - {_dt.now().strftime('%Y-%m-%d')}"
+                folder_ok, folder_id, folder_err = await drive.get_or_create_folder(
+                    parent_id=project_id,
+                    folder_name=subfolder_name,
+                )
+                if folder_ok and folder_id:
+                    _storage = StorageService()
+                    _client = await _storage._get_fresh_http_client(timeout=300.0)
+                    async with _client:
+                        _resp = await _client.get(storage_url)
+                        if _resp.status_code == 200 and _resp.content:
+                            stem = Path(video["input_filename"]).stem
+                            fname = f"{stem}_upscaled.mp4"
+                            d_ok, d_fid, d_err = await drive.upload_file(
+                                file_content=_resp.content,
+                                filename=fname,
+                                folder_id=folder_id,
+                                mime_type="video/mp4",
+                            )
+                            if d_ok:
+                                drive_status = "completed"
+                                drive_file_id = d_fid
+                            else:
+                                drive_status = "failed"
+                                print(f"[UPSCALE] Drive upload failed for {video_id}: {d_err}")
+                        else:
+                            drive_status = "failed"
+                            print(f"[UPSCALE] Drive re-download failed for {video_id}")
+                else:
+                    drive_status = "failed"
+                    print(f"[UPSCALE] Drive folder creation failed for {video_id}: {folder_err}")
+            else:
+                drive_status = "skipped"
+        except Exception as e:
+            drive_status = "failed"
+            print(f"[UPSCALE] Drive upload exception for {video_id}: {e}")
+
+    await job_service.update_video_upload_status(
+        video_id,
+        drive_upload_status=drive_status,
+        output_drive_file_id=drive_file_id,
+    )
+
+    # --- Mark video completed with final URL ---
+    await job_service.update_video_status(
+        video_id, "completed", output_url=storage_url,
+    )
+    await job_service.increment_completed_count(batch_id)
+    return ProcessingResult(success=True)
+
+
 async def _process_single_video(video: dict, batch: dict) -> ProcessingResult:
     """
     Process a single video through Freepik upscaling.
+
+    If the video already has a freepik_task_id (e.g. from a previous timed-out
+    attempt), checks that existing task first before submitting a new one.
 
     Returns ProcessingResult with success status and error classification.
     """
@@ -464,11 +570,54 @@ async def _process_single_video(video: dict, batch: dict) -> ProcessingResult:
 
     video_id = video["id"]
     batch_id = batch["id"]
+    existing_task_id = video.get("freepik_task_id")
 
     # Mark video as processing
     await job_service.update_video_status(video_id, "processing")
 
-    # Submit to Freepik
+    # If there's an existing Freepik task (e.g. from a timed-out attempt),
+    # check its status before submitting a brand-new task.
+    if existing_task_id:
+        print(f"[UPSCALE] Video {video_id}: checking existing task {existing_task_id}")
+        status, output_url, check_error = await freepik.check_task_status(existing_task_id)
+
+        if status == "COMPLETED" and output_url:
+            # The previous task finished after our timeout — recover it
+            print(f"[UPSCALE] Video {video_id}: recovered completed task {existing_task_id}")
+            task_id = existing_task_id
+            # Jump straight to delivery (skip submit + poll)
+            return await _deliver_completed_video(
+                video, batch, task_id, output_url, job_service,
+            )
+
+        if status in ("IN_PROGRESS", "QUEUED", "IN_QUEUE"):
+            # Still running — resume polling instead of resubmitting
+            print(f"[UPSCALE] Video {video_id}: resuming poll on {existing_task_id}")
+            task_id = existing_task_id
+            status, output_url, poll_error = await freepik.poll_until_complete(task_id)
+            if status == "COMPLETED" and output_url:
+                return await _deliver_completed_video(
+                    video, batch, task_id, output_url, job_service,
+                )
+            # Fall through to failure handling below
+            err_msg = poll_error or f"Freepik task ended with status: {status}"
+            failure_type = _classify_error(err_msg)
+            await job_service.update_video_status(
+                video_id, "failed", error_message=err_msg,
+            )
+            await job_service.increment_failed_count(batch_id)
+            return ProcessingResult(
+                success=False,
+                failure_type=failure_type,
+                error_message=err_msg,
+                should_pause_batch=(failure_type == "credit_exhaustion"),
+            )
+
+        # Task FAILED on Freepik side — submit fresh below
+        if status == "FAILED":
+            print(f"[UPSCALE] Video {video_id}: existing task {existing_task_id} failed, resubmitting")
+
+    # Submit to Freepik (new task)
     success, task_id, error = await freepik.submit_task(
         video_url=video["input_storage_url"],
         resolution=batch.get("resolution", "2k"),
@@ -500,93 +649,10 @@ async def _process_single_video(video: dict, batch: dict) -> ProcessingResult:
     # Poll until complete
     status, output_url, poll_error = await freepik.poll_until_complete(task_id)
 
-    if status == "COMPLETED":
-        # --- Delivery Step A: Supabase Upload ---
-        storage_url = output_url  # default to Freepik temp URL
-        supabase_status = "pending"
-        try:
-            storage = StorageService()
-            up_success, public_url, up_error = await storage.upload_upscaled_video(
-                source_url=output_url,
-                user_id=batch.get("user_id", "unknown"),
-                batch_id=batch["id"],
-                original_filename=video["input_filename"],
-            )
-            if up_success:
-                storage_url = public_url
-                supabase_status = "completed"
-            else:
-                supabase_status = "failed"
-                print(f"[UPSCALE] Supabase upload failed for {video_id}: {up_error}")
-        except Exception as e:
-            supabase_status = "failed"
-            print(f"[UPSCALE] Supabase upload exception for {video_id}: {e}")
-
-        await job_service.update_video_upload_status(
-            video_id,
-            supabase_upload_status=supabase_status,
-            output_storage_url=storage_url,
+    if status == "COMPLETED" and output_url:
+        return await _deliver_completed_video(
+            video, batch, task_id, output_url, job_service,
         )
-
-        # --- Delivery Step B: Google Drive Upload (optional, never fails the video) ---
-        drive_status = "skipped"
-        drive_file_id = None
-        project_id = batch.get("project_id")
-
-        if project_id:
-            try:
-                if is_drive_configured():
-                    drive = GoogleDriveService()
-                    subfolder_name = f"Upscaled - {_dt.now().strftime('%Y-%m-%d')}"
-                    folder_ok, folder_id, folder_err = await drive.get_or_create_folder(
-                        parent_id=project_id,
-                        folder_name=subfolder_name,
-                    )
-                    if folder_ok and folder_id:
-                        # Download video bytes for Drive upload
-                        _storage = StorageService()
-                        _client = await _storage._get_fresh_http_client(timeout=300.0)
-                        async with _client:
-                            _resp = await _client.get(storage_url)
-                            if _resp.status_code == 200 and _resp.content:
-                                stem = Path(video["input_filename"]).stem
-                                fname = f"{stem}_upscaled.mp4"
-                                d_ok, d_fid, d_err = await drive.upload_file(
-                                    file_content=_resp.content,
-                                    filename=fname,
-                                    folder_id=folder_id,
-                                    mime_type="video/mp4",
-                                )
-                                if d_ok:
-                                    drive_status = "completed"
-                                    drive_file_id = d_fid
-                                else:
-                                    drive_status = "failed"
-                                    print(f"[UPSCALE] Drive upload failed for {video_id}: {d_err}")
-                            else:
-                                drive_status = "failed"
-                                print(f"[UPSCALE] Drive re-download failed for {video_id}")
-                    else:
-                        drive_status = "failed"
-                        print(f"[UPSCALE] Drive folder creation failed for {video_id}: {folder_err}")
-                else:
-                    drive_status = "skipped"
-            except Exception as e:
-                drive_status = "failed"
-                print(f"[UPSCALE] Drive upload exception for {video_id}: {e}")
-
-        await job_service.update_video_upload_status(
-            video_id,
-            drive_upload_status=drive_status,
-            output_drive_file_id=drive_file_id,
-        )
-
-        # --- Mark video completed with final URL ---
-        await job_service.update_video_status(
-            video_id, "completed", output_url=storage_url,
-        )
-        await job_service.increment_completed_count(batch_id)
-        return ProcessingResult(success=True)
     else:
         err_msg = poll_error or f"Freepik task ended with status: {status}"
         failure_type = _classify_error(err_msg)
