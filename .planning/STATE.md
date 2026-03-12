@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Batch Video Upscale
-status: completed
-stopped_at: Phase 12 context gathered
-last_updated: "2026-03-11T21:51:19.925Z"
-last_activity: 2026-03-11 -- Completed plan 11-02 (retry logic, credit pause, 3 API endpoints, 26 new tests)
+status: in_progress
+stopped_at: Completed 12-01-PLAN.md
+last_updated: "2026-03-12T01:00:30Z"
+last_activity: 2026-03-12 -- Completed plan 12-01 (delivery pipeline, Supabase + Drive upload, 17 new tests)
 progress:
   total_phases: 4
   completed_phases: 2
-  total_plans: 5
-  completed_plans: 5
-  percent: 50
+  total_plans: 7
+  completed_plans: 6
+  percent: 64
 ---
 
 # Project State
@@ -21,23 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-11)
 
 **Core value:** Provide a unified platform for AI-powered media processing where users can generate, edit, upscale, and manage their content end-to-end
-**Current focus:** v1.1 Batch Video Upscale -- Phase 11 complete (2/2 plans done), Phase 12 next
+**Current focus:** v1.1 Batch Video Upscale -- Phase 12 in progress (1/2 plans done), Plan 12-02 next
 
 ## Current Position
 
 Phase: 12 of 13 (Storage & Delivery)
-Plan: 0 of 0 in current phase (awaiting planning)
-Status: Phase 11 complete, Phase 12 next
-Last activity: 2026-03-11 -- Completed plan 11-02 (retry logic, credit pause, 3 API endpoints, 26 new tests)
+Plan: 1 of 2 in current phase
+Status: Phase 12 plan 01 complete, plan 02 next
+Last activity: 2026-03-12 -- Completed plan 12-01 (delivery pipeline, Supabase + Drive upload, 17 new tests)
 
-Progress: [#####░░░░░] 50%
+Progress: [######░░░░] 64%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5 (v1.1)
-- Average duration: 7.2 min
-- Total execution time: 36 min
+- Total plans completed: 6 (v1.1)
+- Average duration: 6.8 min
+- Total execution time: 41 min
 
 **By Phase:**
 
@@ -45,10 +45,11 @@ Progress: [#####░░░░░] 50%
 |-------|-------|-------|----------|
 | 10 | 3 | 28 min | 9.3 min |
 | 11 | 2 | 8 min | 4 min |
+| 12 | 1 | 5 min | 5 min |
 
 **Recent Trend:**
-- Last 5 plans: 10-01 (5 min), 10-02 (8 min), 10-03 (15 min), 11-01 (4 min), 11-02 (4 min)
-- Trend: consistent, Phase 11 completing fast
+- Last 5 plans: 10-02 (8 min), 10-03 (15 min), 11-01 (4 min), 11-02 (4 min), 12-01 (5 min)
+- Trend: consistent, averaging ~5 min per plan
 
 *Updated after each plan completion*
 
@@ -80,6 +81,10 @@ v1.1 decisions made during execution:
 - [11-02] Exponential backoff BASE_DELAY * 2^attempt (2s, 4s) for simplicity
 - [11-02] Batch status re-check after each video via _get_batch_for_processing to detect external pause
 - [11-02] Terminal batch relaunch on retry: set to processing + create_task for automatic resume
+- [12-01] Public URLs (not signed) for permanent upscaled video access
+- [12-01] Storage path: upscaled/{user_id}/{batch_id}/{stem}_upscaled.mp4 for clear organization
+- [12-01] Drive subfolder naming: "Upscaled - YYYY-MM-DD" for date-based grouping
+- [12-01] Re-download from storage_url for Drive upload to keep StorageService stateless
 
 ### Pending Todos
 
@@ -92,7 +97,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-11T21:51:19.921Z
-Stopped at: Phase 12 context gathered
-Resume file: .planning/phases/12-output-delivery/12-CONTEXT.md
-Next action: Plan and execute Phase 12 (Storage & Delivery)
+Last session: 2026-03-12T01:00:30Z
+Stopped at: Completed 12-01-PLAN.md
+Resume file: .planning/phases/12-output-delivery/12-01-SUMMARY.md
+Next action: Execute Phase 12 Plan 02 (batch ZIP download)
