@@ -93,12 +93,12 @@ Plans:
   3. Each video displays a color-coded status badge (pending/processing/completed/failed/paused) and the batch shows an overall progress bar with counts and estimated time remaining
   4. User can view past batches in a history feed and re-run a previous batch with the same settings
   5. The Batch Video Upscale page is accessible from the homepage and sidebar navigation for all authenticated users
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 13-01: TBD
-- [ ] 13-02: TBD
-- [ ] 13-03: TBD
+- [ ] 13-01-PLAN.md -- Backend upload endpoint, apiClient methods, navigation integration
+- [ ] 13-02-PLAN.md -- BatchVideoUpscale page: upload zone, settings, queue, status polling, progress
+- [ ] 13-03-PLAN.md -- Batch history, re-run flow, human verification
 
 ## Progress
 
