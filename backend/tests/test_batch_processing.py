@@ -46,9 +46,10 @@ class TestProcessSingleVideo:
     """Tests for _process_single_video background function."""
 
     @pytest.mark.asyncio
+    @patch("api.upscale.StorageService")
     @patch("api.upscale.FreepikUpscalerService")
     @patch("api.upscale.UpscaleJobService")
-    async def test_calls_freepik_and_updates_completed(self, MockJobService, MockFreepik):
+    async def test_calls_freepik_and_updates_completed(self, MockJobService, MockFreepik, MockStorage):
         """_process_single_video calls submit_task + poll_until_complete and updates to 'completed'."""
         from api.upscale import _process_single_video
 
@@ -56,8 +57,12 @@ class TestProcessSingleVideo:
         mock_freepik.submit_task = AsyncMock(return_value=(True, "task-123", None))
         mock_freepik.poll_until_complete = AsyncMock(return_value=("COMPLETED", "https://output.url/video.mp4", None))
 
+        mock_storage = MockStorage.return_value
+        mock_storage.upload_upscaled_video = AsyncMock(return_value=(True, "https://storage.example.com/upscaled.mp4", None))
+
         mock_job_svc = MockJobService.return_value
         mock_job_svc.update_video_status = AsyncMock(return_value=True)
+        mock_job_svc.update_video_upload_status = AsyncMock(return_value=True)
         mock_job_svc.increment_completed_count = AsyncMock(return_value=True)
 
         result = await _process_single_video(SAMPLE_VIDEO, SAMPLE_BATCH)
@@ -118,9 +123,10 @@ class TestErrorClassification:
     """Tests that _process_single_video returns ProcessingResult with correct error classification."""
 
     @pytest.mark.asyncio
+    @patch("api.upscale.StorageService")
     @patch("api.upscale.FreepikUpscalerService")
     @patch("api.upscale.UpscaleJobService")
-    async def test_returns_success_result_on_completion(self, MockJobService, MockFreepik):
+    async def test_returns_success_result_on_completion(self, MockJobService, MockFreepik, MockStorage):
         """_process_single_video returns ProcessingResult(success=True) on successful completion."""
         from api.upscale import _process_single_video
 
@@ -128,8 +134,12 @@ class TestErrorClassification:
         mock_freepik.submit_task = AsyncMock(return_value=(True, "task-123", None))
         mock_freepik.poll_until_complete = AsyncMock(return_value=("COMPLETED", "https://output.url/video.mp4", None))
 
+        mock_storage = MockStorage.return_value
+        mock_storage.upload_upscaled_video = AsyncMock(return_value=(True, "https://storage.example.com/upscaled.mp4", None))
+
         mock_job_svc = MockJobService.return_value
         mock_job_svc.update_video_status = AsyncMock(return_value=True)
+        mock_job_svc.update_video_upload_status = AsyncMock(return_value=True)
         mock_job_svc.increment_completed_count = AsyncMock(return_value=True)
 
         result = await _process_single_video(SAMPLE_VIDEO, SAMPLE_BATCH)
