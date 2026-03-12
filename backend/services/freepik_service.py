@@ -216,6 +216,10 @@ class FreepikUpscalerService:
         while True:
             elapsed = time.monotonic() - start_time
             if elapsed >= timeout:
+                # One final check before giving up — task may have just finished
+                status, output_url, error = await self.check_task_status(task_id)
+                if status == "COMPLETED":
+                    return status, output_url, error
                 return "TIMEOUT", None, f"Task {task_id} exceeded timeout of {timeout}s"
 
             status, output_url, error = await self.check_task_status(task_id)
