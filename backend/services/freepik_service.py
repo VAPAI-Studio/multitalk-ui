@@ -16,12 +16,8 @@ from typing import Optional, Tuple
 from config.settings import settings
 
 
-# Resolution mapping: user-facing labels -> Freepik API values
-RESOLUTION_MAP = {
-    "1k": "1080p",
-    "2k": "1440p",
-    "4k": "2160p",
-}
+# Resolution values: Freepik API accepts "1k", "2k", "4k" directly
+VALID_RESOLUTIONS = {"1k", "2k", "4k"}
 
 
 class FreepikUpscalerService:
@@ -75,14 +71,14 @@ class FreepikUpscalerService:
         if not self.api_key:
             return False, None, "Freepik API key not configured. Please set FREEPIK_API_KEY."
 
-        api_resolution = RESOLUTION_MAP.get(resolution, resolution)
+        api_resolution = resolution if resolution in VALID_RESOLUTIONS else "2k"
 
         payload = {
-            "video_url": video_url,
+            "video": video_url,
             "resolution": api_resolution,
             "creativity": creativity,
             "sharpen": sharpen,
-            "grain": grain,
+            "smart_grain": grain,
             "fps_boost": fps_boost,
             "flavor": flavor,
         }

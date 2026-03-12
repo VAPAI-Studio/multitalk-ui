@@ -108,7 +108,7 @@ class TestSubmitTask:
 
     @pytest.mark.asyncio
     async def test_submit_task_resolution_mapping(self, freepik_service):
-        """submit_task maps resolution '2k' to '1440p' in payload."""
+        """submit_task passes resolution '2k' directly to Freepik API."""
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {"data": {"task_id": "xyz789"}}
@@ -130,7 +130,11 @@ class TestSubmitTask:
             call_kwargs = mock_client_instance.post.call_args
             payload = call_kwargs.kwargs.get("json") or call_kwargs[1].get("json")
             assert payload is not None
-            assert payload.get("resolution") == "1440p"
+            assert payload.get("resolution") == "2k"
+            assert payload.get("video") is not None
+            assert "video_url" not in payload
+            assert payload.get("smart_grain") is not None
+            assert "grain" not in payload
 
 
 # ---------------------------------------------------------------------------
