@@ -5,6 +5,10 @@ Tests all CRUD endpoints for batch and video management
 with mocked authentication and service dependencies.
 Includes delivery pipeline tests (Phase 12).
 """
+import io
+import time
+import zipfile
+
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock, MagicMock, patch, call
@@ -944,3 +948,406 @@ class TestDeliveryPipeline:
         assert video["supabase_upload_status"] == "completed"
         assert video["drive_upload_status"] == "skipped"
         assert video["output_drive_file_id"] is None
+
+
+# ---------------------------------------------------------------------------
+# ZIP Download Tests (Phase 12 Plan 02)
+# ---------------------------------------------------------------------------
+
+
+class TestZipDownload:
+    """Tests for batch ZIP download endpoints."""
+
+    @patch("api.upscale.asyncio")
+    @patch("api.upscale.UpscaleJobService")
+    def test_zip_job_creation(self, MockService, mock_asyncio, client):
+        """POST /api/upscale/batches/{id}/download-zip creates ZIP job and returns job_id."""
+        def _close_coro(coro):
+            coro.close()
+            return MagicMock()
+        mock_asyncio.create_task.side_effect = _close_coro
+
+        instance = MockService.return_value
+        instance.get_batch = AsyncMock(return_value={
+            "id": "batch-001",
+            "user_id": "test-user-id",
+            "status": "completed",
+            "resolution": "2k",
+            "creativity": 0,
+            "sharpen": 0,
+            "grain": 0,
+            "fps_boost": False,
+            "flavor": "vivid",
+            "total_videos": 2,
+            "completed_videos": 2,
+            "failed_videos": 0,
+            "created_at": "2026-03-11T10:00:00Z",
+            "videos": [
+                {
+                    "id": "video-001",
+                    "batch_id": "batch-001",
+                    "status": "completed",
+                    "queue_position": 1,
+                    "input_filename": "clip_a.mp4",
+                    "input_storage_url": "https://example.com/clip_a.mp4",
+                    "output_storage_url": "https://supabase.example.com/public/clip_a_upscaled.mp4",
+                    "created_at": "2026-03-11T10:00:00Z",
+                },
+                {
+                    "id": "video-002",
+                    "batch_id": "batch-001",
+                    "status": "completed",
+                    "queue_position": 2,
+                    "input_filename": "clip_b.mp4",
+                    "input_storage_url": "https://example.com/clip_b.mp4",
+                    "output_storage_url": "https://supabase.example.com/public/clip_b_upscaled.mp4",
+                    "created_at": "2026-03-11T10:00:00Z",
+                },
+            ],
+        })
+
+        response = client.post("/api/upscale/batches/batch-001/download-zip")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert "job_id" in data
+        assert data["job_id"] is not None
+
+    @patch("api.upscale.UpscaleJobService")
+    def test_zip_job_creation_no_completed_videos(self, MockService, client):
+        """POST returns 400 when batch has no completed videos with output_storage_url."""
+        instance = MockService.return_value
+        instance.get_batch = AsyncMock(return_value={
+            "id": "batch-001",
+            "user_id": "test-user-id",
+            "status": "processing",
+            "resolution": "2k",
+            "creativity": 0,
+            "sharpen": 0,
+            "grain": 0,
+            "fps_boost": False,
+            "flavor": "vivid",
+            "total_videos": 1,
+            "completed_videos": 0,
+            "failed_videos": 0,
+            "created_at": "2026-03-11T10:00:00Z",
+            "videos": [
+                {
+                    "id": "video-001",
+                    "batch_id": "batch-001",
+                    "status": "pending",
+                    "queue_position": 1,
+                    "input_filename": "clip_a.mp4",
+                    "input_storage_url": "https://example.com/clip_a.mp4",
+                    "output_storage_url": None,
+                    "created_at": "2026-03-11T10:00:00Z",
+                },
+            ],
+        })
+
+        response = client.post("/api/upscale/batches/batch-001/download-zip")
+        assert response.status_code == 400
+
+    @patch("api.upscale.UpscaleJobService")
+    def test_zip_job_creation_batch_not_found(self, MockService, client):
+        """POST returns 404 for nonexistent batch."""
+        instance = MockService.return_value
+        instance.get_batch = AsyncMock(return_value=None)
+
+        response = client.post("/api/upscale/batches/nonexistent/download-zip")
+        assert response.status_code == 404
+
+    def test_zip_job_status(self, client):
+        """GET /api/upscale/zip-jobs/{id}/status returns job status fields."""
+        from api.upscale import _ZIP_JOBS
+
+        job_id = "test-status-job"
+        _ZIP_JOBS[job_id] = {
+            "status": "building",
+            "created_at": time.time(),
+            "progress_pct": 50.0,
+            "files_done": 1,
+            "total_files": 2,
+            "error": None,
+            "zip_bytes": None,
+        }
+
+        try:
+            response = client.get(f"/api/upscale/zip-jobs/{job_id}/status")
+            assert response.status_code == 200
+            data = response.json()
+            assert data["status"] == "building"
+            assert data["progress_pct"] == 50.0
+            assert data["files_done"] == 1
+            assert data["total_files"] == 2
+            assert data["error"] is None
+        finally:
+            _ZIP_JOBS.pop(job_id, None)
+
+    def test_zip_job_status_not_found(self, client):
+        """GET returns 404 for unknown job_id."""
+        response = client.get("/api/upscale/zip-jobs/unknown-id/status")
+        assert response.status_code == 404
+
+    def test_zip_download_ready(self, client):
+        """GET /api/upscale/zip-jobs/{id}/download returns ZIP bytes with correct headers."""
+        from api.upscale import _ZIP_JOBS
+
+        # Create a real ZIP in memory
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, 'w', zipfile.ZIP_STORED) as zf:
+            zf.writestr("test_upscaled.mp4", b"fake-video-bytes")
+        zip_bytes = buf.getvalue()
+
+        job_id = "test-download-job"
+        _ZIP_JOBS[job_id] = {
+            "status": "ready",
+            "created_at": time.time(),
+            "progress_pct": 100.0,
+            "files_done": 1,
+            "total_files": 1,
+            "error": None,
+            "zip_bytes": zip_bytes,
+        }
+
+        try:
+            response = client.get(f"/api/upscale/zip-jobs/{job_id}/download")
+            assert response.status_code == 200
+            assert response.headers["content-type"] == "application/zip"
+            assert "attachment" in response.headers.get("content-disposition", "")
+            assert "upscaled_batch.zip" in response.headers.get("content-disposition", "")
+
+            # Verify response is valid ZIP
+            result_zip = zipfile.ZipFile(io.BytesIO(response.content))
+            assert "test_upscaled.mp4" in result_zip.namelist()
+        finally:
+            _ZIP_JOBS.pop(job_id, None)
+
+    def test_zip_download_not_ready(self, client):
+        """GET returns 409 when ZIP status is not 'ready'."""
+        from api.upscale import _ZIP_JOBS
+
+        job_id = "test-not-ready-job"
+        _ZIP_JOBS[job_id] = {
+            "status": "building",
+            "created_at": time.time(),
+            "progress_pct": 50.0,
+            "files_done": 1,
+            "total_files": 2,
+            "error": None,
+            "zip_bytes": None,
+        }
+
+        try:
+            response = client.get(f"/api/upscale/zip-jobs/{job_id}/download")
+            assert response.status_code == 409
+        finally:
+            _ZIP_JOBS.pop(job_id, None)
+
+    def test_zip_download_cleanup(self, client):
+        """After successful download, job is removed from _ZIP_JOBS."""
+        from api.upscale import _ZIP_JOBS
+
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, 'w', zipfile.ZIP_STORED) as zf:
+            zf.writestr("test_upscaled.mp4", b"fake-video-bytes")
+        zip_bytes = buf.getvalue()
+
+        job_id = "test-cleanup-job"
+        _ZIP_JOBS[job_id] = {
+            "status": "ready",
+            "created_at": time.time(),
+            "progress_pct": 100.0,
+            "files_done": 1,
+            "total_files": 1,
+            "error": None,
+            "zip_bytes": zip_bytes,
+        }
+
+        response = client.get(f"/api/upscale/zip-jobs/{job_id}/download")
+        assert response.status_code == 200
+        # Job should be removed after download
+        assert job_id not in _ZIP_JOBS
+
+    def test_zip_ttl_cleanup(self, client):
+        """Expired ZIP jobs are cleaned up when a new job is created."""
+        from api.upscale import _ZIP_JOBS, _cleanup_expired_zip_jobs
+
+        # Insert an expired job (created 20 minutes ago)
+        expired_id = "expired-job"
+        _ZIP_JOBS[expired_id] = {
+            "status": "ready",
+            "created_at": time.time() - 1200,  # 20 minutes ago
+            "progress_pct": 100.0,
+            "files_done": 1,
+            "total_files": 1,
+            "error": None,
+            "zip_bytes": b"old-zip",
+        }
+
+        try:
+            _cleanup_expired_zip_jobs()
+            assert expired_id not in _ZIP_JOBS
+        finally:
+            _ZIP_JOBS.pop(expired_id, None)
+
+    @pytest.mark.asyncio
+    async def test_zip_filenames_use_upscaled_suffix(self):
+        """_build_zip creates ZIP entries with {stem}_upscaled.mp4 filenames."""
+        from api.upscale import _build_zip, _ZIP_JOBS
+
+        job_id = "test-filename-job"
+        _ZIP_JOBS[job_id] = {
+            "status": "pending",
+            "created_at": time.time(),
+            "progress_pct": 0.0,
+            "files_done": 0,
+            "total_files": 2,
+            "error": None,
+            "zip_bytes": None,
+        }
+
+        videos = [
+            {
+                "input_filename": "my_video.mp4",
+                "output_storage_url": "https://example.com/my_video_up.mp4",
+            },
+            {
+                "input_filename": "another_clip.mp4",
+                "output_storage_url": "https://example.com/another_up.mp4",
+            },
+        ]
+
+        # Mock httpx to return fake video bytes
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.content = b"fake-video-bytes"
+
+        with patch("api.upscale.httpx.AsyncClient") as MockClient:
+            mock_client = AsyncMock()
+            mock_client.get = AsyncMock(return_value=mock_response)
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            MockClient.return_value = mock_client
+
+            await _build_zip(job_id, videos)
+
+        try:
+            assert _ZIP_JOBS[job_id]["status"] == "ready"
+            assert _ZIP_JOBS[job_id]["zip_bytes"] is not None
+
+            # Verify ZIP contents have correct filenames
+            result_zip = zipfile.ZipFile(io.BytesIO(_ZIP_JOBS[job_id]["zip_bytes"]))
+            names = result_zip.namelist()
+            assert "my_video_upscaled.mp4" in names
+            assert "another_clip_upscaled.mp4" in names
+        finally:
+            _ZIP_JOBS.pop(job_id, None)
+
+    @pytest.mark.asyncio
+    async def test_zip_build_skips_failed_downloads(self):
+        """_build_zip skips videos whose download fails (non-200 status)."""
+        from api.upscale import _build_zip, _ZIP_JOBS
+
+        job_id = "test-skip-failed-job"
+        _ZIP_JOBS[job_id] = {
+            "status": "pending",
+            "created_at": time.time(),
+            "progress_pct": 0.0,
+            "files_done": 0,
+            "total_files": 2,
+            "error": None,
+            "zip_bytes": None,
+        }
+
+        videos = [
+            {
+                "input_filename": "good.mp4",
+                "output_storage_url": "https://example.com/good.mp4",
+            },
+            {
+                "input_filename": "bad.mp4",
+                "output_storage_url": "https://example.com/bad.mp4",
+            },
+        ]
+
+        good_response = MagicMock()
+        good_response.status_code = 200
+        good_response.content = b"good-video-bytes"
+
+        bad_response = MagicMock()
+        bad_response.status_code = 404
+        bad_response.content = b""
+
+        with patch("api.upscale.httpx.AsyncClient") as MockClient:
+            mock_client = AsyncMock()
+            mock_client.get = AsyncMock(side_effect=[good_response, bad_response])
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            MockClient.return_value = mock_client
+
+            await _build_zip(job_id, videos)
+
+        try:
+            assert _ZIP_JOBS[job_id]["status"] == "ready"
+            result_zip = zipfile.ZipFile(io.BytesIO(_ZIP_JOBS[job_id]["zip_bytes"]))
+            names = result_zip.namelist()
+            assert "good_upscaled.mp4" in names
+            assert "bad_upscaled.mp4" not in names
+        finally:
+            _ZIP_JOBS.pop(job_id, None)
+
+    @pytest.mark.asyncio
+    async def test_zip_build_sets_error_on_exception(self):
+        """_build_zip sets status='error' if an unexpected exception occurs."""
+        from api.upscale import _build_zip, _ZIP_JOBS
+
+        job_id = "test-error-job"
+        _ZIP_JOBS[job_id] = {
+            "status": "pending",
+            "created_at": time.time(),
+            "progress_pct": 0.0,
+            "files_done": 0,
+            "total_files": 1,
+            "error": None,
+            "zip_bytes": None,
+        }
+
+        videos = [
+            {
+                "input_filename": "test.mp4",
+                "output_storage_url": "https://example.com/test.mp4",
+            },
+        ]
+
+        with patch("api.upscale.httpx.AsyncClient") as MockClient:
+            MockClient.side_effect = RuntimeError("connection pool exhausted")
+
+            await _build_zip(job_id, videos)
+
+        try:
+            assert _ZIP_JOBS[job_id]["status"] == "error"
+            assert _ZIP_JOBS[job_id]["error"] is not None
+            assert "connection pool exhausted" in _ZIP_JOBS[job_id]["error"]
+        finally:
+            _ZIP_JOBS.pop(job_id, None)
+
+    def test_zip_download_not_found(self, client):
+        """GET /api/upscale/zip-jobs/{id}/download returns 404 for unknown job."""
+        response = client.get("/api/upscale/zip-jobs/unknown-id/download")
+        assert response.status_code == 404
+
+    def test_zip_creation_requires_auth(self, unauthenticated_client):
+        """POST download-zip returns 401 without auth token."""
+        response = unauthenticated_client.post("/api/upscale/batches/batch-001/download-zip")
+        assert response.status_code == 401
+
+    def test_zip_status_requires_auth(self, unauthenticated_client):
+        """GET zip-jobs status returns 401 without auth token."""
+        response = unauthenticated_client.get("/api/upscale/zip-jobs/some-id/status")
+        assert response.status_code == 401
+
+    def test_zip_download_requires_auth(self, unauthenticated_client):
+        """GET zip-jobs download returns 401 without auth token."""
+        response = unauthenticated_client.get("/api/upscale/zip-jobs/some-id/download")
+        assert response.status_code == 401
