@@ -44,15 +44,23 @@ def client(mock_user):
 
 @pytest.fixture
 def unauthenticated_client():
-    """Provide a TestClient with NO auth override (for 401 tests)."""
+    """Provide a TestClient with NO auth override (for 401 tests).
+
+    Overrides get_supabase so the Supabase singleton is never created,
+    allowing the tests to run in CI without real Supabase credentials.
+    The auth dependency itself is NOT overridden so the 401 path is tested.
+    """
     import sys
     from pathlib import Path
+
     backend_dir = Path(__file__).parent.parent
     sys.path.insert(0, str(backend_dir))
 
     from main import app
-    # Clear any previous overrides
-    app.dependency_overrides.clear()
+    from core.supabase import get_supabase
+
+    # Override only the Supabase client dependency — auth still runs its logic
+    app.dependency_overrides[get_supabase] = lambda: MagicMock()
     yield TestClient(app)
     app.dependency_overrides.clear()
 
