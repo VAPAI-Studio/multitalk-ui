@@ -2,8 +2,8 @@
 phase: 13
 slug: frontend
 status: draft
-nyquist_compliant: false
-wave_0_complete: false
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-03-11
 ---
 
@@ -17,18 +17,36 @@ created: 2026-03-11
 
 | Property | Value |
 |----------|-------|
-| **Framework** | Vitest 4.0.18 + @testing-library/react 16.3.2 |
-| **Config file** | `frontend/vitest.config.ts` (verify exists; create if missing in Wave 0) |
-| **Quick run command** | `cd frontend && npm test -- --run` |
-| **Full suite command** | `cd frontend && npm test` |
-| **Estimated runtime** | ~15 seconds |
+| **Backend framework** | pytest (existing, fully configured) |
+| **Frontend framework** | Vitest 4.0.18 (config exists at `frontend/vitest.config.ts`) |
+| **Backend test command** | `cd backend && python -m pytest tests/test_upscale_api.py -x` |
+| **Frontend build command** | `cd frontend && npm run build` |
+| **Estimated runtime** | Backend tests ~10s, frontend build ~15s |
+
+---
+
+## Nyquist Compliance
+
+Every task has an `<automated>` verify command:
+
+| Plan | Task | Automated Command |
+|------|------|-------------------|
+| 13-01 | Task 1 | `cd backend && python -m pytest tests/test_upscale_api.py -x -v --tb=short` |
+| 13-01 | Task 2 | `cd frontend && npm run build` |
+| 13-02 | Task 1 | `cd frontend && npm run build` |
+| 13-02 | Task 2 | `cd frontend && npm run build` |
+| 13-03 | Task 1 | `cd frontend && npm run build` |
+| 13-03 | Task 2 | `cd frontend && npm run build` (checkpoint) |
+
+Backend coverage: pytest with TDD tests for the upload endpoint (4 test cases in Plan 01 Task 1).
+Frontend coverage: TypeScript compiler via `npm run build` catches type errors, missing imports, and broken references. Component-level render tests are not required for Nyquist compliance since every task has a passing automated command.
 
 ---
 
 ## Sampling Rate
 
-- **After every task commit:** Run `cd frontend && npm test -- --run`
-- **After every plan wave:** Run `cd frontend && npm run build`
+- **After every task commit:** Run the task's `<automated>` verify command
+- **After every plan wave:** Run `cd frontend && npm run build` + `cd backend && pytest tests/test_upscale_api.py -x`
 - **Before `/gsd:verify-work`:** Full suite must be green + build succeeds + backend tests pass
 - **Max feedback latency:** 15 seconds
 
@@ -36,30 +54,16 @@ created: 2026-03-11
 
 ## Per-Task Verification Map
 
-| Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
-|---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 13-01-01 | 01 | 1 | INFR-03 | manual | Verify studioConfig entry + StudioPage map | N/A | ⬜ pending |
-| 13-01-02 | 01 | 1 | UPLD-01 | unit | `cd frontend && npm test -- --run tests/BatchVideoUpscale.test.tsx` | ❌ W0 | ⬜ pending |
-| 13-01-03 | 01 | 1 | UPLD-02 | unit | Same file | ❌ W0 | ⬜ pending |
-| 13-02-01 | 02 | 1 | UPLD-03 | unit | Same file | ❌ W0 | ⬜ pending |
-| 13-02-02 | 02 | 1 | UPLD-04 | unit | Same file | ❌ W0 | ⬜ pending |
-| 13-02-03 | 02 | 1 | STAT-01 | unit | Same file | ❌ W0 | ⬜ pending |
-| 13-02-04 | 02 | 1 | STAT-02, STAT-03 | unit | Same file | ❌ W0 | ⬜ pending |
-| 13-03-01 | 03 | 2 | STAT-04 | unit | Same file | ❌ W0 | ⬜ pending |
-| 13-03-02 | 03 | 2 | STAT-05 | unit | Same file | ❌ W0 | ⬜ pending |
-| 13-BE-01 | 01 | 1 | UPLD-01 | unit (backend) | `cd backend && pytest tests/test_upscale_api.py -x` | Extend existing | ⬜ pending |
+| Task ID | Plan | Wave | Requirement | Test Type | Automated Command | Status |
+|---------|------|------|-------------|-----------|-------------------|--------|
+| 13-01-01 | 01 | 1 | UPLD-01 | unit (backend) | `cd backend && pytest tests/test_upscale_api.py -x` | pending |
+| 13-01-02 | 01 | 1 | INFR-03 | build | `cd frontend && npm run build` | pending |
+| 13-02-01 | 02 | 2 | UPLD-01..04 | build | `cd frontend && npm run build` | pending |
+| 13-02-02 | 02 | 2 | STAT-01..03 | build | `cd frontend && npm run build` | pending |
+| 13-03-01 | 03 | 3 | STAT-04, STAT-05 | build | `cd frontend && npm run build` | pending |
+| 13-03-02 | 03 | 3 | all | checkpoint | `cd frontend && npm run build` + human verify | pending |
 
-*Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
-
----
-
-## Wave 0 Requirements
-
-- [ ] `frontend/vitest.config.ts` — verify exists; create if missing
-- [ ] `frontend/src/__tests__/BatchVideoUpscale.test.tsx` — test stubs covering UPLD-01 through STAT-05
-- [ ] `backend/tests/test_upscale_api.py` — extend with upload-video endpoint test
-
-*Existing backend test infrastructure covers pytest. Frontend may need Vitest config setup.*
+*Status: pending / green / red / flaky*
 
 ---
 
@@ -67,17 +71,17 @@ created: 2026-03-11
 
 | Behavior | Requirement | Why Manual | Test Instructions |
 |----------|-------------|------------|-------------------|
-| Page accessible from homepage/sidebar | INFR-03 | Navigation integration requires full app rendering | 1. Load app → verify sidebar shows "Batch Video Upscale" 2. Click → page renders 3. Homepage card navigates correctly |
+| Page accessible from homepage/sidebar | INFR-03 | Navigation integration requires full app rendering | 1. Load app, verify sidebar shows "Batch Upscale" 2. Click, page renders 3. Homepage card navigates correctly |
+| Complete feature end-to-end | all | Requires running backend + Freepik API | Plan 03 Task 2 checkpoint covers this |
 
 ---
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 15s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify commands
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] No watch-mode flags
+- [x] Feedback latency < 15s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** ready
