@@ -3,14 +3,21 @@ Upscale API Router
 
 Endpoints for batch video upscaling: create batches, add videos,
 start processing, and query status. Background processing functions
-handle Freepik API submission and polling.
+handle Freepik API submission and polling. Includes batch ZIP download
+with background job creation, polling, and streaming download.
 """
 
 import asyncio
+import io
+import time
+import uuid
+import zipfile
 from datetime import datetime as _dt
 from pathlib import Path
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 
 from core.auth import get_current_user
 from core.google_drive import is_drive_configured
@@ -22,6 +29,8 @@ from models.upscale import (
     ProcessingResult,
     ReorderPayload,
     UpscaleBatch,
+    ZipJobResponse,
+    ZipJobStatusResponse,
     _classify_error,
 )
 from services.freepik_service import FreepikUpscalerService
@@ -33,6 +42,60 @@ router = APIRouter(prefix="/upscale", tags=["upscale"])
 
 MAX_RETRIES = 2
 BASE_DELAY = 2  # seconds
+
+
+# ---------------------------------------------------------------------------
+# In-memory ZIP job store (same pattern as _HF_JOBS in hf_download_service)
+# ---------------------------------------------------------------------------
+
+_ZIP_JOBS: dict[str, dict] = {}
+_ZIP_TTL_SECONDS = 600  # 10 minutes
+
+
+def _cleanup_expired_zip_jobs() -> None:
+    """Remove ZIP jobs older than TTL."""
+    now = time.time()
+    expired = [
+        jid for jid, job in _ZIP_JOBS.items()
+        if now - job.get("created_at", 0) > _ZIP_TTL_SECONDS
+    ]
+    for jid in expired:
+        _ZIP_JOBS.pop(jid, None)
+
+
+async def _build_zip(job_id: str, videos: list[dict]) -> None:
+    """Background task: download completed videos and build ZIP archive."""
+    try:
+        _ZIP_JOBS[job_id]["status"] = "building"
+        buf = io.BytesIO()
+
+        async with httpx.AsyncClient(timeout=120.0, follow_redirects=True) as client:
+            with zipfile.ZipFile(buf, 'w', zipfile.ZIP_STORED) as zf:
+                for i, video in enumerate(videos):
+                    url = video.get("output_storage_url")
+                    if not url:
+                        continue
+                    try:
+                        resp = await client.get(url)
+                        if resp.status_code != 200 or not resp.content:
+                            continue
+                        stem = Path(video["input_filename"]).stem
+                        arcname = f"{stem}_upscaled.mp4"
+                        zf.writestr(arcname, resp.content)
+                    except Exception:
+                        continue  # skip failed downloads
+                    _ZIP_JOBS[job_id]["files_done"] = i + 1
+                    _ZIP_JOBS[job_id]["progress_pct"] = round(
+                        (i + 1) / len(videos) * 100, 1
+                    )
+
+        buf.seek(0)
+        _ZIP_JOBS[job_id]["zip_bytes"] = buf.getvalue()
+        _ZIP_JOBS[job_id]["status"] = "ready"
+
+    except Exception as e:
+        _ZIP_JOBS[job_id]["status"] = "error"
+        _ZIP_JOBS[job_id]["error"] = str(e)
 
 
 # ---------------------------------------------------------------------------
@@ -239,6 +302,102 @@ async def reorder_queue(
         raise HTTPException(status_code=500, detail="Failed to reorder videos")
 
     return {"success": True}
+
+
+# ---------------------------------------------------------------------------
+# Batch ZIP Download
+# ---------------------------------------------------------------------------
+
+
+@router.post("/batches/{batch_id}/download-zip", response_model=ZipJobResponse)
+async def create_zip_download(
+    batch_id: str,
+    user=Depends(get_current_user),
+):
+    """Create a background ZIP job for all completed videos in a batch."""
+    service = UpscaleJobService()
+    batch = await service.get_batch(batch_id, user.id)
+
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+
+    # Filter: only completed videos with a download URL
+    eligible = [
+        v for v in batch.get("videos", [])
+        if v.get("status") == "completed" and v.get("output_storage_url")
+    ]
+
+    if not eligible:
+        raise HTTPException(
+            status_code=400,
+            detail="No completed videos with download URLs",
+        )
+
+    # Housekeeping: purge expired jobs
+    _cleanup_expired_zip_jobs()
+
+    # Create job entry
+    job_id = str(uuid.uuid4())
+    _ZIP_JOBS[job_id] = {
+        "status": "pending",
+        "created_at": time.time(),
+        "progress_pct": 0.0,
+        "files_done": 0,
+        "total_files": len(eligible),
+        "error": None,
+        "zip_bytes": None,
+    }
+
+    # Launch background builder
+    asyncio.create_task(_build_zip(job_id, eligible))
+
+    return ZipJobResponse(success=True, job_id=job_id)
+
+
+@router.get("/zip-jobs/{job_id}/status", response_model=ZipJobStatusResponse)
+async def get_zip_job_status(
+    job_id: str,
+    user=Depends(get_current_user),
+):
+    """Poll ZIP job status."""
+    job = _ZIP_JOBS.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="ZIP job not found")
+
+    return ZipJobStatusResponse(
+        status=job["status"],
+        progress_pct=job.get("progress_pct", 0.0),
+        files_done=job.get("files_done", 0),
+        total_files=job.get("total_files", 0),
+        error=job.get("error"),
+    )
+
+
+@router.get("/zip-jobs/{job_id}/download")
+async def download_zip(
+    job_id: str,
+    user=Depends(get_current_user),
+):
+    """Download the completed ZIP archive. Removes job from store after download."""
+    job = _ZIP_JOBS.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="ZIP job not found")
+
+    if job["status"] != "ready":
+        raise HTTPException(status_code=409, detail="ZIP not ready")
+
+    zip_bytes = job["zip_bytes"]
+
+    # Cleanup: remove job from store after download
+    _ZIP_JOBS.pop(job_id, None)
+
+    return StreamingResponse(
+        io.BytesIO(zip_bytes),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": "attachment; filename=upscaled_batch.zip",
+        },
+    )
 
 
 # ---------------------------------------------------------------------------

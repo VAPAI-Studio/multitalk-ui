@@ -189,3 +189,22 @@ def _classify_error(error_message: str) -> FailureType:
 class ReorderPayload(BaseModel):
     """Payload for reordering pending videos in a batch."""
     video_ids: List[str]
+
+
+# --- ZIP download responses ---
+
+
+class ZipJobResponse(BaseModel):
+    """Response for ZIP job creation."""
+    success: bool
+    job_id: Optional[str] = None
+    error: Optional[str] = None
+
+
+class ZipJobStatusResponse(BaseModel):
+    """Response for ZIP job status polling."""
+    status: str  # pending, building, ready, error
+    progress_pct: float = 0.0
+    files_done: int = 0
+    total_files: int = 0
+    error: Optional[str] = None
