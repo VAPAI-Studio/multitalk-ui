@@ -24,6 +24,7 @@ from models.custom_workflow import (
     UpdateCustomWorkflowRequest,
     generate_slug,
 )
+from services.comfyui_service import ComfyUIService
 from services.workflow_service import WorkflowService
 
 
@@ -472,3 +473,56 @@ class CustomWorkflowService:
 
         except Exception as e:
             return False, None, str(e)
+
+    # ------------------------------------------------------------------
+    # Workflow Execution
+    # ------------------------------------------------------------------
+
+    async def execute_dynamic_workflow(
+        self,
+        workflow_config: dict,
+        user_params: dict,
+        base_url: str,
+        client_id: str,
+    ) -> Tuple[bool, Optional[str], Optional[str]]:
+        """
+        Execute a custom workflow through the standard pipeline.
+
+        This is the single code path used by both the test runner (Phase 16)
+        and the production renderer, satisfying TEST-04. It orchestrates:
+        1. Template loading and parameter substitution via WorkflowService
+        2. Workflow validation via WorkflowService
+        3. Prompt submission via ComfyUIService
+
+        Args:
+            workflow_config: Row dict from the custom_workflows table.
+            user_params: User-provided parameter values to substitute.
+            base_url: ComfyUI server URL.
+            client_id: WebSocket client ID for progress tracking.
+
+        Returns:
+            (success, prompt_id, error_message)
+        """
+        slug = workflow_config.get("slug", "")
+        template_name = f"custom/{slug}"
+
+        # Step 1: Load template and substitute parameters
+        success, workflow, error = await self.workflow_service.build_workflow(
+            template_name, user_params
+        )
+        if not success:
+            return False, None, error
+
+        # Step 2: Validate the built workflow
+        valid, validation_error = await self.workflow_service.validate_workflow(workflow)
+        if not valid:
+            return False, None, validation_error
+
+        # Step 3: Submit to ComfyUI
+        comfyui_service = ComfyUIService()
+        success, prompt_id, submit_error = await comfyui_service.submit_prompt(
+            base_url,
+            {"prompt": workflow, "client_id": client_id},
+        )
+
+        return success, prompt_id, submit_error
