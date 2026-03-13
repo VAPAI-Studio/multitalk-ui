@@ -70,7 +70,7 @@ Requirements for Workflow Builder milestone. Each maps to roadmap phases.
 
 - [x] **STORE-01**: Custom workflow configs stored in Supabase `custom_workflows` table with JSONB columns
 - [x] **STORE-02**: Workflow template files saved to `backend/workflows/custom/` directory
-- [ ] **STORE-03**: Backend CRUD API (create, read, update, delete, list, publish/unpublish) at `/api/custom-workflows/`
+- [x] **STORE-03**: Backend CRUD API (create, read, update, delete, list, publish/unpublish) at `/api/custom-workflows/`
 - [x] **STORE-04**: Workflow parsing endpoint accepts ComfyUI JSON and returns structured node/input data
 - [x] **STORE-05**: All custom workflow API endpoints are admin-only
 - [ ] **STORE-06**: Frontend fetches published custom workflows on app load and merges into navigation
@@ -145,7 +145,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DYN-07 | Phase 16 | Pending |
 | STORE-01 | Phase 14 | Complete |
 | STORE-02 | Phase 14 | Complete |
-| STORE-03 | Phase 14 | Pending |
+| STORE-03 | Phase 14 | Complete |
 | STORE-04 | Phase 14 | Complete |
 | STORE-05 | Phase 14 | Complete |
 | STORE-06 | Phase 17 | Pending |
