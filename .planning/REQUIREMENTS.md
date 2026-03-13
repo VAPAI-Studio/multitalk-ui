@@ -105,56 +105,56 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| WB-01 | — | Pending |
-| WB-02 | — | Pending |
-| WB-03 | — | Pending |
-| WB-04 | — | Pending |
-| WB-05 | — | Pending |
-| WB-06 | — | Pending |
-| WB-07 | — | Pending |
-| DEP-01 | — | Pending |
-| DEP-02 | — | Pending |
-| DEP-03 | — | Pending |
-| DEP-04 | — | Pending |
-| MDL-01 | — | Pending |
-| MDL-02 | — | Pending |
-| MDL-03 | — | Pending |
-| VAR-01 | — | Pending |
-| VAR-02 | — | Pending |
-| VAR-03 | — | Pending |
-| VAR-04 | — | Pending |
-| VAR-05 | — | Pending |
-| VAR-06 | — | Pending |
-| VAR-07 | — | Pending |
-| VAR-08 | — | Pending |
-| META-01 | — | Pending |
-| META-02 | — | Pending |
-| META-03 | — | Pending |
-| META-04 | — | Pending |
-| META-05 | — | Pending |
-| TEST-01 | — | Pending |
-| TEST-02 | — | Pending |
-| TEST-03 | — | Pending |
-| TEST-04 | — | Pending |
-| DYN-01 | — | Pending |
-| DYN-02 | — | Pending |
-| DYN-03 | — | Pending |
-| DYN-04 | — | Pending |
-| DYN-05 | — | Pending |
-| DYN-06 | — | Pending |
-| DYN-07 | — | Pending |
-| STORE-01 | — | Pending |
-| STORE-02 | — | Pending |
-| STORE-03 | — | Pending |
-| STORE-04 | — | Pending |
-| STORE-05 | — | Pending |
-| STORE-06 | — | Pending |
+| WB-01 | Phase 14 | Pending |
+| WB-02 | Phase 14 | Pending |
+| WB-03 | Phase 14 | Pending |
+| WB-04 | Phase 14 | Pending |
+| WB-05 | Phase 15 | Pending |
+| WB-06 | Phase 15 | Pending |
+| WB-07 | Phase 15 | Pending |
+| DEP-01 | Phase 15 | Pending |
+| DEP-02 | Phase 15 | Pending |
+| DEP-03 | Phase 15 | Pending |
+| DEP-04 | Phase 15 | Pending |
+| MDL-01 | Phase 15 | Pending |
+| MDL-02 | Phase 15 | Pending |
+| MDL-03 | Phase 15 | Pending |
+| VAR-01 | Phase 15 | Pending |
+| VAR-02 | Phase 15 | Pending |
+| VAR-03 | Phase 15 | Pending |
+| VAR-04 | Phase 15 | Pending |
+| VAR-05 | Phase 15 | Pending |
+| VAR-06 | Phase 15 | Pending |
+| VAR-07 | Phase 15 | Pending |
+| VAR-08 | Phase 15 | Pending |
+| META-01 | Phase 15 | Pending |
+| META-02 | Phase 15 | Pending |
+| META-03 | Phase 15 | Pending |
+| META-04 | Phase 15 | Pending |
+| META-05 | Phase 15 | Pending |
+| TEST-01 | Phase 16 | Pending |
+| TEST-02 | Phase 16 | Pending |
+| TEST-03 | Phase 16 | Pending |
+| TEST-04 | Phase 14 | Pending |
+| DYN-01 | Phase 17 | Pending |
+| DYN-02 | Phase 17 | Pending |
+| DYN-03 | Phase 16 | Pending |
+| DYN-04 | Phase 16 | Pending |
+| DYN-05 | Phase 16 | Pending |
+| DYN-06 | Phase 17 | Pending |
+| DYN-07 | Phase 16 | Pending |
+| STORE-01 | Phase 14 | Pending |
+| STORE-02 | Phase 14 | Pending |
+| STORE-03 | Phase 14 | Pending |
+| STORE-04 | Phase 14 | Pending |
+| STORE-05 | Phase 14 | Pending |
+| STORE-06 | Phase 17 | Pending |
 
 **Coverage:**
 - v1.2 requirements: 44 total
-- Mapped to phases: 0
-- Unmapped: 44 ⚠️
+- Mapped to phases: 44
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-13*
-*Last updated: 2026-03-13 after initial definition*
+*Last updated: 2026-03-13 after roadmap creation*

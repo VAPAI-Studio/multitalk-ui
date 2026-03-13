@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Workflow Builder
-status: defining_requirements
+status: roadmap_created
 stopped_at: null
 last_updated: "2026-03-13T00:00:00Z"
-last_activity: 2026-03-13 -- Milestone v1.2 started
+last_activity: 2026-03-13 -- Roadmap created for v1.2
 progress:
-  total_phases: 0
+  total_phases: 4
   completed_phases: 0
-  total_plans: 0
+  total_plans: 12
   completed_plans: 0
   percent: 0
 ---
@@ -21,14 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-13)
 
 **Core value:** Provide a unified platform for AI-powered media processing where users can generate, edit, upscale, and manage their content end-to-end
-**Current focus:** v1.2 Workflow Builder -- Defining requirements
+**Current focus:** v1.2 Workflow Builder -- Phase 14 ready to plan
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-03-13 — Milestone v1.2 started
+Phase: 14 of 17 (Foundation)
+Plan: 0 of 3 in current phase
+Status: Ready to plan
+Last activity: 2026-03-13 — Roadmap created (4 phases, 44 requirements mapped)
+
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
@@ -42,17 +44,23 @@ Last activity: 2026-03-13 — Milestone v1.2 started
 ### Decisions
 
 All v1.0 + v1.1 decisions finalized — see PROJECT.md Key Decisions table.
+Pending v1.2 decisions:
+- Dynamic renderer, not code generation (JSONB config at runtime)
+- JSONB for variable/section configs (flexible schema evolution)
+- Test runner shares code path with renderer (single execute_dynamic_workflow function)
+- Parallel dynamic page state in localStorage (never pollute StudioPageType union)
 
 ### Pending Todos
 
-- v1.1 Phase 13-03 deferred (STAT-04, STAT-05 — batch history & re-run)
+- v1.1 Phase 13-03 deferred (STAT-04, STAT-05 -- batch history and re-run)
 
 ### Blockers/Concerns
 
-None.
+- Heroku filesystem ephemerality: backend/workflows/custom/ files lost on restart (acceptable for dev; migrate to Supabase Storage before production deploy)
+- Verify pg_jsonschema availability in Supabase tier before relying on DB-level JSONB validation
 
 ## Session Continuity
 
 Last session: 2026-03-13
-Stopped at: Milestone v1.2 initialization
-Next action: Define requirements and create roadmap
+Stopped at: Roadmap created for v1.2 Workflow Builder
+Next action: /gsd:plan-phase 14
