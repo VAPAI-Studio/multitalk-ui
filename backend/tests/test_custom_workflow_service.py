@@ -409,3 +409,376 @@ class TestParseWorkflow:
         # All configurable inputs should be non-links
         for inp in ksampler.configurable_inputs:
             assert inp.is_link is False
+
+
+# ============================================================================
+# Template file management tests
+# ============================================================================
+
+class TestTemplateFileManagement:
+    """Tests for _save_template_file and _delete_template_file."""
+
+    def test_save_template_file_creates_directory_and_file(self, custom_workflow_service, tmp_path):
+        """_save_template_file creates custom/ dir and writes JSON file."""
+        from services.workflow_service import WorkflowService
+        # Override workflows_dir to use tmp_path
+        custom_workflow_service.workflow_service = WorkflowService()
+        custom_workflow_service.workflow_service.workflows_dir = tmp_path
+
+        workflow_json = {"1": {"class_type": "Test", "inputs": {"val": 1}}}
+        custom_workflow_service._save_template_file("my-workflow", workflow_json)
+
+        expected_file = tmp_path / "custom" / "my-workflow.json"
+        assert expected_file.exists()
+
+        import json
+        with open(expected_file) as f:
+            saved = json.load(f)
+        assert saved == workflow_json
+
+    def test_save_template_file_overwrites_existing(self, custom_workflow_service, tmp_path):
+        """_save_template_file overwrites an existing file."""
+        from services.workflow_service import WorkflowService
+        custom_workflow_service.workflow_service = WorkflowService()
+        custom_workflow_service.workflow_service.workflows_dir = tmp_path
+
+        original = {"1": {"class_type": "Old", "inputs": {}}}
+        custom_workflow_service._save_template_file("test-wf", original)
+
+        updated = {"1": {"class_type": "New", "inputs": {"x": 2}}}
+        custom_workflow_service._save_template_file("test-wf", updated)
+
+        import json
+        expected_file = tmp_path / "custom" / "test-wf.json"
+        with open(expected_file) as f:
+            saved = json.load(f)
+        assert saved == updated
+
+    def test_delete_template_file_removes_file(self, custom_workflow_service, tmp_path):
+        """_delete_template_file removes the JSON file from disk."""
+        from services.workflow_service import WorkflowService
+        custom_workflow_service.workflow_service = WorkflowService()
+        custom_workflow_service.workflow_service.workflows_dir = tmp_path
+
+        workflow_json = {"1": {"class_type": "Test", "inputs": {}}}
+        custom_workflow_service._save_template_file("to-delete", workflow_json)
+
+        expected_file = tmp_path / "custom" / "to-delete.json"
+        assert expected_file.exists()
+
+        custom_workflow_service._delete_template_file("to-delete")
+        assert not expected_file.exists()
+
+    def test_delete_template_file_no_error_if_missing(self, custom_workflow_service, tmp_path):
+        """_delete_template_file does not raise if file does not exist."""
+        from services.workflow_service import WorkflowService
+        custom_workflow_service.workflow_service = WorkflowService()
+        custom_workflow_service.workflow_service.workflows_dir = tmp_path
+
+        # Should not raise
+        custom_workflow_service._delete_template_file("nonexistent")
+
+
+# ============================================================================
+# CRUD operation tests
+# ============================================================================
+
+class TestCreateWorkflow:
+    """Tests for CustomWorkflowService.create."""
+
+    @pytest.mark.asyncio
+    async def test_create_success_with_auto_slug(self, custom_workflow_service, mock_supabase, tmp_path):
+        """create() generates slug from name, saves template, inserts DB row."""
+        from services.workflow_service import WorkflowService
+        custom_workflow_service.workflow_service = WorkflowService()
+        custom_workflow_service.workflow_service.workflows_dir = tmp_path
+
+        from models.custom_workflow import CreateCustomWorkflowRequest
+        request = CreateCustomWorkflowRequest(
+            name="My Test Workflow",
+            workflow_json={"1": {"class_type": "Test", "inputs": {"val": 42}}},
+            output_type="image",
+        )
+
+        # Configure mock to return inserted row
+        mock_execute = mock_supabase.table.return_value.execute
+        mock_execute.return_value.data = [{
+            "id": "uuid-123",
+            "name": "My Test Workflow",
+            "slug": "my-test-workflow",
+            "template_filename": "my-test-workflow.json",
+        }]
+
+        success, result, error = await custom_workflow_service.create(request)
+
+        assert success is True
+        assert result is not None
+        assert result["slug"] == "my-test-workflow"
+        assert error is None
+
+        # Verify template file was saved
+        template_file = tmp_path / "custom" / "my-test-workflow.json"
+        assert template_file.exists()
+
+    @pytest.mark.asyncio
+    async def test_create_with_explicit_slug(self, custom_workflow_service, mock_supabase, tmp_path):
+        """create() uses provided slug instead of generating one."""
+        from services.workflow_service import WorkflowService
+        custom_workflow_service.workflow_service = WorkflowService()
+        custom_workflow_service.workflow_service.workflows_dir = tmp_path
+
+        from models.custom_workflow import CreateCustomWorkflowRequest
+        request = CreateCustomWorkflowRequest(
+            name="My Workflow",
+            slug="custom-slug",
+            workflow_json={"1": {"class_type": "Test", "inputs": {}}},
+        )
+
+        mock_execute = mock_supabase.table.return_value.execute
+        mock_execute.return_value.data = [{
+            "id": "uuid-456",
+            "name": "My Workflow",
+            "slug": "custom-slug",
+            "template_filename": "custom-slug.json",
+        }]
+
+        success, result, error = await custom_workflow_service.create(request)
+
+        assert success is True
+        template_file = tmp_path / "custom" / "custom-slug.json"
+        assert template_file.exists()
+
+    @pytest.mark.asyncio
+    async def test_create_duplicate_slug_returns_error(self, custom_workflow_service, mock_supabase, tmp_path):
+        """create() returns friendly error if slug already exists."""
+        from services.workflow_service import WorkflowService
+        custom_workflow_service.workflow_service = WorkflowService()
+        custom_workflow_service.workflow_service.workflows_dir = tmp_path
+
+        from models.custom_workflow import CreateCustomWorkflowRequest
+        request = CreateCustomWorkflowRequest(
+            name="Duplicate",
+            workflow_json={"1": {"class_type": "Test", "inputs": {}}},
+        )
+
+        # Simulate Supabase unique constraint violation
+        mock_execute = mock_supabase.table.return_value.execute
+        mock_execute.side_effect = Exception("duplicate key value violates unique constraint")
+
+        success, result, error = await custom_workflow_service.create(request)
+
+        assert success is False
+        assert result is None
+        assert "already exists" in error.lower() or "duplicate" in error.lower()
+
+    @pytest.mark.asyncio
+    async def test_create_with_created_by(self, custom_workflow_service, mock_supabase, tmp_path):
+        """create() passes created_by to DB row when provided."""
+        from services.workflow_service import WorkflowService
+        custom_workflow_service.workflow_service = WorkflowService()
+        custom_workflow_service.workflow_service.workflows_dir = tmp_path
+
+        from models.custom_workflow import CreateCustomWorkflowRequest
+        request = CreateCustomWorkflowRequest(
+            name="User Workflow",
+            workflow_json={"1": {"class_type": "Test", "inputs": {}}},
+        )
+
+        mock_execute = mock_supabase.table.return_value.execute
+        mock_execute.return_value.data = [{"id": "uuid-789", "name": "User Workflow", "slug": "user-workflow"}]
+
+        success, result, error = await custom_workflow_service.create(request, created_by="user-id-abc")
+
+        assert success is True
+        # Verify insert was called with created_by in the row
+        insert_call = mock_supabase.table.return_value.insert
+        assert insert_call.called
+        inserted_row = insert_call.call_args[0][0]
+        assert inserted_row["created_by"] == "user-id-abc"
+
+
+class TestGetWorkflow:
+    """Tests for CustomWorkflowService.get."""
+
+    @pytest.mark.asyncio
+    async def test_get_existing_workflow(self, custom_workflow_service, mock_supabase):
+        """get() retrieves a workflow by ID."""
+        mock_execute = mock_supabase.table.return_value.execute
+        mock_execute.return_value.data = {
+            "id": "uuid-123",
+            "name": "Test",
+            "slug": "test",
+        }
+
+        result = await custom_workflow_service.get("uuid-123")
+
+        assert result is not None
+        assert result["id"] == "uuid-123"
+
+    @pytest.mark.asyncio
+    async def test_get_nonexistent_returns_none(self, custom_workflow_service, mock_supabase):
+        """get() returns None for a non-existent workflow."""
+        mock_execute = mock_supabase.table.return_value.execute
+        mock_execute.return_value.data = None
+
+        result = await custom_workflow_service.get("nonexistent-id")
+
+        assert result is None
+
+
+class TestListWorkflows:
+    """Tests for CustomWorkflowService.list_all and list_published."""
+
+    @pytest.mark.asyncio
+    async def test_list_all_returns_workflows(self, custom_workflow_service, mock_supabase):
+        """list_all() returns all workflows ordered by created_at desc."""
+        mock_execute = mock_supabase.table.return_value.execute
+        mock_execute.return_value.data = [
+            {"id": "1", "name": "First", "is_published": True},
+            {"id": "2", "name": "Second", "is_published": False},
+        ]
+
+        result = await custom_workflow_service.list_all()
+
+        assert len(result) == 2
+        mock_supabase.table.return_value.order.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_list_all_empty(self, custom_workflow_service, mock_supabase):
+        """list_all() returns empty list when no workflows exist."""
+        mock_execute = mock_supabase.table.return_value.execute
+        mock_execute.return_value.data = []
+
+        result = await custom_workflow_service.list_all()
+
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_list_published_filters_correctly(self, custom_workflow_service, mock_supabase):
+        """list_published() only returns published workflows."""
+        mock_execute = mock_supabase.table.return_value.execute
+        mock_execute.return_value.data = [
+            {"id": "1", "name": "Published", "is_published": True},
+        ]
+
+        result = await custom_workflow_service.list_published()
+
+        assert len(result) == 1
+        # Verify eq filter was called for is_published
+        mock_supabase.table.return_value.eq.assert_called()
+
+
+class TestUpdateWorkflow:
+    """Tests for CustomWorkflowService.update."""
+
+    @pytest.mark.asyncio
+    async def test_update_partial_fields(self, custom_workflow_service, mock_supabase):
+        """update() applies only non-None fields."""
+        from models.custom_workflow import UpdateCustomWorkflowRequest
+        request = UpdateCustomWorkflowRequest(
+            name="Updated Name",
+            description="New description",
+        )
+
+        mock_execute = mock_supabase.table.return_value.execute
+        mock_execute.return_value.data = [{
+            "id": "uuid-123",
+            "name": "Updated Name",
+            "description": "New description",
+        }]
+
+        success, result, error = await custom_workflow_service.update("uuid-123", request)
+
+        assert success is True
+        assert result is not None
+        assert result["name"] == "Updated Name"
+
+    @pytest.mark.asyncio
+    async def test_update_sets_updated_at(self, custom_workflow_service, mock_supabase):
+        """update() adds updated_at timestamp to the update dict."""
+        from models.custom_workflow import UpdateCustomWorkflowRequest
+        request = UpdateCustomWorkflowRequest(name="New Name")
+
+        mock_execute = mock_supabase.table.return_value.execute
+        mock_execute.return_value.data = [{"id": "uuid-123", "name": "New Name"}]
+
+        success, result, error = await custom_workflow_service.update("uuid-123", request)
+
+        assert success is True
+        # Verify update was called with updated_at
+        update_call = mock_supabase.table.return_value.update
+        assert update_call.called
+        update_data = update_call.call_args[0][0]
+        assert "updated_at" in update_data
+
+
+class TestDeleteWorkflow:
+    """Tests for CustomWorkflowService.delete."""
+
+    @pytest.mark.asyncio
+    async def test_delete_removes_row_and_file(self, custom_workflow_service, mock_supabase, tmp_path):
+        """delete() removes DB row and template file."""
+        from services.workflow_service import WorkflowService
+        custom_workflow_service.workflow_service = WorkflowService()
+        custom_workflow_service.workflow_service.workflows_dir = tmp_path
+
+        # Create a template file first
+        custom_dir = tmp_path / "custom"
+        custom_dir.mkdir(parents=True)
+        template_file = custom_dir / "to-delete.json"
+        template_file.write_text('{"1": {"class_type": "Test", "inputs": {}}}')
+
+        # Mock get to return the workflow (need slug for file deletion)
+        mock_execute = mock_supabase.table.return_value.execute
+        mock_execute.return_value.data = {
+            "id": "uuid-123",
+            "slug": "to-delete",
+        }
+
+        success, error = await custom_workflow_service.delete("uuid-123")
+
+        assert success is True
+        assert error is None
+        assert not template_file.exists()
+
+    @pytest.mark.asyncio
+    async def test_delete_nonexistent_returns_error(self, custom_workflow_service, mock_supabase):
+        """delete() returns error when workflow not found."""
+        mock_execute = mock_supabase.table.return_value.execute
+        mock_execute.return_value.data = None
+
+        success, error = await custom_workflow_service.delete("nonexistent-id")
+
+        assert success is False
+        assert error is not None
+
+
+class TestTogglePublish:
+    """Tests for CustomWorkflowService.toggle_publish."""
+
+    @pytest.mark.asyncio
+    async def test_toggle_publish_true(self, custom_workflow_service, mock_supabase):
+        """toggle_publish() sets is_published to True."""
+        mock_execute = mock_supabase.table.return_value.execute
+        mock_execute.return_value.data = [{
+            "id": "uuid-123",
+            "is_published": True,
+        }]
+
+        success, result, error = await custom_workflow_service.toggle_publish("uuid-123", True)
+
+        assert success is True
+        assert result is not None
+
+    @pytest.mark.asyncio
+    async def test_toggle_publish_false(self, custom_workflow_service, mock_supabase):
+        """toggle_publish() sets is_published to False."""
+        mock_execute = mock_supabase.table.return_value.execute
+        mock_execute.return_value.data = [{
+            "id": "uuid-123",
+            "is_published": False,
+        }]
+
+        success, result, error = await custom_workflow_service.toggle_publish("uuid-123", False)
+
+        assert success is True
