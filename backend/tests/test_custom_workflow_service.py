@@ -782,3 +782,146 @@ class TestTogglePublish:
         success, result, error = await custom_workflow_service.toggle_publish("uuid-123", False)
 
         assert success is True
+
+
+# ============================================================================
+# execute_dynamic_workflow tests
+# ============================================================================
+
+class TestExecuteDynamicWorkflow:
+    """Tests for CustomWorkflowService.execute_dynamic_workflow."""
+
+    @pytest.mark.asyncio
+    async def test_execute_success(self, custom_workflow_service):
+        """execute_dynamic_workflow returns prompt_id on success."""
+        from unittest.mock import AsyncMock, patch
+
+        workflow_config = {"slug": "my-workflow", "id": "uuid-123"}
+        user_params = {"PROMPT": "test prompt", "WIDTH": 640}
+
+        built_workflow = {"1": {"class_type": "Test", "inputs": {"text": "test prompt"}}}
+
+        with patch.object(
+            custom_workflow_service.workflow_service,
+            "build_workflow",
+            new_callable=AsyncMock,
+            return_value=(True, built_workflow, None),
+        ) as mock_build, patch.object(
+            custom_workflow_service.workflow_service,
+            "validate_workflow",
+            new_callable=AsyncMock,
+            return_value=(True, None),
+        ) as mock_validate, patch(
+            "services.custom_workflow_service.ComfyUIService"
+        ) as MockComfyUI:
+            mock_comfy_instance = MockComfyUI.return_value
+            mock_comfy_instance.submit_prompt = AsyncMock(
+                return_value=(True, "prompt-id-abc", None)
+            )
+
+            success, prompt_id, error = await custom_workflow_service.execute_dynamic_workflow(
+                workflow_config, user_params, "http://comfy:8188", "client-123"
+            )
+
+            assert success is True
+            assert prompt_id == "prompt-id-abc"
+            assert error is None
+
+            # Verify build_workflow called with correct template name
+            mock_build.assert_called_once_with("custom/my-workflow", user_params)
+
+            # Verify validate_workflow called with built workflow
+            mock_validate.assert_called_once_with(built_workflow)
+
+            # Verify submit_prompt called with correct payload
+            mock_comfy_instance.submit_prompt.assert_called_once_with(
+                "http://comfy:8188",
+                {"prompt": built_workflow, "client_id": "client-123"},
+            )
+
+    @pytest.mark.asyncio
+    async def test_execute_build_failure(self, custom_workflow_service):
+        """execute_dynamic_workflow returns error if template build fails."""
+        from unittest.mock import AsyncMock, patch
+
+        workflow_config = {"slug": "bad-workflow", "id": "uuid-456"}
+        user_params = {}
+
+        with patch.object(
+            custom_workflow_service.workflow_service,
+            "build_workflow",
+            new_callable=AsyncMock,
+            return_value=(False, None, "Template 'custom/bad-workflow' not found"),
+        ):
+            success, prompt_id, error = await custom_workflow_service.execute_dynamic_workflow(
+                workflow_config, user_params, "http://comfy:8188", "client-123"
+            )
+
+            assert success is False
+            assert prompt_id is None
+            assert "not found" in error
+
+    @pytest.mark.asyncio
+    async def test_execute_validation_failure(self, custom_workflow_service):
+        """execute_dynamic_workflow returns error if validation fails."""
+        from unittest.mock import AsyncMock, patch
+
+        workflow_config = {"slug": "invalid-wf", "id": "uuid-789"}
+        user_params = {"PROMPT": "test"}
+
+        built_workflow = {"1": {"class_type": "Test"}}  # missing inputs
+
+        with patch.object(
+            custom_workflow_service.workflow_service,
+            "build_workflow",
+            new_callable=AsyncMock,
+            return_value=(True, built_workflow, None),
+        ), patch.object(
+            custom_workflow_service.workflow_service,
+            "validate_workflow",
+            new_callable=AsyncMock,
+            return_value=(False, "Node 1 missing required 'inputs' field"),
+        ):
+            success, prompt_id, error = await custom_workflow_service.execute_dynamic_workflow(
+                workflow_config, user_params, "http://comfy:8188", "client-123"
+            )
+
+            assert success is False
+            assert prompt_id is None
+            assert "inputs" in error
+
+    @pytest.mark.asyncio
+    async def test_execute_comfyui_submission_failure(self, custom_workflow_service):
+        """execute_dynamic_workflow returns error if ComfyUI submission fails."""
+        from unittest.mock import AsyncMock, patch
+
+        workflow_config = {"slug": "submit-fail", "id": "uuid-000"}
+        user_params = {"PROMPT": "test"}
+
+        built_workflow = {"1": {"class_type": "Test", "inputs": {"text": "test"}}}
+
+        with patch.object(
+            custom_workflow_service.workflow_service,
+            "build_workflow",
+            new_callable=AsyncMock,
+            return_value=(True, built_workflow, None),
+        ), patch.object(
+            custom_workflow_service.workflow_service,
+            "validate_workflow",
+            new_callable=AsyncMock,
+            return_value=(True, None),
+        ), patch(
+            "services.custom_workflow_service.ComfyUIService"
+        ) as MockComfyUI:
+            mock_comfy_instance = MockComfyUI.return_value
+            mock_comfy_instance.submit_prompt = AsyncMock(
+                return_value=(False, None, "ComfyUI rejected prompt (400): Node error")
+            )
+
+            success, prompt_id, error = await custom_workflow_service.execute_dynamic_workflow(
+                workflow_config, user_params, "http://comfy:8188", "client-123"
+            )
+
+            assert success is False
+            assert prompt_id is None
+            assert "rejected" in error.lower() or "error" in error.lower()
