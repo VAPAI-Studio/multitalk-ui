@@ -101,3 +101,10 @@ def upscale_job_service(mock_supabase):
     """Provide an UpscaleJobService instance with mocked Supabase client."""
     from services.upscale_job_service import UpscaleJobService
     return UpscaleJobService(supabase=mock_supabase)
+
+
+@pytest.fixture
+def custom_workflow_service(mock_supabase):
+    """Provide a CustomWorkflowService instance with mocked Supabase client."""
+    from services.custom_workflow_service import CustomWorkflowService
+    return CustomWorkflowService(supabase=mock_supabase)
