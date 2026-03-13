@@ -54,7 +54,7 @@ Requirements for Workflow Builder milestone. Each maps to roadmap phases.
 - [ ] **TEST-01**: Admin can fill in test values for all configured variables in the builder
 - [ ] **TEST-02**: Admin can execute a test run against the ComfyUI server with real-time progress
 - [ ] **TEST-03**: Test output (image/video/audio) displays inline in the builder
-- [ ] **TEST-04**: Test run uses the exact same code path as the published feature (shared execution function)
+- [x] **TEST-04**: Test run uses the exact same code path as the published feature (shared execution function)
 
 ### Dynamic Rendering
 
@@ -69,10 +69,10 @@ Requirements for Workflow Builder milestone. Each maps to roadmap phases.
 ### Storage & API
 
 - [x] **STORE-01**: Custom workflow configs stored in Supabase `custom_workflows` table with JSONB columns
-- [ ] **STORE-02**: Workflow template files saved to `backend/workflows/custom/` directory
+- [x] **STORE-02**: Workflow template files saved to `backend/workflows/custom/` directory
 - [ ] **STORE-03**: Backend CRUD API (create, read, update, delete, list, publish/unpublish) at `/api/custom-workflows/`
 - [x] **STORE-04**: Workflow parsing endpoint accepts ComfyUI JSON and returns structured node/input data
-- [ ] **STORE-05**: All custom workflow API endpoints are admin-only
+- [x] **STORE-05**: All custom workflow API endpoints are admin-only
 - [ ] **STORE-06**: Frontend fetches published custom workflows on app load and merges into navigation
 
 ## Future Requirements
@@ -135,7 +135,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TEST-01 | Phase 16 | Pending |
 | TEST-02 | Phase 16 | Pending |
 | TEST-03 | Phase 16 | Pending |
-| TEST-04 | Phase 14 | Pending |
+| TEST-04 | Phase 14 | Complete |
 | DYN-01 | Phase 17 | Pending |
 | DYN-02 | Phase 17 | Pending |
 | DYN-03 | Phase 16 | Pending |
@@ -144,10 +144,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DYN-06 | Phase 17 | Pending |
 | DYN-07 | Phase 16 | Pending |
 | STORE-01 | Phase 14 | Complete |
-| STORE-02 | Phase 14 | Pending |
+| STORE-02 | Phase 14 | Complete |
 | STORE-03 | Phase 14 | Pending |
 | STORE-04 | Phase 14 | Complete |
-| STORE-05 | Phase 14 | Pending |
+| STORE-05 | Phase 14 | Complete |
 | STORE-06 | Phase 17 | Pending |
 
 **Coverage:**
