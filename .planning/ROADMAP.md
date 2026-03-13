@@ -55,12 +55,12 @@ Full details: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
   2. Admin can create, read, update, delete, and list custom workflow configurations through the CRUD API; all write endpoints return 403 for non-admin users
   3. The custom_workflows Supabase table exists with JSONB columns for variable and section configs; workflow template files are saved to backend/workflows/custom/
   4. A single execute_dynamic_workflow function exists in the backend service layer that accepts a workflow config and user-provided parameters, and submits to ComfyUI via the existing WorkflowService — this is the shared code path that both test runner and renderer will use
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 14-01: TBD
-- [ ] 14-02: TBD
-- [ ] 14-03: TBD
+- [ ] 14-01-PLAN.md — Pydantic models, database migration, workflow parser with format detection and link filtering
+- [ ] 14-02-PLAN.md — CRUD service operations, template file management, and shared execute_dynamic_workflow function
+- [ ] 14-03-PLAN.md — API router with parse/CRUD/publish endpoints, main.py registration, and integration tests
 
 ### Phase 15: Builder UI
 **Goal**: Admin can visually configure a complete custom workflow feature — select which node inputs become user variables, set field types and validation, check dependency/model status, and define feature metadata — all from a single builder page in the Infrastructure studio
