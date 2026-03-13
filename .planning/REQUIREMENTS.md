@@ -9,10 +9,10 @@ Requirements for Workflow Builder milestone. Each maps to roadmap phases.
 
 ### Workflow Builder
 
-- [ ] **WB-01**: Admin can upload a ComfyUI workflow JSON file via drag-and-drop or file picker
-- [ ] **WB-02**: System detects API vs UI format and rejects UI format with guidance to export API format
-- [ ] **WB-03**: System parses workflow JSON and displays all nodes with class_type and inputs in a node inspector
-- [ ] **WB-04**: System filters out node-to-node link arrays from configurable input candidates
+- [x] **WB-01**: Admin can upload a ComfyUI workflow JSON file via drag-and-drop or file picker
+- [x] **WB-02**: System detects API vs UI format and rejects UI format with guidance to export API format
+- [x] **WB-03**: System parses workflow JSON and displays all nodes with class_type and inputs in a node inspector
+- [x] **WB-04**: System filters out node-to-node link arrays from configurable input candidates
 - [ ] **WB-05**: Admin can select which node inputs become user-facing variables by clicking them
 - [ ] **WB-06**: System auto-detects suggested field types from ComfyUI metadata (BOOLEAN→toggle, COMBO→select, STRING→text, INT/FLOAT→number)
 - [ ] **WB-07**: Admin can optionally enrich node metadata via ComfyUI `/object_info` endpoint
@@ -68,10 +68,10 @@ Requirements for Workflow Builder milestone. Each maps to roadmap phases.
 
 ### Storage & API
 
-- [ ] **STORE-01**: Custom workflow configs stored in Supabase `custom_workflows` table with JSONB columns
+- [x] **STORE-01**: Custom workflow configs stored in Supabase `custom_workflows` table with JSONB columns
 - [ ] **STORE-02**: Workflow template files saved to `backend/workflows/custom/` directory
 - [ ] **STORE-03**: Backend CRUD API (create, read, update, delete, list, publish/unpublish) at `/api/custom-workflows/`
-- [ ] **STORE-04**: Workflow parsing endpoint accepts ComfyUI JSON and returns structured node/input data
+- [x] **STORE-04**: Workflow parsing endpoint accepts ComfyUI JSON and returns structured node/input data
 - [ ] **STORE-05**: All custom workflow API endpoints are admin-only
 - [ ] **STORE-06**: Frontend fetches published custom workflows on app load and merges into navigation
 
@@ -105,10 +105,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| WB-01 | Phase 14 | Pending |
-| WB-02 | Phase 14 | Pending |
-| WB-03 | Phase 14 | Pending |
-| WB-04 | Phase 14 | Pending |
+| WB-01 | Phase 14 | Complete |
+| WB-02 | Phase 14 | Complete |
+| WB-03 | Phase 14 | Complete |
+| WB-04 | Phase 14 | Complete |
 | WB-05 | Phase 15 | Pending |
 | WB-06 | Phase 15 | Pending |
 | WB-07 | Phase 15 | Pending |
@@ -143,10 +143,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DYN-05 | Phase 16 | Pending |
 | DYN-06 | Phase 17 | Pending |
 | DYN-07 | Phase 16 | Pending |
-| STORE-01 | Phase 14 | Pending |
+| STORE-01 | Phase 14 | Complete |
 | STORE-02 | Phase 14 | Pending |
 | STORE-03 | Phase 14 | Pending |
-| STORE-04 | Phase 14 | Pending |
+| STORE-04 | Phase 14 | Complete |
 | STORE-05 | Phase 14 | Pending |
 | STORE-06 | Phase 17 | Pending |
 

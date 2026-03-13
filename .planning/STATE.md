@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Workflow Builder
-status: phase_planned
-stopped_at: null
-last_updated: "2026-03-13T00:00:00Z"
-last_activity: 2026-03-13 -- Phase 14 planned (3 plans, verified)
+status: executing
+stopped_at: "Completed 14-01-PLAN.md"
+last_updated: "2026-03-13T20:45:26Z"
+last_activity: 2026-03-13 -- Plan 14-01 executed (models, migration, parser)
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 12
-  completed_plans: 0
-  percent: 0
+  completed_plans: 1
+  percent: 8
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-13)
 
 **Core value:** Provide a unified platform for AI-powered media processing where users can generate, edit, upscale, and manage their content end-to-end
-**Current focus:** v1.2 Workflow Builder -- Phase 14 planned, ready to execute
+**Current focus:** v1.2 Workflow Builder -- Phase 14 executing (1/3 plans complete)
 
 ## Current Position
 
 Phase: 14 of 17 (Foundation)
-Plan: 0 of 3 in current phase
-Status: Planned — ready to execute
-Last activity: 2026-03-13 — Roadmap created (4 phases, 44 requirements mapped)
+Plan: 1 of 3 in current phase
+Status: Executing -- Plan 14-01 complete
+Last activity: 2026-03-13 — Plan 14-01 executed (models, migration, parser)
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [#░░░░░░░░░] 8%
 
 ## Performance Metrics
 
@@ -50,6 +50,10 @@ Pending v1.2 decisions:
 - Test runner shares code path with renderer (single execute_dynamic_workflow function)
 - Parallel dynamic page state in localStorage (never pollute StudioPageType union)
 
+Executed v1.2 decisions:
+- Added bool guard in is_link_input to handle Python bool-is-int subclass edge case (14-01)
+- Used __new__ pattern in parser tests for pure unit testing without Supabase (14-01)
+
 ### Pending Todos
 
 - v1.1 Phase 13-03 deferred (STAT-04, STAT-05 -- batch history and re-run)
@@ -62,5 +66,5 @@ Pending v1.2 decisions:
 ## Session Continuity
 
 Last session: 2026-03-13
-Stopped at: Roadmap created for v1.2 Workflow Builder
-Next action: /gsd:plan-phase 14
+Stopped at: Completed 14-01-PLAN.md
+Next action: Execute 14-02-PLAN.md
