@@ -6,15 +6,23 @@ and CRUD operations for custom workflow configurations. The parser is the core
 intelligence of the Workflow Builder -- it takes raw ComfyUI API-format JSON
 and extracts structured node/input data, filtering out link arrays.
 
-CRUD and execute methods will be added in Plan 02.
+CRUD methods provide create/read/update/delete/list/publish operations.
+execute_dynamic_workflow is the single code path for both test runner and
+production renderer (satisfies TEST-04).
 """
+import json
+import os
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
 
 from core.supabase import get_supabase
 from models.custom_workflow import (
+    CreateCustomWorkflowRequest,
     ParsedNode,
     ParsedNodeInput,
     ParseWorkflowResponse,
+    UpdateCustomWorkflowRequest,
+    generate_slug,
 )
 from services.workflow_service import WorkflowService
 
@@ -207,3 +215,260 @@ class CustomWorkflowService:
             nodes=nodes,
         )
         return True, response, None
+
+    # ------------------------------------------------------------------
+    # Template File Management
+    # ------------------------------------------------------------------
+
+    def _save_template_file(self, slug: str, workflow_json: dict) -> None:
+        """
+        Write workflow JSON template to backend/workflows/custom/{slug}.json.
+
+        Creates the custom/ subdirectory if it does not exist.
+
+        Args:
+            slug: URL-safe workflow identifier.
+            workflow_json: The ComfyUI API-format workflow dict.
+        """
+        custom_dir = self.workflow_service.workflows_dir / "custom"
+        os.makedirs(custom_dir, exist_ok=True)
+        file_path = custom_dir / f"{slug}.json"
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(workflow_json, f, indent=2)
+
+    def _delete_template_file(self, slug: str) -> None:
+        """
+        Remove workflow JSON template from disk if it exists.
+
+        Does not raise if the file is missing.
+
+        Args:
+            slug: URL-safe workflow identifier.
+        """
+        file_path = self.workflow_service.workflows_dir / "custom" / f"{slug}.json"
+        if file_path.exists():
+            os.remove(file_path)
+
+    # ------------------------------------------------------------------
+    # CRUD Operations
+    # ------------------------------------------------------------------
+
+    async def create(
+        self,
+        data: CreateCustomWorkflowRequest,
+        created_by: Optional[str] = None,
+    ) -> Tuple[bool, Optional[dict], Optional[str]]:
+        """
+        Create a new custom workflow configuration.
+
+        Generates slug from name if not provided, saves the template file
+        to disk, and inserts a row into the custom_workflows table.
+
+        Args:
+            data: CreateCustomWorkflowRequest with workflow details.
+            created_by: Optional user ID of the creator.
+
+        Returns:
+            (success, row_dict, error_message)
+        """
+        try:
+            slug = data.slug if data.slug else generate_slug(data.name)
+
+            # Save template file to disk
+            self._save_template_file(slug, data.workflow_json)
+
+            # Build the DB row
+            row = {
+                "name": data.name,
+                "slug": slug,
+                "description": data.description,
+                "template_filename": f"{slug}.json",
+                "original_workflow": data.workflow_json,
+                "variable_config": [],
+                "section_config": [],
+                "output_type": data.output_type,
+                "studio": data.studio,
+                "icon": data.icon,
+                "gradient": data.gradient,
+            }
+            if created_by:
+                row["created_by"] = created_by
+
+            result = (
+                self.supabase.table("custom_workflows")
+                .insert(row)
+                .execute()
+            )
+
+            if result.data:
+                row_data = result.data[0] if isinstance(result.data, list) else result.data
+                return True, row_data, None
+            return False, None, "Failed to create workflow"
+
+        except Exception as e:
+            error_str = str(e).lower()
+            if "duplicate" in error_str or "unique" in error_str:
+                return False, None, f"A workflow with slug '{slug}' already exists. Please choose a different name."
+            return False, None, str(e)
+
+    async def get(self, workflow_id: str) -> Optional[dict]:
+        """
+        Retrieve a single workflow by ID.
+
+        Args:
+            workflow_id: UUID of the workflow.
+
+        Returns:
+            Row dict or None if not found.
+        """
+        try:
+            result = (
+                self.supabase.table("custom_workflows")
+                .select("*")
+                .eq("id", workflow_id)
+                .single()
+                .execute()
+            )
+            return result.data if result.data else None
+        except Exception:
+            return None
+
+    async def list_all(self) -> List[dict]:
+        """
+        List all custom workflows ordered by created_at descending.
+
+        Returns:
+            List of row dicts.
+        """
+        try:
+            result = (
+                self.supabase.table("custom_workflows")
+                .select("*")
+                .order("created_at", desc=True)
+                .execute()
+            )
+            return result.data or []
+        except Exception:
+            return []
+
+    async def list_published(self) -> List[dict]:
+        """
+        List only published custom workflows ordered by created_at descending.
+
+        Returns:
+            List of row dicts where is_published is True.
+        """
+        try:
+            result = (
+                self.supabase.table("custom_workflows")
+                .select("*")
+                .eq("is_published", True)
+                .order("created_at", desc=True)
+                .execute()
+            )
+            return result.data or []
+        except Exception:
+            return []
+
+    async def update(
+        self,
+        workflow_id: str,
+        data: UpdateCustomWorkflowRequest,
+    ) -> Tuple[bool, Optional[dict], Optional[str]]:
+        """
+        Partially update a custom workflow configuration.
+
+        Only non-None fields from the request are applied. Always sets
+        updated_at to the current UTC time.
+
+        Args:
+            workflow_id: UUID of the workflow to update.
+            data: UpdateCustomWorkflowRequest with optional fields.
+
+        Returns:
+            (success, updated_row_dict, error_message)
+        """
+        try:
+            update_dict = data.model_dump(exclude_none=True)
+            update_dict["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+            result = (
+                self.supabase.table("custom_workflows")
+                .update(update_dict)
+                .eq("id", workflow_id)
+                .execute()
+            )
+
+            if result.data:
+                row_data = result.data[0] if isinstance(result.data, list) else result.data
+                return True, row_data, None
+            return False, None, "Workflow not found"
+
+        except Exception as e:
+            return False, None, str(e)
+
+    async def delete(self, workflow_id: str) -> Tuple[bool, Optional[str]]:
+        """
+        Delete a custom workflow: remove DB row and template file.
+
+        Args:
+            workflow_id: UUID of the workflow to delete.
+
+        Returns:
+            (success, error_message)
+        """
+        try:
+            # Get the workflow first (need slug for file deletion)
+            workflow = await self.get(workflow_id)
+            if not workflow:
+                return False, "Workflow not found"
+
+            slug = workflow.get("slug", "")
+
+            # Delete the DB row
+            self.supabase.table("custom_workflows").delete().eq("id", workflow_id).execute()
+
+            # Delete the template file from disk
+            if slug:
+                self._delete_template_file(slug)
+
+            return True, None
+
+        except Exception as e:
+            return False, str(e)
+
+    async def toggle_publish(
+        self,
+        workflow_id: str,
+        publish: bool,
+    ) -> Tuple[bool, Optional[dict], Optional[str]]:
+        """
+        Set the is_published flag on a workflow.
+
+        Args:
+            workflow_id: UUID of the workflow.
+            publish: True to publish, False to unpublish.
+
+        Returns:
+            (success, updated_row_dict, error_message)
+        """
+        try:
+            update_data = {
+                "is_published": publish,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
+
+            result = (
+                self.supabase.table("custom_workflows")
+                .update(update_data)
+                .eq("id", workflow_id)
+                .execute()
+            )
+
+            if result.data:
+                row_data = result.data[0] if isinstance(result.data, list) else result.data
+                return True, row_data, None
+            return False, None, "Workflow not found"
+
+        except Exception as e:
+            return False, None, str(e)
