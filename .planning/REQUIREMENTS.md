@@ -53,15 +53,15 @@ Requirements for Workflow Builder milestone. Each maps to roadmap phases.
 
 - [x] **TEST-01**: Admin can fill in test values for all configured variables in the builder
 - [x] **TEST-02**: Admin can execute a test run against the ComfyUI server with real-time progress
-- [ ] **TEST-03**: Test output (image/video/audio) displays inline in the builder
+- [x] **TEST-03**: Test output (image/video/audio) displays inline in the builder
 - [x] **TEST-04**: Test run uses the exact same code path as the published feature (shared execution function)
 
 ### Dynamic Rendering
 
 - [ ] **DYN-01**: Published custom workflows appear in their assigned studio's navigation
 - [ ] **DYN-02**: Published custom workflows appear on the Homepage within their studio card
-- [ ] **DYN-03**: A DynamicWorkflowPage component renders the configured form with sections, inputs, and validation
-- [ ] **DYN-04**: Dynamic page handles file uploads (upload to ComfyUI and/or base64) per variable config
+- [x] **DYN-03**: A DynamicWorkflowPage component renders the configured form with sections, inputs, and validation
+- [x] **DYN-04**: Dynamic page handles file uploads (upload to ComfyUI and/or base64) per variable config
 - [ ] **DYN-05**: Dynamic page integrates with job tracking and monitoring (createJob, startJobMonitoring)
 - [ ] **DYN-06**: Dynamic page includes feed sidebar with correct pageContext filtering
 - [ ] **DYN-07**: Dynamic features work with both ComfyUI and RunPod execution backends
@@ -134,12 +134,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | META-05 | Phase 15 | Complete |
 | TEST-01 | Phase 16 | Complete |
 | TEST-02 | Phase 16 | Complete |
-| TEST-03 | Phase 16 | Pending |
+| TEST-03 | Phase 16 | Complete |
 | TEST-04 | Phase 14 | Complete |
 | DYN-01 | Phase 17 | Pending |
 | DYN-02 | Phase 17 | Pending |
-| DYN-03 | Phase 16 | Pending |
-| DYN-04 | Phase 16 | Pending |
+| DYN-03 | Phase 16 | Complete |
+| DYN-04 | Phase 16 | Complete |
 | DYN-05 | Phase 16 | Pending |
 | DYN-06 | Phase 17 | Pending |
 | DYN-07 | Phase 16 | Pending |
