@@ -526,3 +526,36 @@ class CustomWorkflowService:
         )
 
         return success, prompt_id, submit_error
+
+    async def execute_dynamic_workflow_runpod(
+        self,
+        workflow_config: dict,
+        user_params: dict,
+    ) -> Tuple[bool, Optional[str], Optional[str]]:
+        """
+        Execute a custom workflow via RunPod serverless.
+
+        Builds full workflow JSON then submits to the universal RUNPOD_ENDPOINT_ID
+        via RunPodService.submit_built_workflow (avoids double template loading).
+
+        Args:
+            workflow_config: Row dict from the custom_workflows table.
+            user_params: User-provided parameter values to substitute.
+
+        Returns:
+            (success, job_id, error_message)
+        """
+        from services.runpod_service import RunPodService
+        slug = workflow_config.get("slug", "")
+        template_name = f"custom/{slug}"
+
+        # Step 1: Build workflow (same as ComfyUI path)
+        success, workflow, error = await self.workflow_service.build_workflow(
+            template_name, user_params
+        )
+        if not success:
+            return False, None, error
+
+        # Step 2: Submit built workflow JSON directly to RunPod
+        runpod_service = RunPodService()
+        return await runpod_service.submit_built_workflow(workflow)

@@ -7,11 +7,13 @@ Depends(verify_admin) at the endpoint level (NOT router-level).
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 
-from core.auth import verify_admin
+from core.auth import get_current_user, verify_admin
 from models.custom_workflow import (
     CreateCustomWorkflowRequest,
     CustomWorkflowListResponse,
     CustomWorkflowResponse,
+    ExecuteWorkflowRequest,
+    ExecuteWorkflowResponse,
     ParseWorkflowRequest,
     ParseWorkflowResponse,
     UpdateCustomWorkflowRequest,
@@ -211,3 +213,41 @@ async def unpublish_workflow(
         raise HTTPException(status_code=400, detail=error or "Failed to unpublish workflow")
 
     return CustomWorkflowResponse(success=True, workflow=workflow)
+
+
+@router.post("/{workflow_id}/execute", response_model=ExecuteWorkflowResponse)
+async def execute_workflow(
+    workflow_id: str,
+    payload: ExecuteWorkflowRequest,
+    current_user: dict = Depends(get_current_user),
+) -> ExecuteWorkflowResponse:
+    """
+    Execute a custom workflow (test run or production).
+
+    Authenticated (not admin-only) — published features are accessible to all users.
+    Routes to ComfyUI or RunPod depending on execution_backend field.
+
+    Returns 404 if workflow not found, 500 on execution failure.
+    """
+    service = CustomWorkflowService()
+    workflow = await service.get(workflow_id)
+    if workflow is None:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
+    if payload.execution_backend == 'runpod':
+        success, job_id, error = await service.execute_dynamic_workflow_runpod(
+            workflow, payload.parameters
+        )
+    else:
+        success, job_id, error = await service.execute_dynamic_workflow(
+            workflow, payload.parameters, payload.base_url, payload.client_id
+        )
+
+    if not success:
+        raise HTTPException(status_code=500, detail=error or "Execution failed")
+
+    return ExecuteWorkflowResponse(
+        success=True,
+        prompt_id=job_id,
+        execution_backend=payload.execution_backend,
+    )
