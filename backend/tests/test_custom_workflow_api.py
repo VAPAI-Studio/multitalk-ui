@@ -19,9 +19,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 @pytest.fixture
 def admin_client():
-    """TestClient with mocked admin auth."""
+    """TestClient with mocked admin auth (also overrides get_current_user for endpoints that use it)."""
     from main import app
-    from core.auth import verify_admin
+    from core.auth import get_current_user, verify_admin
 
     mock_admin = MagicMock()
     mock_admin.id = "admin-user-id-123"
@@ -29,6 +29,7 @@ def admin_client():
     mock_admin.app_metadata = {}
 
     app.dependency_overrides[verify_admin] = lambda: mock_admin
+    app.dependency_overrides[get_current_user] = lambda: mock_admin
     client = TestClient(app)
     yield client
     app.dependency_overrides.clear()
