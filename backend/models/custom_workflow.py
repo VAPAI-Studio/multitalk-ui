@@ -5,7 +5,7 @@ Defines request/response schemas for workflow parsing and CRUD operations.
 Used by the API router, custom workflow service, and builder UI.
 """
 import re
-from typing import Optional, List, Any, Literal
+from typing import Optional, List, Any, Literal, Dict
 
 from pydantic import BaseModel, Field
 
@@ -97,4 +97,23 @@ class CustomWorkflowListResponse(BaseModel):
     """Response for listing custom workflows."""
     success: bool
     workflows: List[dict] = []
+    error: Optional[str] = None
+
+
+# --- Execute models ---
+
+
+class ExecuteWorkflowRequest(BaseModel):
+    """Request to execute a custom workflow (test run or production)."""
+    parameters: Dict[str, Any]                              # placeholder_key -> value; files pre-processed by frontend
+    base_url: str = ''                                      # ComfyUI URL; ignored for runpod backend
+    client_id: str = ''                                     # WebSocket client ID for ComfyUI progress
+    execution_backend: Literal['comfyui', 'runpod'] = 'comfyui'
+
+
+class ExecuteWorkflowResponse(BaseModel):
+    """Response from executing a custom workflow."""
+    success: bool
+    prompt_id: Optional[str] = None                        # ComfyUI prompt_id OR RunPod job_id
+    execution_backend: Optional[str] = None
     error: Optional[str] = None

@@ -192,8 +192,10 @@ async def test_execute_dynamic_workflow_runpod_service():
     )
     service.workflow_service = mock_workflow_service
 
-    # Mock RunPodService to return a job_id
-    with patch("services.custom_workflow_service.RunPodService") as MockRunPod:
+    # Mock RunPodService to return a job_id.
+    # RunPodService is lazily imported inside the method body, so patch at
+    # the source module level where it is defined.
+    with patch("services.runpod_service.RunPodService") as MockRunPod:
         mock_runpod = MockRunPod.return_value
         mock_runpod.submit_built_workflow = AsyncMock(
             return_value=(True, "runpod-job-abc", None)
