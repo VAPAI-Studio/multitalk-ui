@@ -14,7 +14,9 @@ import {
   extractModelRefs,
   checkModelPresence,
   parseInstalledPackages,
+  generateSlug,
 } from '../lib/builderUtils';
+import { studios } from '../lib/studioConfig';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -1452,6 +1454,220 @@ function DependenciesStep({
 }
 
 // ---------------------------------------------------------------------------
+// MetadataStep sub-component
+// ---------------------------------------------------------------------------
+
+interface MetadataStepProps {
+  state: BuilderState;
+  onUpdate: (partial: Partial<BuilderState>) => void;
+  onBack: () => void;
+  setStatus: (s: string) => void;
+  isLoading: boolean;
+  setIsLoading: (v: boolean) => void;
+}
+
+function MetadataStep({
+  state,
+  onUpdate,
+  onBack,
+  setStatus,
+  isLoading,
+  setIsLoading,
+}: MetadataStepProps) {
+  async function togglePublish() {
+    if (!state.workflowId) return;
+    setIsLoading(true);
+    try {
+      const newPublished = !state.metadata.is_published;
+      if (newPublished) {
+        await apiClient.publishCustomWorkflow(state.workflowId);
+      } else {
+        await apiClient.unpublishCustomWorkflow(state.workflowId);
+      }
+      onUpdate({ metadata: { ...state.metadata, is_published: newPublished } });
+      setStatus(newPublished ? 'Feature published.' : 'Feature unpublished.');
+    } catch (err: unknown) {
+      setStatus(`Toggle failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function handleSaveAll() {
+    if (!state.workflowId) return;
+    setIsLoading(true);
+    try {
+      await apiClient.updateCustomWorkflow(state.workflowId, {
+        name: state.metadata.name,
+        description: state.metadata.description,
+        output_type: state.metadata.output_type,
+        studio: state.metadata.studio,
+        icon: state.metadata.icon,
+        gradient: state.metadata.gradient,
+        variable_config: state.variableConfig as unknown as Record<string, unknown>[],
+        section_config: state.sectionConfig as unknown as Record<string, unknown>[],
+      });
+      setStatus('Workflow saved successfully.');
+    } catch (err: unknown) {
+      setStatus(`Save failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Name + Slug + Description */}
+      <div className="rounded-2xl border border-gray-200 bg-white p-6 space-y-4">
+        <h3 className="font-bold text-gray-900">Feature Identity</h3>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Feature Name *</label>
+            <input
+              type="text"
+              value={state.metadata.name}
+              onChange={(e) => {
+                const name = e.target.value;
+                onUpdate({
+                  metadata: {
+                    ...state.metadata,
+                    name,
+                    slug: generateSlug(name),
+                  },
+                });
+              }}
+              placeholder="My Custom Workflow"
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Slug (auto-generated, editable)</label>
+            <input
+              type="text"
+              value={state.metadata.slug}
+              onChange={(e) => onUpdate({ metadata: { ...state.metadata, slug: e.target.value } })}
+              placeholder="my-custom-workflow"
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm font-mono focus:border-blue-400 transition-all"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">Description</label>
+          <textarea
+            rows={3}
+            value={state.metadata.description}
+            onChange={(e) => onUpdate({ metadata: { ...state.metadata, description: e.target.value } })}
+            placeholder="Briefly describe what this feature does..."
+            className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm resize-y focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
+          />
+        </div>
+      </div>
+
+      {/* Studio + Output Type */}
+      <div className="rounded-2xl border border-gray-200 bg-white p-6 space-y-4">
+        <h3 className="font-bold text-gray-900">Publishing Target</h3>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Studio</label>
+            <select
+              value={state.metadata.studio}
+              onChange={(e) => onUpdate({ metadata: { ...state.metadata, studio: e.target.value } })}
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm bg-white focus:border-blue-400 transition-all"
+            >
+              <option value="">Select a studio...</option>
+              {studios.filter(s => !s.adminOnly).map(s => (
+                <option key={s.id} value={s.id}>{s.title}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Output Type</label>
+            <select
+              value={state.metadata.output_type}
+              onChange={(e) => onUpdate({ metadata: { ...state.metadata, output_type: e.target.value as 'image' | 'video' | 'audio' } })}
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm bg-white focus:border-blue-400 transition-all"
+            >
+              <option value="image">Image</option>
+              <option value="video">Video</option>
+              <option value="audio">Audio</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Icon + Gradient */}
+      <div className="rounded-2xl border border-gray-200 bg-white p-6 space-y-4">
+        <h3 className="font-bold text-gray-900">Appearance</h3>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Icon (emoji)</label>
+            <input
+              type="text"
+              value={state.metadata.icon}
+              onChange={(e) => onUpdate({ metadata: { ...state.metadata, icon: e.target.value } })}
+              placeholder="✨"
+              maxLength={4}
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-2xl text-center focus:border-blue-400 transition-all"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Gradient</label>
+            <select
+              value={state.metadata.gradient}
+              onChange={(e) => onUpdate({ metadata: { ...state.metadata, gradient: e.target.value } })}
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm bg-white focus:border-blue-400 transition-all"
+            >
+              {GRADIENT_PALETTE.map(g => (
+                <option key={g.value} value={g.value}>{g.label}</option>
+              ))}
+            </select>
+            {/* Preview swatch */}
+            <div className={`mt-2 h-8 rounded-xl bg-gradient-to-r ${state.metadata.gradient}`} />
+          </div>
+        </div>
+      </div>
+
+      {/* Publish toggle + Save */}
+      <div className="rounded-2xl border border-gray-200 bg-white p-6 flex items-center justify-between">
+        <div>
+          <h3 className="font-bold text-gray-900">Published</h3>
+          <p className="text-xs text-gray-500 mt-1">Published features are visible to all users. Unpublished features are admin-only.</p>
+        </div>
+        <button
+          onClick={() => void togglePublish()}
+          disabled={isLoading || !state.workflowId}
+          className={`relative w-14 h-7 rounded-full transition-colors duration-200 focus:outline-none ${
+            state.metadata.is_published ? 'bg-green-500' : 'bg-gray-300'
+          }`}
+        >
+          <span className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform duration-200 ${
+            state.metadata.is_published ? 'translate-x-7' : 'translate-x-0'
+          }`} />
+        </button>
+      </div>
+
+      {/* Action buttons */}
+      <div className="flex gap-3">
+        <button onClick={onBack} className="px-5 py-2.5 rounded-xl border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition-colors">
+          Back
+        </button>
+        <button
+          onClick={() => void handleSaveAll()}
+          disabled={isLoading || !state.metadata.name}
+          className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 transition-all shadow-md"
+        >
+          {isLoading ? 'Saving...' : 'Save Workflow'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main WorkflowBuilder component
 // ---------------------------------------------------------------------------
 
@@ -1487,10 +1703,6 @@ export default function WorkflowBuilder({ comfyUrl }: Props) {
     await saveToBackend();
     setStep(next);
   };
-
-  // Suppress unused import warning for GRADIENT_PALETTE
-  // (it will be used in Plan 06 metadata step)
-  void GRADIENT_PALETTE;
 
   return (
     <div className="space-y-6">
@@ -1551,9 +1763,14 @@ export default function WorkflowBuilder({ comfyUrl }: Props) {
       )}
 
       {step === 'metadata' && (
-        <div className="rounded-2xl border border-gray-200 p-6 text-gray-400 text-center">
-          Metadata step — implemented in Plan 06
-        </div>
+        <MetadataStep
+          state={state}
+          onUpdate={(p) => setState(s => ({...s, ...p}))}
+          onBack={() => void goToStep('dependencies')}
+          setStatus={setStatus}
+          isLoading={isLoading}
+          setIsLoading={setIsLoading}
+        />
       )}
     </div>
   );
