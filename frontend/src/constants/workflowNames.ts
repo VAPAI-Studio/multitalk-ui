@@ -10,7 +10,7 @@ export const WORKFLOW_DISPLAY_NAMES: Record<string, string> = {
   'video-lipsync': 'Video Lipsync',
   'wan-i2v': 'WAN I2V',
   'wan-move': 'WAN Move',
-  'ltx2-i2v': 'LTX2 I2V',
+  'ltx23': 'LTX 2.3 Video',
   'upscale-vid': 'Video Upscale',
   'legacy': 'Legacy',
 
@@ -35,7 +35,7 @@ export const VIDEO_WORKFLOW_NAMES = [
   'video-lipsync',
   'wan-i2v',
   'wan-move',
-  'ltx2-i2v',
+  'ltx23',
   'upscale-vid',
   'legacy',
 ]
