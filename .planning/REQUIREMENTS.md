@@ -51,8 +51,8 @@ Requirements for Workflow Builder milestone. Each maps to roadmap phases.
 
 ### Testing
 
-- [ ] **TEST-01**: Admin can fill in test values for all configured variables in the builder
-- [ ] **TEST-02**: Admin can execute a test run against the ComfyUI server with real-time progress
+- [x] **TEST-01**: Admin can fill in test values for all configured variables in the builder
+- [x] **TEST-02**: Admin can execute a test run against the ComfyUI server with real-time progress
 - [ ] **TEST-03**: Test output (image/video/audio) displays inline in the builder
 - [x] **TEST-04**: Test run uses the exact same code path as the published feature (shared execution function)
 
@@ -132,8 +132,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | META-03 | Phase 15 | Complete |
 | META-04 | Phase 15 | Complete |
 | META-05 | Phase 15 | Complete |
-| TEST-01 | Phase 16 | Pending |
-| TEST-02 | Phase 16 | Pending |
+| TEST-01 | Phase 16 | Complete |
+| TEST-02 | Phase 16 | Complete |
 | TEST-03 | Phase 16 | Pending |
 | TEST-04 | Phase 14 | Complete |
 | DYN-01 | Phase 17 | Pending |
