@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Workflow Builder
 status: executing
-stopped_at: Completed 15-03-PLAN.md
-last_updated: "2026-03-14T12:35:00.000Z"
+stopped_at: Completed 15-04-PLAN.md
+last_updated: "2026-03-14T12:42:01.834Z"
 last_activity: 2026-03-14 -- Plan 15-03 executed (WorkflowBuilder step machine, Upload step, Inspect step)
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 9
-  completed_plans: 6
+  completed_plans: 7
   percent: 72
 ---
 
@@ -47,6 +47,7 @@ Progress: [███████░░░] 72%
 | 15    | 01   | 7min     | 2     | 2     |
 | Phase 15-builder-ui P02 | 3 | 2 tasks | 2 files |
 | 15    | 03   | 3min     | 2     | 1     |
+| Phase 15-builder-ui P04 | 3min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -75,6 +76,8 @@ Executed v1.2 decisions:
 - Both UploadStep and InspectStep implemented together in one commit — required for TypeScript to compile (InspectStep referenced in JSX) (15-03)
 - fetchObjectInfo at module scope (not inside InspectStep component) for cleaner TypeScript return type inference (15-03)
 - void GRADIENT_PALETTE/INPUT_TYPE_OPTIONS used to suppress unused import warnings for constants consumed in Plans 04-06 (15-03)
+- [Phase 15-builder-ui]: Tasks 1 and 2 committed together in one atomic commit — same file, both sub-components needed to TypeScript compile
+- [Phase 15-builder-ui]: Section dropdown only visible on VariableCard when sections.length > 0 to avoid UI clutter when no sections exist
 
 ### Pending Todos
 
@@ -87,6 +90,6 @@ Executed v1.2 decisions:
 
 ## Session Continuity
 
-Last session: 2026-03-14T12:35:00.000Z
-Stopped at: Completed 15-03-PLAN.md
+Last session: 2026-03-14T12:42:01.829Z
+Stopped at: Completed 15-04-PLAN.md
 Next action: Execute Phase 15 plans (15-04 next)

@@ -13,9 +13,9 @@ Requirements for Workflow Builder milestone. Each maps to roadmap phases.
 - [x] **WB-02**: System detects API vs UI format and rejects UI format with guidance to export API format
 - [x] **WB-03**: System parses workflow JSON and displays all nodes with class_type and inputs in a node inspector
 - [x] **WB-04**: System filters out node-to-node link arrays from configurable input candidates
-- [ ] **WB-05**: Admin can select which node inputs become user-facing variables by clicking them
+- [x] **WB-05**: Admin can select which node inputs become user-facing variables by clicking them
 - [x] **WB-06**: System auto-detects suggested field types from ComfyUI metadata (BOOLEAN→toggle, COMBO→select, STRING→text, INT/FLOAT→number)
-- [ ] **WB-07**: Admin can optionally enrich node metadata via ComfyUI `/object_info` endpoint
+- [x] **WB-07**: Admin can optionally enrich node metadata via ComfyUI `/object_info` endpoint
 
 ### Dependency Check
 
@@ -32,14 +32,14 @@ Requirements for Workflow Builder milestone. Each maps to roadmap phases.
 
 ### Variable Configuration
 
-- [ ] **VAR-01**: Admin can set display label, placeholder text, and help text for each variable
-- [ ] **VAR-02**: Admin can choose UI input type: text, textarea, number, slider, file-image, file-audio, file-video, dropdown, toggle, resolution
-- [ ] **VAR-03**: Admin can set default values, min/max (for numbers/sliders), and step size
-- [ ] **VAR-04**: Admin can set validation rules: required, file type accept filters, file size limits
+- [x] **VAR-01**: Admin can set display label, placeholder text, and help text for each variable
+- [x] **VAR-02**: Admin can choose UI input type: text, textarea, number, slider, file-image, file-audio, file-video, dropdown, toggle, resolution
+- [x] **VAR-03**: Admin can set default values, min/max (for numbers/sliders), and step size
+- [x] **VAR-04**: Admin can set validation rules: required, file type accept filters, file size limits
 - [x] **VAR-05**: System maps each variable to its `{{PLACEHOLDER_KEY}}` in the workflow template with visual indicator
-- [ ] **VAR-06**: Admin can specify file handling mode per file variable: upload to ComfyUI or base64 encode
-- [ ] **VAR-07**: Admin can reorder variables via drag-and-drop
-- [ ] **VAR-08**: Admin can organize variables into named sections
+- [x] **VAR-06**: Admin can specify file handling mode per file variable: upload to ComfyUI or base64 encode
+- [x] **VAR-07**: Admin can reorder variables via drag-and-drop
+- [x] **VAR-08**: Admin can organize variables into named sections
 
 ### Feature Metadata
 
@@ -109,9 +109,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | WB-02 | Phase 14 | Complete |
 | WB-03 | Phase 14 | Complete |
 | WB-04 | Phase 14 | Complete |
-| WB-05 | Phase 15 | Pending |
+| WB-05 | Phase 15 | Complete |
 | WB-06 | Phase 15 | Complete |
-| WB-07 | Phase 15 | Pending |
+| WB-07 | Phase 15 | Complete |
 | DEP-01 | Phase 15 | Complete |
 | DEP-02 | Phase 15 | Complete |
 | DEP-03 | Phase 15 | Complete |
@@ -119,14 +119,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MDL-01 | Phase 15 | Complete |
 | MDL-02 | Phase 15 | Complete |
 | MDL-03 | Phase 15 | Pending |
-| VAR-01 | Phase 15 | Pending |
-| VAR-02 | Phase 15 | Pending |
-| VAR-03 | Phase 15 | Pending |
-| VAR-04 | Phase 15 | Pending |
+| VAR-01 | Phase 15 | Complete |
+| VAR-02 | Phase 15 | Complete |
+| VAR-03 | Phase 15 | Complete |
+| VAR-04 | Phase 15 | Complete |
 | VAR-05 | Phase 15 | Complete |
-| VAR-06 | Phase 15 | Pending |
-| VAR-07 | Phase 15 | Pending |
-| VAR-08 | Phase 15 | Pending |
+| VAR-06 | Phase 15 | Complete |
+| VAR-07 | Phase 15 | Complete |
+| VAR-08 | Phase 15 | Complete |
 | META-01 | Phase 15 | Complete |
 | META-02 | Phase 15 | Pending |
 | META-03 | Phase 15 | Pending |
