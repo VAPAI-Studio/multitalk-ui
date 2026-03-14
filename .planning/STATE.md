@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Workflow Builder
 status: executing
-stopped_at: Completed 16-03-PLAN.md
-last_updated: "2026-03-14T14:24:17.295Z"
+stopped_at: Completed 17-01-PLAN.md
+last_updated: "2026-03-14T14:52:30.275Z"
 last_activity: 2026-03-14 -- Plan 15-03 executed (WorkflowBuilder step machine, Upload step, Inspect step)
 progress:
   total_phases: 4
   completed_phases: 3
-  total_plans: 12
-  completed_plans: 12
+  total_plans: 15
+  completed_plans: 13
   percent: 72
 ---
 
@@ -53,6 +53,7 @@ Progress: [███████░░░] 72%
 | Phase 16 P01 | 3min | 3 tasks | 6 files |
 | Phase 16 P02 | 3m24s | 2 tasks | 2 files |
 | Phase 16-test-runner-and-dynamic-renderer P03 | 3min | 2 tasks | 2 files |
+| Phase 17-navigation-integration P01 | 2min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -92,6 +93,8 @@ Executed v1.2 decisions:
 - [Phase 16]: execute endpoint uses get_current_user (not verify_admin) — authenticated users can execute published features
 - [Phase 16]: Used startJobMonitoring for both backends in TestStep — startRunPodJobMonitoring requires endpointId not available from execute response; server-side routes to correct backend
 - [Phase 16-test-runner-and-dynamic-renderer]: Used ResizableFeedSidebar instead of UnifiedFeed (does not exist); startJobMonitoring for both backends; CompleteJobPayload.status uses 'failed'; cast via unknown for strict TS overlap
+- [Phase 17-navigation-integration]: list_published_workflows uses Depends(get_current_user) not Depends(verify_admin) — published features accessible to all authenticated users on app load
+- [Phase 17-navigation-integration]: admin_client fixture overrides both verify_admin and get_current_user — admins are authenticated users and must satisfy both dependency types
 
 ### Pending Todos
 
@@ -104,6 +107,6 @@ Executed v1.2 decisions:
 
 ## Session Continuity
 
-Last session: 2026-03-14T14:19:55.535Z
-Stopped at: Completed 16-03-PLAN.md
+Last session: 2026-03-14T14:52:30.272Z
+Stopped at: Completed 17-01-PLAN.md
 Next action: Execute Phase 15 plans (15-04 next)

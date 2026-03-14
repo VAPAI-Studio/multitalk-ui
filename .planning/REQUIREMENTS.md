@@ -73,7 +73,7 @@ Requirements for Workflow Builder milestone. Each maps to roadmap phases.
 - [x] **STORE-03**: Backend CRUD API (create, read, update, delete, list, publish/unpublish) at `/api/custom-workflows/`
 - [x] **STORE-04**: Workflow parsing endpoint accepts ComfyUI JSON and returns structured node/input data
 - [x] **STORE-05**: All custom workflow API endpoints are admin-only
-- [ ] **STORE-06**: Frontend fetches published custom workflows on app load and merges into navigation
+- [x] **STORE-06**: Frontend fetches published custom workflows on app load and merges into navigation
 
 ## Future Requirements
 
@@ -148,7 +148,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | STORE-03 | Phase 14 | Complete |
 | STORE-04 | Phase 14 | Complete |
 | STORE-05 | Phase 14 | Complete |
-| STORE-06 | Phase 17 | Pending |
+| STORE-06 | Phase 17 | Complete |
 
 **Coverage:**
 - v1.2 requirements: 44 total
