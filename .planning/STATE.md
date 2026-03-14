@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Workflow Builder
-status: completed
-stopped_at: Completed 14-03-PLAN.md (Phase 14 complete)
-last_updated: "2026-03-13T21:39:03.356Z"
-last_activity: 2026-03-13 -- Plan 14-03 executed (API router, integration tests)
+status: executing
+stopped_at: Completed 15-01-PLAN.md
+last_updated: "2026-03-14T12:25:31.821Z"
+last_activity: 2026-03-14 -- Plan 15-01 executed (infrastructure endpoints, apiClient builder methods)
 progress:
   total_phases: 4
   completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
-  percent: 25
+  total_plans: 9
+  completed_plans: 4
+  percent: 68
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-13)
 
 **Core value:** Provide a unified platform for AI-powered media processing where users can generate, edit, upscale, and manage their content end-to-end
-**Current focus:** v1.2 Workflow Builder -- Phase 14 complete, ready for Phase 15
+**Current focus:** v1.2 Workflow Builder -- Phase 15 in progress (1 of 6 plans done)
 
 ## Current Position
 
-Phase: 14 of 17 (Foundation) -- COMPLETE
-Plan: 3 of 3 in current phase (all done)
-Status: Phase 14 complete -- ready for Phase 15
-Last activity: 2026-03-13 -- Plan 14-03 executed (API router, integration tests)
+Phase: 15 of 17 (Builder UI)
+Plan: 1 of 6 in current phase (15-01 complete)
+Status: In progress -- ready for 15-02
+Last activity: 2026-03-14 -- Plan 15-01 executed (infrastructure endpoints, apiClient builder methods)
 
-Progress: [###░░░░░░░] 25%
+Progress: [███████░░░] 68%
 
 ## Performance Metrics
 
@@ -44,6 +44,7 @@ Progress: [###░░░░░░░] 25%
 | 14    | 01   | 4min     | 2     | 6     |
 | 14    | 02   | 4min     | 2     | 2     |
 | 14    | 03   | 3min     | 2     | 3     |
+| 15    | 01   | 7min     | 2     | 2     |
 
 ## Accumulated Context
 
@@ -63,6 +64,9 @@ Executed v1.2 decisions:
 - Template files saved at workflows/custom/{slug}.json for WorkflowService._find_template_path integration (14-02)
 - Used JSONResponse wrapper for create endpoint to return HTTP 201 status code (14-03)
 - Per-endpoint Depends(verify_admin) pattern matches infrastructure.py convention (14-03)
+- Inline json/Path imports inside endpoint functions to avoid module-level import pollution (15-01)
+- TypeScript interfaces co-located in apiClient.ts rather than separate types file (15-01)
+- getDockerfileContent/saveDockerfileContent added as typed wrappers alongside existing getDockerfile/saveDockerfile (15-01)
 
 ### Pending Todos
 
@@ -75,6 +79,6 @@ Executed v1.2 decisions:
 
 ## Session Continuity
 
-Last session: 2026-03-13T21:35:27.812Z
-Stopped at: Completed 14-03-PLAN.md (Phase 14 complete)
+Last session: 2026-03-14T12:24:53.150Z
+Stopped at: Completed 15-01-PLAN.md
 Next action: Execute Phase 15 plans
