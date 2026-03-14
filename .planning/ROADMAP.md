@@ -91,12 +91,12 @@ Plans:
   2. The DynamicWorkflowPage component renders the correct form layout (sections, labels, placeholders, help text) with proper input widgets for every configured field type including file uploads (upload-to-ComfyUI and base64 modes) and resolution pairs
   3. Submitting the dynamic form creates a tracked job via createJob, monitors it via startJobMonitoring, and displays the result — using the exact same execute_dynamic_workflow backend function as the test runner
   4. Dynamic workflow execution works with both ComfyUI and RunPod execution backends without any backend-specific logic in the renderer
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 16-01: TBD
-- [ ] 16-02: TBD
-- [ ] 16-03: TBD
+- [ ] 16-01-PLAN.md — Execute endpoint (backend models + RunPod service method + HTTP route + apiClient method)
+- [ ] 16-02-PLAN.md — DynamicFormRenderer component + TestStep in WorkflowBuilder (6th step)
+- [ ] 16-03-PLAN.md — DynamicWorkflowPage production component (job tracking + dual-backend + UnifiedFeed)
 
 ### Phase 17: Navigation Integration
 **Goal**: Published custom workflows appear seamlessly in the app's navigation — inside their assigned studio, on the homepage, and with a correctly filtered generation feed — without modifying the StudioPageType union or requiring a rebuild
@@ -133,6 +133,6 @@ Phases execute in numeric order: 14 -> 15 -> 16 -> 17
 | 12. Output Delivery | v1.1 | 2/2 | Complete | 2026-03-12 |
 | 13. Frontend | v1.1 | 3/3 | Complete | 2026-03-13 |
 | 14. Foundation | v1.2 | 3/3 | Complete | 2026-03-13 |
-| 15. Builder UI | 6/6 | Complete    | 2026-03-14 | - |
+| 15. Builder UI | v1.2 | 6/6 | Complete | 2026-03-14 |
 | 16. Test Runner and Dynamic Renderer | v1.2 | 0/3 | Not started | - |
 | 17. Navigation Integration | v1.2 | 0/2 | Not started | - |
