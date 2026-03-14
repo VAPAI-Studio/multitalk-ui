@@ -45,6 +45,23 @@ def unauthenticated_client():
     app.dependency_overrides.clear()
 
 
+@pytest.fixture
+def non_admin_client():
+    """TestClient with mocked non-admin authenticated user."""
+    from main import app
+    from core.auth import get_current_user
+
+    mock_user = MagicMock()
+    mock_user.id = "regular-user-id-456"
+    mock_user.user_metadata = {"role": "user"}
+    mock_user.app_metadata = {}
+
+    app.dependency_overrides[get_current_user] = lambda: mock_user
+    client = TestClient(app)
+    yield client
+    app.dependency_overrides.clear()
+
+
 # ---------------------------------------------------------------------------
 # Sample Data
 # ---------------------------------------------------------------------------
@@ -470,4 +487,29 @@ class TestAdminProtection:
         response = unauthenticated_client.post(
             "/api/custom-workflows/some-id/unpublish"
         )
+        assert response.status_code in (401, 403)
+
+
+# ---------------------------------------------------------------------------
+# Published Endpoint Auth Tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.integration
+class TestPublishedEndpointAuth:
+    """Tests for /published endpoint authentication — should be accessible to non-admins."""
+
+    def test_list_published_non_admin(self, non_admin_client):
+        """GET /published returns 200 for non-admin authenticated user."""
+        with patch("api.custom_workflows.CustomWorkflowService") as MockService:
+            instance = MockService.return_value
+            instance.list_published = AsyncMock(return_value=[])
+            response = non_admin_client.get("/api/custom-workflows/published")
+            assert response.status_code == 200
+            data = response.json()
+            assert data["success"] is True
+
+    def test_list_published_unauthenticated(self, unauthenticated_client):
+        """GET /published returns 401/403 for unauthenticated request."""
+        response = unauthenticated_client.get("/api/custom-workflows/published")
         assert response.status_code in (401, 403)
