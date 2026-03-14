@@ -41,7 +41,7 @@ Full details: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
 
 - [x] **Phase 14: Foundation** - Database schema, backend models, CRUD API, workflow parser, and shared execution function (completed 2026-03-13)
 - [x] **Phase 15: Builder UI** - Admin page with node inspector, variable configuration, dependency/model checks, metadata editor (completed 2026-03-14)
-- [ ] **Phase 16: Test Runner and Dynamic Renderer** - DynamicWorkflowPage component shared between builder testing and production rendering
+- [x] **Phase 16: Test Runner and Dynamic Renderer** - DynamicWorkflowPage component shared between builder testing and production rendering (completed 2026-03-14)
 - [ ] **Phase 17: Navigation Integration** - Merge dynamic features into studios, homepage, routing, and feed sidebar
 
 ## Phase Details
@@ -134,5 +134,5 @@ Phases execute in numeric order: 14 -> 15 -> 16 -> 17
 | 13. Frontend | v1.1 | 3/3 | Complete | 2026-03-13 |
 | 14. Foundation | v1.2 | 3/3 | Complete | 2026-03-13 |
 | 15. Builder UI | v1.2 | 6/6 | Complete | 2026-03-14 |
-| 16. Test Runner and Dynamic Renderer | 2/3 | In Progress|  | - |
+| 16. Test Runner and Dynamic Renderer | 3/3 | Complete   | 2026-03-14 | - |
 | 17. Navigation Integration | v1.2 | 0/2 | Not started | - |
