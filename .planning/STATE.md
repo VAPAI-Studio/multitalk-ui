@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Workflow Builder
 status: executing
-stopped_at: Completed 15-05-PLAN.md
-last_updated: "2026-03-14T12:47:22.494Z"
+stopped_at: Completed 15-06-PLAN.md
+last_updated: "2026-03-14T12:53:06.587Z"
 last_activity: 2026-03-14 -- Plan 15-03 executed (WorkflowBuilder step machine, Upload step, Inspect step)
 progress:
   total_phases: 4
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 9
-  completed_plans: 8
+  completed_plans: 9
   percent: 72
 ---
 
@@ -49,6 +49,7 @@ Progress: [███████░░░] 72%
 | 15    | 03   | 3min     | 2     | 1     |
 | Phase 15-builder-ui P04 | 3min | 2 tasks | 1 files |
 | Phase 15-builder-ui P05 | 2min | 2 tasks | 1 files |
+| Phase 15 P06 | 8min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -82,6 +83,8 @@ Executed v1.2 decisions:
 - [Phase 15-builder-ui]: Tasks 1 and 2 committed together in one atomic commit — shared loadChecks function and local state in DependenciesStep (15-05)
 - [Phase 15-builder-ui]: SHA refresh pattern: re-fetch Dockerfile after each saveDockerfileContent to get updated SHA, preventing 409 conflict on second add (15-05)
 - [Phase 15-builder-ui]: MdlStatus type local to DependenciesStep (not exported) — render-only type alias, avoids import proliferation (15-05)
+- [Phase 15]: MetadataStep togglePublish/handleSaveAll use void wrapper in JSX onClick — consistent with builder file async handler pattern (15-06)
+- [Phase 15]: Infrastructure tab state defaults to 'files' so existing admin UX unchanged; builder accessed via explicit tab click (15-06)
 
 ### Pending Todos
 
@@ -94,6 +97,6 @@ Executed v1.2 decisions:
 
 ## Session Continuity
 
-Last session: 2026-03-14T12:47:22.490Z
-Stopped at: Completed 15-05-PLAN.md
+Last session: 2026-03-14T12:53:06.584Z
+Stopped at: Completed 15-06-PLAN.md
 Next action: Execute Phase 15 plans (15-04 next)

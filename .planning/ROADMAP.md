@@ -40,7 +40,7 @@ Full details: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
 **Milestone Goal:** Enable admins to create new platform features from ComfyUI workflows without writing code — upload a workflow JSON, configure inputs visually, test it, and publish it as a live feature page.
 
 - [x] **Phase 14: Foundation** - Database schema, backend models, CRUD API, workflow parser, and shared execution function (completed 2026-03-13)
-- [ ] **Phase 15: Builder UI** - Admin page with node inspector, variable configuration, dependency/model checks, metadata editor
+- [x] **Phase 15: Builder UI** - Admin page with node inspector, variable configuration, dependency/model checks, metadata editor (completed 2026-03-14)
 - [ ] **Phase 16: Test Runner and Dynamic Renderer** - DynamicWorkflowPage component shared between builder testing and production rendering
 - [ ] **Phase 17: Navigation Integration** - Merge dynamic features into studios, homepage, routing, and feed sidebar
 
@@ -133,6 +133,6 @@ Phases execute in numeric order: 14 -> 15 -> 16 -> 17
 | 12. Output Delivery | v1.1 | 2/2 | Complete | 2026-03-12 |
 | 13. Frontend | v1.1 | 3/3 | Complete | 2026-03-13 |
 | 14. Foundation | v1.2 | 3/3 | Complete | 2026-03-13 |
-| 15. Builder UI | 5/6 | In Progress|  | - |
+| 15. Builder UI | 6/6 | Complete   | 2026-03-14 | - |
 | 16. Test Runner and Dynamic Renderer | v1.2 | 0/3 | Not started | - |
 | 17. Navigation Integration | v1.2 | 0/2 | Not started | - |

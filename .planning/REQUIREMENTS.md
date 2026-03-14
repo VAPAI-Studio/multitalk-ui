@@ -44,10 +44,10 @@ Requirements for Workflow Builder milestone. Each maps to roadmap phases.
 ### Feature Metadata
 
 - [x] **META-01**: Admin can set feature name, auto-generated slug (editable), and description
-- [ ] **META-02**: Admin can assign feature to any existing studio (Lipsync, Image, Video, Audio, Virtual Set, LoRA)
-- [ ] **META-03**: Admin can specify output type: image, video, or audio
-- [ ] **META-04**: Admin can pick an icon (emoji) and gradient colors for the feature card
-- [ ] **META-05**: Admin can enable or disable a published feature (disabled hides from non-admins)
+- [x] **META-02**: Admin can assign feature to any existing studio (Lipsync, Image, Video, Audio, Virtual Set, LoRA)
+- [x] **META-03**: Admin can specify output type: image, video, or audio
+- [x] **META-04**: Admin can pick an icon (emoji) and gradient colors for the feature card
+- [x] **META-05**: Admin can enable or disable a published feature (disabled hides from non-admins)
 
 ### Testing
 
@@ -128,10 +128,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | VAR-07 | Phase 15 | Complete |
 | VAR-08 | Phase 15 | Complete |
 | META-01 | Phase 15 | Complete |
-| META-02 | Phase 15 | Pending |
-| META-03 | Phase 15 | Pending |
-| META-04 | Phase 15 | Pending |
-| META-05 | Phase 15 | Pending |
+| META-02 | Phase 15 | Complete |
+| META-03 | Phase 15 | Complete |
+| META-04 | Phase 15 | Complete |
+| META-05 | Phase 15 | Complete |
 | TEST-01 | Phase 16 | Pending |
 | TEST-02 | Phase 16 | Pending |
 | TEST-03 | Phase 16 | Pending |
