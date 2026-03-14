@@ -92,14 +92,13 @@ async def list_workflows(
 
 @router.get("/published", response_model=CustomWorkflowListResponse)
 async def list_published_workflows(
-    admin_user: dict = Depends(verify_admin),
+    current_user: dict = Depends(get_current_user),  # any authenticated user
 ) -> CustomWorkflowListResponse:
     """
-    List only published custom workflows.
+    List only published, enabled custom workflows.
 
     Returns published workflows ordered by created_at descending.
-
-    Admin-only.
+    Accessible to all authenticated users (used by frontend nav on app load).
     """
     service = CustomWorkflowService()
     workflows = await service.list_published()
