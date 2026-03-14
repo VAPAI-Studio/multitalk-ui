@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { apiClient } from '../lib/apiClient';
-import type { ParsedNode, CreateWorkflowPayload } from '../lib/apiClient';
+import type { ParsedNode, CreateWorkflowPayload, ExecuteCustomWorkflowPayload } from '../lib/apiClient';
 import {
   type VariableConfig,
   type SectionConfig,
@@ -17,12 +17,16 @@ import {
   generateSlug,
 } from '../lib/builderUtils';
 import { studios } from '../lib/studioConfig';
+import { DynamicFormRenderer, type FormValues } from '../components/DynamicFormRenderer';
+import { createJob, updateJobToProcessing, completeJob } from '../lib/jobTracking';
+import { startJobMonitoring, uploadMediaToComfy, fileToBase64 } from '../components/utils';
+import { useExecutionBackend } from '../contexts/ExecutionBackendContext';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-type BuilderStep = 'upload' | 'inspect' | 'variables' | 'dependencies' | 'metadata';
+type BuilderStep = 'upload' | 'inspect' | 'variables' | 'dependencies' | 'metadata' | 'test';
 
 interface BuilderState {
   workflowFile: File | null;
@@ -63,8 +67,9 @@ const STEP_LABELS: Record<BuilderStep, string> = {
   variables: 'Variables',
   dependencies: 'Dependencies',
   metadata: 'Metadata',
+  test: 'Test',
 };
-const STEPS: BuilderStep[] = ['upload', 'inspect', 'variables', 'dependencies', 'metadata'];
+const STEPS: BuilderStep[] = ['upload', 'inspect', 'variables', 'dependencies', 'metadata', 'test'];
 
 // ---------------------------------------------------------------------------
 // StepIndicator sub-component
@@ -1668,6 +1673,178 @@ function MetadataStep({
 }
 
 // ---------------------------------------------------------------------------
+// TestStep sub-component
+// ---------------------------------------------------------------------------
+
+interface TestStepProps {
+  workflowId: string | null;
+  variableConfig: VariableConfig[];
+  sectionConfig: SectionConfig[];
+  outputType: 'image' | 'video' | 'audio';
+  comfyUrl: string;
+}
+
+function TestStep({ workflowId, variableConfig, sectionConfig, outputType, comfyUrl }: TestStepProps) {
+  const { backend } = useExecutionBackend();
+  const [formValues, setFormValues] = useState<FormValues>({});
+  const [status, setStatus] = useState('');
+  const [resultUrl, setResultUrl] = useState('');
+  const [isRunning, setIsRunning] = useState(false);
+  const cleanupRef = useRef<(() => void) | null>(null);
+
+  // Cleanup monitoring on unmount
+  useEffect(() => () => { cleanupRef.current?.(); }, []);
+
+  function handleValueChange(key: string, value: string | number | boolean | File | null) {
+    setFormValues(prev => ({ ...prev, [key]: value }));
+  }
+
+  async function runTest() {
+    if (!workflowId) {
+      setStatus('Save the workflow first (complete the Metadata step).');
+      return;
+    }
+    setStatus('Preparing parameters...');
+    setResultUrl('');
+    setIsRunning(true);
+
+    try {
+      // Pre-process file inputs: upload (default) or base64 encode
+      const processedParams: Record<string, string | number | boolean | null> = {};
+      for (const v of variableConfig) {
+        if (v.type === 'resolution') {
+          const w = formValues[v.placeholder_key + '_W'];
+          const h = formValues[v.placeholder_key + '_H'];
+          processedParams[v.placeholder_key + '_W'] = (w as number) ?? 512;
+          processedParams[v.placeholder_key + '_H'] = (h as number) ?? 512;
+        } else if (['file-image', 'file-audio', 'file-video'].includes(v.type)) {
+          const file = formValues[v.placeholder_key] as File | null;
+          if (file) {
+            if (v.file_mode === 'base64') {
+              processedParams[v.placeholder_key] = await fileToBase64(file);
+            } else {
+              // default: upload mode — upload to ComfyUI input directory
+              setStatus(`Uploading ${file.name}...`);
+              const filename = await uploadMediaToComfy(comfyUrl, file);
+              processedParams[v.placeholder_key] = filename;
+            }
+          } else {
+            processedParams[v.placeholder_key] = null;
+          }
+        } else {
+          const raw = formValues[v.placeholder_key];
+          processedParams[v.placeholder_key] = (raw as string | number | boolean | null) ?? null;
+        }
+      }
+
+      const clientId = `builder-test-${Math.random().toString(36).slice(2)}`;
+      const payload: ExecuteCustomWorkflowPayload = {
+        parameters: processedParams,
+        base_url: comfyUrl,
+        client_id: clientId,
+        execution_backend: backend,
+      };
+
+      setStatus('Submitting workflow...');
+      const resp = await apiClient.executeCustomWorkflow(workflowId, payload);
+
+      if (!resp.success || !resp.prompt_id) {
+        throw new Error(resp.error || 'No prompt_id returned');
+      }
+
+      const promptId = resp.prompt_id;
+
+      // Job tracking (workflow_type = 'custom-workflow-test' for filtering)
+      await createJob({
+        job_id: promptId,
+        comfy_url: comfyUrl,
+        workflow_type: 'custom-workflow-test',
+        width: 0,
+        height: 0,
+        trim_to_audio: false,
+      });
+      await updateJobToProcessing(promptId);
+
+      setStatus('Running... (watching for output)');
+
+      // Note: startRunPodJobMonitoring requires an endpointId not available at this point.
+      // The execute endpoint handles backend routing server-side and returns a ComfyUI prompt_id
+      // regardless of backend. We use startJobMonitoring for both backends to poll /history.
+      const cleanup = startJobMonitoring(
+        promptId,
+        comfyUrl,
+        async (jobStatus, message, outputInfo) => {
+          if (jobStatus === 'processing') {
+            setStatus(message || (backend === 'runpod' ? 'Processing on RunPod...' : 'Processing in ComfyUI…'));
+          } else if (jobStatus === 'completed' && outputInfo) {
+            const url = outputInfo.video_url || outputInfo.result_url || outputInfo.image_url || '';
+            setResultUrl(url);
+            setStatus('Test complete!');
+            setIsRunning(false);
+            await completeJob({ job_id: promptId, status: 'completed', output_video_urls: url ? [url] : [] }).catch(() => {});
+          } else if (jobStatus === 'error') {
+            setStatus(`Error: ${message}`);
+            setIsRunning(false);
+            await completeJob({ job_id: promptId, status: 'failed', error_message: message }).catch(() => {});
+          }
+        }
+      );
+      cleanupRef.current = cleanup;
+    } catch (err: any) {
+      setStatus(`Error: ${err.message || 'Unknown error'}`);
+      setIsRunning(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-3xl border border-gray-200/80 p-6 shadow-lg bg-white/80">
+        <h2 className="text-xl font-bold text-gray-900 mb-4">Test Your Workflow</h2>
+        <p className="text-sm text-gray-500 mb-6">
+          Fill in test values below and click Run Test to execute a real workflow run.
+        </p>
+        {variableConfig.length === 0 ? (
+          <p className="text-gray-400 italic">No variables configured. Add variables in the Variables step.</p>
+        ) : (
+          <DynamicFormRenderer
+            variableConfig={variableConfig}
+            sectionConfig={sectionConfig}
+            formValues={formValues}
+            onValueChange={handleValueChange}
+            disabled={isRunning}
+          />
+        )}
+        <div className="mt-6 flex items-center gap-4">
+          <button
+            onClick={() => void runTest()}
+            disabled={isRunning || !workflowId}
+            className="px-6 py-3 rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold shadow-lg hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {isRunning ? (
+              <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Running...</>
+            ) : 'Run Test'}
+          </button>
+          {status && <span className="text-sm text-gray-600">{status}</span>}
+        </div>
+        {resultUrl && (
+          <div className="mt-6">
+            {outputType === 'video' && (
+              <video src={resultUrl} controls className="w-full rounded-2xl shadow border border-gray-200/50" />
+            )}
+            {outputType === 'image' && (
+              <img src={resultUrl} alt="Test result" className="w-full rounded-2xl shadow border border-gray-200/50" />
+            )}
+            {outputType === 'audio' && (
+              <audio src={resultUrl} controls className="w-full" />
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main WorkflowBuilder component
 // ---------------------------------------------------------------------------
 
@@ -1770,6 +1947,16 @@ export default function WorkflowBuilder({ comfyUrl }: Props) {
           setStatus={setStatus}
           isLoading={isLoading}
           setIsLoading={setIsLoading}
+        />
+      )}
+
+      {step === 'test' && (
+        <TestStep
+          workflowId={state.workflowId}
+          variableConfig={state.variableConfig}
+          sectionConfig={state.sectionConfig}
+          outputType={state.metadata.output_type}
+          comfyUrl={comfyUrl}
         />
       )}
     </div>
