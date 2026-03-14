@@ -14,7 +14,7 @@ import CreateImage from '../pages/CreateImage';
 import ImageGrid from '../pages/ImageGrid';
 import WANI2V from '../pages/WANI2V';
 import WANMove from '../pages/WANMove';
-import LTX2I2V from '../pages/LTX2I2V';
+import LTX23VideoGen from '../pages/LTX23VideoGen';
 import VideoUpscale from '../pages/VideoUpscale';
 import AudioStemSeparator from '../pages/AudioStemSeparator';
 import CharacterCaption from '../pages/CharacterCaption';
@@ -41,7 +41,7 @@ const appComponents: Record<string, React.ComponentType<{ comfyUrl: string }> | 
   'image-grid': ImageGrid,
   'wan-i2v': WANI2V,
   'wan-move': WANMove,
-  'ltx2-i2v': LTX2I2V,
+  'ltx23-video': LTX23VideoGen,
   'upscale-vid': VideoUpscale,
   'audio-stem-separator': AudioStemSeparator,
   'character-caption': CharacterCaption,
