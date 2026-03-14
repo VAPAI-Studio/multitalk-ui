@@ -8,6 +8,11 @@ export interface Announcement {
 // When committing user-facing changes, add a new entry at the top.
 export const announcements: Announcement[] = [
   {
+    id: "2026-03-14-dynamic-workflows",
+    message: "Admins can now test and publish custom AI workflows from the Workflow Builder — published features appear as live pages.",
+    type: "feature" as const,
+  },
+  {
     id: "2026-03-14-workflow-builder",
     message: "New: Workflow Builder in Infrastructure -- admins can now build and publish custom AI features without code",
     type: "feature",
