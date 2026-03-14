@@ -134,5 +134,5 @@ Phases execute in numeric order: 14 -> 15 -> 16 -> 17
 | 13. Frontend | v1.1 | 3/3 | Complete | 2026-03-13 |
 | 14. Foundation | v1.2 | 3/3 | Complete | 2026-03-13 |
 | 15. Builder UI | v1.2 | 6/6 | Complete | 2026-03-14 |
-| 16. Test Runner and Dynamic Renderer | v1.2 | 0/3 | Not started | - |
+| 16. Test Runner and Dynamic Renderer | 1/3 | In Progress|  | - |
 | 17. Navigation Integration | v1.2 | 0/2 | Not started | - |

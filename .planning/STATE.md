@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Workflow Builder
 status: executing
-stopped_at: Completed 15-06-PLAN.md
-last_updated: "2026-03-14T12:58:00.792Z"
+stopped_at: Completed 16-01-PLAN.md
+last_updated: "2026-03-14T14:08:34.257Z"
 last_activity: 2026-03-14 -- Plan 15-03 executed (WorkflowBuilder step machine, Upload step, Inspect step)
 progress:
   total_phases: 4
   completed_phases: 2
-  total_plans: 9
-  completed_plans: 9
+  total_plans: 12
+  completed_plans: 10
   percent: 72
 ---
 
@@ -50,6 +50,7 @@ Progress: [███████░░░] 72%
 | Phase 15-builder-ui P04 | 3min | 2 tasks | 1 files |
 | Phase 15-builder-ui P05 | 2min | 2 tasks | 1 files |
 | Phase 15 P06 | 8min | 2 tasks | 3 files |
+| Phase 16 P01 | 3min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -85,6 +86,8 @@ Executed v1.2 decisions:
 - [Phase 15-builder-ui]: MdlStatus type local to DependenciesStep (not exported) — render-only type alias, avoids import proliferation (15-05)
 - [Phase 15]: MetadataStep togglePublish/handleSaveAll use void wrapper in JSX onClick — consistent with builder file async handler pattern (15-06)
 - [Phase 15]: Infrastructure tab state defaults to 'files' so existing admin UX unchanged; builder accessed via explicit tab click (15-06)
+- [Phase 16]: Lazy import of RunPodService inside execute_dynamic_workflow_runpod to avoid circular imports; test patches at services.runpod_service.RunPodService
+- [Phase 16]: execute endpoint uses get_current_user (not verify_admin) — authenticated users can execute published features
 
 ### Pending Todos
 
@@ -97,6 +100,6 @@ Executed v1.2 decisions:
 
 ## Session Continuity
 
-Last session: 2026-03-14T12:53:06.584Z
-Stopped at: Completed 15-06-PLAN.md
+Last session: 2026-03-14T14:08:34.255Z
+Stopped at: Completed 16-01-PLAN.md
 Next action: Execute Phase 15 plans (15-04 next)
