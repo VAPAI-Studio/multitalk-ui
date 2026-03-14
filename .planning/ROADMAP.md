@@ -106,11 +106,12 @@ Plans:
   1. When a custom workflow is published to a studio (e.g., Lipsync, Image, Video), it appears in that studio's sidebar navigation and on the Homepage within the studio's feature card — immediately, without a page reload or rebuild
   2. The app fetches all published custom workflow configs once at startup and merges them into the navigation; dynamic page state uses a parallel localStorage key separate from the static StudioPageType union
   3. The dynamic feature page includes a generation feed sidebar filtered to that workflow's pageContext, consistent with all existing static feature pages
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 17-01: TBD
-- [ ] 17-02: TBD
+- [ ] 17-01-PLAN.md — Backend /published endpoint auth relaxation (verify_admin → get_current_user) + Wave 0 non-admin test
+- [ ] 17-02-PLAN.md — Frontend data layer: apiClient.listPublishedWorkflows() + useDynamicWorkflows hook
+- [ ] 17-03-PLAN.md — Navigation wiring: App.tsx parallel state + sidebar dynamic items + StudioPage dropdown + Homepage enrichment
 
 ## Progress
 
@@ -135,4 +136,4 @@ Phases execute in numeric order: 14 -> 15 -> 16 -> 17
 | 14. Foundation | v1.2 | 3/3 | Complete | 2026-03-13 |
 | 15. Builder UI | v1.2 | 6/6 | Complete | 2026-03-14 |
 | 16. Test Runner and Dynamic Renderer | 3/3 | Complete    | 2026-03-14 | - |
-| 17. Navigation Integration | v1.2 | 0/2 | Not started | - |
+| 17. Navigation Integration | v1.2 | 0/3 | Not started | - |
