@@ -5,6 +5,7 @@ import {
   type VariableConfig,
   type SectionConfig,
   type FeatureMetadata,
+  type VariableInputType,
   inferFieldType,
   derivePlaceholderKey,
   GRADIENT_PALETTE,
@@ -642,6 +643,586 @@ function InspectStep({
 }
 
 // ---------------------------------------------------------------------------
+// VariableCard sub-component
+// ---------------------------------------------------------------------------
+
+interface VariableCardProps {
+  variable: VariableConfig;
+  index: number;
+  sections: SectionConfig[];
+  onUpdate: (id: string, partial: Partial<VariableConfig>) => void;
+  onRemove: (id: string) => void;
+  onAssignSection: (varId: string, sectionId: string | undefined) => void;
+  onDragStart: (e: React.DragEvent, index: number) => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDrop: (e: React.DragEvent, index: number) => void;
+}
+
+function VariableCard({
+  variable,
+  index,
+  sections,
+  onUpdate,
+  onRemove,
+  onAssignSection,
+  onDragStart,
+  onDragOver,
+  onDrop,
+}: VariableCardProps) {
+  const isNumber = variable.type === 'number' || variable.type === 'slider';
+  const isDropdown = variable.type === 'dropdown';
+  const isFile =
+    variable.type === 'file-image' ||
+    variable.type === 'file-audio' ||
+    variable.type === 'file-video';
+
+  return (
+    <div
+      draggable
+      onDragStart={(e) => onDragStart(e, index)}
+      onDragOver={(e) => { e.preventDefault(); onDragOver(e); }}
+      onDrop={(e) => onDrop(e, index)}
+      className="rounded-2xl border-2 border-gray-200 bg-white p-4 cursor-grab active:cursor-grabbing hover:border-gray-300 transition-all duration-150"
+    >
+      {/* Row 1: drag handle + node source + placeholder badge + remove button */}
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-gray-400 select-none text-lg">⠿</span>
+        <span className="text-xs text-gray-500 font-mono truncate">
+          Node {variable.node_id} · {variable.input_name}
+        </span>
+        <span className="ml-auto px-2 py-0.5 rounded-lg bg-slate-100 text-slate-600 text-xs font-mono shrink-0">
+          {'{{' + variable.placeholder_key + '}}'}
+        </span>
+        <button
+          onClick={() => onRemove(variable.id)}
+          className="text-gray-400 hover:text-red-500 transition-colors ml-2 shrink-0 text-lg leading-none"
+        >
+          ×
+        </button>
+      </div>
+
+      {/* Row 2: label + type selector */}
+      <div className="grid grid-cols-2 gap-3 mb-3">
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">Label *</label>
+          <input
+            type="text"
+            value={variable.label}
+            onChange={(e) => onUpdate(variable.id, { label: e.target.value })}
+            className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">Input Type</label>
+          <select
+            value={variable.type}
+            onChange={(e) => onUpdate(variable.id, { type: e.target.value as VariableInputType })}
+            className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100 bg-white transition-all"
+          >
+            {INPUT_TYPE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Row 3: placeholder + help text */}
+      <div className="grid grid-cols-2 gap-3 mb-3">
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">Placeholder Text</label>
+          <input
+            type="text"
+            value={variable.placeholder ?? ''}
+            onChange={(e) => onUpdate(variable.id, { placeholder: e.target.value })}
+            className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">Help Text</label>
+          <input
+            type="text"
+            value={variable.help_text ?? ''}
+            onChange={(e) => onUpdate(variable.id, { help_text: e.target.value })}
+            className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+          />
+        </div>
+      </div>
+
+      {/* Type-specific: number / slider */}
+      {isNumber && (
+        <div className="grid grid-cols-4 gap-2 mb-3">
+          {(['default_value', 'min', 'max', 'step'] as const).map((field) => (
+            <div key={field}>
+              <label className="block text-xs font-semibold text-gray-600 mb-1 capitalize">
+                {field.replace('_', ' ')}
+              </label>
+              <input
+                type="number"
+                value={(variable[field] as number | undefined) ?? ''}
+                onChange={(e) =>
+                  onUpdate(variable.id, {
+                    [field]: e.target.value === '' ? undefined : Number(e.target.value),
+                  })
+                }
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Type-specific: dropdown */}
+      {isDropdown && (
+        <div className="mb-3">
+          <label className="block text-xs font-semibold text-gray-600 mb-1">Options (one per line)</label>
+          <textarea
+            rows={3}
+            value={(variable.options ?? []).join('\n')}
+            onChange={(e) =>
+              onUpdate(variable.id, { options: e.target.value.split('\n').filter(Boolean) })
+            }
+            className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm resize-y"
+          />
+        </div>
+      )}
+
+      {/* Type-specific: file-* */}
+      {isFile && (
+        <div className="grid grid-cols-3 gap-3 mb-3">
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Accept Filter</label>
+            <input
+              type="text"
+              value={variable.accept ?? ''}
+              placeholder="e.g. image/png,image/jpeg"
+              onChange={(e) => onUpdate(variable.id, { accept: e.target.value })}
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Max Size (MB)</label>
+            <input
+              type="number"
+              value={variable.max_size_mb ?? ''}
+              onChange={(e) =>
+                onUpdate(variable.id, {
+                  max_size_mb: e.target.value === '' ? undefined : Number(e.target.value),
+                })
+              }
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">File Mode</label>
+            <select
+              value={variable.file_mode ?? 'upload'}
+              onChange={(e) =>
+                onUpdate(variable.id, { file_mode: e.target.value as 'upload' | 'base64' })
+              }
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm bg-white"
+            >
+              <option value="upload">Upload to ComfyUI</option>
+              <option value="base64">Base64 encode</option>
+            </select>
+          </div>
+        </div>
+      )}
+
+      {/* Bottom row: required checkbox + section assignment */}
+      <div className="flex items-center justify-between gap-4 pt-1">
+        <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={variable.required ?? false}
+            onChange={(e) => onUpdate(variable.id, { required: e.target.checked })}
+            className="rounded"
+          />
+          Required field
+        </label>
+
+        {sections.length > 0 && (
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-gray-500 font-medium">Section:</label>
+            <select
+              value={variable.section_id ?? ''}
+              onChange={(e) =>
+                onAssignSection(variable.id, e.target.value === '' ? undefined : e.target.value)
+              }
+              className="rounded-lg border border-gray-200 px-2 py-1 text-xs bg-white focus:border-blue-400 transition-all"
+            >
+              <option value="">No section</option>
+              {sections.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// SectionPanel sub-component
+// ---------------------------------------------------------------------------
+
+interface SectionPanelProps {
+  section: SectionConfig;
+  variables: VariableConfig[];
+  allVariables: VariableConfig[];
+  sections: SectionConfig[];
+  onRenameSection: (id: string, name: string) => void;
+  onDeleteSection: (id: string) => void;
+  onUpdateVariable: (id: string, partial: Partial<VariableConfig>) => void;
+  onRemoveVariable: (id: string) => void;
+  onAssignSection: (varId: string, sectionId: string | undefined) => void;
+  onDragStart: (e: React.DragEvent, index: number) => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDrop: (e: React.DragEvent, index: number) => void;
+  getGlobalIndex: (varId: string) => number;
+}
+
+function SectionPanel({
+  section,
+  variables,
+  sections,
+  onRenameSection,
+  onDeleteSection,
+  onUpdateVariable,
+  onRemoveVariable,
+  onAssignSection,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  getGlobalIndex,
+}: SectionPanelProps) {
+  return (
+    <div className="rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50/50 p-4 space-y-3">
+      {/* Section header */}
+      <div className="flex items-center gap-3">
+        <div className="w-1 h-6 bg-gradient-to-b from-blue-400 to-purple-500 rounded-full shrink-0" />
+        <input
+          type="text"
+          value={section.name}
+          onChange={(e) => onRenameSection(section.id, e.target.value)}
+          className="flex-1 font-bold text-gray-800 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-400 focus:outline-none py-0.5 text-sm"
+        />
+        <button
+          onClick={() => onDeleteSection(section.id)}
+          className="text-xs text-gray-400 hover:text-red-500 transition-colors shrink-0"
+        >
+          Remove Section
+        </button>
+      </div>
+
+      {/* Variables in this section */}
+      {variables.map((v) => (
+        <VariableCard
+          key={v.id}
+          variable={v}
+          index={getGlobalIndex(v.id)}
+          sections={sections}
+          onUpdate={onUpdateVariable}
+          onRemove={onRemoveVariable}
+          onAssignSection={onAssignSection}
+          onDragStart={onDragStart}
+          onDragOver={onDragOver}
+          onDrop={onDrop}
+        />
+      ))}
+
+      {variables.length === 0 && (
+        <p className="text-xs text-gray-400 text-center py-2">
+          No variables in this section yet. Use the "Section" dropdown on variable cards to assign them here.
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// VariablesStep sub-component
+// ---------------------------------------------------------------------------
+
+interface VariablesStepProps {
+  state: BuilderState;
+  onUpdate: (partial: Partial<BuilderState>) => void;
+  onNext: () => void;
+  onBack: () => void;
+  setStatus: (s: string) => void;
+  isLoading: boolean;
+  setIsLoading: (v: boolean) => void;
+}
+
+function VariablesStep({
+  state,
+  onUpdate,
+  onNext,
+  onBack,
+  setStatus,
+  isLoading,
+  setIsLoading,
+}: VariablesStepProps) {
+  const dragIndexRef = useRef<number | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Suppress unused isDragging warning — used for future visual feedback
+  void isDragging;
+
+  // ---------------------------------------------------------------------------
+  // Drag-and-drop handlers
+  // ---------------------------------------------------------------------------
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    dragIndexRef.current = index;
+    e.dataTransfer.effectAllowed = 'move';
+    setIsDragging(true);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    const fromIndex = dragIndexRef.current;
+    if (fromIndex === null || fromIndex === dropIndex) {
+      dragIndexRef.current = null;
+      setIsDragging(false);
+      return;
+    }
+
+    const reordered = [...state.variableConfig];
+    const [moved] = reordered.splice(fromIndex, 1);
+    reordered.splice(dropIndex, 0, moved);
+    // Re-assign order values
+    const withOrder = reordered.map((v, i) => ({ ...v, order: i }));
+    onUpdate({ variableConfig: withOrder });
+
+    dragIndexRef.current = null;
+    setIsDragging(false);
+  };
+
+  const handleDragEnd = () => {
+    dragIndexRef.current = null;
+    setIsDragging(false);
+  };
+
+  // ---------------------------------------------------------------------------
+  // Variable CRUD handlers
+  // ---------------------------------------------------------------------------
+
+  const handleUpdateVariable = (id: string, partial: Partial<VariableConfig>) => {
+    onUpdate({
+      variableConfig: state.variableConfig.map((v) =>
+        v.id === id ? { ...v, ...partial } : v,
+      ),
+    });
+  };
+
+  const handleRemoveVariable = (id: string) => {
+    const filtered = state.variableConfig.filter((v) => v.id !== id);
+    onUpdate({ variableConfig: filtered.map((v, i) => ({ ...v, order: i })) });
+  };
+
+  const handleAssignSection = (varId: string, sectionId: string | undefined) => {
+    onUpdate({
+      variableConfig: state.variableConfig.map((v) =>
+        v.id === varId ? { ...v, section_id: sectionId } : v,
+      ),
+    });
+  };
+
+  // ---------------------------------------------------------------------------
+  // Section CRUD handlers
+  // ---------------------------------------------------------------------------
+
+  const handleAddSection = () => {
+    const newSection: SectionConfig = {
+      id: crypto.randomUUID(),
+      name: 'New Section',
+      order: state.sectionConfig.length,
+    };
+    onUpdate({ sectionConfig: [...state.sectionConfig, newSection] });
+  };
+
+  const handleRenameSection = (id: string, name: string) => {
+    onUpdate({
+      sectionConfig: state.sectionConfig.map((s) =>
+        s.id === id ? { ...s, name } : s,
+      ),
+    });
+  };
+
+  const handleDeleteSection = (id: string) => {
+    // Clear section_id from all variables that belonged to this section
+    onUpdate({
+      sectionConfig: state.sectionConfig.filter((s) => s.id !== id),
+      variableConfig: state.variableConfig.map((v) =>
+        v.section_id === id ? { ...v, section_id: undefined } : v,
+      ),
+    });
+  };
+
+  // ---------------------------------------------------------------------------
+  // Helper: get global index of a variable by id
+  // ---------------------------------------------------------------------------
+
+  const getGlobalIndex = (varId: string) =>
+    state.variableConfig.findIndex((v) => v.id === varId);
+
+  // ---------------------------------------------------------------------------
+  // Save + advance handler
+  // ---------------------------------------------------------------------------
+
+  const handleNext = async () => {
+    if (!state.workflowId) {
+      onNext();
+      return;
+    }
+    setIsLoading(true);
+    setStatus('Saving variables…');
+    try {
+      await apiClient.updateCustomWorkflow(state.workflowId, {
+        variable_config: state.variableConfig as unknown as Record<string, unknown>[],
+        section_config: state.sectionConfig as unknown as Record<string, unknown>[],
+      });
+    } catch {
+      setStatus('Warning: could not save variables to backend.');
+    }
+    setIsLoading(false);
+    setStatus('');
+    onNext();
+  };
+
+  // ---------------------------------------------------------------------------
+  // Derived data
+  // ---------------------------------------------------------------------------
+
+  const unsectionedVars = state.variableConfig.filter((v) => !v.section_id);
+
+  return (
+    <div className="space-y-4" onDragEnd={handleDragEnd}>
+      {/* Header */}
+      <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+        <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+          <span className="w-6 h-6 rounded-full bg-slate-700 text-white text-xs flex items-center justify-center font-bold shrink-0">
+            3
+          </span>
+          Configure Variables ({state.variableConfig.length})
+        </h2>
+        <p className="text-xs text-gray-500 mt-1 ml-8">
+          Drag cards to reorder. Set labels, types, and section assignments. Click Next to save.
+        </p>
+      </div>
+
+      {/* Empty state */}
+      {state.variableConfig.length === 0 && (
+        <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-10 text-center">
+          <p className="text-sm text-gray-500">
+            Go back to the Inspect step to add variables from workflow nodes.
+          </p>
+          <button
+            onClick={onBack}
+            className="mt-3 px-4 py-2 rounded-xl border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors"
+          >
+            Back to Inspect
+          </button>
+        </div>
+      )}
+
+      {/* Unsectioned variables */}
+      {unsectionedVars.length > 0 && (
+        <div className="space-y-3">
+          {unsectionedVars.map((variable) => (
+            <VariableCard
+              key={variable.id}
+              variable={variable}
+              index={getGlobalIndex(variable.id)}
+              sections={state.sectionConfig}
+              onUpdate={handleUpdateVariable}
+              onRemove={handleRemoveVariable}
+              onAssignSection={handleAssignSection}
+              onDragStart={handleDragStart}
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Sections */}
+      {state.sectionConfig.length > 0 && (
+        <div className="space-y-4">
+          {state.sectionConfig.map((section) => {
+            const sectionVars = state.variableConfig.filter(
+              (v) => v.section_id === section.id,
+            );
+            return (
+              <SectionPanel
+                key={section.id}
+                section={section}
+                variables={sectionVars}
+                allVariables={state.variableConfig}
+                sections={state.sectionConfig}
+                onRenameSection={handleRenameSection}
+                onDeleteSection={handleDeleteSection}
+                onUpdateVariable={handleUpdateVariable}
+                onRemoveVariable={handleRemoveVariable}
+                onAssignSection={handleAssignSection}
+                onDragStart={handleDragStart}
+                onDragOver={handleDragOver}
+                onDrop={handleDrop}
+                getGlobalIndex={getGlobalIndex}
+              />
+            );
+          })}
+        </div>
+      )}
+
+      {/* Add Section button */}
+      {state.variableConfig.length > 0 && (
+        <button
+          onClick={handleAddSection}
+          className="w-full rounded-2xl border-2 border-dashed border-gray-200 py-3 text-sm text-gray-500 hover:border-blue-300 hover:text-blue-500 hover:bg-blue-50/30 transition-all"
+        >
+          + Add Section
+        </button>
+      )}
+
+      {/* Navigation */}
+      <div className="flex items-center gap-3 pt-2">
+        <button
+          onClick={onBack}
+          className="px-5 py-2.5 rounded-xl border border-gray-300 bg-white text-gray-700 font-semibold text-sm hover:bg-gray-50 transition-colors"
+        >
+          Back
+        </button>
+        <button
+          onClick={() => void handleNext()}
+          disabled={isLoading}
+          className="px-6 py-2.5 rounded-xl bg-slate-700 text-white font-semibold text-sm hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
+        >
+          {isLoading ? (
+            <>
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              Saving…
+            </>
+          ) : (
+            'Next: Dependencies'
+          )}
+        </button>
+        <p className="text-xs text-gray-400">
+          {state.variableConfig.length} variable{state.variableConfig.length !== 1 ? 's' : ''}
+          {state.sectionConfig.length > 0 &&
+            ` · ${state.sectionConfig.length} section${state.sectionConfig.length !== 1 ? 's' : ''}`}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main WorkflowBuilder component
 // ---------------------------------------------------------------------------
 
@@ -678,10 +1259,9 @@ export default function WorkflowBuilder({ comfyUrl }: Props) {
     setStep(next);
   };
 
-  // Suppress unused import warning for GRADIENT_PALETTE and INPUT_TYPE_OPTIONS
-  // (they will be used in Plans 04-06 step implementations)
+  // Suppress unused import warning for GRADIENT_PALETTE
+  // (it will be used in Plan 06 metadata step)
   void GRADIENT_PALETTE;
-  void INPUT_TYPE_OPTIONS;
 
   return (
     <div className="space-y-6">
@@ -718,9 +1298,15 @@ export default function WorkflowBuilder({ comfyUrl }: Props) {
       )}
 
       {step === 'variables' && (
-        <div className="rounded-2xl border border-gray-200 p-6 text-gray-400 text-center">
-          Variables step — implemented in Plan 04
-        </div>
+        <VariablesStep
+          state={state}
+          onUpdate={(p) => setState((s) => ({ ...s, ...p }))}
+          onNext={() => void goToStep('dependencies')}
+          onBack={() => void goToStep('inspect')}
+          setStatus={setStatus}
+          isLoading={isLoading}
+          setIsLoading={setIsLoading}
+        />
       )}
 
       {step === 'dependencies' && (
