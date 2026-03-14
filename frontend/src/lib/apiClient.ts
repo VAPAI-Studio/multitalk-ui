@@ -51,6 +51,20 @@ export interface CustomWorkflowResponse {
   error?: string;
 }
 
+export interface ExecuteCustomWorkflowPayload {
+  parameters: Record<string, string | number | boolean | null>
+  base_url?: string
+  client_id?: string
+  execution_backend?: 'comfyui' | 'runpod'
+}
+
+export interface ExecuteCustomWorkflowResponse {
+  success: boolean
+  prompt_id?: string
+  execution_backend?: string
+  error?: string
+}
+
 export interface CustomWorkflowListResponse {
   success: boolean;
   workflows: CustomWorkflow[];
@@ -1702,6 +1716,19 @@ class ApiClient {
     return this.request<CustomWorkflowResponse>(`/api/custom-workflows/${id}/unpublish`, {
       method: 'POST',
     });
+  }
+
+  async executeCustomWorkflow(
+    id: string,
+    payload: ExecuteCustomWorkflowPayload
+  ): Promise<ExecuteCustomWorkflowResponse> {
+    return this.request<ExecuteCustomWorkflowResponse>(
+      `/api/custom-workflows/${id}/execute`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }
+    )
   }
 
   async getNodeRegistry(): Promise<NodeRegistry> {
