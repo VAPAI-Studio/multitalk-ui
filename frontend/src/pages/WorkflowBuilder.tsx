@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { apiClient } from '../lib/apiClient';
 import type { ParsedNode, CreateWorkflowPayload } from '../lib/apiClient';
 import {
@@ -10,6 +10,10 @@ import {
   derivePlaceholderKey,
   GRADIENT_PALETTE,
   INPUT_TYPE_OPTIONS,
+  extractClassTypes,
+  extractModelRefs,
+  checkModelPresence,
+  parseInstalledPackages,
 } from '../lib/builderUtils';
 
 // ---------------------------------------------------------------------------
@@ -1223,6 +1227,231 @@ function VariablesStep({
 }
 
 // ---------------------------------------------------------------------------
+// DependenciesStep helpers
+// ---------------------------------------------------------------------------
+
+function buildInstallBlock(pkgName: string, repo: string, hasRequirements: boolean): string {
+  let block = `\n# Added by Workflow Builder\nRUN cd /comfyui/custom_nodes && \\\n    git clone ${repo} ${pkgName}`;
+  if (hasRequirements) {
+    block += `\nRUN cd /comfyui/custom_nodes/${pkgName} && \\\n    pip install -r requirements.txt --no-cache-dir`;
+  }
+  return block + '\n';
+}
+
+// ---------------------------------------------------------------------------
+// DependenciesStep sub-component
+// ---------------------------------------------------------------------------
+
+interface DependenciesStepProps {
+  state: BuilderState;
+  onUpdate: (partial: Partial<BuilderState>) => void;
+  onNext: () => void;
+  onBack: () => void;
+  setStatus: (s: string) => void;
+  isLoading: boolean;
+  setIsLoading: (v: boolean) => void;
+}
+
+type DepStatus = { pkgName: string; repo: string; hasRequirements: boolean; installed: boolean };
+type MdlStatus = { filename: string; present: boolean };
+
+function DependenciesStep({
+  state,
+  onUpdate,
+  onNext,
+  onBack,
+  setStatus,
+  isLoading,
+  setIsLoading,
+}: DependenciesStepProps) {
+  const [depStatuses, setDepStatuses] = useState<DepStatus[]>([]);
+  const [modelStatuses, setModelStatuses] = useState<MdlStatus[]>([]);
+  const [dockerfileContent, setDockerfileContent] = useState('');
+  const [dockerfileSha, setDockerfileSha] = useState('');
+  const [loaded, setLoaded] = useState(false);
+  const [addingPkg, setAddingPkg] = useState<string | null>(null);
+
+  const loadChecks = useCallback(async () => {
+    setIsLoading(true);
+    setStatus('Loading dependency and model data...');
+    try {
+      // 1. Fetch registry, manifest, dockerfile in parallel
+      const [registry, manifest, dockerfile] = await Promise.all([
+        apiClient.getNodeRegistry(),
+        apiClient.getModelManifest(),
+        apiClient.getDockerfileContent(),
+      ]);
+
+      // 2. Build class_type → package map
+      const classTypeToPackage: Record<string, { pkgName: string; repo: string; hasRequirements: boolean }> = {};
+      for (const [pkgName, pkg] of Object.entries(registry.packages)) {
+        for (const ct of pkg.class_types) {
+          classTypeToPackage[ct] = { pkgName, repo: pkg.repo, hasRequirements: pkg.has_requirements };
+        }
+      }
+
+      // 3. Extract class_types from parsed nodes
+      const classTypes = extractClassTypes(state.parsedNodes);
+
+      // 4. Get installed packages from dockerfile
+      const installed = parseInstalledPackages(dockerfile.content);
+
+      // 5. Build dep statuses (skip class_types not in registry — those are ComfyUI built-ins)
+      const seenPkgs = new Set<string>();
+      const deps: DepStatus[] = [];
+      for (const ct of classTypes) {
+        const pkgInfo = classTypeToPackage[ct];
+        if (!pkgInfo || seenPkgs.has(pkgInfo.pkgName)) continue;
+        seenPkgs.add(pkgInfo.pkgName);
+        deps.push({
+          pkgName: pkgInfo.pkgName,
+          repo: pkgInfo.repo,
+          hasRequirements: pkgInfo.hasRequirements,
+          installed: installed.has(pkgInfo.pkgName),
+        });
+      }
+
+      // 6. Extract model refs and check against manifest
+      const modelRefs = extractModelRefs(state.parsedNodes);
+      const modelChecks = checkModelPresence(modelRefs, manifest);
+
+      // 7. Update state
+      setDockerfileContent(dockerfile.content);
+      setDockerfileSha(dockerfile.sha);
+      onUpdate({ dockerfileSha: dockerfile.sha });
+      setDepStatuses(deps);
+      setModelStatuses(modelChecks);
+      setLoaded(true);
+      setStatus('');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      setStatus(`Failed to load checks: ${msg}`);
+    } finally {
+      setIsLoading(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.parsedNodes]);
+
+  // Load on mount and when parsedNodes change
+  useEffect(() => {
+    void loadChecks();
+  }, [loadChecks]);
+
+  const addPackageToDockerfile = async (dep: DepStatus) => {
+    setAddingPkg(dep.pkgName);
+    try {
+      const installBlock = buildInstallBlock(dep.pkgName, dep.repo, dep.hasRequirements);
+      const newContent = dockerfileContent + installBlock;
+      const result = await apiClient.saveDockerfileContent({
+        content: newContent,
+        sha: dockerfileSha,
+        commit_message: `builder: add ${dep.pkgName} custom node`,
+        trigger_deploy: false,
+      });
+      if (!result.success) throw new Error('Save failed');
+
+      // CRITICAL: re-fetch to get updated SHA after commit
+      const refreshed = await apiClient.getDockerfileContent();
+      setDockerfileContent(refreshed.content);
+      setDockerfileSha(refreshed.sha);
+      onUpdate({ dockerfileSha: refreshed.sha });
+
+      // Mark as installed in local state
+      setDepStatuses(prev => prev.map(d =>
+        d.pkgName === dep.pkgName ? { ...d, installed: true } : d,
+      ));
+      setStatus(`Added ${dep.pkgName} to Dockerfile.`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      setStatus(`Failed to add ${dep.pkgName}: ${msg}`);
+    } finally {
+      setAddingPkg(null);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Dependencies panel */}
+      <div className="rounded-2xl border border-gray-200 bg-white p-6">
+        <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+          Custom Node Packages
+          {!loaded && <span className="text-sm text-gray-400">(loading...)</span>}
+        </h3>
+        {loaded && depStatuses.length === 0 && (
+          <p className="text-sm text-gray-500">No custom node packages detected (workflow uses only built-in ComfyUI nodes).</p>
+        )}
+        {depStatuses.map(dep => (
+          <div key={dep.pkgName} className="flex items-center gap-3 py-2 border-b border-gray-100 last:border-0">
+            <span className={`w-3 h-3 rounded-full flex-shrink-0 ${dep.installed ? 'bg-green-400' : 'bg-orange-400'}`} />
+            <span className="flex-1 font-mono text-sm text-gray-800">{dep.pkgName}</span>
+            <span className={`text-xs px-2 py-0.5 rounded-lg font-medium ${dep.installed ? 'bg-green-50 text-green-700' : 'bg-orange-50 text-orange-700'}`}>
+              {dep.installed ? 'Installed' : 'Missing'}
+            </span>
+            {!dep.installed && (
+              <button
+                onClick={() => void addPackageToDockerfile(dep)}
+                disabled={addingPkg === dep.pkgName}
+                className="text-xs px-3 py-1.5 rounded-lg bg-slate-700 text-white hover:bg-slate-800 disabled:opacity-50 transition-colors"
+              >
+                {addingPkg === dep.pkgName ? 'Adding...' : 'Add to Dockerfile'}
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Models panel */}
+      <div className="rounded-2xl border border-gray-200 bg-white p-6">
+        <h3 className="font-bold text-gray-900 mb-4">
+          Model Files on Network Volume
+        </h3>
+        {loaded && modelStatuses.length === 0 && (
+          <p className="text-sm text-gray-500">No model files detected in this workflow (no inputs matching model field names or extensions).</p>
+        )}
+        {modelStatuses.map(model => (
+          <div key={model.filename} className="flex items-center gap-3 py-2 border-b border-gray-100 last:border-0">
+            <span className={`w-3 h-3 rounded-full flex-shrink-0 ${model.present ? 'bg-green-400' : 'bg-red-400'}`} />
+            <span className="flex-1 font-mono text-sm text-gray-800 break-all">{model.filename}</span>
+            <span className={`text-xs px-2 py-0.5 rounded-lg font-medium flex-shrink-0 ${model.present ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+              {model.present ? 'On Volume' : 'Missing'}
+            </span>
+          </div>
+        ))}
+        {loaded && modelStatuses.some(m => !m.present) && (
+          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3 mt-4">
+            Some models are not detected on the RunPod network volume. Use the Infrastructure file browser to upload them before publishing.
+          </p>
+        )}
+      </div>
+
+      {/* Navigation */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={onBack}
+          className="px-5 py-2.5 rounded-xl border border-gray-300 bg-white text-gray-700 font-semibold text-sm hover:bg-gray-50 transition-colors"
+        >
+          Back
+        </button>
+        <button
+          onClick={onNext}
+          disabled={isLoading}
+          className="px-6 py-2.5 rounded-xl bg-slate-700 text-white font-semibold text-sm hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          Next: Feature Metadata
+        </button>
+        <button
+          onClick={() => void loadChecks()}
+          disabled={isLoading}
+          className="px-4 py-2.5 rounded-xl border border-gray-300 bg-white text-gray-600 font-semibold text-sm hover:bg-gray-50 disabled:opacity-50 transition-colors"
+        >
+          {isLoading ? 'Loading...' : 'Refresh'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main WorkflowBuilder component
 // ---------------------------------------------------------------------------
 
@@ -1310,9 +1539,15 @@ export default function WorkflowBuilder({ comfyUrl }: Props) {
       )}
 
       {step === 'dependencies' && (
-        <div className="rounded-2xl border border-gray-200 p-6 text-gray-400 text-center">
-          Dependencies step — implemented in Plan 05
-        </div>
+        <DependenciesStep
+          state={state}
+          onUpdate={(p) => setState((s) => ({ ...s, ...p }))}
+          onNext={() => void goToStep('metadata')}
+          onBack={() => void goToStep('variables')}
+          setStatus={setStatus}
+          isLoading={isLoading}
+          setIsLoading={setIsLoading}
+        />
       )}
 
       {step === 'metadata' && (
