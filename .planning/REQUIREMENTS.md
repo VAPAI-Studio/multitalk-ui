@@ -14,19 +14,19 @@ Requirements for Workflow Builder milestone. Each maps to roadmap phases.
 - [x] **WB-03**: System parses workflow JSON and displays all nodes with class_type and inputs in a node inspector
 - [x] **WB-04**: System filters out node-to-node link arrays from configurable input candidates
 - [ ] **WB-05**: Admin can select which node inputs become user-facing variables by clicking them
-- [ ] **WB-06**: System auto-detects suggested field types from ComfyUI metadata (BOOLEAN→toggle, COMBO→select, STRING→text, INT/FLOAT→number)
+- [x] **WB-06**: System auto-detects suggested field types from ComfyUI metadata (BOOLEAN→toggle, COMBO→select, STRING→text, INT/FLOAT→number)
 - [ ] **WB-07**: Admin can optionally enrich node metadata via ComfyUI `/object_info` endpoint
 
 ### Dependency Check
 
-- [ ] **DEP-01**: System extracts all custom node class_types from the uploaded workflow
+- [x] **DEP-01**: System extracts all custom node class_types from the uploaded workflow
 - [x] **DEP-02**: System looks up custom node package names from ComfyUI registry by class_type
-- [ ] **DEP-03**: System checks the current Dockerfile for which custom node packages are already installed
+- [x] **DEP-03**: System checks the current Dockerfile for which custom node packages are already installed
 - [ ] **DEP-04**: Admin can add missing custom node packages to the Dockerfile with one click
 
 ### Model Check
 
-- [ ] **MDL-01**: System extracts all model filenames referenced in the workflow (checkpoints, LoRAs, VAEs, controlnets)
+- [x] **MDL-01**: System extracts all model filenames referenced in the workflow (checkpoints, LoRAs, VAEs, controlnets)
 - [x] **MDL-02**: System checks which models exist on the RunPod network volume via S3 listing
 - [ ] **MDL-03**: Admin sees a list of models with present/missing status indicators
 
@@ -36,14 +36,14 @@ Requirements for Workflow Builder milestone. Each maps to roadmap phases.
 - [ ] **VAR-02**: Admin can choose UI input type: text, textarea, number, slider, file-image, file-audio, file-video, dropdown, toggle, resolution
 - [ ] **VAR-03**: Admin can set default values, min/max (for numbers/sliders), and step size
 - [ ] **VAR-04**: Admin can set validation rules: required, file type accept filters, file size limits
-- [ ] **VAR-05**: System maps each variable to its `{{PLACEHOLDER_KEY}}` in the workflow template with visual indicator
+- [x] **VAR-05**: System maps each variable to its `{{PLACEHOLDER_KEY}}` in the workflow template with visual indicator
 - [ ] **VAR-06**: Admin can specify file handling mode per file variable: upload to ComfyUI or base64 encode
 - [ ] **VAR-07**: Admin can reorder variables via drag-and-drop
 - [ ] **VAR-08**: Admin can organize variables into named sections
 
 ### Feature Metadata
 
-- [ ] **META-01**: Admin can set feature name, auto-generated slug (editable), and description
+- [x] **META-01**: Admin can set feature name, auto-generated slug (editable), and description
 - [ ] **META-02**: Admin can assign feature to any existing studio (Lipsync, Image, Video, Audio, Virtual Set, LoRA)
 - [ ] **META-03**: Admin can specify output type: image, video, or audio
 - [ ] **META-04**: Admin can pick an icon (emoji) and gradient colors for the feature card
@@ -110,24 +110,24 @@ Which phases cover which requirements. Updated during roadmap creation.
 | WB-03 | Phase 14 | Complete |
 | WB-04 | Phase 14 | Complete |
 | WB-05 | Phase 15 | Pending |
-| WB-06 | Phase 15 | Pending |
+| WB-06 | Phase 15 | Complete |
 | WB-07 | Phase 15 | Pending |
-| DEP-01 | Phase 15 | Pending |
+| DEP-01 | Phase 15 | Complete |
 | DEP-02 | Phase 15 | Complete |
-| DEP-03 | Phase 15 | Pending |
+| DEP-03 | Phase 15 | Complete |
 | DEP-04 | Phase 15 | Pending |
-| MDL-01 | Phase 15 | Pending |
+| MDL-01 | Phase 15 | Complete |
 | MDL-02 | Phase 15 | Complete |
 | MDL-03 | Phase 15 | Pending |
 | VAR-01 | Phase 15 | Pending |
 | VAR-02 | Phase 15 | Pending |
 | VAR-03 | Phase 15 | Pending |
 | VAR-04 | Phase 15 | Pending |
-| VAR-05 | Phase 15 | Pending |
+| VAR-05 | Phase 15 | Complete |
 | VAR-06 | Phase 15 | Pending |
 | VAR-07 | Phase 15 | Pending |
 | VAR-08 | Phase 15 | Pending |
-| META-01 | Phase 15 | Pending |
+| META-01 | Phase 15 | Complete |
 | META-02 | Phase 15 | Pending |
 | META-03 | Phase 15 | Pending |
 | META-04 | Phase 15 | Pending |

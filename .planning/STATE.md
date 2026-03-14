@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Workflow Builder
 status: executing
-stopped_at: Completed 15-01-PLAN.md
-last_updated: "2026-03-14T12:25:31.821Z"
+stopped_at: Completed 15-02-PLAN.md
+last_updated: "2026-03-14T12:29:52.387Z"
 last_activity: 2026-03-14 -- Plan 15-01 executed (infrastructure endpoints, apiClient builder methods)
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 9
-  completed_plans: 4
+  completed_plans: 5
   percent: 68
 ---
 
@@ -45,6 +45,7 @@ Progress: [███████░░░] 68%
 | 14    | 02   | 4min     | 2     | 2     |
 | 14    | 03   | 3min     | 2     | 3     |
 | 15    | 01   | 7min     | 2     | 2     |
+| Phase 15-builder-ui P02 | 3 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -67,6 +68,9 @@ Executed v1.2 decisions:
 - Inline json/Path imports inside endpoint functions to avoid module-level import pollution (15-01)
 - TypeScript interfaces co-located in apiClient.ts rather than separate types file (15-01)
 - getDockerfileContent/saveDockerfileContent added as typed wrappers alongside existing getDockerfile/saveDockerfile (15-01)
+- [Phase 15-builder-ui]: inferFieldType checks Array.isArray + all-string guard before string-extension checks (15-02)
+- [Phase 15-builder-ui]: MODEL_FIELDS set ported verbatim from backend scan_workflows.py (15-02)
+- [Phase 15-builder-ui]: generateSlug mirrors Python backend generate_slug() exactly (15-02)
 
 ### Pending Todos
 
@@ -79,6 +83,6 @@ Executed v1.2 decisions:
 
 ## Session Continuity
 
-Last session: 2026-03-14T12:24:53.150Z
-Stopped at: Completed 15-01-PLAN.md
+Last session: 2026-03-14T12:29:47.098Z
+Stopped at: Completed 15-02-PLAN.md
 Next action: Execute Phase 15 plans
