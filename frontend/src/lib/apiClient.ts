@@ -1729,6 +1729,15 @@ class ApiClient {
     return this.request<CustomWorkflowListResponse>('/api/custom-workflows/');
   }
 
+  async listPublishedWorkflows(): Promise<CustomWorkflowListResponse> {
+    const cacheKey = 'published-workflows';
+    const cached = this.getCached<CustomWorkflowListResponse>(cacheKey);
+    if (cached) return cached;
+    const result = await this.request<CustomWorkflowListResponse>('/api/custom-workflows/published');
+    if (result.success) this.setCache(cacheKey, result);
+    return result;
+  }
+
   async getCustomWorkflow(id: string): Promise<CustomWorkflowResponse> {
     return this.request<CustomWorkflowResponse>(`/api/custom-workflows/${id}`);
   }
