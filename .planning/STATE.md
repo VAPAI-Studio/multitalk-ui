@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Workflow Builder
 status: executing
-stopped_at: Completed 17-02-PLAN.md
-last_updated: "2026-03-14T14:55:08.060Z"
+stopped_at: Completed 17-03 Tasks 1+2; checkpoint human-verify pending
+last_updated: "2026-03-14T15:01:41.769Z"
 last_activity: 2026-03-14 -- Plan 15-03 executed (WorkflowBuilder step machine, Upload step, Inspect step)
 progress:
   total_phases: 4
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 15
-  completed_plans: 14
+  completed_plans: 15
   percent: 72
 ---
 
@@ -55,6 +55,7 @@ Progress: [███████░░░] 72%
 | Phase 16-test-runner-and-dynamic-renderer P03 | 3min | 2 tasks | 2 files |
 | Phase 17-navigation-integration P01 | 2min | 2 tasks | 2 files |
 | Phase 17-navigation-integration P02 | 3min | 2 tasks | 2 files |
+| Phase 17-navigation-integration P03 | 8min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -98,6 +99,8 @@ Executed v1.2 decisions:
 - [Phase 17-navigation-integration]: admin_client fixture overrides both verify_admin and get_current_user — admins are authenticated users and must satisfy both dependency types
 - [Phase 17-navigation-integration]: listPublishedWorkflows caches only on success to avoid storing error states that block retries
 - [Phase 17-navigation-integration]: useDynamicWorkflows uses silent fail so static app continues working when dynamic workflow API unavailable
+- [Phase 17-navigation-integration]: onDynamicNavigate prop in StudioPage uses _prefix alias — dynamic apps navigate inline via setSelectedAppId, not global nav
+- [Phase 17-navigation-integration]: enrichedStudios useMemo merges dynamic apps into studio.apps for StudioCard card preview without changing navigation target
 
 ### Pending Todos
 
@@ -110,6 +113,6 @@ Executed v1.2 decisions:
 
 ## Session Continuity
 
-Last session: 2026-03-14T14:55:08.057Z
-Stopped at: Completed 17-02-PLAN.md
+Last session: 2026-03-14T15:01:41.766Z
+Stopped at: Completed 17-03 Tasks 1+2; checkpoint human-verify pending
 Next action: Execute Phase 15 plans (15-04 next)
