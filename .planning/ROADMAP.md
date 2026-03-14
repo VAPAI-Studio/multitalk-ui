@@ -72,13 +72,15 @@ Plans:
   3. Admin can see which custom node packages the workflow requires, which are already in the Dockerfile, and add missing packages with one click; admin can see which model files are referenced and whether each exists on the RunPod network volume
   4. Admin can set the feature name, slug, description, output type, target studio, icon (emoji), gradient colors, and toggle published/disabled state
   5. Optionally, admin can enrich node input metadata by connecting to a live ComfyUI server's /object_info endpoint
-**Plans**: TBD
+**Plans**: 6 plans
 
 Plans:
-- [ ] 15-01: TBD
-- [ ] 15-02: TBD
-- [ ] 15-03: TBD
-- [ ] 15-04: TBD
+- [ ] 15-01-PLAN.md — Backend node-registry and model-manifest endpoints + typed apiClient methods for builder operations
+- [ ] 15-02-PLAN.md — TypeScript types (VariableConfig, SectionConfig, FeatureMetadata) + pure utility functions + unit tests (TDD)
+- [ ] 15-03-PLAN.md — WorkflowBuilder component scaffold + Upload step + Inspect step with node inspector and variable promotion
+- [ ] 15-04-PLAN.md — Variables step: type-specific field editors, drag-and-drop reordering, section management
+- [ ] 15-05-PLAN.md — Dependencies step: custom node package checker vs Dockerfile, model file checker vs RunPod manifest
+- [ ] 15-06-PLAN.md — Metadata step (name/slug/studio/gradient/publish toggle) + Infrastructure.tsx tab integration
 
 ### Phase 16: Test Runner and Dynamic Renderer
 **Goal**: A single DynamicWorkflowPage component renders any custom workflow configuration into a working feature page with form inputs, file handling, job tracking, and output display — used both as the test panel inside the builder and as the production page for published features
@@ -130,7 +132,7 @@ Phases execute in numeric order: 14 -> 15 -> 16 -> 17
 | 11. Batch Processing | v1.1 | 2/2 | Complete | 2026-03-11 |
 | 12. Output Delivery | v1.1 | 2/2 | Complete | 2026-03-12 |
 | 13. Frontend | v1.1 | 3/3 | Complete | 2026-03-13 |
-| 14. Foundation | 3/3 | Complete    | 2026-03-13 | - |
-| 15. Builder UI | v1.2 | 0/4 | Not started | - |
+| 14. Foundation | v1.2 | 3/3 | Complete | 2026-03-13 |
+| 15. Builder UI | v1.2 | 0/6 | Not started | - |
 | 16. Test Runner and Dynamic Renderer | v1.2 | 0/3 | Not started | - |
 | 17. Navigation Integration | v1.2 | 0/2 | Not started | - |
