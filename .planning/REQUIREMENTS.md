@@ -22,13 +22,13 @@ Requirements for Workflow Builder milestone. Each maps to roadmap phases.
 - [x] **DEP-01**: System extracts all custom node class_types from the uploaded workflow
 - [x] **DEP-02**: System looks up custom node package names from ComfyUI registry by class_type
 - [x] **DEP-03**: System checks the current Dockerfile for which custom node packages are already installed
-- [ ] **DEP-04**: Admin can add missing custom node packages to the Dockerfile with one click
+- [x] **DEP-04**: Admin can add missing custom node packages to the Dockerfile with one click
 
 ### Model Check
 
 - [x] **MDL-01**: System extracts all model filenames referenced in the workflow (checkpoints, LoRAs, VAEs, controlnets)
 - [x] **MDL-02**: System checks which models exist on the RunPod network volume via S3 listing
-- [ ] **MDL-03**: Admin sees a list of models with present/missing status indicators
+- [x] **MDL-03**: Admin sees a list of models with present/missing status indicators
 
 ### Variable Configuration
 
@@ -115,10 +115,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DEP-01 | Phase 15 | Complete |
 | DEP-02 | Phase 15 | Complete |
 | DEP-03 | Phase 15 | Complete |
-| DEP-04 | Phase 15 | Pending |
+| DEP-04 | Phase 15 | Complete |
 | MDL-01 | Phase 15 | Complete |
 | MDL-02 | Phase 15 | Complete |
-| MDL-03 | Phase 15 | Pending |
+| MDL-03 | Phase 15 | Complete |
 | VAR-01 | Phase 15 | Complete |
 | VAR-02 | Phase 15 | Complete |
 | VAR-03 | Phase 15 | Complete |
