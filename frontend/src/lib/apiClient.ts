@@ -7,6 +7,104 @@ interface CacheEntry<T> {
   timestamp: number
 }
 
+// Custom Workflow Builder types
+export interface ParsedNodeInput {
+  name: string;
+  value: unknown;
+  is_link: boolean;
+}
+
+export interface ParsedNode {
+  node_id: string;
+  class_type: string;
+  title?: string;
+  inputs: ParsedNodeInput[];
+  configurable_inputs: ParsedNodeInput[];
+}
+
+export interface ParseWorkflowResponse {
+  success: boolean;
+  format?: string;
+  nodes: ParsedNode[];
+  error?: string;
+}
+
+export interface CustomWorkflow {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  output_type: 'image' | 'video' | 'audio';
+  studio?: string;
+  icon: string;
+  gradient: string;
+  is_published: boolean;
+  variable_config: Record<string, unknown>[];
+  section_config: Record<string, unknown>[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CustomWorkflowResponse {
+  success: boolean;
+  workflow?: CustomWorkflow;
+  error?: string;
+}
+
+export interface CustomWorkflowListResponse {
+  success: boolean;
+  workflows: CustomWorkflow[];
+  error?: string;
+}
+
+export interface CreateWorkflowPayload {
+  name: string;
+  slug?: string;
+  description?: string;
+  workflow_json: Record<string, unknown>;
+  output_type?: 'image' | 'video' | 'audio';
+  studio?: string;
+  icon?: string;
+  gradient?: string;
+}
+
+export interface UpdateWorkflowPayload {
+  name?: string;
+  description?: string;
+  variable_config?: Record<string, unknown>[];
+  section_config?: Record<string, unknown>[];
+  output_type?: 'image' | 'video' | 'audio';
+  studio?: string;
+  icon?: string;
+  gradient?: string;
+}
+
+export interface NodeRegistryPackage {
+  repo: string;
+  branch: string | null;
+  has_requirements: boolean;
+  class_types: string[];
+}
+
+export interface NodeRegistry {
+  _schema_version: string;
+  packages: Record<string, NodeRegistryPackage>;
+}
+
+export interface ModelManifestEntry {
+  filename: string;
+  path: string;
+  source: string | null;
+  size_gb: number;
+  type: string;
+  used_by: string[];
+}
+
+export interface ModelManifest {
+  _schema_version: string;
+  models: ModelManifestEntry[];
+}
+
 class ApiClient {
   private baseURL: string
   private cache: Map<string, CacheEntry<any>> = new Map()
@@ -1553,6 +1651,76 @@ class ApiClient {
     })
     if (!response.ok) throw new Error('ZIP download failed')
     return response.blob()
+  }
+
+  // ============================================================================
+  // Custom Workflow Builder Methods (Phase 15)
+  // ============================================================================
+
+  async parseWorkflow(workflowJson: Record<string, unknown>): Promise<ParseWorkflowResponse> {
+    return this.request<ParseWorkflowResponse>('/api/custom-workflows/parse', {
+      method: 'POST',
+      body: JSON.stringify({ workflow_json: workflowJson }),
+    });
+  }
+
+  async createCustomWorkflow(payload: CreateWorkflowPayload): Promise<CustomWorkflowResponse> {
+    return this.request<CustomWorkflowResponse>('/api/custom-workflows/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async listCustomWorkflows(): Promise<CustomWorkflowListResponse> {
+    return this.request<CustomWorkflowListResponse>('/api/custom-workflows/');
+  }
+
+  async getCustomWorkflow(id: string): Promise<CustomWorkflowResponse> {
+    return this.request<CustomWorkflowResponse>(`/api/custom-workflows/${id}`);
+  }
+
+  async updateCustomWorkflow(id: string, payload: UpdateWorkflowPayload): Promise<CustomWorkflowResponse> {
+    return this.request<CustomWorkflowResponse>(`/api/custom-workflows/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async deleteCustomWorkflow(id: string): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(`/api/custom-workflows/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async publishCustomWorkflow(id: string): Promise<CustomWorkflowResponse> {
+    return this.request<CustomWorkflowResponse>(`/api/custom-workflows/${id}/publish`, {
+      method: 'POST',
+    });
+  }
+
+  async unpublishCustomWorkflow(id: string): Promise<CustomWorkflowResponse> {
+    return this.request<CustomWorkflowResponse>(`/api/custom-workflows/${id}/unpublish`, {
+      method: 'POST',
+    });
+  }
+
+  async getNodeRegistry(): Promise<NodeRegistry> {
+    return this.request<NodeRegistry>('/api/infrastructure/node-registry');
+  }
+
+  async getModelManifest(): Promise<ModelManifest> {
+    return this.request<ModelManifest>('/api/infrastructure/model-manifest');
+  }
+
+  async getDockerfileContent(): Promise<{ success: boolean; content: string; sha: string; path: string }> {
+    return this.request<{ success: boolean; content: string; sha: string; path: string }>('/api/infrastructure/dockerfiles/content');
+  }
+
+  async saveDockerfileContent(payload: { content: string; sha: string; commit_message: string; trigger_deploy?: boolean }): Promise<{ success: boolean; commit_sha: string; deploy_triggered: boolean }> {
+    return this.request<{ success: boolean; commit_sha: string; deploy_triggered: boolean }>('/api/infrastructure/dockerfiles/content', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
   }
 
   // Helper method for authenticated requests (backward compatibility)
