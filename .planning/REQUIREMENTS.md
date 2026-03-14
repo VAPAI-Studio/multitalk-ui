@@ -58,12 +58,12 @@ Requirements for Workflow Builder milestone. Each maps to roadmap phases.
 
 ### Dynamic Rendering
 
-- [ ] **DYN-01**: Published custom workflows appear in their assigned studio's navigation
-- [ ] **DYN-02**: Published custom workflows appear on the Homepage within their studio card
+- [x] **DYN-01**: Published custom workflows appear in their assigned studio's navigation
+- [x] **DYN-02**: Published custom workflows appear on the Homepage within their studio card
 - [x] **DYN-03**: A DynamicWorkflowPage component renders the configured form with sections, inputs, and validation
 - [x] **DYN-04**: Dynamic page handles file uploads (upload to ComfyUI and/or base64) per variable config
 - [x] **DYN-05**: Dynamic page integrates with job tracking and monitoring (createJob, startJobMonitoring)
-- [ ] **DYN-06**: Dynamic page includes feed sidebar with correct pageContext filtering
+- [x] **DYN-06**: Dynamic page includes feed sidebar with correct pageContext filtering
 - [x] **DYN-07**: Dynamic features work with both ComfyUI and RunPod execution backends
 
 ### Storage & API
@@ -136,12 +136,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TEST-02 | Phase 16 | Complete |
 | TEST-03 | Phase 16 | Complete |
 | TEST-04 | Phase 14 | Complete |
-| DYN-01 | Phase 17 | Pending |
-| DYN-02 | Phase 17 | Pending |
+| DYN-01 | Phase 17 | Complete |
+| DYN-02 | Phase 17 | Complete |
 | DYN-03 | Phase 16 | Complete |
 | DYN-04 | Phase 16 | Complete |
 | DYN-05 | Phase 16 | Complete |
-| DYN-06 | Phase 17 | Pending |
+| DYN-06 | Phase 17 | Complete |
 | DYN-07 | Phase 16 | Complete |
 | STORE-01 | Phase 14 | Complete |
 | STORE-02 | Phase 14 | Complete |
