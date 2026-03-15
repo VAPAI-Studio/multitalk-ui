@@ -1693,7 +1693,7 @@ class ApiClient {
     const cacheKey = 'published-workflows';
     const cached = this.getCached<CustomWorkflowListResponse>(cacheKey);
     if (cached) return cached;
-    const result = await this.request<CustomWorkflowListResponse>('/api/custom-workflows/published');
+    const result = await this.request<CustomWorkflowListResponse>('/custom-workflows/published');
     if (result.success) this.setCache(cacheKey, result);
     return result;
   }
