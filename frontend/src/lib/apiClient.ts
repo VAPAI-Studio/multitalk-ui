@@ -1712,21 +1712,21 @@ class ApiClient {
   // ============================================================================
 
   async parseWorkflow(workflowJson: Record<string, unknown>): Promise<ParseWorkflowResponse> {
-    return this.request<ParseWorkflowResponse>('/api/custom-workflows/parse', {
+    return this.request<ParseWorkflowResponse>('/custom-workflows/parse', {
       method: 'POST',
       body: JSON.stringify({ workflow_json: workflowJson }),
     });
   }
 
   async createCustomWorkflow(payload: CreateWorkflowPayload): Promise<CustomWorkflowResponse> {
-    return this.request<CustomWorkflowResponse>('/api/custom-workflows/', {
+    return this.request<CustomWorkflowResponse>('/custom-workflows/', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
   }
 
   async listCustomWorkflows(): Promise<CustomWorkflowListResponse> {
-    return this.request<CustomWorkflowListResponse>('/api/custom-workflows/');
+    return this.request<CustomWorkflowListResponse>('/custom-workflows/');
   }
 
   async listPublishedWorkflows(): Promise<CustomWorkflowListResponse> {
@@ -1739,30 +1739,30 @@ class ApiClient {
   }
 
   async getCustomWorkflow(id: string): Promise<CustomWorkflowResponse> {
-    return this.request<CustomWorkflowResponse>(`/api/custom-workflows/${id}`);
+    return this.request<CustomWorkflowResponse>(`/custom-workflows/${id}`);
   }
 
   async updateCustomWorkflow(id: string, payload: UpdateWorkflowPayload): Promise<CustomWorkflowResponse> {
-    return this.request<CustomWorkflowResponse>(`/api/custom-workflows/${id}`, {
+    return this.request<CustomWorkflowResponse>(`/custom-workflows/${id}`, {
       method: 'PUT',
       body: JSON.stringify(payload),
     });
   }
 
   async deleteCustomWorkflow(id: string): Promise<{ success: boolean }> {
-    return this.request<{ success: boolean }>(`/api/custom-workflows/${id}`, {
+    return this.request<{ success: boolean }>(`/custom-workflows/${id}`, {
       method: 'DELETE',
     });
   }
 
   async publishCustomWorkflow(id: string): Promise<CustomWorkflowResponse> {
-    return this.request<CustomWorkflowResponse>(`/api/custom-workflows/${id}/publish`, {
+    return this.request<CustomWorkflowResponse>(`/custom-workflows/${id}/publish`, {
       method: 'POST',
     });
   }
 
   async unpublishCustomWorkflow(id: string): Promise<CustomWorkflowResponse> {
-    return this.request<CustomWorkflowResponse>(`/api/custom-workflows/${id}/unpublish`, {
+    return this.request<CustomWorkflowResponse>(`/custom-workflows/${id}/unpublish`, {
       method: 'POST',
     });
   }
@@ -1772,7 +1772,7 @@ class ApiClient {
     payload: ExecuteCustomWorkflowPayload
   ): Promise<ExecuteCustomWorkflowResponse> {
     return this.request<ExecuteCustomWorkflowResponse>(
-      `/api/custom-workflows/${id}/execute`,
+      `/custom-workflows/${id}/execute`,
       {
         method: 'POST',
         body: JSON.stringify(payload),
