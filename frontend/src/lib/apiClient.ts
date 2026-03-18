@@ -1781,19 +1781,19 @@ class ApiClient {
   }
 
   async getNodeRegistry(): Promise<NodeRegistry> {
-    return this.request<NodeRegistry>('/api/infrastructure/node-registry');
+    return this.request<NodeRegistry>('/infrastructure/node-registry');
   }
 
   async getModelManifest(): Promise<ModelManifest> {
-    return this.request<ModelManifest>('/api/infrastructure/model-manifest');
+    return this.request<ModelManifest>('/infrastructure/model-manifest');
   }
 
   async getDockerfileContent(): Promise<{ success: boolean; content: string; sha: string; path: string }> {
-    return this.request<{ success: boolean; content: string; sha: string; path: string }>('/api/infrastructure/dockerfiles/content');
+    return this.request<{ success: boolean; content: string; sha: string; path: string }>('/infrastructure/dockerfiles/content');
   }
 
   async saveDockerfileContent(payload: { content: string; sha: string; commit_message: string; trigger_deploy?: boolean }): Promise<{ success: boolean; commit_sha: string; deploy_triggered: boolean }> {
-    return this.request<{ success: boolean; commit_sha: string; deploy_triggered: boolean }>('/api/infrastructure/dockerfiles/content', {
+    return this.request<{ success: boolean; commit_sha: string; deploy_triggered: boolean }>('/infrastructure/dockerfiles/content', {
       method: 'PUT',
       body: JSON.stringify(payload),
     });
