@@ -1,6 +1,7 @@
 """
 Shared pytest fixtures and configuration for all tests
 """
+import os
 import pytest
 import sys
 from pathlib import Path
@@ -65,6 +66,38 @@ def freepik_service(mock_freepik_settings):
     """Provide a FreepikUpscalerService instance with mocked settings."""
     from services.freepik_service import FreepikUpscalerService
     return FreepikUpscalerService()
+
+
+# --- Global Supabase singleton mock (CI / no-credentials environments) ---
+
+@pytest.fixture(autouse=True, scope="session")
+def mock_supabase_singleton():
+    """Pre-populate the SupabaseClient singleton with a mock when no real
+    credentials are present (e.g. CI).  This prevents the ValueError raised
+    by core/supabase.py from crashing tests that go through FastAPI's DI
+    layer (Depends(get_supabase)) before the auth guard even runs.
+
+    Tests that already inject their own mock supabase (e.g. service-layer
+    unit tests) are unaffected because they pass the mock directly to the
+    service constructor instead of calling get_supabase().
+    """
+    if os.environ.get("SUPABASE_URL"):
+        yield  # real credentials available — leave singleton alone
+        return
+
+    from core.supabase import SupabaseClient
+
+    mock_client = MagicMock()
+    # auth.get_user returns an object with user=None so unauthenticated
+    # requests still correctly produce 401 responses.
+    mock_auth_response = MagicMock()
+    mock_auth_response.user = None
+    mock_client.auth.get_user.return_value = mock_auth_response
+
+    original = SupabaseClient._instance
+    SupabaseClient._instance = mock_client
+    yield
+    SupabaseClient._instance = original
 
 
 # --- Supabase mock fixtures ---
