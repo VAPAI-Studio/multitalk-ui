@@ -5,6 +5,7 @@ import { FileUpload } from "../components/FileUpload";
 import { HFDownload } from "../components/HFDownload";
 import { DockerfileEditor } from "../components/DockerfileEditor";
 import WorkflowBuilder from "./WorkflowBuilder";
+import WorkflowList from "./WorkflowList";
 
 interface Props {
   comfyUrl: string;
@@ -14,7 +15,7 @@ export default function Infrastructure({ comfyUrl: _comfyUrl }: Props) {
   const { isAdmin } = useAuth();
   const [currentPath, setCurrentPath] = useState<string>("");
   const [fileTreeRefreshId, setFileTreeRefreshId] = useState(0);
-  const [currentTab, setCurrentTab] = useState<'files' | 'builder'>('files');
+  const [currentTab, setCurrentTab] = useState<'files' | 'builder' | 'workflows'>('files');
 
   // Admin-only access control
   if (!isAdmin) {
@@ -70,6 +71,16 @@ export default function Infrastructure({ comfyUrl: _comfyUrl }: Props) {
             >
               Workflow Builder
             </button>
+            <button
+              onClick={() => setCurrentTab('workflows')}
+              className={`px-4 py-2 rounded-xl font-medium transition-all text-sm ${
+                currentTab === 'workflows'
+                  ? 'bg-slate-700 text-white shadow-md'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              Workflows
+            </button>
           </div>
 
           {currentTab === 'files' && (
@@ -123,6 +134,10 @@ export default function Infrastructure({ comfyUrl: _comfyUrl }: Props) {
 
           {currentTab === 'builder' && (
             <WorkflowBuilder comfyUrl={_comfyUrl} />
+          )}
+
+          {currentTab === 'workflows' && (
+            <WorkflowList />
           )}
         </div>
       </div>

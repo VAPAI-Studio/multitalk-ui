@@ -1,0 +1,224 @@
+{
+  "_schema_version": "1.0",
+  "_description": "Maps ComfyUI custom node packages to their git repos and the class_types they provide. Maintained manually. Used by scan_workflows.py and generate_dockerfile.py.",
+  "_builtins_note": "ComfyUI built-in class_types are hardcoded in scan_workflows.py, not listed here.",
+  "packages": {
+    "ComfyUI-WanVideoWrapper": {
+      "repo": "https://github.com/kijai/ComfyUI-WanVideoWrapper.git",
+      "branch": null,
+      "has_requirements": true,
+      "class_types": [
+        "WanVideoModelLoader",
+        "WanVideoSampler",
+        "WanVideoVAELoader",
+        "WanVideoDecode",
+        "WanVideoEncode",
+        "WanVideoTextEncode",
+        "WanVideoTextEncodeCached",
+        "LoadWanVideoT5TextEncoder",
+        "WanVideoClipVisionEncode",
+        "WanVideoImageToVideoMultiTalk",
+        "WanVideoImageToVideoEncode",
+        "WanVideoLoraSelect",
+        "WanVideoSetLoRAs",
+        "WanVideoBlockSwap",
+        "WanVideoTorchCompileSettings",
+        "WanVideoFreeInitArgs",
+        "WanVideoEnhanceAVideo",
+        "WanVideoSLG",
+        "WanVideoExperimentalArgs",
+        "WanVideoNAG",
+        "WanVideoAddWanMoveTracks",
+        "WanImageToVideo",
+        "MultiTalkModelLoader",
+        "MultiTalkWav2VecEmbeds",
+        "DownloadAndLoadWav2VecModel"
+      ]
+    },
+    "ComfyUI-KJNodes": {
+      "repo": "https://github.com/kijai/ComfyUI-KJNodes.git",
+      "branch": null,
+      "has_requirements": true,
+      "class_types": [
+        "ImageResizeKJv2",
+        "GetImageSizeAndCount",
+        "GetImageRangeFromBatch",
+        "INTConstant",
+        "PathchSageAttentionKJ",
+        "VRAM_Debug",
+        "PreviewAny"
+      ]
+    },
+    "ComfyUI-VideoHelperSuite": {
+      "repo": "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite.git",
+      "branch": null,
+      "has_requirements": true,
+      "class_types": [
+        "VHS_VideoCombine",
+        "VHS_LoadVideo",
+        "VHS_LoadAudioUpload"
+      ]
+    },
+    "ComfyUI-LTXVideo": {
+      "repo": "https://github.com/Lightricks/ComfyUI-LTXVideo.git",
+      "branch": null,
+      "has_requirements": true,
+      "class_types": [
+        "LTXVAudioVAELoader",
+        "LTXVConditioning",
+        "LTXVSpatioTemporalTiledVAEDecode",
+        "LTXVAudioVAEDecode",
+        "LTXVEmptyLatentAudio",
+        "LTXVSeparateAVLatent",
+        "LTXVConcatAVLatent",
+        "LTXVScheduler",
+        "LTXVPreprocess",
+        "LTXVGemmaCLIPModelLoader",
+        "LTXVImgToVideoInplace",
+        "LTXVLatentUpsampler"
+      ]
+    },
+    "ComfyUI-SeedVR2_VideoUpscaler": {
+      "repo": "https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler.git",
+      "branch": null,
+      "has_requirements": true,
+      "class_types": [
+        "SeedVR2VideoUpscaler",
+        "SeedVR2LoadVAEModel",
+        "SeedVR2LoadDiTModel",
+        "LoadVideo",
+        "GetVideoComponents",
+        "SaveVideo",
+        "CreateVideo"
+      ]
+    },
+    "ComfyUI-Gemini": {
+      "repo": "https://github.com/NakanoSanku/ComfyUI-Gemini.git",
+      "branch": null,
+      "has_requirements": true,
+      "class_types": [
+        "GeminiImage2Node",
+        "GeminiNode"
+      ]
+    },
+    "rgthree-comfy": {
+      "repo": "https://github.com/rgthree/rgthree-comfy.git",
+      "branch": null,
+      "has_requirements": false,
+      "class_types": [
+        "Power Lora Loader (rgthree)",
+        "Seed (rgthree)"
+      ]
+    },
+    "comfyui-tooling-nodes": {
+      "repo": "https://github.com/Acly/comfyui-tooling-nodes.git",
+      "branch": null,
+      "has_requirements": false,
+      "class_types": [
+        "ETN_LoadImageBase64",
+        "Base64DecodeNode"
+      ]
+    },
+    "audio-separation-nodes-comfyui": {
+      "repo": "https://github.com/christian-byrne/audio-separation-nodes-comfyui.git",
+      "branch": null,
+      "has_requirements": true,
+      "class_types": [
+        "AudioSeparation",
+        "AudioSeparatorSimple",
+        "AudioCrop",
+        "DownloadOpenUnmixModel"
+      ]
+    },
+    "ComfyUI_essentials": {
+      "repo": "https://github.com/cubiq/ComfyUI_essentials.git",
+      "branch": null,
+      "has_requirements": true,
+      "class_types": [
+        "GetImageSize+",
+        "ImageBatchMulti",
+        "SimpleMath+",
+        "MaskBatch+",
+        "ImageScaleToMaxDimension"
+      ]
+    },
+    "ComfyUI_FL-Nodes": {
+      "repo": "https://github.com/filliptm/ComfyUI_Fill-Nodes.git",
+      "branch": null,
+      "has_requirements": true,
+      "class_types": [
+        "FL_PathAnimator",
+        "Resize To Megapixels"
+      ]
+    },
+    "primitive-types": {
+      "repo": "https://github.com/drustan-hawk/primitive-types.git",
+      "branch": null,
+      "has_requirements": false,
+      "class_types": [
+        "PrimitiveInt",
+        "PrimitiveFloat",
+        "PrimitiveStringMultiline"
+      ]
+    },
+    "ComfyMath": {
+      "repo": "https://github.com/evanspearman/ComfyMath.git",
+      "branch": null,
+      "has_requirements": false,
+      "class_types": [
+        "CM_IntBinaryOperation"
+      ]
+    },
+    "ComfyUI_Comfyroll_CustomNodes": {
+      "repo": "https://github.com/Suzie1/ComfyUI_Comfyroll_CustomNodes.git",
+      "branch": null,
+      "has_requirements": false,
+      "class_types": [
+        "CR Float To Integer"
+      ]
+    },
+    "was-node-suite-comfyui": {
+      "repo": "https://github.com/WASasquatch/was-node-suite-comfyui.git",
+      "branch": null,
+      "has_requirements": true,
+      "class_types": [
+        "String Literal",
+        "Text Concatenate"
+      ]
+    },
+    "ComfyUI-Easy-Use": {
+      "repo": "https://github.com/yolain/ComfyUI-Easy-Use.git",
+      "branch": null,
+      "has_requirements": true,
+      "class_types": [
+        "easy cleanGpuUsed",
+        "easy ckptNames",
+        "EasyCache"
+      ]
+    },
+    "ComfyUI-Impact-Pack": {
+      "repo": "https://github.com/ltdrdata/ComfyUI-Impact-Pack.git",
+      "branch": null,
+      "has_requirements": true,
+      "class_types": [
+        "ImpactExecutionOrderController"
+      ]
+    },
+    "Comfyui-Memory_Cleanup": {
+      "repo": "https://github.com/LAOGOU-666/Comfyui-Memory_Cleanup.git",
+      "branch": null,
+      "has_requirements": false,
+      "class_types": [
+        "RAMCleanup"
+      ]
+    },
+    "ComfyUI_LayerStyle": {
+      "repo": "https://github.com/chflame163/ComfyUI_LayerStyle.git",
+      "branch": null,
+      "has_requirements": true,
+      "class_types": [
+        "LayerUtility: PurgeVRAM"
+      ]
+    }
+  }
+}

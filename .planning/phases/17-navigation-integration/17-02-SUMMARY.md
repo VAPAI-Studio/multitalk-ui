@@ -102,3 +102,12 @@ None - no external service configuration required.
 ---
 *Phase: 17-navigation-integration*
 *Completed: 2026-03-14*
+
+## Self-Check: PASSED
+
+- FOUND: `frontend/src/lib/apiClient.ts` (modified)
+- FOUND: `frontend/src/hooks/useDynamicWorkflows.ts` (created)
+- FOUND: `.planning/phases/17-navigation-integration/17-02-SUMMARY.md`
+- FOUND: commit `d1d5139` (feat(17-02): add listPublishedWorkflows to apiClient)
+- FOUND: commit `be2525c` (feat(17-02): create useDynamicWorkflows hook)
+- FOUND: commit `860249a` (docs(17-02): complete frontend data layer plan)
