@@ -1100,15 +1100,55 @@ class ApiClient {
   }
 
   // Virtual Set (World Labs / Marble API)
-  async generateVirtualSetWorld(imageData: string, displayName?: string, model?: string) {
+  async generateVirtualSetWorld(params: {
+    promptType: 'image' | 'multi-image' | 'video'
+    imageData?: string
+    images?: { imageData: string; azimuth: number }[]
+    reconstructImages?: boolean
+    videoUrl?: string
+    textPrompt?: string
+    displayName?: string
+    model?: string
+  }) {
     return this.request('/virtual-set/generate', {
       method: 'POST',
       body: JSON.stringify({
-        image_data: imageData,
-        display_name: displayName || 'Virtual Set Scene',
-        model: model || 'Marble 0.1-plus',
+        prompt_type: params.promptType,
+        image_data: params.imageData,
+        images: params.images?.map(i => ({ image_data: i.imageData, azimuth: i.azimuth })),
+        reconstruct_images: params.reconstructImages || false,
+        video_url: params.videoUrl,
+        text_prompt: params.textPrompt || null,
+        display_name: params.displayName || 'Virtual Set Scene',
+        model: params.model || 'Marble 0.1-plus',
       }),
     })
+  }
+
+  async uploadVideoForVirtualSet(file: File): Promise<{ success: boolean; video_url?: string; filename?: string; error?: string }> {
+    const token = this.getAuthToken()
+    const url = `${this.baseURL}/virtual-set/upload-video`
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 300000) // 5 min timeout for large videos
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        body: formData,
+        signal: controller.signal,
+      })
+      clearTimeout(timeoutId)
+      return response.json()
+    } catch (e: any) {
+      clearTimeout(timeoutId)
+      return { success: false, error: e.message || 'Upload failed' }
+    }
   }
 
   async getVirtualSetStatus(operationId: string) {

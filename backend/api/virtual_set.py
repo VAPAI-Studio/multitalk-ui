@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Header
+from fastapi import APIRouter, Header, UploadFile
 from typing import Optional
+import asyncio
 import uuid
 
 from models.virtual_set import (
@@ -33,32 +34,129 @@ def _resolve_token(authorization: Optional[str] = None, x_api_key: Optional[str]
     return _extract_bearer_token(authorization)
 
 
+@router.post("/upload-video")
+async def upload_video(
+    file: UploadFile,
+    authorization: Optional[str] = Header(None),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+):
+    """Upload a video file to Supabase Storage for Virtual Set world generation."""
+    try:
+        content = await file.read()
+        if len(content) > 100 * 1024 * 1024:
+            return {"success": False, "error": "Video must be under 100MB"}
+
+        storage = StorageService()
+        from datetime import datetime
+        timestamp = datetime.now().strftime('%Y-%m-%d')
+        unique_id = str(uuid.uuid4())[:8]
+        filename = file.filename or "video.mp4"
+        path = f"input-videos-virtualset/{timestamp}/{unique_id}_{filename}"
+        content_type = file.content_type or "video/mp4"
+
+        loop = asyncio.get_event_loop()
+        upload_response = await loop.run_in_executor(
+            None,
+            lambda: storage.supabase.storage
+            .from_("multitalk-videos")
+            .upload(path, content, {"content-type": content_type, "upsert": "true"}),
+        )
+
+        if hasattr(upload_response, "error") and upload_response.error:
+            return {"success": False, "error": f"Upload failed: {upload_response.error}"}
+        elif isinstance(upload_response, dict) and upload_response.get("error"):
+            return {"success": False, "error": f"Upload failed: {upload_response['error']}"}
+
+        public_url = storage.supabase.storage.from_("multitalk-videos").get_public_url(path)
+        if isinstance(public_url, dict):
+            public_url = public_url.get("publicUrl") or public_url.get("public_url") or str(public_url)
+
+        return {"success": True, "video_url": public_url, "filename": filename}
+
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 @router.post("/generate", response_model=VirtualSetGenerateResponse)
 async def generate_world(
     request: VirtualSetGenerateRequest,
     authorization: Optional[str] = Header(None),
     x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
 ):
-    """Upload image to storage and submit to World Labs for 3D world generation."""
+    """Upload media to storage and submit to World Labs for 3D world generation.
+    Supports image, multi-image, and video prompt types."""
     try:
         storage_service = StorageService()
         worldlabs_service = WorldLabsService()
 
-        # Upload image to Supabase to get a public URL (World Labs needs a URL, not data URL)
-        upload_success, public_url, upload_error = (
-            await storage_service.upload_image_from_data_url(
-                request.image_data, "virtual-set-sources"
+        image_url = None
+        images_with_urls = None
+        video_url = None
+
+        if request.prompt_type == "image":
+            # Single image: upload to Supabase and get public URL
+            if not request.image_data:
+                return VirtualSetGenerateResponse(
+                    success=False, error="image_data is required for image prompt type"
+                )
+            upload_success, public_url, upload_error = (
+                await storage_service.upload_image_from_data_url(
+                    request.image_data, "virtual-set-sources"
+                )
             )
-        )
-        if not upload_success or not public_url:
-            return VirtualSetGenerateResponse(
-                success=False,
-                error=f"Failed to upload image: {upload_error}",
-            )
+            if not upload_success or not public_url:
+                return VirtualSetGenerateResponse(
+                    success=False, error=f"Failed to upload image: {upload_error}"
+                )
+            image_url = public_url
+
+        elif request.prompt_type == "multi-image":
+            # Multiple images: upload each to Supabase
+            if not request.images or len(request.images) < 2:
+                return VirtualSetGenerateResponse(
+                    success=False, error="At least 2 images are required for multi-image prompt"
+                )
+            max_images = 8 if request.reconstruct_images else 4
+            if len(request.images) > max_images:
+                return VirtualSetGenerateResponse(
+                    success=False,
+                    error=f"Maximum {max_images} images allowed"
+                    + (" (8 with reconstruct mode)" if not request.reconstruct_images else ""),
+                )
+
+            images_with_urls = []
+            for img in request.images:
+                upload_success, public_url, upload_error = (
+                    await storage_service.upload_image_from_data_url(
+                        img.image_data, "virtual-set-sources"
+                    )
+                )
+                if not upload_success or not public_url:
+                    return VirtualSetGenerateResponse(
+                        success=False,
+                        error=f"Failed to upload image: {upload_error}",
+                    )
+                images_with_urls.append({
+                    "url": public_url,
+                    "azimuth": img.azimuth if img.azimuth is not None else 0,
+                })
+
+        elif request.prompt_type == "video":
+            # Video: URL should already be uploaded via /upload-video
+            if not request.video_url:
+                return VirtualSetGenerateResponse(
+                    success=False, error="video_url is required for video prompt type"
+                )
+            video_url = request.video_url
 
         # Submit to World Labs
         success, operation_id, error = await worldlabs_service.generate_world(
-            image_url=public_url,
+            prompt_type=request.prompt_type,
+            image_url=image_url,
+            images=images_with_urls,
+            reconstruct_images=request.reconstruct_images,
+            video_url=video_url,
+            text_prompt=request.text_prompt,
             display_name=request.display_name,
             model=request.model,
         )

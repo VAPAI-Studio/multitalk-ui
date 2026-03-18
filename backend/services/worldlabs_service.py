@@ -1,5 +1,5 @@
 import httpx
-from typing import Tuple, Optional
+from typing import Tuple, Optional, List
 from config.settings import settings
 
 
@@ -8,31 +8,85 @@ class WorldLabsService:
         self.api_key = settings.WORLDLABS_API_KEY
         self.base_url = "https://api.worldlabs.ai"
 
+    def _build_world_prompt(
+        self,
+        prompt_type: str,
+        image_url: Optional[str] = None,
+        images: Optional[List[dict]] = None,
+        reconstruct_images: bool = False,
+        video_url: Optional[str] = None,
+        text_prompt: Optional[str] = None,
+    ) -> dict:
+        """Build the world_prompt payload based on prompt type."""
+        if prompt_type == "image":
+            prompt = {
+                "type": "image",
+                "image_prompt": {"source": "uri", "uri": image_url},
+            }
+            if text_prompt:
+                prompt["text_prompt"] = text_prompt
+            return prompt
+
+        elif prompt_type == "multi-image":
+            prompt = {
+                "type": "multi-image",
+                "multi_image_prompt": [
+                    {
+                        "azimuth": img["azimuth"],
+                        "content": {"source": "uri", "uri": img["url"]},
+                    }
+                    for img in (images or [])
+                ],
+                "reconstruct_images": reconstruct_images,
+            }
+            if text_prompt:
+                prompt["text_prompt"] = text_prompt
+            return prompt
+
+        elif prompt_type == "video":
+            prompt = {
+                "type": "video",
+                "video_prompt": {"source": "uri", "uri": video_url},
+            }
+            if text_prompt:
+                prompt["text_prompt"] = text_prompt
+            return prompt
+
+        raise ValueError(f"Unknown prompt_type: {prompt_type}")
+
     async def generate_world(
         self,
-        image_url: str,
+        prompt_type: str = "image",
+        image_url: Optional[str] = None,
+        images: Optional[List[dict]] = None,
+        reconstruct_images: bool = False,
+        video_url: Optional[str] = None,
+        text_prompt: Optional[str] = None,
         display_name: str = "Virtual Set Scene",
         model: str = "Marble 0.1-plus",
     ) -> Tuple[bool, Optional[str], Optional[str]]:
         """
-        Submit an image to World Labs for 3D world generation.
-        image_url must be a publicly accessible URL (not a data URL).
+        Submit media to World Labs for 3D world generation.
+        Supports image, multi-image, and video prompt types.
         Returns (success, operation_id, error).
         """
         try:
             if not self.api_key:
                 return False, None, "World Labs API key not configured"
 
+            world_prompt = self._build_world_prompt(
+                prompt_type=prompt_type,
+                image_url=image_url,
+                images=images,
+                reconstruct_images=reconstruct_images,
+                video_url=video_url,
+                text_prompt=text_prompt,
+            )
+
             payload = {
                 "display_name": display_name,
-                "world_prompt": {
-                    "type": "image",
-                    "image_prompt": {
-                        "source": "uri",
-                        "uri": image_url,
-                    },
-                },
                 "model": model,
+                "world_prompt": world_prompt,
             }
 
             headers = {

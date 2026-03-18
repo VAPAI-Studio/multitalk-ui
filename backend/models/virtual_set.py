@@ -1,8 +1,27 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List, Literal
+
+
+class MultiImageInput(BaseModel):
+    image_data: str  # data:image/...;base64,...
+    azimuth: Optional[int] = None  # 0-360 degrees
+
 
 class VirtualSetGenerateRequest(BaseModel):
-    image_data: str  # data:image/...;base64,...
+    prompt_type: Literal["image", "multi-image", "video"] = "image"
+
+    # For ImagePrompt (single image)
+    image_data: Optional[str] = None  # data:image/...;base64,...
+
+    # For MultiImagePrompt
+    images: Optional[List[MultiImageInput]] = None
+    reconstruct_images: bool = False
+
+    # For VideoPrompt (URL from prior upload)
+    video_url: Optional[str] = None
+
+    # Common
+    text_prompt: Optional[str] = None
     display_name: str = "Virtual Set Scene"
     model: str = "Marble 0.1-plus"  # or "Marble 0.1-mini"
 
