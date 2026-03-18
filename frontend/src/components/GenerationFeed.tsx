@@ -14,10 +14,10 @@ import type { FeedDisplaySettings } from '../types/feedDisplay'
 import { GRID_MIN_ITEM_WIDTH } from '../types/feedDisplay'
 import { getWorkflowDisplayName } from '../constants/workflowNames'
 
-// Unified item type that can be video or image
+// Unified item type that can be video, image, or world
 interface GenerationItem {
   id: string
-  type: 'video' | 'image'
+  type: 'video' | 'image' | 'world'
   created_at: string
   title: string
   status: string
@@ -37,6 +37,9 @@ interface GenerationItem {
   prompt?: string
   workflow_name?: string
   model_used?: string
+  // World-specific fields
+  splat_url?: string
+  world_id?: string
   // Metadata
   metadata: any
 }
@@ -44,7 +47,7 @@ interface GenerationItem {
 // Feed configuration
 export interface GenerationFeedConfig {
   // Media type filtering
-  mediaType: 'video' | 'image' | 'all'
+  mediaType: 'video' | 'image' | 'world' | 'all'
 
   // Workflow filtering
   workflowNames?: string[]  // Filter to specific workflows (multi-select)
@@ -123,15 +126,17 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
     return saved === null ? true : saved === 'true' // Default: true (filter to current workflow)
   })
 
-  const [mediaTypeFilter, setMediaTypeFilter] = useState<'video' | 'image' | 'all'>(config.mediaType)
+  const [mediaTypeFilter, setMediaTypeFilter] = useState<'video' | 'image' | 'world' | 'all'>(config.mediaType)
   const [error, setError] = useState<string | null>(null)
 
   // Progressive loading state
   const [loadingPhase, setLoadingPhase] = useState<'initial' | 'progressive' | 'complete'>('initial')
   const [videoOffset, setVideoOffset] = useState(0)
   const [imageOffset, setImageOffset] = useState(0)
+  const [worldOffset, setWorldOffset] = useState(0)
   const [hasMoreVideos, setHasMoreVideos] = useState(true)
   const [hasMoreImages, setHasMoreImages] = useState(true)
+  const [hasMoreWorlds, setHasMoreWorlds] = useState(true)
   const [isBackfilling, setIsBackfilling] = useState(false)
 
   // For image modal
@@ -246,6 +251,20 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
     }
   }
 
+  const worldJobToItem = (job: any): GenerationItem => ({
+    id: job.id,
+    type: 'world',
+    created_at: job.created_at,
+    title: job.text_prompt || job.display_name || `3D World (${job.model || 'World'})`,
+    status: job.status,
+    preview_url: job.thumbnail_url || job.input_image_urls?.[0] || '',
+    thumbnail_url: job.thumbnail_url,
+    splat_url: job.splat_url,
+    world_id: job.world_id,
+    workflow_name: 'virtual-set-world',
+    metadata: job,
+  })
+
   // Get effective workflow filter (now independent of user filtering)
   const getEffectiveWorkflows = useCallback(() => {
     // When "This Workflow" is selected and we have page context, filter to those workflows
@@ -258,16 +277,19 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
 
   // Load a batch of items (progressive loading)
   const loadBatch = useCallback(async (
-    type: 'video' | 'image' | 'both',
+    type: 'video' | 'image' | 'world' | 'both',
     batchSize: number,
     vOffset: number,
-    iOffset: number
-  ): Promise<{ videos: GenerationItem[], images: GenerationItem[], hasMoreV: boolean, hasMoreI: boolean }> => {
+    iOffset: number,
+    wOffset: number = 0
+  ): Promise<{ videos: GenerationItem[], images: GenerationItem[], worlds: GenerationItem[], hasMoreV: boolean, hasMoreI: boolean, hasMoreW: boolean }> => {
     const effectiveWorkflows = getEffectiveWorkflows()
     const videos: GenerationItem[] = []
     const images: GenerationItem[] = []
+    const worlds: GenerationItem[] = []
     let hasMoreV = true
     let hasMoreI = true
+    let hasMoreW = true
 
     // Load videos
     if (type === 'video' || type === 'both') {
@@ -342,7 +364,39 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
       }
     }
 
-    return { videos, images, hasMoreV, hasMoreI }
+    // Load worlds
+    if (type === 'world' || type === 'both') {
+      try {
+        const worldParams = {
+          limit: batchSize,
+          offset: wOffset,
+          user_id: showMineOnly ? user?.id : undefined
+        }
+        const worldResponse = config.showCompletedOnly
+          ? await apiClient.getCompletedWorldJobs(worldParams) as any
+          : await apiClient.getWorldJobs(worldParams) as any
+
+        if (worldResponse?.success && worldResponse.world_jobs) {
+          for (const job of worldResponse.world_jobs) {
+            // Filter by page context if needed
+            if (effectiveWorkflows && effectiveWorkflows.length > 0 &&
+                !effectiveWorkflows.includes('virtual-set-world') &&
+                !effectiveWorkflows.includes('virtual-set')) {
+              continue
+            }
+            worlds.push(worldJobToItem(job))
+          }
+          hasMoreW = worldResponse.world_jobs.length === batchSize
+        } else {
+          hasMoreW = false
+        }
+      } catch (err: any) {
+        if (err?.name !== 'AbortError') console.error('Error loading worlds:', err)
+        hasMoreW = false
+      }
+    }
+
+    return { videos, images, worlds, hasMoreV, hasMoreI, hasMoreW }
   }, [config.showCompletedOnly, getEffectiveWorkflows, showMineOnly, user])
 
   // Initial load - load first batch quickly
@@ -352,22 +406,25 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
     setLoadingPhase('initial')
     setVideoOffset(0)
     setImageOffset(0)
+    setWorldOffset(0)
 
     try {
-      const { videos, images, hasMoreV, hasMoreI } = await loadBatch('both', initialBatch, 0, 0)
+      const { videos, images, worlds, hasMoreV, hasMoreI, hasMoreW } = await loadBatch('both', initialBatch, 0, 0, 0)
 
       // Merge and sort
-      const items = [...videos, ...images]
+      const items = [...videos, ...images, ...worlds]
       items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
       setAllItems(items)
       setVideoOffset(videos.length)
       setImageOffset(images.length)
+      setWorldOffset(worlds.length)
       setHasMoreVideos(hasMoreV)
       setHasMoreImages(hasMoreI)
+      setHasMoreWorlds(hasMoreW)
 
       // Start progressive loading if we have more
-      if ((hasMoreV || hasMoreI) && items.length < maxItems) {
+      if ((hasMoreV || hasMoreI || hasMoreW) && items.length < maxItems) {
         setLoadingPhase('progressive')
       } else {
         setLoadingPhase('complete')
@@ -387,7 +444,7 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
       setLoadingPhase('complete')
       return
     }
-    if (!hasMoreVideos && !hasMoreImages) {
+    if (!hasMoreVideos && !hasMoreImages && !hasMoreWorlds) {
       setLoadingPhase('complete')
       return
     }
@@ -395,13 +452,13 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
     setLoadingMore(true)
 
     try {
-      const { videos, images, hasMoreV, hasMoreI } = await loadBatch(
-        'both', BATCH_SIZE, videoOffset, imageOffset
+      const { videos, images, worlds, hasMoreV, hasMoreI, hasMoreW } = await loadBatch(
+        'both', BATCH_SIZE, videoOffset, imageOffset, worldOffset
       )
 
-      if (videos.length > 0 || images.length > 0) {
+      if (videos.length > 0 || images.length > 0 || worlds.length > 0) {
         setAllItems(prev => {
-          const newItems = [...prev, ...videos, ...images]
+          const newItems = [...prev, ...videos, ...images, ...worlds]
           // Remove duplicates by id
           const seen = new Set<string>()
           const unique = newItems.filter(item => {
@@ -415,18 +472,20 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
         })
         setVideoOffset(prev => prev + videos.length)
         setImageOffset(prev => prev + images.length)
+        setWorldOffset(prev => prev + worlds.length)
       }
 
       setHasMoreVideos(hasMoreV)
       setHasMoreImages(hasMoreI)
+      setHasMoreWorlds(hasMoreW)
 
-      if (!hasMoreV && !hasMoreI) {
+      if (!hasMoreV && !hasMoreI && !hasMoreW) {
         setLoadingPhase('complete')
       }
     } finally {
       setLoadingMore(false)
     }
-  }, [loadingPhase, loadingMore, allItems.length, hasMoreVideos, hasMoreImages, videoOffset, imageOffset, loadBatch, maxItems])
+  }, [loadingPhase, loadingMore, allItems.length, hasMoreVideos, hasMoreImages, hasMoreWorlds, videoOffset, imageOffset, worldOffset, loadBatch, maxItems])
 
   // Backfill - fetch more of a specific type when filter reduces visible items
   const backfillType = useCallback(async (type: 'video' | 'image') => {
@@ -468,11 +527,11 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
   const refreshFeed = useCallback(async () => {
     // Don't show loading spinner for refresh (keeps existing items visible)
     try {
-      const { videos, images } = await loadBatch('both', initialBatch, 0, 0)
+      const { videos, images, worlds } = await loadBatch('both', initialBatch, 0, 0, 0)
 
       // Merge new items with existing, keeping newest
       setAllItems(prev => {
-        const newItems = [...videos, ...images]
+        const newItems = [...videos, ...images, ...worlds]
         const merged = [...newItems, ...prev]
         const seen = new Set<string>()
         const unique = merged.filter(item => {
@@ -491,11 +550,11 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
 
   // Manual load more (user-triggered)
   const loadMore = useCallback(() => {
-    if (loadingPhase === 'complete' && (hasMoreVideos || hasMoreImages)) {
+    if (loadingPhase === 'complete' && (hasMoreVideos || hasMoreImages || hasMoreWorlds)) {
       setLoadingPhase('progressive')
     }
     loadNextBatch()
-  }, [loadingPhase, hasMoreVideos, hasMoreImages, loadNextBatch])
+  }, [loadingPhase, hasMoreVideos, hasMoreImages, hasMoreWorlds, loadNextBatch])
 
   // Fix stuck video job manually
   const handleFixStuckJob = async (jobId: string, comfyUrl: string) => {
@@ -571,7 +630,7 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
     if (loadingPhase !== 'complete' || isBackfilling) return
 
     // Only backfill if we're filtering by type and have few results
-    if (effectiveMediaType !== 'all' && displayedItems.length < MIN_VISIBLE) {
+    if (effectiveMediaType !== 'all' && effectiveMediaType !== 'world' && displayedItems.length < MIN_VISIBLE) {
       const hasMore = effectiveMediaType === 'video' ? hasMoreVideos : hasMoreImages
       if (hasMore) {
         backfillType(effectiveMediaType)
@@ -580,7 +639,7 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
     // Note: backfillType is intentionally excluded to prevent infinite loops
     // The function is stable and doesn't need to trigger re-runs
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectiveMediaType, displayedItems.length, loadingPhase, isBackfilling, hasMoreVideos, hasMoreImages])
+  }, [effectiveMediaType, displayedItems.length, loadingPhase, isBackfilling, hasMoreVideos, hasMoreImages, hasMoreWorlds])
 
   return (
     <div className="h-full flex flex-col bg-white rounded-2xl shadow-lg border border-gray-200">
@@ -787,7 +846,7 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
             )}
 
             {/* Load More */}
-            {(hasMoreVideos || hasMoreImages) && displayedItems.length > 0 && (
+            {(hasMoreVideos || hasMoreImages || hasMoreWorlds) && displayedItems.length > 0 && (
               <div className="flex justify-center pt-2">
                 <button
                   onClick={loadMore}

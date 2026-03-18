@@ -254,15 +254,18 @@ export default function VirtualSet({ comfyUrl = "" }: Props) {
         setGenerationStatus("");
         pollingRef.current = false;
 
-        // Save world to feed for later access (use first available image)
+        // Save world to feed for later access
         const refImage = getReferenceImageUrl();
         if (refImage) {
           apiClient.saveVirtualSetWorld(
             refImage,
             status.splat_url,
             status.world_id,
-            worldModel
-          ).catch(() => {});
+            worldModel,
+            promptType
+          ).catch((err) => console.error('[VirtualSet] Failed to save world:', err));
+        } else {
+          console.warn('[VirtualSet] No reference image available for world save (prompt_type:', promptType, ')');
         }
 
         return;
@@ -363,10 +366,11 @@ export default function VirtualSet({ comfyUrl = "" }: Props) {
 
   // Handle feed item click - load a saved world
   const handleFeedItemClick = useCallback((item: any): boolean => {
-    const params = item.metadata?.parameters;
-    if (params?.splat_url && item.workflow_name === "virtual-set-world") {
-      setSplatUrl(params.splat_url);
-      setInputImageDataUrl(item.source_image_url || item.preview_url || "");
+    // World items from world_jobs have splat_url as top-level field
+    const splatUrl = item.splat_url || item.metadata?.splat_url || item.metadata?.parameters?.splat_url;
+    if (splatUrl && (item.type === 'world' || item.workflow_name === 'virtual-set-world')) {
+      setSplatUrl(splatUrl);
+      setInputImageDataUrl(item.source_image_url || item.preview_url || item.thumbnail_url || "");
       setScreenshotDataUrl("");
       setScreenshotHistory([]);
       setResultImageUrl("");

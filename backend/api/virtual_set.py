@@ -16,7 +16,11 @@ from services.worldlabs_service import WorldLabsService
 from services.openrouter_service import OpenRouterService
 from services.storage_service import StorageService
 from services.image_job_service import ImageJobService
+from services.world_job_service import WorldJobService
 from models.image_job import CreateImageJobPayload, CompleteImageJobPayload
+from models.world_job import CreateWorldJobPayload, CompleteWorldJobPayload
+from core.supabase import get_supabase_for_token
+from core.auth import resolve_user_id
 
 router = APIRouter(prefix="/virtual-set", tags=["virtual-set"])
 
@@ -227,12 +231,11 @@ async def save_world(
     authorization: Optional[str] = Header(None),
     x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
 ):
-    """Save a generated 3D world as an image job for the feed."""
+    """Save a generated 3D world as a world job for the feed."""
     try:
         storage_service = StorageService()
-        image_job_service = ImageJobService(
-            auth_token=_resolve_token(authorization, x_api_key)
-        )
+        supabase = get_supabase_for_token(_resolve_token(authorization, x_api_key))
+        world_job_service = WorldJobService(supabase)
 
         # Upload original image to get a URL for the feed thumbnail
         upload_success, image_url, upload_error = (
@@ -246,23 +249,27 @@ async def save_world(
                 error=f"Failed to store image: {upload_error}",
             )
 
-        # Create image job with splat_url in parameters
-        job_id = str(uuid.uuid4())
-        job_payload = CreateImageJobPayload(
-            user_id=None,
-            comfy_job_id=job_id,
-            workflow_name="virtual-set-world",
-            comfy_url="worldlabs",
+        # Resolve user_id from auth
+        user_id = resolve_user_id(authorization, x_api_key)
+        if not user_id:
+            return VirtualSetSaveWorldResponse(
+                success=False,
+                error="Authentication required to save worlds",
+            )
+
+        # Create world job
+        job_payload = CreateWorldJobPayload(
+            user_id=user_id,
+            splat_url=request.splat_url,
+            world_id=request.world_id,
+            model=request.model,
+            prompt_type=request.prompt_type,
             input_image_urls=[image_url],
-            prompt=f"3D World ({request.model})",
-            parameters={
-                "splat_url": request.splat_url,
-                "world_id": request.world_id,
-                "model": request.model,
-            },
+            thumbnail_url=image_url,
+            display_name=f"3D World ({request.model})",
         )
 
-        success, created_job_id, error = await image_job_service.create_job(job_payload)
+        success, created_job_id, error = await world_job_service.create_job(job_payload)
         if not success:
             return VirtualSetSaveWorldResponse(
                 success=False,
@@ -271,11 +278,13 @@ async def save_world(
 
         # Mark as completed immediately
         if created_job_id:
-            await image_job_service.complete_job(
-                CompleteImageJobPayload(
+            await world_job_service.complete_job(
+                CompleteWorldJobPayload(
                     job_id=created_job_id,
                     status="completed",
-                    output_image_urls=[image_url],
+                    splat_url=request.splat_url,
+                    world_id=request.world_id,
+                    thumbnail_url=image_url,
                 )
             )
 
@@ -303,9 +312,8 @@ async def reconstruct_image(
     try:
         openrouter_service = OpenRouterService()
         storage_service = StorageService()
-        image_job_service = ImageJobService(
-            auth_token=_resolve_token(authorization, x_api_key)
-        )
+        supabase = get_supabase_for_token(_resolve_token(authorization, x_api_key))
+        image_job_service = ImageJobService(supabase)
 
         # Upload screenshot to storage
         screenshot_upload_success, screenshot_url, screenshot_error = (
@@ -431,7 +439,7 @@ async def reconstruct_image(
     except Exception as e:
         if image_job_id:
             try:
-                ijs = ImageJobService(auth_token=_resolve_token(authorization, x_api_key))
+                ijs = ImageJobService(get_supabase_for_token(_resolve_token(authorization, x_api_key)))
                 await ijs.complete_job(
                     CompleteImageJobPayload(
                         job_id=image_job_id,

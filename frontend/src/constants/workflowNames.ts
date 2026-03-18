@@ -52,6 +52,10 @@ export const IMAGE_WORKFLOW_NAMES = [
   'multi-camera-angle',
   'character-caption',
   'virtual-set',
+]
+
+// World workflow names for type categorization
+export const WORLD_WORKFLOW_NAMES = [
   'virtual-set-world',
 ]
 
@@ -66,6 +70,8 @@ export function getWorkflowDisplayName(workflowName: string): string {
 /**
  * Get the media type for a workflow
  */
-export function getWorkflowMediaType(workflowName: string): 'video' | 'image' {
-  return VIDEO_WORKFLOW_NAMES.includes(workflowName) ? 'video' : 'image'
+export function getWorkflowMediaType(workflowName: string): 'video' | 'image' | 'world' {
+  if (VIDEO_WORKFLOW_NAMES.includes(workflowName)) return 'video'
+  if (WORLD_WORKFLOW_NAMES.includes(workflowName)) return 'world'
+  return 'image'
 }

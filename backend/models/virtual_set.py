@@ -42,6 +42,7 @@ class VirtualSetSaveWorldRequest(BaseModel):
     splat_url: str
     world_id: Optional[str] = None
     model: str = "Marble 0.1-plus"
+    prompt_type: Optional[str] = "image"  # "image", "multi-image", or "video"
 
 class VirtualSetSaveWorldResponse(BaseModel):
     success: bool

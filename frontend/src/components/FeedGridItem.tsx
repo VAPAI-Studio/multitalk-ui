@@ -42,7 +42,7 @@ function LazyImage({
 
 export interface GenerationItem {
   id: string
-  type: 'video' | 'image'
+  type: 'video' | 'image' | 'world'
   created_at: string
   title: string
   status: string

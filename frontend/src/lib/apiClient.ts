@@ -957,6 +957,50 @@ class ApiClient {
     })
   }
 
+  // World Jobs endpoints (World Labs API)
+
+  async getWorldJobs(params?: {
+    limit?: number;
+    offset?: number;
+    user_id?: string;
+    status?: string;
+  }) {
+    const queryParams = new URLSearchParams()
+    if (params?.limit) queryParams.append('limit', params.limit.toString())
+    if (params?.offset) queryParams.append('offset', params.offset.toString())
+    if (params?.user_id) queryParams.append('user_id', params.user_id)
+    if (params?.status) queryParams.append('status', params.status)
+
+    const query = queryParams.toString()
+    const cacheKey = `world-jobs-feed-${query}`
+    const cached = this.getCached(cacheKey)
+    if (cached) return cached
+
+    const result = await this.request(`/world-jobs/feed${query ? `?${query}` : ''}`)
+    this.setCache(cacheKey, result)
+    return result
+  }
+
+  async getCompletedWorldJobs(params?: {
+    limit?: number;
+    offset?: number;
+    user_id?: string;
+  }) {
+    const queryParams = new URLSearchParams()
+    if (params?.limit) queryParams.append('limit', params.limit.toString())
+    if (params?.offset) queryParams.append('offset', params.offset.toString())
+    if (params?.user_id) queryParams.append('user_id', params.user_id)
+
+    const query = queryParams.toString()
+    const cacheKey = `world-jobs-completed-${query}`
+    const cached = this.getCached(cacheKey)
+    if (cached) return cached
+
+    const result = await this.request(`/world-jobs/completed/recent${query ? `?${query}` : ''}`)
+    this.setCache(cacheKey, result)
+    return result
+  }
+
   // LoRA Trainer endpoints (Musubi Tuner for QWEN Image LoRA)
   async startMusubiTraining(payload: {
     images: Array<{ filename: string; data: string; caption: string }>;
@@ -1166,7 +1210,7 @@ class ApiClient {
     })
   }
 
-  async saveVirtualSetWorld(imageData: string, splatUrl: string, worldId?: string, model?: string) {
+  async saveVirtualSetWorld(imageData: string, splatUrl: string, worldId?: string, model?: string, promptType?: string) {
     return this.request('/virtual-set/save-world', {
       method: 'POST',
       body: JSON.stringify({
@@ -1174,6 +1218,7 @@ class ApiClient {
         splat_url: splatUrl,
         world_id: worldId || null,
         model: model || 'Marble 0.1-plus',
+        prompt_type: promptType || 'image',
       }),
     })
   }

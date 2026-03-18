@@ -8,6 +8,11 @@ export interface Announcement {
 // When committing user-facing changes, add a new entry at the top.
 export const announcements: Announcement[] = [
   {
+    id: "2026-03-18-world-jobs",
+    message: "Virtual Set now saves 3D worlds to your generation feed so you can revisit and reconstruct them anytime",
+    type: "feature",
+  },
+  {
     id: "2026-03-11-batch-upscale",
     message: "New: Batch Video Upscale in Video Studio -- upscale multiple videos at once with Freepik AI",
     type: "feature",
