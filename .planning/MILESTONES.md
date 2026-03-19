@@ -23,3 +23,27 @@
 
 ---
 
+## v1.1 Batch Video Upscale (Shipped: 2026-03-13)
+
+**Phases completed:** 4 phases (10-13), 10 plans
+**Requirements:** All v1.1 requirements satisfied (STAT-04, STAT-05 deferred — batch history/re-run)
+
+**Key accomplishments:**
+1. Freepik API integration with credit-aware queue management
+2. Sequential batch processing with pause/resume on credit exhaustion
+3. Streaming output delivery to Supabase Storage and Google Drive
+4. Batch ZIP download with background job processing
+5. Full frontend with upload, settings, progress tracking, and navigation integration
+
+**Delivered:** Batch video upscaling via Freepik API with intelligent error handling, dual output delivery, and complete UI.
+
+---
+
+## v1.2 Workflow Builder (In Progress)
+
+**Phases planned:** 4 phases (14-17), ~12 plans
+**Requirements:** 44 requirements across 8 categories (WB, DEP, MDL, VAR, META, TEST, DYN, STORE)
+
+**Goal:** Enable admins to create new platform features from ComfyUI workflows without writing code — upload a workflow JSON, configure inputs visually, test it, and publish it as a live feature page.
+
+---

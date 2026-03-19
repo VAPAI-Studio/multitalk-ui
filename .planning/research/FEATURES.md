@@ -1,247 +1,312 @@
-# Feature Landscape: Batch Video Upscale
+# Feature Landscape: Workflow Builder
 
-**Domain:** Batch video upscaling with external API integration (Freepik Video Upscaler)
-**Researched:** 2026-03-11
-**Milestone:** v1.1 Batch Video Upscale
-**Context:** Adding batch upscale capability to existing AI media processing platform that already has single-video ComfyUI-based upscaling (SeedVR2), Google Drive integration with project folder picker, Supabase storage, and per-video job tracking.
+**Domain:** Admin-only no-code workflow builder for converting ComfyUI workflow JSON into live feature pages
+**Researched:** 2026-03-13
+**Milestone:** v1.2 Workflow Builder
+**Context:** Adding a visual workflow builder to an existing platform that already has 25+ AI features, a centralized backend workflow system (templates + {{PLACEHOLDER}} substitution), studio-based navigation (studioConfig.ts), UnifiedFeed sidebar, dual execution backends (ComfyUI + RunPod), and admin-only Infrastructure studio. The builder creates database-stored feature configurations that a dynamic renderer turns into feature pages — no code generation, no rebuild required.
 
 ---
 
 ## Table Stakes
 
-Features users expect from any batch video upscaling interface. Missing any of these makes the feature feel broken or unfinished compared to the existing single-video upscale page.
+Features the admin user will expect from any workflow builder tool. Missing these makes the tool feel unfinished or untrustworthy compared to existing tools like ViewComfy, ComfyUI App Builder, and ComfyFlowApp.
 
-### TS-1: Multi-File Upload with Video Validation
+### TS-1: Workflow JSON Upload and Node Parsing
 
 | Aspect | Detail |
 |--------|--------|
-| **Why expected** | The word "batch" implies multi-file. A batch upscaler that only accepts one file is just a regular upscaler. Users need drag-and-drop or file picker for multiple videos at once. |
+| **Why expected** | Every workflow builder in this space (ViewComfy, ComfyFlowApp, ComfyUI App Builder) starts with uploading a workflow JSON file. This is the universal entry point. An admin who exports from ComfyUI will immediately look for a file upload button. |
+| **Complexity** | Medium |
+| **Notes** | Accept `workflow_api.json` (the API format exported from ComfyUI via "Save (API format)"). Parse node IDs, `class_type`, and all inputs, distinguishing between widget inputs (constant values: strings, numbers, booleans, lists) and link inputs (references to other nodes as `[node_id, output_index]` arrays). Widget inputs are the ones that can become user-facing variables. Link inputs connect the graph and are not user-configurable. Also parse `_meta.title` on each node for display names. The existing `backend/workflows/` directory stores flat JSON templates — this builder creates new entries in that system. |
+| **Acceptance** | Admin uploads a JSON file. System parses and lists all nodes with their class types, titles, and configurable inputs. Only widget inputs (non-link values) are shown as candidates for user variables. Parse errors show clear messages with the problematic field. |
+
+### TS-2: Variable Configuration — Map Node Inputs to Form Fields
+
+| Aspect | Detail |
+|--------|--------|
+| **Why expected** | The core function of every ComfyUI-to-app tool is selecting which inputs become user-facing. ViewComfy, ComfyUI App Builder, and ComfyFlowApp all center on this. An admin expects to check a box next to a node input, give it a label, and configure its display type. |
+| **Complexity** | Medium |
+| **Notes** | From ComfyUI's own type system (verified against official docs), the primitive widget types are: `STRING` (text field or textarea), `INT` (number input or slider), `FLOAT` (number input or slider with step), `BOOLEAN` (toggle/checkbox), `COMBO` (dropdown, defined as a list of strings in the workflow). File inputs are `IMAGE` and `AUDIO` (and effectively `VIDEO` via LoadVideo nodes). The builder should auto-suggest a display type based on the detected input type: `STRING` → text, `INT` with min/max → slider or number, `COMBO` → dropdown, `IMAGE` → file upload. Admin can override the suggestion. Each variable gets: label, placeholder/helper text, required/optional flag, default value, and display type override. Maps the variable to a `{{PLACEHOLDER_NAME}}` in the template using a naming convention like `NODE_ID_INPUT_NAME`. |
+| **Acceptance** | Each parseable node input shows its type (auto-detected), current value (from the JSON), and a "Make variable" toggle. When toggled on, admin sees: label field, placeholder field, required toggle, default value field, and display type selector. Changes update a live preview config. |
+
+### TS-3: Six Core Field Display Types
+
+| Aspect | Detail |
+|--------|--------|
+| **Why expected** | The existing feature pages use exactly these input patterns. Any workflow builder that doesn't support the types already in use will be unable to replicate existing features. ViewComfy documents support for "Text, Numbers, Dropdowns, Sliders, Checkboxes, Images, Videos, Audio." |
+| **Complexity** | Medium |
+| **Notes** | The six types needed to cover all current {{PLACEHOLDER}} usages across the 19 existing workflows: (1) **text** — single-line text input (maps to STRING, short values like filenames or short prompts); (2) **textarea** — multi-line text (maps to STRING, maps to prompts like {{CUSTOM_PROMPT}}); (3) **number** — numeric input with optional min/max/step (maps to INT or FLOAT, e.g., {{STEPS}}, {{WIDTH}}, {{HEIGHT}}); (4) **slider** — range slider (maps to INT or FLOAT with known range, e.g., {{AUDIO_SCALE}} 0.0-1.0, {{IMAGE_STRENGTH}}); (5) **select** — dropdown (maps to COMBO type or known enum values); (6) **file-upload** — file picker with accept type filter (maps to IMAGE → image/*, AUDIO → audio/*, VIDEO → video/*). Boolean toggle is a seventh type for BOOLEAN inputs. Resolution (width+height pair) is a convenience composite type. That's eight total but the six core + toggle + resolution-pair covers all known use cases. |
+| **Acceptance** | Builder offers all eight display types in the type selector. Dynamic renderer correctly renders all eight types. File upload fields accept appropriate MIME types based on configuration. Resolution pair renders as two linked number inputs that enforce multiples of 32 (matching the existing `useSmartResolution` hook pattern). |
+
+### TS-4: Section Grouping
+
+| Aspect | Detail |
+|--------|--------|
+| **Why expected** | All existing feature pages organize inputs into sections (e.g., "Input", "Settings", "Resolution", "Generate"). Presenting 8 uncategorized fields in a flat list makes the feature page feel unpolished. Every serious form builder (Kissflow, Zoho Forms, Carbon Design System) supports sections. |
 | **Complexity** | Low |
-| **Notes** | Validate on selection: file type (MP4, MOV, AVI, WebM, MKV per Freepik support), file size (warn for very large files given Heroku 512MB memory limit), and video duration (Freepik video upscaler has an 8-second limit per the product page -- this is a critical constraint that must be surfaced early). Show thumbnail preview and metadata (duration, resolution, file size) for each queued video. Reuse existing file input patterns from VideoUpscale.tsx. |
-| **Acceptance** | Accept multiple video files via file picker or drag-and-drop. Show preview thumbnail, filename, duration, resolution, and file size for each. Reject invalid formats with clear error message. Warn if video exceeds 8-second duration limit before submission. |
+| **Notes** | Admin assigns each variable to a named section. Default sections mirroring existing pages: "Inputs", "Settings", "Advanced". Admin can rename, add, or reorder sections. Variables within a section can be reordered (drag-handle or up/down arrows). Section order also configurable. This is stored in the JSONB `section_config` field in the database. |
+| **Acceptance** | Admin can create, rename, and delete sections. Each variable assigned to a section. Sections and their variables reorderable. Dynamic renderer renders sections as the existing `<Section title="...">` component pattern. |
 
-### TS-2: Per-Video Settings Panel
+### TS-5: Test Run Within the Builder
 
 | Aspect | Detail |
 |--------|--------|
-| **Why expected** | Freepik Video Upscaler exposes multiple parameters (resolution, creativity, sharpen, grain, FPS boost, flavor). Users expect to configure these. The question is whether to set globally for the batch or per-video. |
+| **Why expected** | Every workflow builder tool includes a test/preview mode. ComfyUI App Builder has a built-in "App Mode" preview. ViewComfy has a "Playground". Without test-run capability, the admin can only verify the workflow works after publishing it to all users, which is unacceptable. The PROJECT.md explicitly requires this: "Test-run workflows directly from the builder." |
+| **Complexity** | Medium-High |
+| **Notes** | The test runner renders the configured form inline within the builder page (below the configuration panel). Admin fills in test values and submits. The form submission follows the exact same code path as the production dynamic renderer: it calls the existing ComfyUI or RunPod submission pipeline using the configured workflow template and parameters. Output (video/image) is shown inline. Error messages surface ComfyUI errors clearly. This is the "test runner shares code path with renderer" decision from PROJECT.md — critical for confidence that what works in test works in production. The ComfyUI URL comes from the existing `comfyUrl` prop (header setting). |
+| **Acceptance** | Test form rendered with configured field types and labels. Admin can fill and submit. Job monitoring shows progress (reuses existing `startJobMonitoring` pattern). Output rendered inline. Errors shown with ComfyUI error text. Test does not create a permanent job record visible to regular users (or is clearly marked as a test run). |
+
+### TS-6: Publish to Studio
+
+| Aspect | Detail |
+|--------|--------|
+| **Why expected** | The purpose of the builder is to publish new features. An admin completing configuration expects a "Publish" button that makes the feature live. The PROJECT.md explicitly requires: "Publish features to any studio — instant appearance in navigation, no rebuild needed." |
+| **Complexity** | Medium |
+| **Notes** | Publishing saves the configuration to the database and adds the feature to the selected studio's navigation. Admin specifies: feature name, description, icon (emoji), gradient colors (matching existing studio gradient pattern), and which studio (dropdown of existing studios). On publish, the dynamic renderer immediately serves the feature page when navigated to. The studioConfig.ts pattern currently uses a hardcoded array — this needs to become database-driven (or hybrid: static for built-in features, database-queried for custom features). Navigation must update without page reload (could use a React context refresh or React Query invalidation). |
+| **Acceptance** | "Publish" button saves configuration. Admin selects target studio and provides name/description/icon/gradient. Feature immediately appears in sidebar navigation for all users. Dynamic renderer loads and displays the feature correctly. No frontend rebuild required. |
+
+### TS-7: Manage Published Features (CRUD)
+
+| Aspect | Detail |
+|--------|--------|
+| **Why expected** | Admins expect to view, edit, unpublish, and delete features they've created. A tool with only a "create" operation but no management is a dead end after the first publish. |
 | **Complexity** | Low-Medium |
-| **Notes** | Use global defaults with optional per-video override. Most batch workflows use "set once, apply to all" with the ability to tweak individual items. Parameters from PROJECT.md: resolution (360p-4K), creativity, sharpen, grain, fps_boost, flavor. Provide preset buttons (e.g., "Standard", "Cinematic", "Animation") that set sensible defaults for common use cases. Per-video override should be a collapse/expand panel on each queue item. |
-| **Acceptance** | Global settings panel at the top applies to all videos by default. Each video in the queue has an expandable per-video settings override. Presets for common configurations. Settings persist across session (localStorage). |
-
-### TS-3: Sequential Queue Processing
-
-| Aspect | Detail |
-|--------|--------|
-| **Why expected** | The PROJECT.md specifies "process one-by-one" to avoid rate limit bursts. Users expect to see their queue processed in order with clear indication of what's running, what's waiting, and what's done. |
-| **Complexity** | Medium |
-| **Notes** | Backend orchestrates: pick next pending video, submit to Freepik API, poll for completion (CREATED -> IN_PROGRESS -> COMPLETED/FAILED), then move to next. Frontend shows ordered list with status badges per item. This is the core state machine of the feature. The queue lives in the database (Supabase) so it survives page refreshes and browser closes. Freepik rate limits: Free=10/day, Tier 1=125/day. |
-| **Acceptance** | Videos process sequentially, one at a time. Queue order visible in UI. Status per video: pending, processing, completed, failed, paused. Queue persists across page refreshes (database-backed). Processing continues even if user navigates away (backend-driven). |
-
-### TS-4: Per-Video Status Tracking with Progress
-
-| Aspect | Detail |
-|--------|--------|
-| **Why expected** | Users need to know what's happening with each video. A batch with no per-item status is a black box. The existing app already has rich job tracking (video_jobs table, feed sidebar). |
-| **Complexity** | Medium |
-| **Notes** | Each video in the batch gets its own row in the database. Status lifecycle: pending -> processing -> completed/failed/paused. Show Freepik task status (CREATED -> IN_PROGRESS -> COMPLETED/FAILED) mapped to the internal status. The existing VideoJob model already supports this with its status field and per-job tracking. For processing items, show elapsed time and Freepik's reported progress if available. For completed items, show thumbnail of the upscaled result. |
-| **Acceptance** | Each video shows its current status with visual indicator (color-coded badge). Processing videos show elapsed time. Completed videos show output thumbnail and download link. Failed videos show error message and retry button. Paused videos show reason (credit exhaustion) and resume button. |
-
-### TS-5: Output Delivery to Supabase Storage + Google Drive
-
-| Aspect | Detail |
-|--------|--------|
-| **Why expected** | The PROJECT.md explicitly requires dual storage: Supabase for in-app viewing, Google Drive for organized project delivery. The existing video_jobs completion handler already does this (see `backend/api/video_jobs.py` lines 263-344). |
-| **Complexity** | Low-Medium |
-| **Notes** | Reuse the exact pattern from the existing `complete_video_job` endpoint: download from Freepik output URL, upload to Supabase Storage (`video-results` bucket), generate thumbnail, then upload to Google Drive's `AI-Videos` subfolder under the selected project. The `project_id` comes from ProjectContext (already in header). Non-blocking: Drive upload failure does not fail the job. |
-| **Acceptance** | Completed upscaled videos automatically saved to Supabase Storage. If a Google Drive project is selected, videos also uploaded to `{project}/AI-Videos/` folder. Thumbnail generated for feed display. Both uploads are non-blocking (failures logged but don't fail the job). In-app preview and download work via Supabase URL. |
-
-### TS-6: Error Handling with Per-Video Retry
-
-| Aspect | Detail |
-|--------|--------|
-| **Why expected** | External API calls fail. Freepik can return FAILED status, network errors can occur, rate limits can be hit. Users expect to retry individual failed videos without re-submitting the entire batch. |
-| **Complexity** | Medium |
-| **Notes** | Retry resets a single video's status to `pending` and re-queues it. The backend picks it up on the next queue poll cycle. Important: do NOT auto-retry infinitely -- max 2 automatic retries with exponential backoff, then mark as failed and let the user manually retry. Distinguish between retryable errors (network timeout, 5xx from Freepik) and non-retryable errors (invalid video format, 4xx from Freepik). |
-| **Acceptance** | Failed videos show error message and a "Retry" button. Automatic retry (up to 2 attempts) for transient errors. Manual retry button for persistent failures. Retry count shown on each video. Non-retryable errors clearly indicated (no retry button). |
-
-### TS-7: Batch Summary View
-
-| Aspect | Detail |
-|--------|--------|
-| **Why expected** | Users need to see the overall state of their batch at a glance: how many total, how many done, how many failed, estimated time remaining. |
-| **Complexity** | Low |
-| **Notes** | Summary bar at the top of the queue: "5/12 completed, 1 processing, 6 pending" with a progress bar. Estimated time remaining based on average processing time of completed items. This is pure frontend computation from the per-video status data. |
-| **Acceptance** | Summary shows: total count, completed count, processing count, pending count, failed count. Progress bar reflects overall completion percentage. Estimated time remaining (after at least 1 video completes). |
+| **Notes** | A management list view within the builder page shows all published custom features: name, studio, created date, last edited, status (published/draft). Actions per feature: Edit (re-opens builder with loaded config), Unpublish (removes from navigation but keeps config in database), Delete (removes config and navigation entry). Edit must load the full configuration back into the builder panel. Draft state (saved but not yet published) is useful for multi-session editing. |
+| **Acceptance** | List of all custom features with name, studio, status, dates. Edit button opens feature in builder. Unpublish removes from navigation instantly. Delete removes permanently with confirmation dialog. Draft save available during editing. |
 
 ---
 
 ## Differentiators
 
-Features that set this apart from simply running Freepik's own web upscaler 12 times manually. These justify building a custom batch interface.
+Features that set this builder apart from generic workflow-to-app tools like ViewComfy or ComfyFlowApp. They justify building a custom tool instead of using an external service.
 
-### D-1: Credit Exhaustion Detection with Pause-and-Notify
-
-| Aspect | Detail |
-|--------|--------|
-| **Value proposition** | When Freepik credits run out mid-batch, instead of failing all remaining videos, the system pauses the queue and notifies the user. This is explicitly called out in PROJECT.md as a core feature. No competitor does this well -- most just fail silently or error out. |
-| **Complexity** | Medium-High |
-| **Notes** | Detect credit exhaustion from Freepik API response (likely a 402/429 or specific error code in the FAILED status). When detected: (1) mark current video as `paused`, (2) mark all pending videos as `paused`, (3) set batch status to `paused_credit_exhaustion`, (4) show prominent UI notification with link to Freepik to add credits. Requires distinguishing credit exhaustion from other API errors. The pause state must be distinct from failed -- paused items should retain their queue position and settings. |
-| **Acceptance** | Credit exhaustion detected automatically from API responses. All remaining videos pause (not fail). Prominent notification tells user why and links to Freepik. No data loss on pause. Resume button re-queues all paused videos. Queue order and settings preserved through pause/resume cycle. |
-
-### D-2: Resume Capability After Credit Recharge
+### D-1: Live Preview of the Rendered Feature Page
 
 | Aspect | Detail |
 |--------|--------|
-| **Value proposition** | After the user adds credits to their Freepik account, they click "Resume" and the batch continues from where it left off. No re-uploading, no re-configuring, no re-ordering. |
+| **Value proposition** | As the admin configures variables, sections, and field types, a live preview panel shows exactly what the feature page will look like — using the actual dynamic renderer component. No "save and check" cycle. This is more like Webflow or Framer's approach than generic form builders. |
 | **Complexity** | Medium |
-| **Notes** | Resume sets all `paused` videos back to `pending` and restarts the queue processor. The backend picks up where it left off. Optionally verify credit availability before resuming (make a test API call). Resume should also work after browser close/reopen since the queue is database-backed. Must handle edge case: user resumes but still has insufficient credits -- re-detect and re-pause gracefully. |
-| **Acceptance** | "Resume" button appears when batch is paused. Clicking it re-queues all paused videos. Processing resumes from the first pending video. Works after browser close and reopen. Re-pauses gracefully if credits still insufficient. Optional: "Check Credits" button to verify before resuming. |
+| **Notes** | The dynamic renderer is a React component that accepts a config object. The builder feeds it the current (unsaved) config in real-time. Preview renders in a sidebar or bottom panel. Because the renderer is just a component, this is straightforward to wire — the same component renders in preview mode and production mode. Preview should be clearly marked as a preview to avoid confusion. |
+| **Acceptance** | Preview updates as admin changes field labels, types, section names, or ordering. Matches the exact output of the production renderer. Preview mode disables form submission (no actual workflow execution in preview). |
 
-### D-3: Batch History with Re-Run
+### D-2: Auto-Detect Field Types from ComfyUI Type System
 
 | Aspect | Detail |
 |--------|--------|
-| **Value proposition** | View past batches, see results, and re-run a batch with the same or different settings. Useful for iterating on upscale settings (e.g., try different creativity/sharpen combinations). |
+| **Value proposition** | Instead of requiring the admin to manually choose every field type, the parser infers the most likely display type from the ComfyUI input type and current value. `INT` with a value between 0 and 1 → suggests slider. `STRING` longer than 100 characters → suggests textarea. `COMBO` with a list of options → suggests select. This reduces configuration friction significantly. |
 | **Complexity** | Low-Medium |
-| **Notes** | The existing GenerationFeed/ResizableFeedSidebar pattern already handles per-feature job history. Extend it with batch grouping: group individual video jobs by `batch_id`. Show batch-level summary (X/Y completed, total duration, settings used). "Re-run" creates a new batch with the same source videos and settings. Requires adding a `batch_id` field to video jobs. |
-| **Acceptance** | Past batches visible in feed sidebar grouped by batch. Batch summary shows completion stats. Individual video results viewable from batch. "Re-run" option creates new batch with same settings (and optionally same source videos if still available). |
+| **Notes** | Heuristics for auto-detection: (1) BOOLEAN → toggle; (2) COMBO → select (options taken from the list); (3) STRING with multiline=true → textarea; (4) STRING with known filename patterns (ends in .safetensors, .ckpt, .pt) → skip (these are model selectors not user inputs); (5) INT or FLOAT with min/max defined → slider; (6) INT or FLOAT without range → number input; (7) field name contains "seed" → number input with a "randomize" button; (8) field name is "image", "audio", "video", or ends in "_filename" → file upload. These are heuristics and the admin can always override. |
+| **Acceptance** | Each variable shows auto-detected type as default. Override selector available. Auto-detection is documented or shown (e.g., a tooltip saying "Auto-detected from INT type with range 0-100"). |
 
-### D-4: Queue Reordering (Drag-and-Drop)
-
-| Aspect | Detail |
-|--------|--------|
-| **Value proposition** | Users often realize after queuing that they want certain videos processed first. Drag-and-drop reordering before or during processing (for pending items only) adds a level of control that distinguishes this from a simple FIFO queue. |
-| **Complexity** | Medium |
-| **Notes** | Only pending items can be reordered. Processing and completed items are locked in position. Use a `queue_position` integer field in the database. Drag-and-drop using a lightweight library (dnd-kit or similar, already common in React ecosystems). Update positions via API call. Topaz Video AI's community has explicitly requested better batch queue control, indicating this is a real user need. |
-| **Acceptance** | Drag-and-drop to reorder pending videos in queue. Processing/completed items cannot be moved. Queue order persists (database-backed). Visual handle or grip indicator for draggable items. |
-
-### D-5: Batch-Level Download (ZIP)
+### D-3: Full Integration with Existing Job Tracking and Feed
 
 | Aspect | Detail |
 |--------|--------|
-| **Value proposition** | After batch completes, download all upscaled videos as a single ZIP file instead of clicking download 12 times individually. |
+| **Value proposition** | Published custom features behave identically to built-in features — they appear in the generation feed, support dual execution backends (ComfyUI + RunPod), and their jobs appear in the unified feed sidebar. This is only possible because the tool is built into the platform rather than being an external service. |
 | **Complexity** | Medium |
-| **Notes** | Generate ZIP server-side from Supabase Storage URLs. Stream the ZIP to the client to avoid memory issues (important given Heroku's 512MB limit). Alternatively, use client-side ZIP generation (JSZip) by fetching each video and adding to the archive -- but this has browser memory limits for large batches. Server-side streaming ZIP is preferred but must respect Heroku's 30-second timeout. Consider a background job that generates the ZIP and provides a download link when ready. |
-| **Acceptance** | "Download All" button available when batch has completed videos. ZIP contains all completed upscaled videos with original filenames. Works for batches of 10+ videos. Progress indicator during ZIP generation. |
+| **Notes** | When a user submits a custom feature job, the dynamic renderer calls `createJob` with a `workflow_type` derived from the feature's slug. The UnifiedFeed sidebar on custom feature pages filters by that workflow_type. The existing `startJobMonitoring` utility handles progress tracking without changes. The execution backend toggle (ComfyUI vs RunPod) respects user preference automatically. |
+| **Acceptance** | Jobs from custom features appear in generation feed. UnifiedFeed sidebar on the custom feature page shows only that feature's jobs. Execution backend toggle works for custom feature submissions. Job details (status, output, thumbnail) display correctly. |
+
+### D-4: Seed Field with Randomize Button
+
+| Aspect | Detail |
+|--------|--------|
+| **Value proposition** | Most ComfyUI workflows have a seed parameter (INT, typically very large range). The standard UX for seed fields is a number input paired with a "randomize" button (dice icon) that generates a random 64-bit integer. This is a common pattern in existing pages like WANI2V and LipsyncOnePerson. Auto-detecting seed fields and rendering them with a randomize button produces a polished result with no extra admin configuration. |
+| **Complexity** | Low |
+| **Notes** | Detection: field name is "seed" or contains "seed". Renderer: number input + randomize button. Randomize generates `Math.floor(Math.random() * 2**32)` (matching the pattern in existing page components). |
+| **Acceptance** | Fields named "seed" auto-render with randomize button. Randomize button generates a new random seed on click. Admin can disable seed exposure (leave it as a fixed value in the template). |
+
+### D-5: Resolution Pair as Composite Field Type
+
+| Aspect | Detail |
+|--------|--------|
+| **Value proposition** | Width and height parameters are always paired in ComfyUI workflows and must be multiples of 32. The existing `useSmartResolution` hook handles this. Custom features with resolution inputs should use the same composite input that enforces the constraint automatically, rather than two unrelated number fields. |
+| **Complexity** | Low |
+| **Notes** | When both `WIDTH` and `HEIGHT` node inputs are selected as variables (or inputs named "width"/"height"), the admin can link them as a resolution pair. The dynamic renderer then uses the `useSmartResolution` hook behavior. Admin can also just expose them as separate number fields if desired. |
+| **Acceptance** | "Resolution pair" composite type available. When selected for width+height, renders as two linked inputs with "Auto-corrected to multiples of 32" note. Dynamic renderer enforces rounding. |
 
 ---
 
 ## Anti-Features
 
-Things to deliberately NOT build. Including them adds complexity without proportional value or conflicts with the project's constraints.
+Things to deliberately NOT build in v1.2. Including them adds complexity that either slows delivery or belongs in a later milestone.
 
-### AF-1: Parallel API Submissions
+### AF-1: Visual Node Graph Editor
 
-**Do not build.** The PROJECT.md explicitly specifies "process one-by-one" for sequential processing. Submitting multiple videos to Freepik simultaneously would:
-- Burn through credits faster, making credit exhaustion harder to detect and manage
-- Risk hitting Freepik's rate limits (50 req/sec, but more importantly daily limits of 10-125)
-- Complicate the pause/resume logic
-- Add concurrency complexity for marginal time savings
+**Do not build.** A visual canvas showing ComfyUI nodes as connected boxes (like ComfyUI's own interface or reactflow-based editors) is enormously complex. The builder's purpose is to configure user-facing inputs for an existing workflow, not to create or modify the workflow's computational graph.
 
-**What to do instead:** Sequential processing with clear queue position indicators. If processing speed becomes a concern, this could be revisited in a future milestone with configurable concurrency (1-3 simultaneous).
+**What to do instead:** Parse the uploaded JSON, present a flat list of nodes with their inputs. The admin configures which inputs become variables — they do not need to see or edit the graph topology. If an admin wants to modify the workflow graph, they do so in ComfyUI itself and re-upload.
 
-### AF-2: Video Trimming/Splitting Before Upscale
+### AF-2: Code Generation (React Component Files)
 
-**Do not build.** Freepik's video upscaler has an 8-second limit. It would be tempting to add a video trimmer that splits longer videos into 8-second segments, upscales each, then stitches them back together. This is a massive scope increase:
-- FFmpeg integration (either client-side via ffmpeg.wasm or server-side)
-- Segment management and reassembly
-- Audio sync across segments
-- Quality loss at segment boundaries
+**Do not build.** Generating `.tsx` files, writing to the filesystem, and triggering rebuilds is fragile, slow, and defeats the "instant publish without rebuild" goal from PROJECT.md. The dynamic renderer approach (database config → React component renders at runtime) is explicitly the chosen pattern.
 
-**What to do instead:** Validate video duration on upload and clearly inform the user that videos must be 8 seconds or shorter. Link to an external trimming tool if needed. If segment-and-stitch becomes a real need, scope it as a separate milestone.
+**What to do instead:** Store configuration in Supabase (JSONB columns). The dynamic renderer interprets the config at runtime. No code generation, no file writes, no rebuilds.
 
-### AF-3: Real-Time Credit Balance Display
+### AF-3: Per-User Workflow Builder Access (Non-Admin)
 
-**Do not build.** Continuously polling Freepik's API for the user's remaining credit balance adds complexity and may not even be possible (Freepik's API docs do not expose a credit balance endpoint). The credit exhaustion detection (D-1) handles the critical case reactively.
+**Do not build.** Allowing regular users to create and publish features requires multi-tenant workflow management, approval workflows, sandboxing, rate limiting per user, and access control audit trails. This is a different product (more like Gradio Spaces or Hugging Face).
 
-**What to do instead:** Detect credit exhaustion when it happens (from API error responses). Show estimated credit cost before submission if pricing data is available. Link to Freepik dashboard for balance checks.
+**What to do instead:** Keep the builder strictly admin-only (same `isAdmin` check used in Infrastructure). One admin, full trust, full control.
 
-### AF-4: Multi-API Backend Support
+### AF-4: Workflow Validation Against a Running ComfyUI Instance
 
-**Do not build.** Do not abstract the upscaling backend to support multiple APIs (Topaz, Neural Love, custom ComfyUI upscale, etc.) in this milestone. The existing SeedVR2 single-video upscale already uses ComfyUI. This milestone is specifically about Freepik API batch upscaling.
+**Do not build** as a blocking step during upload. Calling `/object_info` on a ComfyUI instance to validate every node and input type is useful but: (a) requires a live ComfyUI server at builder time, (b) the server may have different custom nodes than production, (c) it adds latency to the upload flow. The existing workflow templates work without per-upload validation.
 
-**What to do instead:** Build a clean Freepik service layer. If multi-backend support is needed later, the service interface pattern makes it possible to add alternative backends without rewriting the queue logic.
+**What to do instead:** Validate the JSON structure (nodes have `class_type` and `inputs`, no cyclic links). The test-run (TS-5) is the real validation — if the workflow runs successfully in test, it will run in production.
 
-### AF-5: Upload Videos FROM Google Drive
+### AF-5: Drag-and-Drop Node Graph Parsing with Auto-Layout
 
-**Do not build.** The PROJECT.md explicitly scopes this out: "Upload videos from Google Drive -- Planned for future milestone." This milestone uploads TO Google Drive only (output delivery).
+**Do not build.** Auto-detecting the "semantic" role of each node (which nodes are for model loading vs. user input vs. output) by analyzing the graph structure requires heuristics that break for custom nodes. The admin knows their workflow and can identify inputs manually.
 
-**What to do instead:** Accept video uploads from the user's local machine only. The Google Drive -> Freepik direction can be added later by reading from Drive and feeding into the same queue.
+**What to do instead:** Present nodes in a simple list with their `_meta.title` and `class_type`. Admin selects inputs by inspection. For power users who know their JSON, this is fast.
 
-### AF-6: Freepik Account Management
+### AF-6: Conditional Field Logic (Show/Hide Based on Other Field Values)
 
-**Do not build.** No Freepik account creation, API key management UI, or credit purchase flow within the app. The Freepik API key is a backend environment variable (like OPENROUTER_API_KEY).
+**Do not build** in v1.2. Conditional logic (e.g., "show SEED field only if RANDOMIZE_SEED is false") significantly complicates both the builder configuration UI and the dynamic renderer. No existing feature page uses conditional field visibility.
 
-**What to do instead:** Store FREEPIK_API_KEY in backend .env. Provide a link to Freepik's dashboard for account/credit management. Surface credit exhaustion errors clearly so the user knows to go to Freepik to add credits.
+**What to do instead:** Keep all fields always visible. If an admin wants to hide an input, they set it as a fixed value in the template (not a variable). Conditional logic can be added in v2 if feature pages require it.
 
-### AF-7: Video Preview Comparison (Before/After)
+### AF-7: Multiple Output Configuration (Image vs. Video vs. Audio)
 
-**Do not build** in this milestone. A side-by-side or slider-based before/after comparison viewer is a nice-to-have but adds significant UI complexity (synchronized video playback, canvas rendering) that is not part of the batch workflow core.
+**Do not build** as a complex configuration panel. Output type detection can be inferred from the workflow's SaveImage/VHS_VideoCombine/SaveAudio node types (the node that saves the final output). If the builder detects a video save node, the renderer uses a video player; image save node → image preview.
 
-**What to do instead:** Show the upscaled video in a standard player. Users can visually compare by opening the original in a separate tab. Consider this for a future "Video Viewer" enhancement.
+**What to do instead:** Auto-detect output type from terminal node class_type patterns. Admin can override with a simple "Output type: Image / Video / Audio" selector. No multi-output rendering in v1.2.
 
 ---
 
 ## Feature Dependencies
 
 ```
-TS-1: Multi-File Upload
+TS-1: Workflow JSON Upload + Parse
   |
-  +-- TS-2: Per-Video Settings (needs files to configure)
-  |     |
-  |     +-- TS-3: Sequential Queue Processing (needs files + settings)
-  |           |
-  |           +-- TS-4: Per-Video Status Tracking (needs queue running)
-  |           |     |
-  |           |     +-- TS-7: Batch Summary View (aggregates per-video status)
-  |           |     +-- D-3: Batch History (needs completed batches)
-  |           |
-  |           +-- TS-5: Output Delivery (needs completed videos)
-  |           |
-  |           +-- TS-6: Error Handling + Retry (needs failures to handle)
-  |           |     |
-  |           |     +-- D-1: Credit Exhaustion Detection (specialized error)
-  |           |           |
-  |           |           +-- D-2: Resume After Recharge (needs pause state)
-  |           |
-  |           +-- D-4: Queue Reordering (needs pending items in queue)
-  |           +-- D-5: Batch Download ZIP (needs completed outputs)
+  +-- TS-2: Variable Configuration (needs parsed nodes)
+        |
+        +-- TS-3: Six Core Field Types (implements display types for variables)
+        |
+        +-- TS-4: Section Grouping (organizes variables into sections)
+        |
+        +-- D-1: Live Preview (renders TS-2+TS-3+TS-4 in real-time)
+        |
+        +-- D-2: Auto-Detect Types (enhances TS-2 with smart defaults)
+        |
+        +-- D-4: Seed Field + Randomize (specialized field type in TS-3)
+        |
+        +-- D-5: Resolution Pair (specialized composite type in TS-3)
+        |
+        +-- TS-5: Test Run (requires TS-2+TS-3+TS-4 complete to render test form)
+              |
+              +-- TS-6: Publish to Studio (requires test passing to publish)
+                    |
+                    +-- D-3: Feed + Dual Backend Integration (happens at publish time)
+                    |
+                    +-- TS-7: Manage Published Features (requires published features to manage)
 ```
 
-**Critical path:** TS-1 -> TS-2 -> TS-3 -> TS-4 -> TS-5 -> TS-6
+**Critical path:** TS-1 → TS-2 → TS-3 → TS-4 → TS-5 → TS-6
 
-This is the minimum viable flow: upload videos, configure settings, process them sequentially, track status, deliver outputs, handle errors.
+This is the minimum viable loop: upload a workflow, configure its inputs, give them types and sections, test it, publish it.
 
 **Parallel work possible:**
-- D-4 (queue reordering) can be built in parallel with TS-4-TS-6 once the queue exists
-- TS-7 (batch summary) is pure UI that can be built once TS-4 is in place
-- D-1/D-2 (credit exhaustion) builds on top of TS-6 (error handling)
+- D-2 (auto-detect) can be built into TS-1/TS-2 from the start without blocking other features
+- D-4 and D-5 (seed field, resolution pair) are renderer-level features buildable in parallel with TS-5
+- TS-7 (management list) can be built after TS-6 as a follow-on
+- D-3 (feed integration) works automatically if the dynamic renderer calls `createJob` correctly — no separate build step
 
 ---
 
 ## MVP Recommendation
 
-**Prioritize (Phase 1 -- Core Batch Flow):**
-1. TS-1: Multi-file upload with validation (8-second limit check)
-2. TS-2: Global settings panel with presets (defer per-video override to Phase 2)
-3. TS-3: Sequential queue processing (database-backed, backend-driven)
-4. TS-4: Per-video status tracking
-5. TS-5: Output delivery to Supabase + Google Drive
-6. TS-6: Error handling with retry
-7. TS-7: Batch summary view
+### Launch With (v1.2 Core)
 
-**Prioritize (Phase 2 -- Credit Management):**
-1. D-1: Credit exhaustion detection with pause
-2. D-2: Resume capability
-3. Per-video settings override (from TS-2)
+- [ ] TS-1: Workflow JSON upload and node parsing — without this, nothing else works
+- [ ] TS-2: Variable configuration (label, type, required, default) — core builder UX
+- [ ] TS-3: Six core field types + toggle + resolution pair — covers all existing workflow placeholder types
+- [ ] TS-4: Section grouping — minimum for polished output
+- [ ] TS-5: Test run — non-negotiable; admins must test before publishing
+- [ ] TS-6: Publish to studio — the feature's purpose
+- [ ] D-2: Auto-detect field types — low cost, high time savings during configuration
 
-**Defer:**
-- D-3: Batch history with re-run -- can use existing feed for now
-- D-4: Queue reordering -- nice-to-have, not blocking
-- D-5: Batch ZIP download -- individual downloads work fine initially
+### Add After First Publish Works (v1.2 Polish)
 
-**Rationale:** The core batch flow (upload, configure, process, track, deliver, retry) must work end-to-end before adding credit management complexity. Credit pause/resume is the primary differentiator but depends on the core queue being solid first.
+- [ ] TS-7: Manage published features (edit, unpublish, delete) — needed as soon as the first feature is published
+- [ ] D-1: Live preview panel — improves confidence during configuration; add once core is stable
+- [ ] D-3: Feed + dual backend integration — validate this works with the first published feature
+- [ ] D-4: Seed field with randomize — common enough to include early
+- [ ] D-5: Resolution pair composite type — needed for any workflow with width+height
+
+### Future Consideration (v2+)
+
+- [ ] Conditional field logic — only needed when feature pages require dynamic visibility
+- [ ] object_info-based validation (optional, requires live server) — useful but not blocking
+- [ ] Workflow versioning (upload new version of a published workflow) — needed as workflows evolve
+- [ ] Sharing custom features between admin accounts — needed if multi-admin scenario arises
+- [ ] Visual node graph viewer (read-only) — useful for debugging complex workflows
+
+---
+
+## Feature Prioritization Matrix
+
+| Feature | User Value | Implementation Cost | Priority |
+|---------|------------|---------------------|----------|
+| TS-1: Workflow JSON upload + parse | HIGH | MEDIUM | P1 |
+| TS-2: Variable configuration | HIGH | MEDIUM | P1 |
+| TS-3: Six core field types | HIGH | MEDIUM | P1 |
+| TS-4: Section grouping | HIGH | LOW | P1 |
+| TS-5: Test run | HIGH | HIGH | P1 |
+| TS-6: Publish to studio | HIGH | MEDIUM | P1 |
+| D-2: Auto-detect field types | MEDIUM | LOW | P1 |
+| TS-7: Manage published features | HIGH | LOW | P2 |
+| D-1: Live preview | MEDIUM | MEDIUM | P2 |
+| D-3: Feed + dual backend | HIGH | LOW | P2 |
+| D-4: Seed field + randomize | MEDIUM | LOW | P2 |
+| D-5: Resolution pair | MEDIUM | LOW | P2 |
+| Conditional field logic | LOW | HIGH | P3 |
+| object_info validation | LOW | MEDIUM | P3 |
+| Workflow versioning | MEDIUM | MEDIUM | P3 |
+
+**Priority key:**
+- P1: Must have for v1.2 launch
+- P2: Should have, add in v1.2 polish phase
+- P3: Future milestone
+
+---
+
+## Competitor / Prior Art Feature Analysis
+
+| Feature | ViewComfy | ComfyUI App Builder | ComfyFlowApp | Our Builder |
+|---------|-----------|---------------------|--------------|-------------|
+| Upload workflow JSON | Yes (drag+drop) | No (uses current workflow) | Yes | Yes (file input) |
+| Select which inputs to expose | Yes | Yes (click in graph) | Yes | Yes (list view) |
+| Field type configuration | Yes (text, number, select, slider, checkbox, image, video, audio) | Partial | Partial | Yes (8 types) |
+| Section grouping | Unknown | Yes (rename, reorder, group) | Unknown | Yes |
+| Test/preview before publish | Yes (playground) | Yes (app mode) | Yes | Yes (inline test run) |
+| Publish to navigation | No (external hosting) | Yes (ComfyHub) | Yes (own platform) | Yes (platform sidebar) |
+| Manage published features | Yes (CRUD in dashboard) | Yes | Unknown | Yes |
+| Feed/job tracking integration | No | No | No | Yes (platform native) |
+| Dual execution backend | No | No | No | Yes (ComfyUI + RunPod) |
+| Admin-only access | No | No | No | Yes (isAdmin gate) |
+| No rebuild required | Yes | Yes | Yes | Yes |
+| Live preview while configuring | Unknown | Yes (real-time) | Unknown | Yes |
+| Auto-detect field types | No | Yes (graph context) | Unknown | Yes |
+
+**Unique to our approach:** Feed integration, dual execution backend support, and admin-gating are impossible in external tools because they require deep platform integration. These are the key reasons to build rather than use ViewComfy.
+
+---
+
+## Implementation Notes for Dynamic Renderer
+
+The dynamic renderer is the counterpart to the builder. It:
+
+1. Reads the published feature config from the database (workflow_name, variable_config[], section_config[])
+2. Renders a React component matching the existing feature page layout (Section, Field, Label pattern)
+3. On submit: calls `apiClient.submitWorkflow(workflowName, parameterMap, comfyUrl, clientId)`
+4. Creates a job via `createJob({ workflow_type: feature.slug, ... })`
+5. Starts monitoring via `startJobMonitoring(...)`
+6. Renders output (video/image/audio) based on the feature's configured output type
+7. Includes UnifiedFeed with `pageContext: feature.slug`
+
+The renderer is essentially a generic version of every existing feature page, parameterized by the database config. The test runner in the builder IS the renderer, rendered with a flag that suppresses the job from appearing in the regular feed (or marks it clearly as a test).
 
 ---
 
@@ -249,26 +314,30 @@ This is the minimum viable flow: upload videos, configure settings, process them
 
 | Constraint | Impact on Features |
 |-----------|-------------------|
-| Freepik 8-second video limit | Must validate on upload (TS-1), clearly communicate to users |
-| Freepik daily limits (10 free, 125 tier 1) | Sequential processing (TS-3), credit exhaustion detection (D-1) |
-| Heroku 30-second timeout | Queue processing must be background/async, not request-scoped |
-| Heroku 512MB memory | Cannot buffer large video files in memory; stream downloads |
-| Freepik Video Upscaler API uncertainty | API endpoint documented in PROJECT.md but not found in public Freepik API docs; needs validation before implementation begins (LOW confidence) |
-| Existing patterns | Must integrate with existing VideoJob model, feed sidebar, ProjectContext, Google Drive upload pattern |
+| No frontend rebuild on publish | Dynamic renderer (not code generation) is mandatory. Config must live in database. |
+| studioConfig.ts currently hardcoded | Navigation integration requires making custom features database-driven. Built-in features stay in studioConfig.ts; custom features fetched from API. Hybrid approach. |
+| Existing `{{PLACEHOLDER}}` substitution pattern | Variable naming convention must produce valid placeholder names. Suggest SCREAMING_SNAKE_CASE. Reserve names of existing placeholders. |
+| ComfyUI workflow_api.json vs workflow.json | Must accept API format (widget values as constants). The visual format (ComfyUI native) uses a different structure with `widgets_values` arrays that are harder to parse. Require API format export. |
+| Admin-only access | Builder page protected by `isAdmin` check. Dynamic renderer pages are public (like all feature pages). |
+| Existing workflow system (WorkflowService) | Published custom workflows store JSON in `backend/workflows/` or in the database. Database storage preferred for instant publish. WorkflowService needs a path to load from database in addition to files. |
 
 ---
 
 ## Sources
 
-- [Freepik AI Video Upscaler product page](https://www.freepik.com/ai/video-upscaler) -- feature set and limitations
-- [Freepik API documentation](https://docs.freepik.com/pricing) -- pricing model and rate limits
-- [Freepik API endpoint index](https://docs.freepik.com/llms.txt) -- available API endpoints (video upscaler NOT listed as of 2026-03-11)
-- [Magnific API](https://magnific.ai/api/) -- image-only API endpoints, no video
-- [Topaz Video AI batch queue community request](https://community.topazlabs.com/t/much-better-batch-control-of-all-items-in-queue-required/80123) -- user demand for better queue control
-- [LogRocket: UI patterns for async workflows](https://blog.logrocket.com/ui-patterns-for-async-workflows-background-jobs-and-data-pipelines) -- progress tracking and partial failure UX patterns
-- [Freepik AI Video Upscaler Product Hunt launch](https://hunted.space/product/freepik-ai-video-upscaler) -- user feedback and feature reception
-- Existing codebase: `frontend/src/pages/VideoUpscale.tsx`, `backend/api/video_jobs.py`, `frontend/src/contexts/ProjectContext.tsx`, `backend/services/google_drive_service.py`
+- [ComfyUI Datatypes documentation](https://docs.comfy.org/custom-nodes/backend/datatypes) — official input types (STRING, INT, FLOAT, BOOLEAN, COMBO, IMAGE, AUDIO)
+- [ComfyUI Workflow JSON Format — DeepWiki](https://deepwiki.com/Comfy-Org/ComfyUI/7.3-workflow-json-format) — node structure, link arrays vs constant values
+- [ViewComfy GitHub repository](https://github.com/ViewComfy/ViewComfy) — field types: text, numbers, dropdowns, sliders, checkboxes, images, videos, audio
+- [ViewComfy blog: turn workflow into app](https://www.viewcomfy.com/blog/turn-a-comfyui-workflow-into-an-app) — workflow-to-app process (upload → configure → deploy)
+- [ComfyUI App Builder announcement](https://blog.comfy.org/p/from-workflow-to-app-introducing) — rename, reorder, group inputs; App Mode vs App Builder pattern
+- [ComfyUI JS Objects documentation](https://docs.comfy.org/custom-nodes/js/javascript_objects_and_hijacking) — node.widgets, node.inputs distinction; BOOLEAN, INT, FLOAT, STRING, COMBO, IMAGEUPLOAD widget types
+- [InvokeAI Workflow Implementation](https://invoke-ai.github.io/InvokeAI/contributing/frontend/workflows/) — Linear View (linearizing graph into form), field templates from OpenAPI schema, stateful vs stateless fields
+- [Dynamic Forms Complete Guide — Noteforms](https://noteforms.com/resources/dynamic-forms-complete-guide) — conditional logic, progressive disclosure, governance patterns
+- [Dynamic Form Builder System Design — Medium](https://shivambhasin29.medium.com/mastering-frontend-system-design-building-a-dynamic-form-builder-from-scratch-0dfdd78d31d6) — field schema (id, type, label, validation, conditional logic)
+- [Form UI Design Best Practices — Designlab](https://designlab.com/blog/form-ui-design-best-practices) — section grouping, field ordering, spacing
+- Existing codebase: `frontend/src/lib/studioConfig.ts`, `frontend/src/components/StudioPage.tsx`, `frontend/src/App.tsx`, `backend/services/workflow_service.py`, `backend/workflows/*.json`
 
 ---
 
-*Research completed: 2026-03-11*
+*Feature landscape for: v1.2 Workflow Builder*
+*Researched: 2026-03-13*

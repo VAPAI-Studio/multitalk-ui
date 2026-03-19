@@ -5,6 +5,7 @@ import GenerationFeed from "./pages/GenerationFeed";
 import ProfileSettings from "./ProfileSettings";
 import StudioPage from "./components/StudioPage";
 import Infrastructure from "./pages/Infrastructure";
+import DynamicWorkflowPage from "./pages/DynamicWorkflowPage";
 // UI Components
 import ComfyUIStatus from "./components/ComfyUIStatus";
 import ConsoleToggle from "./components/ConsoleToggle";
@@ -18,23 +19,31 @@ import { ExecutionBackendProvider } from "./contexts/ExecutionBackendContext";
 import ExecutionBackendToggle from "./components/ExecutionBackendToggle";
 import AnnouncementBanner from "./components/AnnouncementBanner";
 import { studios, getStudioById, setLastUsedApp, type StudioPageType, type StudioConfig } from "./lib/studioConfig";
+import { useDynamicWorkflows } from "./hooks/useDynamicWorkflows";
+import { type CustomWorkflow } from "./lib/apiClient";
 
 // Collapsible Sidebar Group Component
 function SidebarGroup({
   studio,
   currentPage,
+  activeDynamicWorkflow,
   isExpanded,
   onToggleExpand,
   onNavigate,
+  onDynamicNavigate,
+  dynamicApps,
 }: {
   studio: StudioConfig;
   currentPage: StudioPageType;
+  activeDynamicWorkflow: CustomWorkflow | null;
   isExpanded: boolean;
   onToggleExpand: () => void;
   onNavigate: (page: StudioPageType) => void;
+  onDynamicNavigate: (wf: CustomWorkflow) => void;
+  dynamicApps: CustomWorkflow[];
 }) {
   const isActive = currentPage === studio.id;
-  const hasMultipleApps = studio.apps.length > 1;
+  const hasMultipleApps = studio.apps.length > 1 || dynamicApps.length > 0;
   const isDisabled = studio.comingSoon;
 
   return (
@@ -78,7 +87,7 @@ function SidebarGroup({
       </button>
 
       {/* Collapsible Sub-items */}
-      {isExpanded && hasMultipleApps && !isDisabled && (
+      {isExpanded && !isDisabled && (studio.apps.length > 1 || dynamicApps.length > 0) && (
         <div className="ml-4 mt-1 space-y-1 border-l-2 border-gray-200 dark:border-gray-700 pl-4">
           {studio.apps.map((app) => (
             <button
@@ -94,6 +103,20 @@ function SidebarGroup({
               <span>{app.title}</span>
             </button>
           ))}
+          {dynamicApps.map((wf) => (
+            <button
+              key={wf.slug}
+              onClick={() => onDynamicNavigate(wf)}
+              className={`w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-all duration-200 ${
+                activeDynamicWorkflow?.slug === wf.slug
+                  ? `bg-gradient-to-r ${wf.gradient} text-white`
+                  : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400'
+              }`}
+            >
+              <span>{wf.icon}</span>
+              <span>{wf.name}</span>
+            </button>
+          ))}
         </div>
       )}
     </div>
@@ -107,6 +130,11 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
   const [userMenuOpen, setUserMenuOpen] = useState<boolean>(false);
   const [expandedStudio, setExpandedStudio] = useState<string | null>(null);
+
+  // Parallel dynamic workflow state — never pollutes StudioPageType
+  const DYNAMIC_PAGE_KEY = 'vapai-dynamic-page';
+  const [activeDynamicWorkflow, setActiveDynamicWorkflow] = useState<CustomWorkflow | null>(null);
+  const { workflows: publishedWorkflows, byStudio: dynamicByStudio, loading: dynamicLoading } = useDynamicWorkflows();
 
   // Valid page values for localStorage validation
   const validPages: StudioPageType[] = [
@@ -179,10 +207,34 @@ export default function App() {
     }
   }, [isAdmin]);
 
+  // Restore dynamic page from localStorage after published workflows load
+  useEffect(() => {
+    if (dynamicLoading) return; // Wait for workflows to be fetched
+    const savedSlug = localStorage.getItem(DYNAMIC_PAGE_KEY);
+    if (savedSlug) {
+      const wf = publishedWorkflows.find((w) => w.slug === savedSlug);
+      if (wf) {
+        setActiveDynamicWorkflow(wf);
+      } else {
+        // Stale slug — workflow was unpublished or doesn't exist; clear gracefully
+        localStorage.removeItem(DYNAMIC_PAGE_KEY);
+      }
+    }
+  }, [dynamicLoading, publishedWorkflows]);
+
   // Save current page to localStorage when it changes
   const handlePageChange = (page: StudioPageType) => {
     setCurrentPage(page);
+    setActiveDynamicWorkflow(null);              // Clear dynamic on static navigate
+    localStorage.removeItem(DYNAMIC_PAGE_KEY);   // Clear dynamic key
     localStorage.setItem('vapai-current-page', page);
+    setSidebarOpen(false);
+  };
+
+  // Navigate to a dynamic workflow
+  const handleDynamicNavigate = (workflow: CustomWorkflow) => {
+    setActiveDynamicWorkflow(workflow);
+    localStorage.setItem(DYNAMIC_PAGE_KEY, workflow.slug);
     setSidebarOpen(false);
   };
 
@@ -415,9 +467,12 @@ export default function App() {
                     key={studio.id}
                     studio={studio}
                     currentPage={currentPage}
+                    activeDynamicWorkflow={activeDynamicWorkflow}
                     isExpanded={expandedStudio === studio.id}
                     onToggleExpand={() => toggleStudioExpansion(studio.id)}
                     onNavigate={handlePageChange}
+                    onDynamicNavigate={handleDynamicNavigate}
+                    dynamicApps={dynamicByStudio[studio.id] ?? []}
                   />
                 ))}
               </div>
@@ -489,67 +544,74 @@ export default function App() {
 
         {/* Page Content */}
         <main className="flex-1 transition-all duration-300">
-          {currentPage === "home" && (
+          {activeDynamicWorkflow ? (
+            <DynamicWorkflowPage
+              workflowConfig={activeDynamicWorkflow}
+              comfyUrl={comfyUrl}
+            />
+          ) : currentPage === "home" ? (
             <Homepage
               onNavigate={(page) => handlePageChange(page)}
+              onDynamicNavigate={handleDynamicNavigate}
+              dynamicWorkflows={publishedWorkflows}
               user={user}
             />
-          )}
-
-          {/* Studio Pages */}
-          {currentPage === "lipsync-studio" && (
+          ) : currentPage === "lipsync-studio" ? (
             <StudioPage
               studio={getStudioById("lipsync-studio")!}
               comfyUrl={comfyUrl}
+              dynamicApps={dynamicByStudio["lipsync-studio"] ?? []}
+              onDynamicNavigate={handleDynamicNavigate}
             />
-          )}
-          {currentPage === "image-studio" && (
+          ) : currentPage === "image-studio" ? (
             <StudioPage
               studio={getStudioById("image-studio")!}
               comfyUrl={comfyUrl}
+              dynamicApps={dynamicByStudio["image-studio"] ?? []}
+              onDynamicNavigate={handleDynamicNavigate}
             />
-          )}
-          {currentPage === "virtual-set-studio" && (
+          ) : currentPage === "virtual-set-studio" ? (
             <StudioPage
               studio={getStudioById("virtual-set-studio")!}
               comfyUrl={comfyUrl}
+              dynamicApps={dynamicByStudio["virtual-set-studio"] ?? []}
+              onDynamicNavigate={handleDynamicNavigate}
             />
-          )}
-          {currentPage === "video-studio" && (
+          ) : currentPage === "video-studio" ? (
             <StudioPage
               studio={getStudioById("video-studio")!}
               comfyUrl={comfyUrl}
+              dynamicApps={dynamicByStudio["video-studio"] ?? []}
+              onDynamicNavigate={handleDynamicNavigate}
             />
-          )}
-          {currentPage === "audio-studio" && (
+          ) : currentPage === "audio-studio" ? (
             <StudioPage
               studio={getStudioById("audio-studio")!}
               comfyUrl={comfyUrl}
+              dynamicApps={dynamicByStudio["audio-studio"] ?? []}
+              onDynamicNavigate={handleDynamicNavigate}
             />
-          )}
-          {currentPage === "text-studio" && (
+          ) : currentPage === "text-studio" ? (
             <StudioPage
               studio={getStudioById("text-studio")!}
               comfyUrl={comfyUrl}
+              dynamicApps={dynamicByStudio["text-studio"] ?? []}
+              onDynamicNavigate={handleDynamicNavigate}
             />
-          )}
-          {currentPage === "lora-studio" && (
+          ) : currentPage === "lora-studio" ? (
             <StudioPage
               studio={getStudioById("lora-studio")!}
               comfyUrl={comfyUrl}
+              dynamicApps={dynamicByStudio["lora-studio"] ?? []}
+              onDynamicNavigate={handleDynamicNavigate}
             />
-          )}
-          {currentPage === "infrastructure-studio" && (
+          ) : currentPage === "infrastructure-studio" ? (
             <Infrastructure comfyUrl={comfyUrl} />
-          )}
-
-          {/* Standalone Pages */}
-          {currentPage === "history" && (
+          ) : currentPage === "history" ? (
             <GenerationFeed />
-          )}
-          {currentPage === "profile-settings" && (
+          ) : currentPage === "profile-settings" ? (
             <ProfileSettings onNavigateBack={() => setCurrentPage("home")} />
-          )}
+          ) : null}
         </main>
       </div>
 

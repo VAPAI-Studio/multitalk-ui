@@ -529,3 +529,33 @@ async def save_dockerfile(
         raise HTTPException(status_code=status, detail=f"GitHub API error: {e.response.text}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"GitHub error: {str(e)}")
+
+
+# ---------------------------------------------------------------------------
+# Static config file endpoints for WorkflowBuilder (Phase 15)
+# ---------------------------------------------------------------------------
+
+@router.get("/node-registry")
+async def get_node_registry(
+    admin_user: dict = Depends(verify_admin),
+) -> dict:
+    """Return node_registry.json for dependency checking. Admin-only."""
+    import json
+    from pathlib import Path
+    registry_path = Path(__file__).resolve().parent.parent / "runpod_config" / "node_registry.json"
+    if not registry_path.exists():
+        raise HTTPException(status_code=404, detail="node_registry.json not found")
+    return json.loads(registry_path.read_text())
+
+
+@router.get("/model-manifest")
+async def get_model_manifest(
+    admin_user: dict = Depends(verify_admin),
+) -> dict:
+    """Return model_manifest.json for model presence checking. Admin-only."""
+    import json
+    from pathlib import Path
+    manifest_path = Path(__file__).resolve().parent.parent / "runpod_config" / "model_manifest.json"
+    if not manifest_path.exists():
+        raise HTTPException(status_code=404, detail="model_manifest.json not found")
+    return json.loads(manifest_path.read_text())

@@ -4,6 +4,8 @@ import { FileTree } from "../components/FileTree";
 import { FileUpload } from "../components/FileUpload";
 import { HFDownload } from "../components/HFDownload";
 import { DockerfileEditor } from "../components/DockerfileEditor";
+import WorkflowBuilder from "./WorkflowBuilder";
+import WorkflowList from "./WorkflowList";
 
 interface Props {
   comfyUrl: string;
@@ -13,6 +15,7 @@ export default function Infrastructure({ comfyUrl: _comfyUrl }: Props) {
   const { isAdmin } = useAuth();
   const [currentPath, setCurrentPath] = useState<string>("");
   const [fileTreeRefreshId, setFileTreeRefreshId] = useState(0);
+  const [currentTab, setCurrentTab] = useState<'files' | 'builder' | 'workflows'>('files');
 
   // Admin-only access control
   if (!isAdmin) {
@@ -46,50 +49,96 @@ export default function Infrastructure({ comfyUrl: _comfyUrl }: Props) {
             </p>
           </div>
 
-          {/* File Browser — refreshId prop triggers internal reload without remounting */}
-          <div className="space-y-4">
-            <FileTree
-              refreshId={fileTreeRefreshId}
-              currentPath={currentPath}
-              onNavigate={setCurrentPath}
-            />
+          {/* Tab bar */}
+          <div className="flex gap-2 mb-6">
+            <button
+              onClick={() => setCurrentTab('files')}
+              className={`px-4 py-2 rounded-xl font-medium transition-all text-sm ${
+                currentTab === 'files'
+                  ? 'bg-slate-700 text-white shadow-md'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              File Manager
+            </button>
+            <button
+              onClick={() => setCurrentTab('builder')}
+              className={`px-4 py-2 rounded-xl font-medium transition-all text-sm ${
+                currentTab === 'builder'
+                  ? 'bg-slate-700 text-white shadow-md'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              Workflow Builder
+            </button>
+            <button
+              onClick={() => setCurrentTab('workflows')}
+              className={`px-4 py-2 rounded-xl font-medium transition-all text-sm ${
+                currentTab === 'workflows'
+                  ? 'bg-slate-700 text-white shadow-md'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              Workflows
+            </button>
           </div>
 
-          {/* Upload to Network Volume */}
-          <FileUpload
-            targetPath={currentPath}
-            onUploadComplete={handleTreeRefresh}
-          />
+          {currentTab === 'files' && (
+            <div className="space-y-8">
+              {/* File Browser — refreshId prop triggers internal reload without remounting */}
+              <div className="space-y-4">
+                <FileTree
+                  refreshId={fileTreeRefreshId}
+                  currentPath={currentPath}
+                  onNavigate={setCurrentPath}
+                />
+              </div>
 
-          {/* Download from HuggingFace directly to volume */}
-          <HFDownload
-            targetPath={currentPath}
-            onComplete={handleTreeRefresh}
-          />
+              {/* Upload to Network Volume */}
+              <FileUpload
+                targetPath={currentPath}
+                onUploadComplete={handleTreeRefresh}
+              />
 
-          {/* Edit Dockerfile — in-browser Monaco editor backed by GitHub */}
-          <DockerfileEditor />
+              {/* Download from HuggingFace directly to volume */}
+              <HFDownload
+                targetPath={currentPath}
+                onComplete={handleTreeRefresh}
+              />
 
-          {/* Instructions Card */}
-          <div className="rounded-3xl border border-blue-200/80 p-6 shadow-lg bg-gradient-to-br from-blue-50 to-white">
-            <h2 className="text-lg font-bold text-blue-900 mb-3 flex items-center gap-2">
-              <span>ℹ️</span>
-              Setup Instructions
-            </h2>
-            <div className="space-y-2 text-sm text-blue-800">
-              <p>To use the file browser, configure your RunPod S3 credentials in the backend .env file:</p>
-              <ul className="list-disc list-inside space-y-1 ml-2 text-blue-700">
-                <li>RUNPOD_S3_ACCESS_KEY</li>
-                <li>RUNPOD_S3_SECRET_KEY</li>
-                <li>RUNPOD_NETWORK_VOLUME_ID</li>
-                <li>RUNPOD_S3_ENDPOINT_URL</li>
-                <li>RUNPOD_S3_REGION</li>
-              </ul>
-              <p className="mt-3 text-xs text-blue-600">
-                Get these credentials from: RunPod Dashboard → Storage → Network Volumes → S3 API Access
-              </p>
+              {/* Edit Dockerfile — in-browser Monaco editor backed by GitHub */}
+              <DockerfileEditor />
+
+              {/* Instructions Card */}
+              <div className="rounded-3xl border border-blue-200/80 p-6 shadow-lg bg-gradient-to-br from-blue-50 to-white">
+                <h2 className="text-lg font-bold text-blue-900 mb-3 flex items-center gap-2">
+                  <span>ℹ️</span>
+                  Setup Instructions
+                </h2>
+                <div className="space-y-2 text-sm text-blue-800">
+                  <p>To use the file browser, configure your RunPod S3 credentials in the backend .env file:</p>
+                  <ul className="list-disc list-inside space-y-1 ml-2 text-blue-700">
+                    <li>RUNPOD_S3_ACCESS_KEY</li>
+                    <li>RUNPOD_S3_SECRET_KEY</li>
+                    <li>RUNPOD_NETWORK_VOLUME_ID</li>
+                    <li>RUNPOD_S3_ENDPOINT_URL</li>
+                    <li>RUNPOD_S3_REGION</li>
+                  </ul>
+                  <p className="mt-3 text-xs text-blue-600">
+                    Get these credentials from: RunPod Dashboard → Storage → Network Volumes → S3 API Access
+                  </p>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
+
+          {currentTab === 'builder' && (
+            <WorkflowBuilder comfyUrl={_comfyUrl} />
+          )}
+
+          {currentTab === 'workflows' && (
+            <WorkflowList />
+          )}
         </div>
       </div>
     </div>

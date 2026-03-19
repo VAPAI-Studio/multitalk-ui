@@ -1,832 +1,671 @@
-# Architecture Research: Batch Video Upscale with Freepik API
+# Architecture Research: Workflow Builder Integration
 
-**Research Date:** 2026-03-11
-**Dimension:** Architecture
-**Question:** How does a batch video upscale feature with an external API (Freepik) integrate with the existing architecture?
-**Milestone Context:** v1.1 -- Adding batch video upscale to existing AI media processing app with FastAPI + React stack, Supabase DB/Storage, Google Drive integration.
-
----
-
-## 1. Component Inventory
-
-The batch video upscale feature decomposes into seven components. Each maps to existing architectural patterns or introduces a new pattern only where necessary.
-
-### Component A: Freepik Video Upscaler Service
-
-**Purpose:** Wrap the Freepik Video Upscaler API (`api.freepik.com/v1/ai/video-upscaler`) in a backend service class, handling authentication, submission, polling, and result retrieval.
-
-**Boundaries:**
-- Backend only. No frontend-to-Freepik communication.
-- Encapsulates all Freepik-specific logic: API key auth, request formatting, task status polling, output URL retrieval.
-- Does NOT manage batch sequencing (that is Component C's job).
-- Handles a single video upscale task: submit, poll, return result.
-
-**Interface:**
-```python
-class FreepikUpscalerService:
-    async def submit_task(
-        self, video_url: str, params: UpscaleParams
-    ) -> Tuple[bool, Optional[str], Optional[str]]:
-        """Submit video to Freepik. Returns (success, task_id, error)."""
-
-    async def check_task_status(
-        self, task_id: str
-    ) -> Tuple[str, Optional[str], Optional[str]]:
-        """Poll task. Returns (status, output_url, error).
-        Statuses: CREATED, IN_PROGRESS, COMPLETED, FAILED."""
-
-    async def check_credits(self) -> Tuple[bool, Optional[int], Optional[str]]:
-        """Check remaining credits. Returns (success, credits_remaining, error)."""
-```
-
-**Integration with existing architecture:**
-- New service: `backend/services/freepik_service.py`
-- Follows existing service tuple-return pattern: `(success, data, error)`
-- Uses `httpx.AsyncClient` for API calls (same as `runpod_service.py`)
-- New config in `backend/config/settings.py`: `FREEPIK_API_KEY`
-- Auth: `x-freepik-api-key` header (stored server-side, never exposed to frontend)
-
-**Freepik API Pattern (based on PROJECT.md and image upscaler API pattern):**
-```
-POST api.freepik.com/v1/ai/video-upscaler
-Headers: x-freepik-api-key: <key>
-Body: { video (base64 or URL), resolution, creativity, sharpen, grain, fps_boost, flavor }
-Response: { data: { task_id, status: "CREATED" } }
-
-GET api.freepik.com/v1/ai/video-upscaler/{task_id}
-Response: { data: { task_id, status, generated: [{ url }] } }
-```
-
-**Confidence:** MEDIUM -- The Freepik video upscaler API endpoint path and parameters are specified in PROJECT.md but the API documentation is not publicly indexed. The architecture is designed to match the confirmed Freepik image upscaler API pattern (POST to submit, GET to poll with task_id, statuses CREATED/IN_PROGRESS/COMPLETED/FAILED). The exact video endpoint may differ in parameter naming; this should be validated during implementation.
+**Domain:** Admin tooling for dynamic feature creation in an AI media processing platform
+**Researched:** 2026-03-13
+**Confidence:** HIGH — Based on direct codebase analysis of existing patterns
 
 ---
 
-### Component B: Batch Job Manager
+## Standard Architecture
 
-**Purpose:** Orchestrate sequential processing of a batch of videos. One video at a time to Freepik, advancing through a queue, detecting credit exhaustion, pausing, and resuming.
+### System Overview
 
-**Boundaries:**
-- Backend. Runs as a background loop (FastAPI BackgroundTask or asyncio task).
-- Owns the batch lifecycle: pending -> processing -> completed/failed/paused.
-- Calls Component A (FreepikUpscalerService) for individual video tasks.
-- Calls Component D (Output Delivery) when a video completes.
-- Updates database records (Component E) as videos progress.
-- Does NOT handle HTTP requests directly (Component F does that).
-
-**Interface:**
-```python
-class BatchJobManager:
-    async def start_batch(self, batch_id: str) -> None:
-        """Begin processing videos in batch sequentially.
-        Runs as background task. Self-manages until batch completes or pauses."""
-
-    async def resume_batch(self, batch_id: str) -> None:
-        """Resume a paused batch (after credits refilled)."""
-
-    async def cancel_batch(self, batch_id: str) -> None:
-        """Cancel remaining unprocessed videos in batch."""
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          BROWSER (React SPA)                             │
+│                                                                          │
+│  ┌──────────────┐  ┌──────────────────────┐  ┌────────────────────────┐ │
+│  │  App.tsx     │  │  StudioPage.tsx       │  │  WorkflowBuilderPage   │ │
+│  │  (routing)   │  │  (static app map)     │  │  (admin, new)         │ │
+│  │              │  │  appComponents{}      │  │                        │ │
+│  └──────┬───────┘  └──────────┬───────────┘  └───────────┬────────────┘ │
+│         │                     │                           │              │
+│         ▼                     ▼                           ▼              │
+│  ┌────────────────────────────────────────────────────────────────────┐ │
+│  │                    studioConfig.ts (MODIFIED)                       │ │
+│  │   studios[] — static                                                │ │
+│  │   dynamicStudios[] — fetched from DB, merged at runtime             │ │
+│  └────────────────────────────────────────────────────────────────────┘ │
+│                                                                          │
+│  ┌──────────────────────────────────────────────────────────────────┐   │
+│  │              DynamicWorkflowRenderer (NEW)                        │   │
+│  │  Receives: CustomWorkflow config from DB                          │   │
+│  │  Renders: inputs from variable_configs JSONB                      │   │
+│  │  Submits: via existing apiClient.submitWorkflow()                 │   │
+│  │  Tracks: via existing createJob / startJobMonitoring              │   │
+│  └──────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────┘
+             │ HTTPS / JWT
+             ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         FASTAPI BACKEND                                   │
+│                                                                          │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────────┐  │
+│  │  api/comfyui.py  │  │  api/custom_      │  │  api/feed.py         │  │
+│  │  (existing)      │  │  workflows.py     │  │  (existing)          │  │
+│  │  submit-workflow │  │  (NEW, admin)     │  │  unified feed        │  │
+│  └────────┬─────────┘  └────────┬──────────┘  └──────────────────────┘  │
+│           │                     │                                        │
+│           ▼                     ▼                                        │
+│  ┌──────────────────┐  ┌──────────────────────────────────────────────┐ │
+│  │  WorkflowService │  │  CustomWorkflowService (NEW)                  │ │
+│  │  (existing)      │  │  CRUD for workflow configs                    │ │
+│  │  load_template   │  │  parse_nodes — extract input metadata         │ │
+│  │  build_workflow  │  │  build_params — resolve variable configs      │ │
+│  │  validate        │  │  run_test — reuses WorkflowService            │ │
+│  └────────┬─────────┘  └────────┬─────────────────────────────────────┘ │
+│           │                     │                                        │
+└───────────┼─────────────────────┼────────────────────────────────────────┘
+            │                     │
+            ▼                     ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         SUPABASE (PostgreSQL)                             │
+│                                                                          │
+│  ┌────────────────────────────────────────────────────────────────────┐ │
+│  │  custom_workflows table (NEW)                                       │ │
+│  │  id, name, slug, studio_id, icon, gradient, workflow_file,         │ │
+│  │  variable_configs JSONB, section_configs JSONB, output_type,       │ │
+│  │  published, created_by, created_at, updated_at                     │ │
+│  └────────────────────────────────────────────────────────────────────┘ │
+│                                                                          │
+│  ┌───────────────────────┐  ┌───────────────────────────────────────┐   │
+│  │  video_jobs (existing) │  │  image_jobs (existing)                 │   │
+│  │  workflow_name field  │  │  workflow_name field                   │   │
+│  │  (stores slug of      │  │  (stores slug of dynamic workflows)    │   │
+│  │  dynamic workflows)   │  └───────────────────────────────────────┘   │
+│  └───────────────────────┘                                              │
+│                                                                          │
+│  ┌────────────────────────────────────────────────────────────────────┐ │
+│  │  Storage bucket: workflow-uploads/                                  │ │
+│  │  Stores uploaded workflow JSON files for custom_workflows           │ │
+│  └────────────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────────┘
+            │
+            ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         COMFYUI SERVER                                   │
+│  Receives workflow JSON via submit-prompt (existing path, unchanged)     │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Key behaviors:**
-1. Pop next pending video from batch queue
-2. Submit to Freepik via Component A
-3. Poll for completion (3-second intervals, matching RunPod pattern)
-4. On COMPLETED: trigger output delivery, mark video as completed, advance to next
-5. On FAILED: mark video as failed, advance to next (don't halt batch for single failures)
-6. On credit exhaustion (HTTP 402 or credit check returns 0): pause entire batch, notify frontend
-7. On resume: re-check credits, continue from where paused
+### Component Responsibilities
 
-**Integration with existing architecture:**
-- New module: `backend/services/batch_manager.py`
-- Background task pattern: matches `hf_download_service.py` in-memory job tracking approach, except backed by Supabase (persistent across restarts since batches can run for hours)
-- Polling pattern: matches the existing ComfyUI and RunPod polling (3s intervals)
+| Component | Responsibility | New or Modified |
+|-----------|----------------|-----------------|
+| `studioConfig.ts` | Static studio/app definitions + dynamic studio merge at runtime | MODIFIED — add dynamic merge |
+| `App.tsx` | Routing, page rendering, navigation state | MODIFIED — handle dynamic studio IDs |
+| `StudioPage.tsx` | Renders selected app within studio (static map) | MODIFIED — fallback to DynamicWorkflowRenderer |
+| `WorkflowBuilderPage` | Admin UI: upload JSON, configure inputs, test-run, publish | NEW |
+| `WorkflowNodeInspector` | Parses ComfyUI workflow JSON, displays nodes/inputs | NEW |
+| `VariableConfigurator` | UI to map node inputs to user-facing variable widgets | NEW |
+| `DynamicWorkflowRenderer` | Generic feature page rendered from DB config | NEW |
+| `api/custom_workflows.py` | CRUD + parse + test-run endpoints, admin-gated | NEW |
+| `CustomWorkflowService` | Business logic: parse nodes, build params, validate | NEW |
+| `custom_workflows` table | Stores workflow configs as JSONB, one row per feature | NEW (DB migration) |
 
 ---
 
-### Component C: Database Schema (Batch + Video Tracking)
+## Recommended Project Structure
 
-**Purpose:** Store batch metadata and per-video status in Supabase, enabling progress tracking, pause/resume, and history.
+```
+frontend/src/
+├── pages/
+│   ├── WorkflowBuilder.tsx         # NEW: Admin builder page (upload/configure/test/publish)
+│   └── [existing pages unchanged]
+├── components/
+│   ├── WorkflowBuilder/            # NEW: Sub-components for builder
+│   │   ├── NodeInspector.tsx       # Display parsed ComfyUI nodes/inputs
+│   │   ├── VariableConfigurator.tsx# Map node inputs to widgets (text/slider/file/etc.)
+│   │   └── WorkflowTestPanel.tsx   # Inline test runner
+│   ├── DynamicWorkflowRenderer.tsx # NEW: Generic renderer for published workflows
+│   └── [existing components unchanged]
+├── lib/
+│   ├── studioConfig.ts             # MODIFIED: Add dynamic studio fetching
+│   └── [existing libs unchanged]
+└── types/
+    └── customWorkflow.ts           # NEW: TypeScript interfaces for workflow configs
 
-**Schema Design:**
-
-```sql
--- Batch: groups multiple videos for a single upscale run
-CREATE TABLE upscale_batches (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES auth.users(id),
-    status TEXT NOT NULL DEFAULT 'pending'
-        CHECK (status IN ('pending', 'processing', 'completed', 'failed', 'paused', 'cancelled')),
-
-    -- Upscale parameters (shared across all videos in batch)
-    resolution TEXT,           -- e.g., '1080p', '4k'
-    creativity INTEGER DEFAULT 0,
-    sharpen BOOLEAN DEFAULT false,
-    grain TEXT DEFAULT 'none',
-    fps_boost BOOLEAN DEFAULT false,
-    flavor TEXT DEFAULT 'standard',
-
-    -- Google Drive output
-    project_id TEXT,           -- Google Drive folder ID (from ProjectContext)
-    drive_subfolder TEXT DEFAULT 'AI-Upscaled',
-
-    -- Counts (denormalized for fast reads)
-    total_videos INTEGER NOT NULL DEFAULT 0,
-    completed_videos INTEGER NOT NULL DEFAULT 0,
-    failed_videos INTEGER NOT NULL DEFAULT 0,
-
-    -- Timestamps
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    started_at TIMESTAMPTZ,
-    completed_at TIMESTAMPTZ,
-
-    -- Pause/resume
-    paused_at TIMESTAMPTZ,
-    pause_reason TEXT,         -- e.g., 'credit_exhaustion'
-
-    -- Error
-    error_message TEXT
-);
-
--- Individual video within a batch
-CREATE TABLE upscale_videos (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    batch_id UUID NOT NULL REFERENCES upscale_batches(id) ON DELETE CASCADE,
-    user_id UUID NOT NULL REFERENCES auth.users(id),
-
-    -- Status
-    status TEXT NOT NULL DEFAULT 'pending'
-        CHECK (status IN ('pending', 'processing', 'completed', 'failed', 'skipped')),
-    queue_position INTEGER NOT NULL,  -- Order within batch
-
-    -- Input
-    input_filename TEXT NOT NULL,
-    input_storage_url TEXT NOT NULL,  -- Supabase Storage URL of uploaded source video
-    input_file_size BIGINT,          -- bytes
-
-    -- Freepik tracking
-    freepik_task_id TEXT,
-
-    -- Output
-    output_storage_url TEXT,         -- Supabase Storage URL of upscaled video
-    output_drive_file_id TEXT,       -- Google Drive file ID (if uploaded)
-
-    -- Metadata
-    duration_seconds FLOAT,
-    width INTEGER,
-    height INTEGER,
-
-    -- Timestamps
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    started_at TIMESTAMPTZ,
-    completed_at TIMESTAMPTZ,
-
-    -- Error
-    error_message TEXT
-);
-
--- Indexes for common queries
-CREATE INDEX idx_upscale_batches_user ON upscale_batches(user_id, created_at DESC);
-CREATE INDEX idx_upscale_batches_status ON upscale_batches(status);
-CREATE INDEX idx_upscale_videos_batch ON upscale_videos(batch_id, queue_position);
-CREATE INDEX idx_upscale_videos_status ON upscale_videos(batch_id, status);
+backend/
+├── api/
+│   └── custom_workflows.py         # NEW: Admin CRUD + parse + test endpoints
+├── models/
+│   └── custom_workflow.py          # NEW: Pydantic request/response models
+├── services/
+│   └── custom_workflow_service.py  # NEW: Parse, build, validate, test logic
+└── migrations/
+    └── 005_add_custom_workflows.sql # NEW: DB migration
 ```
 
-**Why separate tables (not extending video_jobs):**
-- `video_jobs` is tightly coupled to ComfyUI/RunPod execution (comfy_job_id, comfy_url, workflow_id FK to workflows table). Batch upscale uses Freepik, not ComfyUI.
-- Batch concept (parent with ordered children) does not exist in the current flat `video_jobs` model.
-- The batch has its own lifecycle (pause/resume) that is architecturally distinct from single-job tracking.
-- Avoids schema pollution of the existing, working job system.
+### Structure Rationale
 
-**Integration with existing architecture:**
-- New migration: `backend/migrations/007_add_upscale_batches.sql`
-- New Pydantic models: `backend/models/upscale.py`
-- New service: `backend/services/upscale_job_service.py` (CRUD operations, follows `VideoJobService` pattern)
-- Supabase client: reuses existing `core/supabase.py` singleton
+- **`WorkflowBuilder/` sub-components:** The builder page has distinct phases (upload → inspect → configure → test → publish). Splitting into sub-components keeps the builder page manageable and each sub-component independently testable.
+- **`DynamicWorkflowRenderer.tsx` separate from pages:** It is not a page — it is a component invoked by `StudioPage.tsx` when no static `appComponents` entry exists for an app ID. Keeping it in `components/` maintains the existing page/component boundary.
+- **`custom_workflow_service.py`:** Business logic stays in services per existing layered architecture. The service can be called by both the CRUD API and the test-run endpoint, avoiding duplication.
+- **`005_add_custom_workflows.sql`:** Migration naming follows existing pattern (004 was RunPod support).
 
 ---
 
-### Component D: Output Delivery Pipeline
+## Architectural Patterns
 
-**Purpose:** When Freepik completes an upscaled video, download it and deliver to both Supabase Storage and Google Drive.
+### Pattern 1: Dynamic Studio Merge at Runtime
 
-**Data Flow:**
-```
-Freepik API (completed task)
-  |
-  | GET output URL from task status response
-  v
-Backend downloads video bytes (httpx streaming)
-  |
-  +---> Upload to Supabase Storage (multitalk-videos bucket)
-  |       Returns: public URL for in-app viewing
-  |
-  +---> Upload to Google Drive (if project_id set)
-          Uses existing GoogleDriveService
-          Creates "AI-Upscaled" subfolder in project folder
-          Returns: Drive file ID
-```
+**What:** `studioConfig.ts` exposes a `getDynamicStudios()` async function that fetches published custom workflows from the API and synthesizes them into `StudioConfig`-shaped objects. `App.tsx` merges them with `studios[]` at startup and on publish events.
 
-**Integration with existing architecture:**
-- Reuses `StorageService.upload_video_from_url()` -- already handles download-from-URL and upload-to-Supabase pattern (see existing `storage_service.py` line 386-467)
-- Reuses `GoogleDriveService.get_or_create_folder()` + `upload_file()` -- already handles folder creation and file upload to shared drive (see existing `google_drive_service.py`)
-- Pattern matches existing `video_jobs.py` complete endpoint (lines 263-344) which already does Supabase upload + Google Drive upload on job completion
-- Key difference: Freepik returns a URL (not ComfyUI view endpoint), so `upload_video_from_url()` is the right method
+**When to use:** The static `studios[]` array in `studioConfig.ts` cannot be modified at runtime without a redeploy. For Workflow Builder, we need features to appear in navigation immediately after an admin publishes them without any rebuild.
 
-**No new service needed.** This is orchestration logic inside `BatchJobManager`, calling existing services.
+**Trade-offs:** Adds one API call on app load; studios appear after hydration (brief flash possible). Acceptable given admin-only publish use case — users load the app fresh after admin publishes.
 
----
-
-### Component E: Backend API Layer
-
-**Purpose:** HTTP endpoints for the frontend to create batches, upload source videos, check status, pause/resume, and cancel.
-
-**Endpoints:**
-
-| Method | Path | Purpose |
-|--------|------|---------|
-| POST | `/api/upscale/batches` | Create batch with parameters, receive batch_id |
-| POST | `/api/upscale/batches/{batch_id}/videos` | Upload source video to batch (multipart) |
-| POST | `/api/upscale/batches/{batch_id}/start` | Start processing the batch |
-| GET | `/api/upscale/batches/{batch_id}` | Get batch status with all video statuses |
-| GET | `/api/upscale/batches` | List user's batches (paginated) |
-| POST | `/api/upscale/batches/{batch_id}/resume` | Resume paused batch |
-| POST | `/api/upscale/batches/{batch_id}/cancel` | Cancel remaining videos |
-| DELETE | `/api/upscale/batches/{batch_id}/videos/{video_id}` | Remove video from pending batch |
-
-**Integration with existing architecture:**
-- New router: `backend/api/upscale.py`
-- Registered in `main.py`: `app.include_router(upscale.router, prefix="/api")`
-- Auth: uses existing `get_current_user()` dependency (all authenticated users, not admin-only)
-- File upload: multipart form handling (same pattern as `storage.py`)
-- Source videos uploaded to Supabase Storage first (frontend -> backend -> Supabase), then Freepik processes from URL
-
-**Video upload flow (source videos):**
-```
-Frontend (multi-file picker)
-  |
-  | POST /api/upscale/batches/{batch_id}/videos
-  | Content-Type: multipart/form-data
-  | Body: video file
-  v
-Backend (upscale.py router)
-  |
-  | Auth check (get_current_user)
-  | Validate file type/size
-  v
-Backend uploads to Supabase Storage
-  | bucket: multitalk-videos, path: upscale-inputs/{batch_id}/{filename}
-  |
-  | Creates upscale_videos record with input_storage_url
-  v
-Returns: video_id, queue_position
-```
-
----
-
-### Component F: Frontend Page + State Management
-
-**Purpose:** Feature page for batch video upscale with file upload, parameter controls, batch progress display, and results.
-
-**Component structure:**
-```
-frontend/src/pages/BatchUpscale.tsx        -- Main page component
-frontend/src/components/BatchUploadZone.tsx -- Multi-file upload with drag-drop
-frontend/src/components/BatchProgress.tsx   -- Batch status + per-video progress
-frontend/src/hooks/useBatchUpscale.ts       -- State management + polling hook
-```
-
-**State management approach:**
-
+**Example:**
 ```typescript
-interface BatchState {
-  // Batch metadata
-  batchId: string | null;
-  batchStatus: 'idle' | 'uploading' | 'pending' | 'processing' | 'completed' | 'paused' | 'failed';
+// studioConfig.ts (MODIFIED)
+export interface CustomWorkflowConfig {
+  id: string;           // slug, e.g., "my-custom-feature"
+  name: string;
+  studio_id: string;    // which studio to attach to, e.g., "image-studio"
+  icon: string;
+  gradient: string;
+  description: string;
+  output_type: 'video' | 'image';
+  variable_configs: VariableConfig[];
+}
 
-  // Videos in batch
-  videos: UpscaleVideo[];  // { id, filename, status, progress, outputUrl, error }
-
-  // Upscale parameters
-  params: {
-    resolution: string;
-    creativity: number;
-    sharpen: boolean;
-    grain: string;
-    fps_boost: boolean;
-    flavor: string;
-  };
-
-  // Progress summary
-  totalVideos: number;
-  completedVideos: number;
-  failedVideos: number;
-
-  // Pause state
-  isPaused: boolean;
-  pauseReason: string | null;
+// NEW function
+export async function fetchDynamicApps(apiBaseUrl: string, token: string): Promise<AppConfig[]> {
+  const response = await fetch(`${apiBaseUrl}/custom-workflows/published`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  const data = await response.json();
+  return data.workflows.map((wf: CustomWorkflowConfig): AppConfig => ({
+    id: wf.id,
+    title: wf.name,
+    icon: wf.icon,
+    gradient: wf.gradient,
+    description: wf.description,
+    features: [`Model: ${wf.name}`, wf.output_type === 'video' ? 'Video output' : 'Image output']
+  }));
 }
 ```
 
-**Polling strategy:**
-- When batch is `processing`: poll `GET /api/upscale/batches/{batch_id}` every 5 seconds
-- Response includes all video statuses, so a single poll updates the entire UI
-- Stop polling when batch reaches terminal state (completed, failed, cancelled)
-- Use `useEffect` cleanup to stop polling on unmount
-
-**Integration with existing architecture:**
-- New studio entry in `studioConfig.ts` under Video Studio (alongside existing Video Upscale)
-- Or: replace existing `upscale-vid` app with enhanced batch version
-- Uses existing `ProjectContext` for Google Drive folder selection (already in header via `ProjectSelector`)
-- Uses existing `apiClient` for all backend calls (add new methods)
-- Page layout follows existing pattern: main content + ResizableFeedSidebar (though feed shows batch history, not ComfyUI jobs)
-- Navigation: added to Video Studio group in sidebar
-
----
-
-### Component G: Credit Monitoring + Pause/Resume
-
-**Purpose:** Detect Freepik credit exhaustion and manage the pause-notify-resume cycle.
-
-**Detection strategy:**
-- Primary: HTTP 402 or 429 response from Freepik API on task submission = out of credits
-- Secondary: Explicit credit check endpoint (if Freepik provides one)
-- Tertiary: Rate limit tracking in-memory (count submissions, compare to known limits)
-
-**Pause flow:**
-```
-BatchJobManager detects credit exhaustion
-  |
-  | 1. Update batch status to 'paused' in DB
-  | 2. Set pause_reason = 'credit_exhaustion'
-  | 3. Set paused_at timestamp
-  v
-Frontend (polling) detects batch.status === 'paused'
-  |
-  | Show banner: "Credits exhausted. Add credits and click Resume."
-  | Show Resume button
-  v
-User clicks Resume
-  |
-  | POST /api/upscale/batches/{batch_id}/resume
-  v
-BatchJobManager.resume_batch()
-  |
-  | 1. Check credits (optional validation)
-  | 2. Update batch status to 'processing'
-  | 3. Restart background loop from next pending video
-  v
-Processing continues
-```
-
-**Integration with existing architecture:**
-- No new components needed. This is behavior within `BatchJobManager` + frontend polling.
-- Pause/resume is a state transition in the database, handled by existing CRUD patterns.
-
----
-
-## 2. Data Flow
-
-### Complete Batch Upscale Flow (End-to-End)
-
-```
-User (Browser)
-  |
-  | 1. Select videos (multi-file picker)
-  | 2. Set upscale parameters (resolution, creativity, etc.)
-  | 3. Confirm Google Drive project (ProjectContext in header)
-  | 4. Click "Start Batch"
-  v
-Frontend (BatchUpscale.tsx)
-  |
-  | POST /api/upscale/batches  (create batch with params)
-  | POST /api/upscale/batches/{id}/videos x N  (upload each video)
-  | POST /api/upscale/batches/{id}/start  (begin processing)
-  v
-Backend API (upscale.py)
-  |
-  | Creates batch + video records in Supabase
-  | Uploads source videos to Supabase Storage
-  | Spawns BatchJobManager.start_batch() as background task
-  v
-BatchJobManager (batch_manager.py)  [background loop]
-  |
-  | FOR EACH pending video (sequential):
-  |   |
-  |   | 1. Download source from Supabase Storage URL
-  |   | 2. Submit to Freepik API
-  |   |      POST api.freepik.com/v1/ai/video-upscaler
-  |   |      Body: { video, resolution, creativity, ... }
-  |   |      Response: { task_id }
-  |   |
-  |   | 3. Poll Freepik every 3s
-  |   |      GET api.freepik.com/v1/ai/video-upscaler/{task_id}
-  |   |      Until: COMPLETED or FAILED
-  |   |
-  |   | 4. On COMPLETED:
-  |   |      Download output from Freepik URL
-  |   |      Upload to Supabase Storage (StorageService.upload_video_from_url)
-  |   |      Upload to Google Drive (GoogleDriveService.upload_file) -- if project_id set
-  |   |      Update upscale_videos record (output URLs, status=completed)
-  |   |      Increment batch.completed_videos
-  |   |
-  |   | 5. On FAILED:
-  |   |      Update upscale_videos record (error, status=failed)
-  |   |      Increment batch.failed_videos
-  |   |      Continue to next video (don't halt batch)
-  |   |
-  |   | 6. On CREDIT EXHAUSTION (402/429):
-  |   |      Update batch status=paused, pause_reason=credit_exhaustion
-  |   |      EXIT loop (wait for resume)
-  |
-  | After all videos: Update batch status=completed (or failed if all failed)
-  v
-Frontend (polling every 5s)
-  |
-  | GET /api/upscale/batches/{id}
-  | Updates BatchProgress component with per-video statuses
-  | Shows completed video thumbnails/previews
-  | Handles pause state (resume button)
-  v
-User sees results in-app (Supabase URLs)
-User finds organized files in Google Drive (AI-Upscaled folder)
-```
-
-### Source Video Upload Flow
-
-```
-User drags videos into upload zone
-  |
-  v
-Frontend (BatchUploadZone.tsx)
-  |
-  | For each file (sequential or parallel with limit):
-  |   POST /api/upscale/batches/{batch_id}/videos
-  |   Content-Type: multipart/form-data
-  |   Body: video file bytes
-  v
-Backend (upscale.py)
-  |
-  | Validate: file type (mp4, mov, webm, avi, mkv), size limit
-  | Upload to Supabase Storage: multitalk-videos/upscale-inputs/{batch_id}/{filename}
-  v
-Supabase Storage
-  |
-  | Returns: public URL
-  v
-Backend creates upscale_videos record
-  | { batch_id, input_filename, input_storage_url, queue_position, status: 'pending' }
-  v
-Frontend adds video to local state list
-```
-
-### Output Delivery Flow (per video)
-
-```
-Freepik COMPLETED status
-  |
-  | task status response contains output URL
-  v
-BatchJobManager
-  |
-  +---> StorageService.upload_video_from_url(freepik_output_url)
-  |       |
-  |       | Downloads video bytes from Freepik
-  |       | Uploads to Supabase: multitalk-videos/upscale-outputs/{date}/{batch_id}_{filename}
-  |       | Returns: Supabase public URL
-  |       v
-  |     Update upscale_videos.output_storage_url
-  |
-  +---> GoogleDriveService (if batch.project_id is set)
-          |
-          | get_or_create_folder(project_id, "AI-Upscaled")
-          | upload_file(video_bytes, filename, folder_id)
-          | Returns: Drive file ID
-          v
-        Update upscale_videos.output_drive_file_id
-```
-
----
-
-## 3. Integration Surface with Existing Architecture
-
-### Backend: What Already Exists and Gets Reused
-
-| Existing Component | How It's Reused | Modification Needed |
-|---|---|---|
-| `core/supabase.py` | DB client for batch/video records | None |
-| `config/settings.py` | New `FREEPIK_API_KEY` config | Add one field |
-| `services/storage_service.py` | `upload_video_from_url()` for output delivery | None |
-| `services/google_drive_service.py` | `get_or_create_folder()` + `upload_file()` for Drive output | None |
-| `core/auth.py` | `get_current_user()` for endpoint protection | None |
-| `main.py` | Router registration | Add one `include_router` line |
-
-### Backend: What's New
-
-| New Component | File | Purpose |
-|---|---|---|
-| Freepik service | `backend/services/freepik_service.py` | Freepik API wrapper (submit, poll, credit check) |
-| Batch manager | `backend/services/batch_manager.py` | Sequential processing loop, pause/resume logic |
-| Upscale job service | `backend/services/upscale_job_service.py` | CRUD for batch + video records in Supabase |
-| API router | `backend/api/upscale.py` | HTTP endpoints for frontend |
-| Pydantic models | `backend/models/upscale.py` | Request/response models |
-| DB migration | `backend/migrations/007_add_upscale_batches.sql` | Tables + indexes |
-
-### Frontend: What Already Exists and Gets Reused
-
-| Existing Component | How It's Reused | Modification Needed |
-|---|---|---|
-| `contexts/ProjectContext.tsx` | Google Drive folder selection | None |
-| `lib/apiClient.ts` | HTTP client with auth | Add new methods |
-| `lib/studioConfig.ts` | Navigation config | Add app entry or modify existing |
-| `components/ResizableFeedSidebar.tsx` | Sidebar for batch history | None (configure with new context) |
-| `contexts/AuthContext.tsx` | User identity for batch ownership | None |
-
-### Frontend: What's New
-
-| New Component | File | Purpose |
-|---|---|---|
-| Batch upscale page | `frontend/src/pages/BatchUpscale.tsx` | Main feature page |
-| Upload zone | `frontend/src/components/BatchUploadZone.tsx` | Multi-file drag-drop upload |
-| Batch progress | `frontend/src/components/BatchProgress.tsx` | Per-video status display |
-| Batch hook | `frontend/src/hooks/useBatchUpscale.ts` | State management + polling |
-
-### External Service: Freepik API
-
-| Concern | Detail |
-|---|---|
-| Auth | `x-freepik-api-key` header, single global key (like RunPod pattern) |
-| Rate limits | Free=10/day, Tier 1=125/day (from PROJECT.md) |
-| Async pattern | POST to submit, GET to poll with task_id |
-| Statuses | CREATED -> IN_PROGRESS -> COMPLETED/FAILED |
-| Credit pricing | Frame-based (longer/higher-res videos cost more) |
-| Video limits | Up to 8 seconds per video (Freepik constraint) |
-
----
-
-## 4. Patterns to Follow
-
-### Pattern 1: Service Tuple Returns
-
-All existing services return `Tuple[bool, Optional[T], Optional[str]]` for `(success, data, error)`. The new Freepik and upscale services must follow this.
-
-```python
-# Good - matches existing pattern
-async def submit_task(self, ...) -> Tuple[bool, Optional[str], Optional[str]]:
-    try:
-        ...
-        return True, task_id, None
-    except Exception as e:
-        return False, None, str(e)
-```
-
-### Pattern 2: Background Task with DB-Backed State
-
-The HF download service uses in-memory job tracking (acceptable for single-admin). Batch upscale needs DB-backed state because:
-- Batches can run for hours (10+ videos at ~3-5 min each)
-- Must survive server restarts
-- Multiple users can have concurrent batches
-- Pause/resume requires persistent state
-
-```python
-# Pattern: Background task that updates DB
-async def start_batch(self, batch_id: str):
-    """Spawned via BackgroundTasks. Self-manages via DB state."""
-    while True:
-        video = await self._get_next_pending_video(batch_id)
-        if not video:
-            break
-
-        await self._process_single_video(batch_id, video)
-
-        # Check if batch was cancelled/paused externally
-        batch = await self._get_batch(batch_id)
-        if batch.status in ('cancelled', 'paused'):
-            break
-```
-
-### Pattern 3: Polling from Frontend
-
-Existing RunPod jobs poll every 3 seconds. Batch upscale should poll less aggressively since individual videos take minutes, not seconds.
-
 ```typescript
-// 5-second polling interval for batch status
+// App.tsx (MODIFIED)
+const [dynamicApps, setDynamicApps] = useState<AppConfig[]>([]);
+
 useEffect(() => {
-    if (!batchId || terminalStates.includes(batchStatus)) return;
+  if (!isAuthenticated || !token) return;
+  fetchDynamicApps(config.apiBaseUrl, token).then(apps => {
+    setDynamicApps(apps);
+  });
+}, [isAuthenticated, token]);
 
-    const interval = setInterval(async () => {
-        const response = await apiClient.getBatchStatus(batchId);
-        updateBatchState(response);
-    }, 5000);
-
-    return () => clearInterval(interval);
-}, [batchId, batchStatus]);
+// Merge dynamic apps into the correct studios when building navigation
+const mergedStudios = useMemo(() => mergeStudiosWithDynamicApps(studios, dynamicApps), [dynamicApps]);
 ```
 
-### Pattern 4: Non-Blocking Output Delivery
+### Pattern 2: StudioPage Fallback to DynamicWorkflowRenderer
 
-The existing `video_jobs.py` complete endpoint (lines 305-344) treats Google Drive upload as non-blocking. Batch upscale follows the same pattern:
+**What:** `StudioPage.tsx` currently has a static `appComponents` record mapping app IDs to components. For any app ID not found in this record, fall through to `DynamicWorkflowRenderer`, passing the app ID so it can load the config from the API.
 
+**When to use:** Every time `StudioPage` renders an app whose ID is not hardcoded. This is the integration point that makes published workflows appear as real pages without modifying the static component map.
+
+**Trade-offs:** Adds an API call when a dynamic app is first opened (to load its config). This is per-navigation, not per-keystroke — negligible cost. Cache the config in component state to avoid re-fetching on re-renders.
+
+**Example:**
+```typescript
+// StudioPage.tsx (MODIFIED)
+import DynamicWorkflowRenderer from './DynamicWorkflowRenderer';
+
+const AppComponent = selectedApp ? appComponents[selectedApp.id] : null;
+
+return (
+  <div>
+    {AppComponent ? (
+      <AppComponent comfyUrl={comfyUrl} />
+    ) : selectedApp ? (
+      // Dynamic app: load config from DB and render generically
+      <DynamicWorkflowRenderer appId={selectedApp.id} comfyUrl={comfyUrl} />
+    ) : null}
+  </div>
+);
+```
+
+### Pattern 3: DynamicWorkflowRenderer as a Config-Driven Feature Page
+
+**What:** A single React component that receives an `appId`, fetches the `CustomWorkflowConfig` from the API, renders the appropriate input widgets based on `variable_configs`, handles file uploads, and submits via the existing `apiClient.submitWorkflow()`. It is a drop-in replacement for any feature page.
+
+**When to use:** All published custom workflows. This component must produce the same job-tracking behavior as hand-coded pages — same `createJob`, `startJobMonitoring`, `completeJob` calls.
+
+**Trade-offs:** A generic renderer is inherently less specialized than a hand-coded page. Complex input interactions (e.g., multi-person mask editor, timeline sync) remain hand-coded pages. DynamicWorkflowRenderer handles the common pattern: upload files, set parameters, generate, view result.
+
+**Example:**
+```typescript
+// DynamicWorkflowRenderer.tsx (NEW)
+interface Props {
+  appId: string;   // matches custom_workflows.slug
+  comfyUrl: string;
+}
+
+export default function DynamicWorkflowRenderer({ appId, comfyUrl }: Props) {
+  const [config, setConfig] = useState<CustomWorkflowConfig | null>(null);
+  const [fieldValues, setFieldValues] = useState<Record<string, any>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [resultUrl, setResultUrl] = useState('');
+  const [status, setStatus] = useState('');
+
+  useEffect(() => {
+    apiClient.getCustomWorkflow(appId).then(data => setConfig(data));
+  }, [appId]);
+
+  async function submit() {
+    // Build parameters from fieldValues + variable_configs mapping
+    // Each VariableConfig has: node_id, input_name, widget_type, param_key
+    const parameters = buildParametersFromConfig(config!.variable_configs, fieldValues);
+
+    const response = await apiClient.submitWorkflow(
+      config!.workflow_file,  // workflow name in backend/workflows/
+      parameters,
+      comfyUrl,
+      `dynamic-${appId}-${Math.random().toString(36).slice(2)}`
+    );
+
+    if (response.success) {
+      await createJob({ job_id: response.prompt_id!, workflow_type: appId, ... });
+      const cleanup = startJobMonitoring(response.prompt_id!, comfyUrl, handleJobUpdate);
+      // cleanup on unmount
+    }
+  }
+
+  // Render input widgets based on variable_configs
+  // Each VariableConfig.widget_type maps to a specific input component
+}
+```
+
+### Pattern 4: JSONB Config Schema for Variable Configs
+
+**What:** Each `custom_workflows` row stores `variable_configs` as a JSONB array. Each element describes one user-facing input: which ComfyUI node it maps to, what widget to render, its display label, and validation rules.
+
+**When to use:** For flexible schema evolution — new widget types can be added without altering the database table structure.
+
+**Trade-offs:** JSONB gives flexibility but loses foreign-key constraints. Acceptable here because the data is admin-managed, not user-generated, and the schema is validated at the application layer.
+
+**Schema:**
+```typescript
+// frontend/src/types/customWorkflow.ts (NEW)
+export interface VariableConfig {
+  param_key: string;        // placeholder key in workflow: {{PARAM_KEY}}
+  node_id: string;          // ComfyUI node ID, e.g., "5"
+  input_name: string;       // field inside node inputs, e.g., "text"
+  widget_type: 'text' | 'textarea' | 'slider' | 'file_image' | 'file_audio'
+              | 'file_video' | 'dropdown' | 'toggle' | 'resolution' | 'number';
+  label: string;            // display label for the user
+  default_value?: any;      // optional default
+  validation?: {
+    required?: boolean;
+    min?: number;
+    max?: number;
+    options?: string[];     // for dropdown
+    accept?: string;        // for file inputs, e.g., "image/*"
+  };
+  section?: string;         // optional grouping label
+  order: number;            // display order within section
+}
+
+export interface SectionConfig {
+  key: string;
+  title: string;
+  order: number;
+}
+
+export interface CustomWorkflowConfig {
+  id: string;               // UUID
+  slug: string;             // URL-safe name, used as app ID
+  name: string;
+  studio_id: string;        // target studio for navigation
+  icon: string;
+  gradient: string;
+  description: string;
+  workflow_file: string;    // filename in backend/workflows/ (without .json)
+  variable_configs: VariableConfig[];
+  section_configs: SectionConfig[];
+  output_type: 'video' | 'image';
+  published: boolean;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+```
+
+### Pattern 5: ComfyUI Workflow JSON Node Parsing
+
+**What:** The builder's node inspector parses a raw ComfyUI workflow JSON and extracts a structured list of nodes with their inputs — specifically values that look like user-configurable parameters (strings, numbers, booleans — not node-to-node connections).
+
+**When to use:** When an admin uploads a workflow JSON file. The parsed node list powers the `VariableConfigurator` so the admin can map inputs to widget types without reading raw JSON.
+
+**Trade-offs:** ComfyUI workflow JSON uses numeric keys for node IDs and stores connections as `[node_id, output_index]` arrays. The parser must distinguish between scalar values (configurable) and array values (node connections). This is deterministic — array inputs are always connections, scalar inputs are always values.
+
+**Example (backend service):**
 ```python
-# Google Drive upload is best-effort, does not fail the video
-try:
-    await drive_service.upload_file(...)
-except Exception as e:
-    print(f"[UPSCALE] Drive upload failed (non-blocking): {e}")
-    # Video is still marked completed with Supabase URL
+# backend/services/custom_workflow_service.py (NEW, excerpt)
+def parse_workflow_nodes(workflow_json: dict) -> list[dict]:
+    """
+    Extract user-configurable inputs from a ComfyUI workflow.
+    Returns list of: {node_id, class_type, input_name, current_value, input_type}
+    """
+    nodes = []
+    for node_id, node_data in workflow_json.items():
+        class_type = node_data.get("class_type", "Unknown")
+        inputs = node_data.get("inputs", {})
+        configurable_inputs = []
+
+        for input_name, value in inputs.items():
+            # Skip node connections (arrays like [node_id, output_index])
+            if isinstance(value, list):
+                continue
+            # Skip null values
+            if value is None:
+                continue
+            # This is a scalar — user-configurable
+            configurable_inputs.append({
+                "input_name": input_name,
+                "current_value": value,
+                "inferred_type": type(value).__name__  # str, int, float, bool
+            })
+
+        if configurable_inputs:
+            nodes.append({
+                "node_id": node_id,
+                "class_type": class_type,
+                "inputs": configurable_inputs
+            })
+
+    return nodes
 ```
 
 ---
 
-## 5. Anti-Patterns to Avoid
+## Data Flow
 
-### Anti-Pattern 1: Extending video_jobs Table
-
-**What:** Adding batch columns to the existing `video_jobs` table.
-**Why bad:** `video_jobs` has FK to `workflows` table (ComfyUI-specific), requires `comfy_url` (non-nullable), and has no concept of parent-child batch relationships. Forcing batch upscale into this model creates nullable-everything and confusing data.
-**Instead:** Separate `upscale_batches` + `upscale_videos` tables with clean schema.
-
-### Anti-Pattern 2: Frontend-Driven Sequential Processing
-
-**What:** Frontend submits one video at a time, waits for completion, then submits next.
-**Why bad:** Requires browser to stay open for hours. Page navigation, tab closure, or sleep kills the batch. No pause/resume possible.
-**Instead:** Backend-driven background loop. Frontend only observes via polling.
-
-### Anti-Pattern 3: Parallel Freepik Submissions
-
-**What:** Submitting all videos to Freepik simultaneously.
-**Why bad:** Burns through daily credit quota instantly. No ability to pause. Freepik rate limits cause failures.
-**Instead:** Sequential processing with credit awareness between each submission.
-
-### Anti-Pattern 4: Storing Freepik Output URLs as Permanent References
-
-**What:** Saving the Freepik-provided output URL as the permanent result.
-**Why bad:** Freepik URLs are temporary (likely 24-48 hour expiry like similar services). Link rot.
-**Instead:** Always download and re-upload to Supabase Storage for permanent access.
-
----
-
-## 6. Suggested Build Order
-
-Components have clear dependencies that dictate build order. Each phase can be completed and tested independently.
-
-### Phase 1: Foundation (DB + Freepik Service + Basic API)
-
-**Build:** Component C (Database Schema) + Component A (Freepik Service) + minimal Component E (API)
-
-**Rationale:** The database schema and Freepik API wrapper are zero-dependency foundations. A minimal API endpoint allows testing Freepik integration end-to-end with a single video before building batch logic.
-
-**Deliverables:**
-1. Migration `007_add_upscale_batches.sql` applied
-2. `backend/models/upscale.py` with Pydantic models
-3. `backend/services/freepik_service.py` (submit + poll + credit check)
-4. `backend/services/upscale_job_service.py` (CRUD for batches/videos)
-5. `backend/api/upscale.py` with create batch + upload video + start endpoints
-6. `FREEPIK_API_KEY` in `config/settings.py`
-
-**Testing checkpoint:** Backend can create a batch, upload a video, submit to Freepik, poll for completion, and store the result URL in the database.
-
----
-
-### Phase 2: Batch Processing (Sequential Queue + Pause/Resume)
-
-**Build:** Component B (Batch Job Manager) + Component G (Credit Monitoring)
-
-**Rationale:** Once single-video processing works, add the sequential queue loop, credit detection, and pause/resume. This is the core differentiator from a simple "upscale one video" feature.
-
-**Dependencies:** Phase 1 (Freepik service + DB + API)
-
-**Deliverables:**
-1. `backend/services/batch_manager.py` with start/resume/cancel
-2. Credit exhaustion detection (402/429 handling)
-3. Pause state management in DB
-4. Resume endpoint in API
-5. Cancel endpoint in API
-
-**Testing checkpoint:** Backend processes 3+ videos sequentially, handles one failing without stopping, pauses on simulated credit exhaustion, and resumes successfully.
-
----
-
-### Phase 3: Output Delivery (Supabase + Google Drive)
-
-**Build:** Component D (Output Delivery Pipeline)
-
-**Rationale:** Once batch processing works, add the output delivery step. This reuses existing services (`StorageService`, `GoogleDriveService`) and follows the proven pattern from `video_jobs.py`.
-
-**Dependencies:** Phase 2 (batch processing must complete videos) + Phase 1
-
-**Deliverables:**
-1. Output download from Freepik + upload to Supabase Storage
-2. Google Drive upload to AI-Upscaled subfolder (when project_id set)
-3. DB updates with output URLs and Drive file IDs
-
-**Testing checkpoint:** Completed upscaled video appears in Supabase Storage with valid public URL. If project is selected, video also appears in Google Drive under AI-Upscaled folder.
-
----
-
-### Phase 4: Frontend (Upload + Progress + Results)
-
-**Build:** Component F (Frontend Page + State Management)
-
-**Rationale:** Backend is fully functional at this point. Frontend can be built and tested against the working API.
-
-**Dependencies:** Phase 3 (complete backend flow)
-
-**Deliverables:**
-1. `BatchUpscale.tsx` page with parameter controls
-2. `BatchUploadZone.tsx` for multi-file upload
-3. `BatchProgress.tsx` for per-video status display
-4. `useBatchUpscale.ts` hook for state + polling
-5. Navigation entry in `studioConfig.ts`
-6. ApiClient methods for all upscale endpoints
-7. Pause/resume UI (banner + button)
-8. Completed results with preview and download
-
-**Testing checkpoint:** User can upload multiple videos, configure parameters, start batch, watch progress update in real-time, see pause notification, resume, and view/download completed results.
-
----
-
-### Dependency Graph
+### Flow 1: Admin Creates and Publishes a Workflow
 
 ```
-Phase 1: DB Schema + Freepik Service + Basic API
-    |
-    +---> Phase 2: Batch Processing + Credit Management
-              |
-              +---> Phase 3: Output Delivery (Supabase + Drive)
-                        |
-                        +---> Phase 4: Frontend Page + UX
+Admin uploads workflow JSON
+    │
+    ▼
+POST /api/custom-workflows/upload
+    │ Stores file in Supabase Storage (workflow-uploads/)
+    │ Returns file reference
+    ▼
+POST /api/custom-workflows/parse
+    │ Loads JSON, calls parse_workflow_nodes()
+    │ Returns list of nodes with configurable inputs
+    ▼
+WorkflowNodeInspector displays nodes
+Admin configures VariableConfigs in VariableConfigurator
+    │
+    ▼
+POST /api/custom-workflows/test-run
+    │ Builds params from test values
+    │ Calls WorkflowService.build_workflow() (existing)
+    │ Calls ComfyUIService.submit_prompt() (existing)
+    │ Monitors via existing job polling
+    │ Returns result or error
+    ▼
+Admin confirms, clicks "Publish"
+    │
+    ▼
+POST /api/custom-workflows/  (create or PATCH /api/custom-workflows/{id})
+    │ Writes row to custom_workflows table with published=true
+    │ workflow_file stored in backend/workflows/ or referenced by path
+    ▼
+Frontend: dynamicApps state refreshes → navigation shows new feature immediately
 ```
 
-**Critical path:** Entirely linear. Each phase depends on the previous one.
-**No parallel tracks** -- unlike the infrastructure milestone, this feature is a single pipeline.
+### Flow 2: User Runs a Published Dynamic Workflow
 
----
+```
+User navigates to dynamic app (e.g., studio = "image-studio", app = "my-custom-feature")
+    │
+    ▼
+StudioPage renders → appComponents["my-custom-feature"] is undefined
+    │
+    ▼
+StudioPage falls through to <DynamicWorkflowRenderer appId="my-custom-feature" />
+    │
+    ▼
+DynamicWorkflowRenderer → GET /api/custom-workflows/my-custom-feature
+    │ Returns CustomWorkflowConfig with variable_configs
+    ▼
+Renders input widgets from variable_configs
+User fills inputs, clicks Generate
+    │
+    ▼
+DynamicWorkflowRenderer.submit()
+    │ Builds parameters: { PARAM_KEY: fieldValue, ... }
+    │ apiClient.submitWorkflow(config.workflow_file, parameters, comfyUrl, clientId)
+    │   → POST /api/comfyui/submit-workflow (EXISTING, unchanged)
+    │   → WorkflowService.build_workflow() (EXISTING, unchanged)
+    │   → ComfyUIService.submit_prompt() (EXISTING, unchanged)
+    ▼
+createJob({ job_id, workflow_type: appId, ... })  [EXISTING]
+updateJobToProcessing(job_id)                      [EXISTING]
+startJobMonitoring(job_id, comfyUrl, callback)     [EXISTING]
+    │
+    ▼
+On completion: completeJob({ output_video_urls or output_image_urls }) [EXISTING]
+Result displayed in DynamicWorkflowRenderer
+Job visible in GenerationFeed (workflow_name = appId)
+```
 
-## 7. Scalability Considerations
+### Flow 3: Navigation Hydration with Dynamic Apps
 
-| Concern | Current Scale (1-5 users) | At 50 users | Mitigation |
-|---|---|---|---|
-| Concurrent batches | 1-2 active | 10-20 active | Background tasks are lightweight (just polling). Freepik rate limits are the bottleneck, not server resources |
-| Freepik credits | 10-125/day shared | Insufficient | Per-user API keys or Freepik enterprise plan needed. Current architecture supports single shared key |
-| Supabase Storage | ~500MB/day | ~5GB/day | Supabase Pro plan handles this. Add cleanup job for old input files |
-| Google Drive | Minimal | 15GB/day | Service account quota may need increase |
-| DB connections | 1-2 concurrent | 10-20 concurrent | Supabase connection pooling handles this |
-| Background tasks | 1-2 loops | 10-20 loops | asyncio handles concurrent coroutines well. Add max concurrent limit if needed |
-| Heroku memory | ~100MB for polling | ~200MB | Polling is lightweight (no video data in memory during poll phase) |
-
----
-
-## 8. Heroku-Specific Constraints
-
-| Constraint | Impact | Mitigation |
-|---|---|---|
-| 30-second request timeout | Source video upload for large files may timeout | Upload to Supabase Storage first (frontend -> Supabase direct, or chunked upload through backend) |
-| 512MB memory limit | Large video download/upload during output delivery | Stream in chunks, never buffer entire video in memory |
-| Dyno cycling (free tier) | Background tasks killed on restart | DB-backed state means batch manager can resume where it left off. Add startup recovery: check for `processing` batches and restart their loops |
-| No persistent filesystem | Cannot cache videos locally | All storage is external (Supabase Storage, Google Drive). Already the pattern for this app |
-
-### Startup Recovery Pattern
-
-```python
-# In main.py or app startup
-@app.on_event("startup")
-async def recover_interrupted_batches():
-    """Resume any batches that were processing when server restarted."""
-    service = UpscaleJobService()
-    interrupted = await service.get_batches_by_status('processing')
-    for batch in interrupted:
-        # Mark current video as failed (it was interrupted)
-        await service.fail_current_video(batch.id, "Server restart")
-        # Resume from next pending video
-        asyncio.create_task(batch_manager.start_batch(batch.id))
+```
+App.tsx mounts, user is authenticated
+    │
+    ▼
+fetchDynamicApps(apiBaseUrl, token)
+    │ GET /api/custom-workflows/published
+    │ Returns [{id: slug, title, icon, gradient, studio_id, ...}]
+    ▼
+mergeStudiosWithDynamicApps(studios, dynamicApps)
+    │ For each dynamic app, finds matching studio by studio_id
+    │ Appends AppConfig to studio.apps
+    │ Returns merged studios array
+    ▼
+App.tsx updates visibleStudios → sidebar re-renders with new apps
+validPages array is updated to include new app IDs
+    │
+    ▼
+Dynamic app navigable in sidebar without rebuild
 ```
 
 ---
 
-## Quality Gate Checklist
+## Integration Points
 
-- [x] Integration points with existing system identified (Section 3: 6 reused backend components, 5 reused frontend components)
-- [x] New vs modified components explicit (Section 3: tables showing reused vs new)
-- [x] Build order considers dependencies (Section 6: 4 phases with linear dependency chain)
-- [x] Data flow direction explicit (Section 2: 3 detailed flow diagrams)
-- [x] Component boundaries clear (Section 1: 7 components with interfaces)
-- [x] Anti-patterns documented (Section 5: 4 anti-patterns with alternatives)
-- [x] Heroku constraints addressed (Section 8: 4 constraints with mitigations)
+### New vs Modified: Complete List
+
+| Component | Status | What Changes |
+|-----------|--------|--------------|
+| `studioConfig.ts` | MODIFIED | Add `fetchDynamicApps()`, `mergeStudiosWithDynamicApps()`. `StudioPageType` union needs to accommodate dynamic IDs — use `string` for the union or a runtime-checked type. |
+| `App.tsx` | MODIFIED | Fetch dynamic apps on auth. Merge into `visibleStudios`. Update `validPages` check to also allow dynamic app slugs. Update main content switch to include dynamic studio page render path. |
+| `StudioPage.tsx` | MODIFIED | After `appComponents` lookup fails, render `DynamicWorkflowRenderer` instead of `null`. |
+| `WorkflowBuilder.tsx` | NEW | Admin page with four sub-panels: upload, inspect, configure, publish. |
+| `DynamicWorkflowRenderer.tsx` | NEW | Generic feature page. Must mirror job-tracking pattern of hand-coded pages. |
+| `WorkflowBuilder/NodeInspector.tsx` | NEW | Displays parsed node list, node class names, input names, current values. |
+| `WorkflowBuilder/VariableConfigurator.tsx` | NEW | For each configurable input, lets admin choose widget type, label, default, validation. |
+| `WorkflowBuilder/WorkflowTestPanel.tsx` | NEW | Submits a test run using test values, shows result inline. |
+| `types/customWorkflow.ts` | NEW | TypeScript interfaces for VariableConfig, SectionConfig, CustomWorkflowConfig. |
+| `apiClient.ts` | MODIFIED | Add methods: `createCustomWorkflow`, `updateCustomWorkflow`, `getCustomWorkflow`, `getPublishedCustomWorkflows`, `uploadWorkflowFile`, `parseWorkflowNodes`, `testRunWorkflow`. |
+| `backend/api/custom_workflows.py` | NEW | FastAPI router at `/api/custom-workflows`. All write endpoints gated by `verify_admin`. GET published is accessible to authenticated users. |
+| `backend/models/custom_workflow.py` | NEW | Pydantic models: `CustomWorkflowCreate`, `CustomWorkflowUpdate`, `CustomWorkflowResponse`, `ParseWorkflowRequest`, `ParseWorkflowResponse`, `TestRunRequest`. |
+| `backend/services/custom_workflow_service.py` | NEW | `parse_workflow_nodes()`, `build_parameters_from_config()`, `test_run()` (calls WorkflowService). |
+| `backend/main.py` | MODIFIED | Register new router: `app.include_router(custom_workflows.router, prefix="/api")`. |
+| `backend/migrations/005_add_custom_workflows.sql` | NEW | Creates `custom_workflows` table with JSONB columns. |
+| `infrastructure-studio` in `studioConfig.ts` | MODIFIED | Add WorkflowBuilder as a new app within infrastructure-studio (alongside existing Infrastructure Manager). |
+
+### API Boundary: New Endpoints
+
+| Endpoint | Method | Auth | Purpose |
+|----------|--------|------|---------|
+| `/api/custom-workflows/` | GET | user | List all published workflows |
+| `/api/custom-workflows/published` | GET | user | List published workflows for nav hydration |
+| `/api/custom-workflows/{slug}` | GET | user | Get single workflow config |
+| `/api/custom-workflows/` | POST | admin | Create workflow config |
+| `/api/custom-workflows/{id}` | PATCH | admin | Update workflow config |
+| `/api/custom-workflows/{id}` | DELETE | admin | Delete workflow config |
+| `/api/custom-workflows/upload` | POST | admin | Upload workflow JSON file to storage |
+| `/api/custom-workflows/parse` | POST | admin | Parse uploaded JSON, return node list |
+| `/api/custom-workflows/test-run` | POST | admin | Test-run workflow with given params |
+
+### Internal Boundaries
+
+| Boundary | Communication | Notes |
+|----------|---------------|-------|
+| DynamicWorkflowRenderer ↔ apiClient | Direct method calls | Same as existing pages |
+| DynamicWorkflowRenderer ↔ createJob/startJobMonitoring | Direct import | Reuses existing jobTracking.ts unchanged |
+| WorkflowTestPanel ↔ existing ComfyUI submit | Via apiClient.submitWorkflow() | No new submit path needed for test runs |
+| custom_workflow_service ↔ WorkflowService | Direct instantiation | `CustomWorkflowService` calls `WorkflowService.build_workflow()` for test runs — same code path as production runs |
+| custom_workflow_service ↔ Supabase | Via `get_supabase_for_token()` | Same pattern as video_job_service, image_job_service |
+
+### Critical Constraint: Workflow File Storage
+
+The existing `WorkflowService` loads templates from `backend/workflows/` on disk. Custom workflows uploaded by admins need their JSON accessible by `WorkflowService`. There are two options:
+
+**Option A (recommended):** Store uploaded JSON as a file in `backend/workflows/custom/` — the builder writes the file to disk on upload, `WorkflowService._find_template_path()` already searches subdirectories. No changes to `WorkflowService` required.
+
+**Option B:** Store JSON in Supabase Storage, add a `load_template_from_db()` method to `WorkflowService`. More flexible but more code change.
+
+Choose Option A. `WorkflowService` already supports subdirectories. The file path in `custom_workflows.workflow_file` stores the stem (e.g., `"custom/MyWorkflow"`) which `WorkflowService` resolves to `backend/workflows/custom/MyWorkflow.json`.
+
+**Constraint:** On Heroku, the filesystem is ephemeral — `backend/workflows/custom/` does not survive a restart. For Heroku production, Option B (DB storage) becomes necessary. For local and RunPod, Option A works. Flag this as a phase-specific concern: start with Option A for development, migrate to Option B before Heroku deploy.
 
 ---
 
-## Confidence Assessment
+## Database Schema
 
-| Area | Confidence | Reason |
-|---|---|---|
-| Architecture pattern | HIGH | Follows proven patterns already in codebase (service layer, tuple returns, background tasks, output delivery pipeline) |
-| DB schema | HIGH | Clean separation matches domain model, indexes support query patterns |
-| Freepik API shape | MEDIUM | Based on confirmed image upscaler API pattern + PROJECT.md specification. Exact video endpoint parameters need validation |
-| Build order | HIGH | Linear dependency chain is straightforward, each phase testable independently |
-| Output delivery | HIGH | Reuses existing, working StorageService + GoogleDriveService with zero modifications |
-| Credit exhaustion detection | MEDIUM | Assumed HTTP 402/429 response. Actual Freepik credit error responses need validation |
-| Frontend integration | HIGH | Follows established page + hook + component pattern used by all other features |
+### `custom_workflows` Table
+
+```sql
+-- backend/migrations/005_add_custom_workflows.sql
+CREATE TABLE IF NOT EXISTS custom_workflows (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug          TEXT NOT NULL UNIQUE,           -- app ID used in navigation
+  name          TEXT NOT NULL,
+  studio_id     TEXT NOT NULL,                  -- matches StudioConfig.id
+  icon          TEXT NOT NULL DEFAULT '⚡',
+  gradient      TEXT NOT NULL DEFAULT 'from-blue-500 to-purple-600',
+  description   TEXT,
+  workflow_file TEXT NOT NULL,                  -- stem path for WorkflowService
+  variable_configs  JSONB NOT NULL DEFAULT '[]',
+  section_configs   JSONB NOT NULL DEFAULT '[]',
+  output_type   TEXT NOT NULL DEFAULT 'video',  -- 'video' | 'image'
+  published     BOOLEAN NOT NULL DEFAULT false,
+  created_by    UUID REFERENCES auth.users(id),
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Index for published lookup (navigation hydration)
+CREATE INDEX idx_custom_workflows_published ON custom_workflows(published)
+  WHERE published = true;
+
+-- Index for slug lookup (per-app config fetch)
+CREATE INDEX idx_custom_workflows_slug ON custom_workflows(slug);
+
+-- RLS: all authenticated users can read published; admins can do everything
+ALTER TABLE custom_workflows ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "read published" ON custom_workflows FOR SELECT
+  USING (published = true);
+-- Admin operations handled at application layer via verify_admin dependency
+```
 
 ---
 
-*Research completed: 2026-03-11*
+## Anti-Patterns
+
+### Anti-Pattern 1: Code Generation Instead of Config-Driven Rendering
+
+**What people do:** Generate TypeScript/Python source files from the builder configuration and write them to disk, triggering a rebuild.
+
+**Why it's wrong:** Requires filesystem access, build tooling available at runtime, and restarts. Eliminates the "instant publish without rebuild" goal. Introduces security risks (arbitrary code injection).
+
+**Do this instead:** Store configuration as JSONB in the database. `DynamicWorkflowRenderer` interprets the config at render time. No code generation, no rebuild.
+
+### Anti-Pattern 2: Separate Submit Path for Dynamic Workflows
+
+**What people do:** Create a new API endpoint for dynamic workflow submission that handles the JSONB config and builds the workflow differently.
+
+**Why it's wrong:** Duplicates the `WorkflowService.build_workflow()` → `ComfyUIService.submit_prompt()` path. Bugs fixed in one path don't fix the other. Test coverage diverges.
+
+**Do this instead:** `DynamicWorkflowRenderer` uses the exact same `apiClient.submitWorkflow()` call as existing pages. The renderer's job is to translate JSONB variable configs into the `parameters` dict that `submitWorkflow` already accepts. The ComfyUI path is unchanged.
+
+### Anti-Pattern 3: Hardcoding Dynamic Studio IDs in App.tsx
+
+**What people do:** Add dynamic studio page cases to the `switch`/`if-else` in `App.tsx` main content area, requiring a code change when new dynamic studios are created.
+
+**Why it's wrong:** Defeats the purpose of dynamic publishing. Every new studio type requires a deploy.
+
+**Do this instead:** The main content area in `App.tsx` handles studio rendering via `StudioPage`. `StudioPage` handles the unknown app ID via `DynamicWorkflowRenderer`. No new cases needed in `App.tsx` for individual dynamic apps.
+
+### Anti-Pattern 4: Storing Raw ComfyUI JSON in the JSONB Column
+
+**What people do:** Store the entire workflow JSON in `variable_configs` or a separate JSONB column rather than just the variable configuration metadata.
+
+**Why it's wrong:** Large JSONB payloads (ComfyUI workflows can be 50-200KB) bloat every row read and make the DB a workflow file store. Navigation hydration fetches all published workflows — fetching full JSON in that query is wasteful.
+
+**Do this instead:** Store only the `variable_configs` metadata (small, structured) in the DB. The workflow JSON file lives at `backend/workflows/custom/`. The `workflow_file` column stores just the path stem.
+
+### Anti-Pattern 5: TypeScript Union Type for Dynamic Page IDs
+
+**What people do:** Add every dynamic app's slug to the `StudioPageType` TypeScript union, requiring a type change with every publish.
+
+**Why it's wrong:** The type union is a compile-time construct. Dynamic slugs don't exist at compile time.
+
+**Do this instead:** `StudioPageType` already covers studio-level IDs (`'image-studio'`, etc.). Dynamic app routing happens within `StudioPage` — the `currentPage` state only needs to know which studio is active, not which individual app within the studio.
+
+---
+
+## Scaling Considerations
+
+| Concern | At Current Scale (small team, ~10 custom workflows) | At 100+ custom workflows |
+|---------|------------------------------------------------------|--------------------------|
+| Navigation hydration | Fetch all published at startup — fast, acceptable | Add pagination or lazy-load studios; cache response |
+| Workflow file storage | Local filesystem (`backend/workflows/custom/`) | Must use Supabase Storage or S3 (ephemeral filesystem on Heroku) |
+| JSONB query performance | No issue | Add GIN index on `variable_configs` if filtering by widget_type |
+| DynamicWorkflowRenderer | Single component handles all cases | Split by output_type if rendering diverges significantly |
+
+---
+
+## Suggested Build Order
+
+Based on dependencies:
+
+1. **Database migration first** — `005_add_custom_workflows.sql`. Everything else depends on this.
+
+2. **Backend service + models** — `custom_workflow.py` models and `custom_workflow_service.py` with `parse_workflow_nodes()`. No frontend dependency.
+
+3. **Backend API endpoints** — `api/custom_workflows.py`. Depends on service. Start with parse and CRUD; test-run can come later.
+
+4. **`DynamicWorkflowRenderer`** — Can be built independently of builder UI. Unblocks end-to-end testing of the renderer with manually-inserted DB rows.
+
+5. **Navigation hydration** — Modify `studioConfig.ts` and `App.tsx` to fetch and merge dynamic apps. Depends on published endpoint.
+
+6. **`StudioPage` fallback** — One-line change after DynamicWorkflowRenderer exists.
+
+7. **Workflow Builder UI** — `WorkflowBuilder.tsx` with `NodeInspector`, `VariableConfigurator`. Depends on parse endpoint and CRUD endpoints.
+
+8. **Test runner in builder** — `WorkflowTestPanel`. Depends on DynamicWorkflowRenderer patterns being established (reuses same submit logic).
+
+9. **Publish flow** — Connect builder PATCH/publish endpoint to navigation refresh.
+
+---
+
+## Sources
+
+- Direct codebase analysis: `studioConfig.ts`, `StudioPage.tsx`, `App.tsx`, `AuthContext.tsx`, `ExecutionBackendContext.tsx`, `jobTracking.ts`, `apiClient.ts`
+- Backend patterns: `workflow_service.py`, `api/comfyui.py`, `api/infrastructure.py` (`verify_admin` pattern), `api/feed.py`, `main.py`
+- Database patterns: `supabase.ts` type definitions, existing job table structures
+- Project requirements: `.planning/PROJECT.md`
+
+---
+*Architecture research for: Workflow Builder integration with sideOUTsticks AI platform*
+*Researched: 2026-03-13*

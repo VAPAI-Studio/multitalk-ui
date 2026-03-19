@@ -11,6 +11,21 @@ export const announcements: Announcement[] = [
     id: "2026-03-18-world-jobs",
     message: "Virtual Set now saves 3D worlds to your generation feed so you can revisit and reconstruct them anytime",
     type: "feature",
+    },
+  {
+    id: "2026-03-14-dynamic-workflows-nav",
+    message: "Custom workflows built in the Workflow Builder now appear automatically in their studio's navigation and on the homepage.",
+    type: "feature" as const,
+  },
+  {
+    id: "2026-03-14-dynamic-workflows",
+    message: "Admins can now test and publish custom AI workflows from the Workflow Builder — published features appear as live pages.",
+    type: "feature" as const,
+  },
+  {
+    id: "2026-03-14-workflow-builder",
+    message: "New: Workflow Builder in Infrastructure -- admins can now build and publish custom AI features without code",
+    type: "feature",
   },
   {
     id: "2026-03-11-batch-upscale",

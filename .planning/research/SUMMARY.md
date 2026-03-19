@@ -1,181 +1,218 @@
 # Project Research Summary
 
-**Project:** sideOUTsticks — v1.1 Batch Video Upscale with Freepik API
-**Domain:** Batch video upscaling via external credit-based API integrated into an existing AI media processing platform
-**Researched:** 2026-03-11
-**Confidence:** MEDIUM (all internal architecture is HIGH; external Freepik API contract is the single LOW-confidence blocker)
+**Project:** sideOUTsticks — v1.2 Workflow Builder (Admin No-Code Feature Creator)
+**Domain:** Admin tooling for dynamic feature creation in an AI media processing platform
+**Researched:** 2026-03-13
+**Confidence:** HIGH
 
 ## Executive Summary
 
-This milestone adds batch video upscaling to an existing, well-structured FastAPI + React platform that already handles ComfyUI and RunPod AI workflows, Supabase storage, and Google Drive delivery. The core work is a sequential batch queue processor that submits videos one-by-one to the Freepik Video Upscaler API, polls for completion, and delivers outputs to both Supabase Storage and Google Drive. No new npm or pip dependencies are required — the entire feature is built on patterns already proven in the codebase (httpx service layer, BackgroundTasks, Supabase state machine, StorageService and GoogleDriveService reuse).
+The v1.2 Workflow Builder is an admin-only no-code tool that converts ComfyUI API-format workflow JSON into live, published feature pages — without any code generation, filesystem writes, or frontend rebuilds. The platform already has a mature foundation: a centralized `WorkflowService` with `{{PLACEHOLDER}}` substitution, studio-based navigation (`studioConfig.ts`), a unified generation feed, dual execution backends (ComfyUI + RunPod), and a consistent job-tracking system. The builder adds a thin configuration layer on top: admins upload a workflow JSON, map node inputs to typed form fields (text, textarea, slider, number, file-upload, dropdown, toggle, resolution pair), group them into sections, test-run the result, and publish — whereupon the `DynamicWorkflowRenderer` component serves the feature page to all users immediately.
 
-The recommended approach follows a strict backend-driven architecture: the batch processing loop runs as a server-side background task backed by persistent Supabase state, so processing continues when the user closes the browser and survives Heroku dyno restarts. The frontend's role is limited to initiating the batch, uploading source videos individually, and polling for status updates every 5 seconds. This design is non-negotiable given Heroku's 30-second request timeout and daily dyno cycling. Processing is sequential (one video at a time) because Freepik's credit-based pricing model and daily rate limits make parallelism counterproductive and complicate the critical pause-on-credit-exhaustion feature.
+The recommended approach is config-driven rendering via a JSONB schema in Supabase (`custom_workflows` table), not code generation. A `DynamicWorkflowRenderer` component reads the published config and renders the form at runtime using the exact same `apiClient.submitWorkflow()` → `createJob()` → `startJobMonitoring()` pipeline as every static feature page. The test runner inside the builder IS the renderer — they share one `execute_dynamic_workflow()` code path to guarantee that passing the builder test means passing in production. Navigation hydration is handled by fetching published workflow configs once at app startup and merging them into the `studios` array, not by adding dynamic IDs to any TypeScript union type.
 
-The critical blocker before implementation can begin: the Freepik Video Upscaler API endpoint (`api.freepik.com/v1/ai/video-upscaler`) is referenced in PROJECT.md but is NOT publicly documented on docs.freepik.com as of March 2026. The project owner must confirm the API contract (endpoint URL, request parameters, response format, credit model, error codes) before Phase 1 can start. This is the only LOW-confidence item. Everything else — stack, architecture, feature scope, pitfall mitigations — is grounded in the existing codebase and established patterns.
+The two highest-risk areas are routing architecture and code path divergence. The `StudioPageType` TypeScript union (currently hardcoded) must not be polluted with runtime database IDs — dynamic page state must live in a parallel localStorage key. And the test runner must never diverge from the production renderer's parameter handling, or test-passes will give false confidence. Both risks are fully preventable by following the patterns described in ARCHITECTURE.md and PITFALLS.md before writing any feature code.
+
+---
 
 ## Key Findings
 
 ### Recommended Stack
 
-The existing stack needs zero new dependencies. The pattern for integrating Freepik is identical to `runpod_service.py` and `worldlabs_service.py`: an httpx-based service class with tuple returns `(success, data, error)`, Settings-based API key configuration, and BackgroundTasks for fire-and-forget processing. The batch queue state lives in two new Supabase tables (`upscale_batches`, `upscale_videos`) rather than in memory — this is the single most important architectural departure from the existing HF download service pattern, which used an in-memory dict that would be fatal on Heroku for long-running user-facing batches.
+The Workflow Builder requires exactly 4 new frontend npm packages; the backend needs zero new dependencies. All workflow execution, file storage, auth, and job tracking reuse existing infrastructure without modification. See [STACK.md](.planning/research/STACK.md) for full version details and rationale.
 
 **Core technologies:**
-- **httpx** (0.28.1, already installed): Freepik API client — identical to the pattern already used in 3 existing services; handles async, streaming, connection pooling, and timeout configuration
-- **FastAPI BackgroundTasks / asyncio.create_task** (built-in, already used): Batch queue runner — fire-and-forget with DB-backed state for restart survival
-- **supabase-py** (>=2.3.0, already installed): Batch and video state persistence — survives restarts, supports pause/resume, enables multi-user concurrent batches
-- **StorageService** (existing, `backend/services/storage_service.py`): Output delivery to Supabase Storage via `upload_video_from_url()` — already handles the download-from-URL pattern; streaming modifications needed for large video files
-- **GoogleDriveService** (existing, `backend/services/google_drive_service.py`): Output delivery to Google Drive — zero modifications needed; reuse `get_or_create_folder()` and `upload_file()`
-
-**No new pip or npm packages needed.** The entire feature uses existing installed libraries. See STACK.md for rationale on excluded technologies (Celery, RQ, aiohttp, ffmpeg, WebSockets, SQLAlchemy).
+- `@dnd-kit/core` + `@dnd-kit/sortable` + `@dnd-kit/utilities` (stable v6/v10): drag-and-drop field reordering — chosen over react-beautiful-dnd (deprecated) and @dnd-kit/react (pre-1.0, React 19 issues) for accessibility, composability, and React 19 compatibility
+- `emoji-picker-react` v4.18.0: emoji icon picker for feature card configuration — lighter than `emoji-mart` (~80KB vs ~170KB), actively maintained as of Feb 2026
+- Gradient selection via a predefined palette of Tailwind classes (zero library cost) — `react-colorful` deferred unless custom hex colors are required in a later milestone
+- Backend: FastAPI + Pydantic v2 + supabase-py — all existing, no new packages needed
+- Database: new `custom_workflows` Supabase table with JSONB columns for `variable_configs` and `section_configs` — consistent with existing table patterns
 
 ### Expected Features
 
-**Must have (table stakes):**
-- Multi-file upload with video validation (type, size, 8-second duration limit per Freepik constraint) — "batch" implies multi-file; warn before submission, not after
-- Global settings panel (resolution, creativity, sharpen, grain, fps_boost, flavor) with preset buttons — configure once, apply to all
-- Sequential queue processing, database-backed and backend-driven — core state machine; queue must survive page close and server restart
-- Per-video status tracking (pending / processing / completed / failed / paused) with elapsed time and error messages
-- Output delivery to Supabase Storage + Google Drive `AI-Upscaled` subfolder — explicitly required by PROJECT.md; non-blocking Drive upload (failure does not fail the video)
-- Per-video error handling with manual retry (max 2 auto-retries for transient errors, then manual)
-- Batch summary view (total / completed / processing / pending / failed counts + progress bar + estimated time remaining)
+See [FEATURES.md](.planning/research/FEATURES.md) for the full feature landscape including the competitor analysis table.
 
-**Should have (competitive differentiators):**
-- Credit exhaustion detection with pause-and-notify — batch pauses with a clear notification and Resume button instead of failing all remaining videos silently
-- Resume capability after credit recharge — re-queues all paused videos from where the batch left off, settings preserved, no re-uploading
-- Batch history with re-run — extends existing feed sidebar with batch grouping; "Re-run" creates new batch with same settings
-- Queue reordering via drag-and-drop for pending items only
-- Batch-level ZIP download of all completed videos
+**Must have (table stakes — v1.2 Core):**
+- Workflow JSON upload and node parsing (TS-1) — universal entry point; every comparable tool starts here
+- Variable configuration: map node inputs to typed form fields (TS-2) — core builder UX
+- Six core field display types + toggle + resolution pair (TS-3) — covers all 19 existing workflow placeholder types
+- Section grouping: assign variables to named, reorderable sections (TS-4) — required for polished output
+- Test run within the builder, sharing renderer code path (TS-5) — non-negotiable before publish
+- Publish to studio: instant navigation appearance, no rebuild (TS-6) — the feature's purpose
+- Auto-detect field types from ComfyUI type system (D-2) — low cost, high time savings
 
-**Defer to later milestone:**
-- Per-video settings override (global settings sufficient for v1; adds UI complexity without proportional value)
-- Video trimming/splitting to work around the 8-second limit (major scope increase — FFmpeg, segment management, audio sync)
-- Upload videos FROM Google Drive (explicitly out-of-scope per PROJECT.md)
-- Real-time credit balance display (Freepik API does not expose a balance endpoint)
-- Before/after video comparison viewer
+**Should have (v1.2 Polish, after first publish works):**
+- Manage published features: edit, unpublish, delete CRUD (TS-7)
+- Live preview panel showing the rendered feature page in real time (D-1)
+- Feed + dual execution backend integration confirmed working (D-3)
+- Seed field with randomize button (D-4) — common enough to include early
+- Resolution pair composite type enforcing multiples-of-32 (D-5)
+
+**Defer (v2+):**
+- Conditional field logic (show/hide based on other field values)
+- `object_info`-based validation against a live ComfyUI instance
+- Workflow versioning (upload a new version of a published workflow)
+- Visual node graph editor or viewer
+- Multi-admin / per-user workflow builder access
+
+**Critical path:** TS-1 → TS-2 → TS-3 → TS-4 → TS-5 → TS-6 (minimum viable loop)
 
 ### Architecture Approach
 
-The feature decomposes into 7 components across a strictly backend-driven pipeline. The frontend initiates and observes; the backend orchestrates. Source videos flow: frontend local file -> individual backend upload -> Supabase Storage staging -> Freepik API (sequential) -> download result (streaming) -> re-upload to Supabase Storage + Google Drive. Two new Supabase tables provide the state machine backbone. Build order is a linear dependency chain — no parallel tracks are possible because each phase depends on the prior one being functional and testable.
+The architecture is an extension of the existing layered pattern: a new `WorkflowBuilderPage` (admin UI) plus a `DynamicWorkflowRenderer` component (generic feature page). `StudioPage.tsx` is modified to fall through to `DynamicWorkflowRenderer` when an app ID is not found in the static `appComponents` map. Navigation hydration fetches published workflow configs once at startup and merges them into the studio config in memory. All execution goes through existing endpoints — there is no new submission code path. See [ARCHITECTURE.md](.planning/research/ARCHITECTURE.md) for the full component diagram, data flows, and SQL schema.
 
 **Major components:**
-1. **FreepikUpscalerService** (`backend/services/freepik_service.py`) — Freepik API wrapper: submit task, poll status, check credits. Single responsibility; isolated from batch logic so API changes are absorbed in one place.
-2. **BatchJobManager** (`backend/services/batch_manager.py`) — Sequential processing loop: pop next pending video, submit to Freepik, poll to completion, trigger output delivery, handle credit exhaustion with pause/resume. Heartbeat column in DB detects stale/crashed tasks.
-3. **Database schema** (`upscale_batches` + `upscale_videos`) — Persistent state machine for batch lifecycle and per-video status; `last_heartbeat` for stale-batch detection; per-destination upload status columns for atomicity tracking.
-4. **Output Delivery Pipeline** — Orchestration inside BatchJobManager calling existing StorageService and GoogleDriveService; streaming download from Freepik (no full-file buffering in memory); temp-file-based Google Drive upload to avoid MediaInMemoryUpload memory spike.
-5. **Backend API layer** (`backend/api/upscale.py`) — 8 HTTP endpoints for CRUD on batches and videos; all protected with existing `get_current_user()` auth dependency; registered in `main.py` with one `include_router` line.
-6. **Frontend page and state** (`frontend/src/pages/BatchUpscale.tsx` + `useBatchUpscale.ts`) — Multi-file upload zone, parameter controls, per-video status display, pause/resume UI; polls `GET /api/upscale/batches/{id}` every 5 seconds, stops on terminal states.
-7. **Credit monitoring and pause/resume** (behavior within BatchJobManager) — Classifies Freepik errors into three categories with distinct handlers: per-second rate limit (backoff + retry), credit exhaustion (pause batch + notify), daily RPD limit (pause + calculate reset time).
+
+| Component | Status | Responsibility |
+|-----------|--------|----------------|
+| `WorkflowBuilderPage` | NEW | Admin UI: upload JSON, configure variables/sections, test-run, publish |
+| `WorkflowBuilder/NodeInspector` | NEW | Display parsed ComfyUI nodes and configurable inputs |
+| `WorkflowBuilder/VariableConfigurator` | NEW | Map node inputs to widget types, labels, validation |
+| `WorkflowBuilder/WorkflowTestPanel` | NEW | Inline test runner (shares `execute_dynamic_workflow` with renderer) |
+| `DynamicWorkflowRenderer` | NEW | Generic feature page driven by JSONB config from database |
+| `studioConfig.ts` | MODIFIED | Add `fetchDynamicApps()` + `mergeStudiosWithDynamicApps()` |
+| `StudioPage.tsx` | MODIFIED | Fallback to `DynamicWorkflowRenderer` when app ID not in static map |
+| `App.tsx` | MODIFIED | Fetch and merge dynamic apps on auth; parallel dynamic page state in localStorage |
+| `custom_workflows` table | NEW | JSONB-backed config store; RLS enabled; `published` index |
+| `custom_workflow_service.py` | NEW | Parse nodes, build params, validate, test-run (calls existing WorkflowService) |
+| `api/custom_workflows.py` | NEW | CRUD + parse + test-run endpoints; all write ops gated by `verify_admin` |
+
+**Suggested build order** (per ARCHITECTURE.md):
+1. Database migration (`005_add_custom_workflows.sql`)
+2. Backend service + Pydantic models
+3. Backend API endpoints
+4. `DynamicWorkflowRenderer` (enables end-to-end testing before builder UI exists)
+5. Navigation hydration (`studioConfig.ts` + `App.tsx`)
+6. `StudioPage.tsx` fallback (one-line change)
+7. `WorkflowBuilder` UI (NodeInspector + VariableConfigurator)
+8. Test runner panel
+9. Publish flow + navigation refresh
 
 ### Critical Pitfalls
 
-1. **Batch state lost on Heroku dyno restart** — Never use in-memory job stores for batch state. ALL state goes to Supabase from day one. Add startup recovery (`@app.on_event("startup")`) that resumes interrupted batches. The existing `hf_download_service.py` in-memory dict pattern would be catastrophic here. (Affects Phase 1 schema design.)
+See [PITFALLS.md](.planning/research/PITFALLS.md) for all 13 pitfalls with codebase-specific file references and line numbers.
 
-2. **Heroku 30-second timeout killing batch submissions** — The batch submission endpoint must return immediately with a `batch_id` and launch processing as a background task. No Freepik API calls inside request handlers. Frontend receives the batch ID instantly and starts polling. (Affects Phase 1 API design.)
+**Top 5 — phase blocking:**
 
-3. **Credit exhaustion treated as a regular per-video error** — Parse Freepik error responses to distinguish: (a) per-second rate limit (429) — exponential backoff and retry; (b) credit exhaustion (402 or custom error code) — pause entire batch and notify user; (c) daily RPD limit — pause and calculate reset time. Failing to separate these causes wasted credits and confusing UX. (Must be designed in Phase 1 FreepikUpscalerService, implemented in Phase 2.)
+1. **`StudioPageType` union does not cover runtime database IDs (Pitfall #1)** — Adding `| string` to the TypeScript union kills compile-time safety on all static pages and breaks the `validPages.includes()` guard. Prevention: maintain a parallel `dynamicPage` state in a separate localStorage key; never merge dynamic slugs into the static union. Must be resolved in Phase 1 before any routing work.
 
-4. **Large video downloads loaded into backend memory** — Existing `storage_service.py:98` loads full file content into memory (`video_response.content`). Acceptable for small ComfyUI outputs (5-20 MB), fatal for 50-200 MB upscaled videos on Heroku's 512 MB limit. Also: `google_drive_service.py:235` uses `MediaInMemoryUpload`. Both must use streaming equivalents for this feature. (Affects Phase 3 output delivery.)
+2. **UI-format vs API-format ComfyUI JSON upload (Pitfall #2)** — Admins default to saving the visual editor format (Ctrl+S in ComfyUI), which is incompatible with `WorkflowService`. Prevention: detect format immediately on upload using the presence of `nodes` + `links` top-level keys; reject with a clear message pointing to "Save (API Format)." Must be in the parser from day one.
 
-5. **Freepik API endpoint undocumented** — `api.freepik.com/v1/ai/video-upscaler` is not in public API docs as of March 2026. Validate manually before writing any code: make a live test call, confirm endpoint URL, parameters, response format, credit model, and error codes. Build the FreepikUpscalerService as a clean abstraction so any API changes are absorbed in one file. (Blocks Phase 0 validation gate.)
+3. **Test runner diverges from renderer code path (Pitfall #6)** — If the test runner and production renderer use different parameter preparation or submission logic, test-passes give false confidence. Prevention: implement a single `execute_dynamic_workflow(config, params, comfy_url, job_context=None)` function that both paths call. Enforce this in the backend service layer before building either the test runner or the renderer.
+
+4. **Dynamic workflow configs fetched inline on every navigation (Pitfall #4)** — Loading the config inside `StudioPage.tsx` or `DynamicWorkflowRenderer` on every render causes a flash-of-loading on every navigation and repeated database fetches. Prevention: fetch all published configs once at app startup (in `AuthContext` or a `WorkflowConfigContext`); `StudioPage` reads from in-memory map synchronously. Background polling every 60 seconds handles updates.
+
+5. **`comfy_job_id` vs `job_id` field naming mismatch (Pitfall #12)** — The codebase has two conflicting job payload interfaces; using the legacy `job_id` field stores no `comfy_job_id`, so the monitoring loop never finds the job and it stays permanently in "processing." Prevention: use only `CreateVideoJobPayload` / `CreateImageJobPayload` (new interfaces) for all dynamic workflow jobs. Verify in Phase 1 database schema work.
+
+---
 
 ## Implications for Roadmap
 
-Based on combined research, the build order is a strict linear dependency chain with one pre-implementation validation gate and 4 build phases. The architecture research explicitly documents this as a linear dependency — unlike the v1.0 infrastructure milestone (which had two parallel tracks), this feature cannot be parallelized.
+Based on the dependency graph in FEATURES.md and the suggested build order in ARCHITECTURE.md, the natural phase structure is:
 
-### Phase 0: API Validation (Pre-implementation Gate)
+### Phase 1: Foundation — Schema, Parser, and Shared Execution
+**Rationale:** Everything else depends on the database schema, the workflow JSON parser, and the single shared execution code path. Pitfalls #1, #2, #6, #8, #10, and #12 are all Phase 1 concerns. Getting these right prevents rewrites in later phases.
+**Delivers:** Migration `005_add_custom_workflows.sql`, `custom_workflow_service.py` with `parse_workflow_nodes()`, a single `execute_dynamic_workflow()` function, correct `comfy_job_id` usage, UI-format detection in the parser, separate routing state model for dynamic pages, backend API endpoints for CRUD and parse.
+**Addresses:** TS-1 (workflow JSON upload + parse), routing model for dynamic pages
+**Avoids:** Pitfalls #1, #2, #6, #8, #10, #12
+**Research flag:** Well-documented patterns — standard Supabase migration + Python JSON parsing + FastAPI layered architecture. No additional research needed.
 
-**Rationale:** The single highest-risk item in this entire feature is the unverified Freepik API endpoint. All subsequent phases depend on knowing the exact API contract. This is a required gate before any code is written — not optional research. A manual test call takes 30 minutes and eliminates all LOW-confidence items.
-**Delivers:** Confirmed API endpoint URL, parameter schema, response format, Freepik task status states, error codes (especially credit exhaustion), and credit consumption model per video.
-**Addresses:** Pitfall #8 (Freepik API documentation gap)
-**Avoids:** Building the FreepikUpscalerService against assumed parameters that may not match the real API
+### Phase 2: Dynamic Renderer + Navigation Hydration
+**Rationale:** The `DynamicWorkflowRenderer` can be built and tested independently of the builder UI by manually inserting rows into the database. This unblocks end-to-end testing of the rendering pipeline before any admin UI exists. Navigation hydration (`studioConfig.ts` + `App.tsx`) and the `StudioPage.tsx` fallback unlock the complete user journey.
+**Delivers:** `DynamicWorkflowRenderer.tsx` rendering all 8 field types from JSONB config, navigation hydration at startup, `StudioPage` fallback, dynamic page localStorage validation on startup.
+**Addresses:** TS-3 (six core field types), TS-6 (publish to studio — renderer side), D-3 (feed + dual backend integration), D-4 (seed + randomize), D-5 (resolution pair)
+**Avoids:** Pitfalls #4, #5, #7, #9, #11
+**Research flag:** Standard patterns for all components. No additional research needed.
 
-### Phase 1: Foundation — Database + Freepik Service + Basic API
+### Phase 3: Workflow Builder Admin UI
+**Rationale:** With the renderer working, the builder UI can be built and validated end-to-end immediately — every "publish" tested against a live renderer. The builder phases map to the five sub-panels: NodeInspector → VariableConfigurator → SectionGrouping → TestPanel → PublishFlow.
+**Delivers:** `WorkflowBuilder.tsx` with all sub-components, publish flow wired to navigation refresh, draft state (saved but unpublished), emoji + gradient picker using `@dnd-kit/sortable` for field reordering and `emoji-picker-react` for icon selection.
+**Addresses:** TS-2 (variable configuration), TS-4 (section grouping), TS-5 (test run), TS-6 (publish to studio — builder side), D-1 (live preview), D-2 (auto-detect field types)
+**Uses:** `@dnd-kit/core` + `@dnd-kit/sortable`, `emoji-picker-react`, gradient preset palette (no library)
+**Avoids:** Pitfall #7 (nonexistent studio target — builder dropdown sources from static `studios` array)
+**Research flag:** Standard patterns. The `@dnd-kit` sortable preset usage pattern is documented in STACK.md. No additional research needed.
 
-**Rationale:** The database schema is the zero-dependency foundation. Everything else (batch manager, frontend, output delivery) depends on having the tables and the Freepik service working end-to-end with a single video. The schema must include ALL columns needed by later phases (heartbeat, per-destination upload status) to avoid mid-feature migrations.
-**Delivers:** Migration `007_add_upscale_batches.sql` applied; `freepik_service.py` tested with a real single-video end-to-end; `upscale_job_service.py` CRUD; `upscale.py` API routes for create batch, upload video, start batch; `FREEPIK_API_KEY` in Settings; fire-and-forget endpoint returning `batch_id` instantly.
-**Addresses:** TS-1 (upload validation), TS-2 (settings model), TS-3 (queue foundation)
-**Avoids:** Pitfall #1 (in-memory state), Pitfall #2 (30-second timeout)
-
-### Phase 2: Batch Processing — Sequential Queue + Credit Management
-
-**Rationale:** Once single-video processing works end-to-end, add the sequential processing loop with the three-category error classification (rate limit, credit exhaustion, daily limit), heartbeat tracking, and pause/resume. This is the core differentiator and the most complex phase. Getting error classification right here prevents the cascade failure mode (all remaining videos failing when credits run out).
-**Delivers:** `batch_manager.py` with start/resume/cancel; three-category Freepik error handling; pause state in DB with `pause_reason`; resume and cancel endpoints; heartbeat column updated on every processing cycle; idempotent re-submission (check for existing `freepik_task_id` before submitting).
-**Addresses:** D-1 (credit exhaustion detection), D-2 (resume after recharge), TS-6 (error handling with retry)
-**Avoids:** Pitfall #3 (credit exhaustion as afterthought), Pitfall #6 (polling too aggressive or too lazy), Pitfall #9 (background task silent failure), Pitfall #10 (rate limit vs credit error conflation), Pitfall #11 (non-idempotent resume)
-
-### Phase 3: Output Delivery — Supabase Storage + Google Drive
-
-**Rationale:** With batch processing functional, add the output delivery step. This phase reuses existing services with minimal new code, but requires streaming download (not full-file-in-memory) and per-destination status tracking (for atomicity across two independent services). Requires a code spike to confirm Supabase Storage's Python SDK supports streaming upload of 50-200 MB files.
-**Delivers:** Streaming video download from Freepik (httpx chunk iteration); upload to Supabase Storage (streaming or temp-file path); Google Drive upload via temp file (replacing MediaInMemoryUpload); per-video `supabase_upload_status` and `drive_upload_status` tracking; startup recovery for interrupted batches at server restart; public or long-lived signed URLs for completed videos.
-**Addresses:** TS-5 (output delivery to Supabase + Drive)
-**Avoids:** Pitfall #4 (memory exhaustion on large videos), Pitfall #5 (dual-destination atomicity), Pitfall #12 (signed URL expiry), Pitfall #14 (Drive folder context persistence)
-
-### Phase 4: Frontend — Upload UI + Progress Display + Results
-
-**Rationale:** The backend is fully functional after Phase 3. The frontend can be built and tested against the working API without any backend unknowns remaining. All component patterns exist in the codebase (file upload, polling hooks, ProjectContext, ResizableFeedSidebar). No new libraries needed.
-**Delivers:** `BatchUpscale.tsx` main page with parameter controls and presets; `BatchUploadZone.tsx` multi-file drag-drop with per-file duration validation; `BatchProgress.tsx` per-video status with color-coded badges; `useBatchUpscale.ts` hook with 5-second polling and terminal state detection; navigation entry in `studioConfig.ts`; pause/resume banner UI; per-video preview and download; batch summary progress bar with estimated time remaining; cascade cleanup on batch deletion.
-**Addresses:** TS-1 through TS-7 (all table stakes), D-4 (queue reordering, stretch goal)
-**Avoids:** Pitfall #13 (unclear state visibility), Pitfall #15 (batch cleanup orphaning files and Freepik tasks)
+### Phase 4: Feature Management (CRUD) + Config Staleness Handling
+**Rationale:** Once the first feature is published, the admin immediately needs to edit, unpublish, and delete. Stale config handling (Pitfall #13) and localStorage invalidation after deletion (Pitfall #9) must be addressed before real users hit published workflows.
+**Delivers:** Management list view (TS-7) with edit/unpublish/delete, config versioning with 60-second background poll, localStorage orphan cleanup on startup, deletion confirmation with active-job check.
+**Addresses:** TS-7 (manage published features)
+**Avoids:** Pitfalls #9, #13
+**Research flag:** Standard patterns. No additional research needed.
 
 ### Phase Ordering Rationale
 
-- **Phase 0 is a hard gate.** No code is written until the Freepik API contract is confirmed. This eliminates the only LOW-confidence item and prevents building against wrong assumptions.
-- **Phase 1 before everything else** because the DB schema underpins all state management. The schema must include ALL columns needed by Phases 2 and 3 (heartbeat, per-destination upload status, granular video statuses) to avoid mid-feature migrations.
-- **Phase 2 before Phase 3** because output delivery only has work to do if the batch manager is completing videos and triggering the delivery step.
-- **Phase 4 last** because it is pure frontend with zero backend unknowns at that point, minimizing rework.
-- **No parallel tracks.** Unlike the v1.0 infrastructure milestone, this feature is a single pipeline. A single developer or pair should move through the phases in order.
+- **Phase 1 must come first** because the database schema and shared execution function are dependencies for every other phase. Pitfalls #1, #6, #8, and #12 are architectural decisions that cannot be retrofitted.
+- **Phase 2 before Phase 3** because a working renderer lets Phase 3 do real end-to-end testing without guessing at the rendering output. It also validates the navigation hydration architecture before the builder UI generates dynamic app IDs.
+- **Phase 3 before Phase 4** because there must be at least one published feature to manage. Phase 4 handles the full lifecycle that only exists once Phase 3 is complete.
+- **Anti-features excluded from all phases:** visual node graph editor, code generation, per-user builder access, conditional field logic, `object_info` blocking validation. These are explicitly out of scope for v1.2 per FEATURES.md.
 
 ### Research Flags
 
-Phases likely needing deeper research during planning:
-- **Phase 0 (API Validation):** Must confirm the Freepik video upscaler API contract before writing any code. Specifically needed: exact endpoint URL, parameter names and types, response body structure, error code for credit exhaustion (HTTP 402? body field?), credit consumption model (per-frame? per-video? capped?), daily quota reset time. Make a live test call — this is mandatory, not optional.
-- **Phase 3 (Streaming Uploads to Supabase):** The existing `storage_service.py` uses standard non-streaming uploads capped at 6 MB. The Supabase Python SDK's support for streaming or multipart upload of 50-200 MB videos needs a code spike before Phase 3 begins. If the SDK does not support it natively, the alternative is writing to a temp file and uploading from disk (Heroku dynos have ~4 GB ephemeral disk space).
+Phases with well-documented patterns (no additional research needed):
+- **Phase 1:** Supabase migrations, Python JSON parsing, FastAPI layered architecture — all established in existing codebase patterns
+- **Phase 2:** React component rendering, job tracking, navigation state — all existing platform patterns replicated
+- **Phase 3:** `@dnd-kit/sortable` usage patterns documented in STACK.md with working code examples; emoji picker is a drop-in
+- **Phase 4:** CRUD UI patterns, polling with TTL — standard web patterns with no new libraries
 
-Phases with standard patterns (skip research during planning):
-- **Phase 1 (DB + Service Layer):** Follows proven patterns from `runpod_service.py` and `hf_download_service.py`. Schema design is fully specified in ARCHITECTURE.md. No research needed beyond Phase 0 API validation.
-- **Phase 2 (Batch Manager):** Sequential state machine with DB-backed state is a well-understood pattern. Existing codebase has analogous implementations. No external library research needed.
-- **Phase 4 (Frontend):** All component patterns exist in the codebase. No new libraries needed. Standard React polling hook with cleanup. Direct implementation from ARCHITECTURE.md component spec.
+No phases require `/gsd:research-phase` during planning. All unknowns are resolved by the research.
+
+---
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Zero new dependencies confirmed by reviewing requirements.txt and package.json. All patterns verified against 3 existing service files in codebase. |
-| Features | HIGH | Table stakes well-understood from Freepik product page, PROJECT.md requirements, and competitor analysis (Topaz batch queue community). Differentiators clearly defined with acceptance criteria. |
-| Architecture | HIGH | All component patterns derived from existing, working code. Interfaces follow established service layer conventions exactly. Build order validated with clear dependency chain. |
-| Pitfalls | HIGH | 15 pitfalls identified with codebase-specific evidence (specific file names and line numbers). Prevention strategies are concrete and actionable. |
-| Freepik API Contract | LOW | Video upscaler API not publicly documented. Parameters inferred from web UI and image upscaler API patterns. Must be validated with a live test call before Phase 1. |
+| Stack | HIGH | All npm versions verified against live registry on 2026-03-13; peer dependency compatibility confirmed; React 19 compatibility checked for all 4 packages; backend zero-new-deps confirmed against existing requirements.txt |
+| Features | HIGH | Features derived from direct codebase analysis of existing feature pages + official ComfyUI datatypes docs + competitor analysis of ViewComfy and ComfyUI App Builder; acceptance criteria defined for all table stakes |
+| Architecture | HIGH | Based on direct codebase analysis of `studioConfig.ts`, `StudioPage.tsx`, `App.tsx`, `workflow_service.py`, `jobTracking.ts`, `supabase.ts` — not inference from external sources; SQL schema fully specified |
+| Pitfalls | HIGH | All 13 pitfalls reference specific file paths and line numbers in the existing codebase; ComfyUI format confusion verified against GitHub issue #1335; Supabase JSONB validation verified against official docs |
 
-**Overall confidence:** MEDIUM (all internal architecture is HIGH; external API contract is the single LOW-confidence blocker that a 30-minute validation call can resolve)
+**Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **Freepik video upscaler API contract:** Before writing any code, the project owner must make a live test call to confirm endpoint URL, parameter names, response format, error codes, and credit consumption model. Document findings to unblock Phase 1. This is the only gap that blocks implementation.
-- **Freepik credit exhaustion error signature:** The exact HTTP status code and response body for credit exhaustion is unknown. Research suggests HTTP 402 but the actual error must be discovered during Phase 0 validation (ideally by intentionally depleting credits on a low-balance test account, or from internal Freepik documentation the project owner may have access to).
-- **Supabase Storage streaming upload in Python:** The existing upload pattern handles small files. The SDK's support for streaming or multipart upload of 50-200 MB videos needs a code spike at the start of Phase 3 before committing to a full implementation.
-- **Freepik 8-second video duration limit enforcement:** The limit is stated on the product page but not confirmed in API documentation. Determine whether the API enforces it with a validation error or silently accepts longer videos (which affects whether the validation gate must be in the frontend, the backend, or both).
+- **Heroku filesystem ephemerality (workflow file storage):** Option A (write custom workflow JSON to `backend/workflows/custom/`) works locally but the Heroku filesystem is ephemeral — files do not survive a restart. For the dev/local phase, Option A is fine. Before deploying to Heroku production, migrate to Option B (store JSON in Supabase Storage and add a `load_template_from_db()` path to `WorkflowService`). Flag as a pre-production task, not a v1.2 blocker for local development.
+
+- **`pg_jsonschema` CHECK constraint on JSONB columns:** Pitfall #5 recommends a Supabase `pg_jsonschema` extension CHECK constraint to enforce the `VariableConfig` schema at the database level. Validate that `pg_jsonschema` is available in the project's Supabase tier before relying on it — if not available, the Zod frontend validation becomes the sole schema enforcement layer and the implementation plan should document this clearly.
+
+- **Admin role detection pattern (`isAdmin` / `verify_admin`):** The existing `api/infrastructure.py` uses a `verify_admin` dependency. The exact implementation (Supabase user metadata field, hardcoded email list, or role table) needs to be confirmed before building the `api/custom_workflows.py` router. Reuse the exact same pattern without re-implementing admin detection.
+
+---
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- Codebase analysis: `backend/services/runpod_service.py`, `backend/services/worldlabs_service.py`, `backend/services/hf_download_service.py`, `backend/services/storage_service.py` (lines 28, 98, 116), `backend/services/google_drive_service.py` (line 235), `backend/api/video_jobs.py` (lines 263-344) — existing service patterns, output delivery pattern, memory usage risks
-- [Freepik API Documentation](https://docs.freepik.com/) — confirmed image upscaler endpoints; video upscaler NOT present as of 2026-03-11
-- [Freepik API rate limits](https://docs.freepik.com/ratelimits) — 10 hits/s sustained, 50 hits/s burst; tier-based daily limits (Free: 10/day, Tier 1: 125/day)
-- [Heroku request timeout docs](https://devcenter.heroku.com/articles/request-timeout) — 30-second hard limit (H12 error)
-- [Supabase storage upload limits](https://supabase.com/docs/guides/storage/uploads/file-limits) — 6 MB standard; resumable upload (TUS protocol) required for larger files
-- [FastAPI background tasks](https://fastapi.tiangolo.com/tutorial/background-tasks/) — fire-and-forget pattern, exception handling limitations
+
+**From STACK.md:**
+- [dnd-kit/core npm](https://www.npmjs.com/package/@dnd-kit/core) — v6.3.1 verified, peerDeps confirmed
+- [dnd-kit React 19 Issue #1654](https://github.com/clauderic/dnd-kit/issues/1654) — React 19 issues isolated to `@dnd-kit/react` (pre-1.0), not `@dnd-kit/core` v6
+- [emoji-picker-react npm](https://www.npmjs.com/package/emoji-picker-react) — v4.18.0, last updated 2026-02-07
+- [ComfyUI Datatypes Documentation](https://docs.comfy.org/custom-nodes/backend/datatypes) — STRING, INT, FLOAT, BOOLEAN, COMBO type metadata with min/max/step/multiline
+- [ComfyUI Workflow JSON Spec](https://docs.comfy.org/specs/workflow_json) — API format structure, node/link distinction
+
+**From FEATURES.md:**
+- [ComfyUI App Builder announcement](https://blog.comfy.org/p/from-workflow-to-app-introducing) — field grouping, rename, reorder, App Mode patterns
+- [ViewComfy GitHub](https://github.com/ViewComfy/ViewComfy) — field types supported: text, numbers, dropdowns, sliders, checkboxes, images, videos, audio
+- [ViewComfy blog](https://www.viewcomfy.com/blog/turn-a-comfyui-workflow-into-an-app) — workflow-to-app process (upload → configure → deploy)
+- Existing codebase: `frontend/src/lib/studioConfig.ts`, `backend/services/workflow_service.py`, `backend/workflows/*.json`
+
+**From ARCHITECTURE.md:**
+- Direct codebase analysis: `studioConfig.ts`, `StudioPage.tsx`, `App.tsx`, `AuthContext.tsx`, `ExecutionBackendContext.tsx`, `jobTracking.ts`, `apiClient.ts`, `workflow_service.py`, `api/infrastructure.py`, `api/comfyui.py`
+
+**From PITFALLS.md:**
+- Direct codebase analysis with file paths and line numbers: `frontend/src/lib/studioConfig.ts` (StudioPageType union line 335), `frontend/src/App.tsx` (validPages line 112), `frontend/src/lib/supabase.ts` (CreateJobPayload vs CreateVideoJobPayload interfaces lines 44, 71)
+- [ComfyUI Issue #1335](https://github.com/comfyanonymous/ComfyUI/issues/1335) — UI-format vs API-format confusion
+- [Supabase pg_jsonschema docs](https://supabase.com/docs/guides/database/extensions/pg_jsonschema) — JSONB schema validation at DB level
+- [Supabase RLS docs](https://supabase.com/docs/guides/database/postgres/row-level-security) — row-level security for `custom_workflows` table
 
 ### Secondary (MEDIUM confidence)
-- [Freepik AI Video Upscaler product page](https://www.freepik.com/ai/video-upscaler) — parameters (resolution, creativity, sharpen, grain, fps_boost, flavor) and 8-second duration limit
-- [Freepik Image Upscaler Creative API](https://docs.freepik.com/api-reference/image-upscaler-creative/post-image-upscaler) — POST to submit + GET to poll pattern (CREATED/IN_PROGRESS/COMPLETED/FAILED statuses); closest documented analog to video upscaler
-- [Supabase resumable uploads blog](https://supabase.com/blog/storage-v3-resumable-uploads) — TUS protocol support for large file uploads
-- [Topaz Video AI batch queue community request](https://community.topazlabs.com/t/much-better-batch-control-of-all-items-in-queue-required/80123) — user demand evidence for better queue control features
-- [LogRocket: UI patterns for async workflows](https://blog.logrocket.com/ui-patterns-for-async-workflows-background-jobs-and-data-pipelines) — progress tracking and partial failure UX patterns
 
-### Tertiary (LOW confidence)
-- PROJECT.md specification of `api.freepik.com/v1/ai/video-upscaler` as the endpoint — unverified against live API; requires owner validation before implementation
-- Freepik credit exhaustion HTTP status assumed to be 402 — inferred from REST conventions; actual error signature unknown
+- [The ComfyUI Production Playbook — Cohorte Projects](https://www.cohorte.co/blog/the-comfyui-production-playbook) — production pitfalls and patterns
+- [InvokeAI Workflow Implementation](https://invoke-ai.github.io/InvokeAI/contributing/frontend/workflows/) — LinearView field template patterns for linearizing graph into form
+- [Dynamic Form Builder System Design — Medium](https://shivambhasin29.medium.com/mastering-frontend-system-design-building-a-dynamic-form-builder-from-scratch-0dfdd78d31d6) — field schema design (id, type, label, validation, conditional logic)
+- [Dynamic Configurations in React Apps — Medium](https://medium.com/@bjvalmaseda/dynamic-configurations-in-react-apps-bypass-the-rebuild-with-express-0269e86eb61d) — bypass rebuild with runtime config pattern
 
 ---
-*Research completed: 2026-03-11*
-*Ready for roadmap: yes, pending Phase 0 API validation*
+
+*Research completed: 2026-03-13*
+*Ready for roadmap: yes*
