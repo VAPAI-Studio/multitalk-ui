@@ -44,6 +44,7 @@ export default function VirtualSet({ comfyUrl = "" }: Props) {
   // Upload state — video
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoPreviewUrl, setVideoPreviewUrl] = useState("");
+  const [videoThumbnailDataUrl, setVideoThumbnailDataUrl] = useState("");
 
   // Common
   const [textPrompt, setTextPrompt] = useState("");
@@ -90,6 +91,7 @@ export default function VirtualSet({ comfyUrl = "" }: Props) {
   const getReferenceImageUrl = () => {
     if (promptType === "image") return inputImageDataUrl;
     if (promptType === "multi-image" && multiImages.length > 0) return multiImages[0].dataUrl;
+    if (promptType === "video") return videoThumbnailDataUrl;
     return "";
   };
 
@@ -165,8 +167,28 @@ export default function VirtualSet({ comfyUrl = "" }: Props) {
       return;
     }
     setVideoFile(file);
-    setVideoPreviewUrl(URL.createObjectURL(file));
+    const blobUrl = URL.createObjectURL(file);
+    setVideoPreviewUrl(blobUrl);
     setError("");
+
+    // Extract first frame as thumbnail for feed reference image
+    const video = document.createElement("video");
+    video.src = blobUrl;
+    video.crossOrigin = "anonymous";
+    video.muted = true;
+    video.addEventListener("loadeddata", () => {
+      video.currentTime = 0;
+    });
+    video.addEventListener("seeked", () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.drawImage(video, 0, 0);
+        setVideoThumbnailDataUrl(canvas.toDataURL("image/jpeg", 0.8));
+      }
+    });
   };
 
   // Check if we can generate
@@ -353,6 +375,7 @@ export default function VirtualSet({ comfyUrl = "" }: Props) {
     setVideoFile(null);
     if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl);
     setVideoPreviewUrl("");
+    setVideoThumbnailDataUrl("");
     setTextPrompt("");
     setSplatUrl("");
     setOperationId("");
