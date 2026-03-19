@@ -20,7 +20,7 @@ function LazyImage({
 
   return (
     <div className="relative w-full h-full">
-      <div className={`absolute inset-0 flex items-center justify-center bg-gray-100 ${loaded ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}>
+      <div className={`absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-800 ${loaded ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}>
         <span className="text-2xl">{error ? '⚠️' : placeholderIcon}</span>
       </div>
       {!error && (
@@ -129,7 +129,7 @@ const LazyVideo = ({
 
 export interface GenerationItem {
   id: string
-  type: 'video' | 'image'
+  type: 'video' | 'image' | 'world'
   created_at: string
   title: string
   status: string
@@ -164,13 +164,13 @@ interface FeedListItemProps {
 
 function getStatusColor(status: string): string {
   switch (status) {
-    case 'completed': return 'bg-green-100 text-green-700'
-    case 'processing': return 'bg-blue-100 text-blue-700'
-    case 'submitted': return 'bg-blue-100 text-blue-700'
-    case 'error': return 'bg-red-100 text-red-700'
-    case 'failed': return 'bg-yellow-100 text-yellow-700'
-    case 'pending': return 'bg-gray-100 text-gray-700'
-    default: return 'bg-gray-100 text-gray-700'
+    case 'completed': return 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300'
+    case 'processing': return 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
+    case 'submitted': return 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
+    case 'error': return 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300'
+    case 'failed': return 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300'
+    case 'pending': return 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
+    default: return 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
   }
 }
 
@@ -206,11 +206,11 @@ export default function FeedListItem({
   // Compact view for failed/error items
   if (item.status === 'failed' || item.status === 'error') {
     return (
-      <div className="border border-yellow-200 rounded-lg p-2 bg-yellow-50">
+      <div className="border border-yellow-200 dark:border-yellow-800 rounded-lg p-2 bg-yellow-50 dark:bg-yellow-900/20">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-sm">{item.type === 'video' ? '🎬' : '🖼️'}</span>
-            <span className="text-xs font-mono text-gray-600">
+            <span className="text-xs font-mono text-gray-600 dark:text-gray-400">
               {getShortJobId(item.id)}
             </span>
           </div>
@@ -225,17 +225,17 @@ export default function FeedListItem({
   // Video item
   if (item.type === 'video') {
     return (
-      <div className="border border-gray-200 rounded-xl p-3 bg-white">
+      <div className="border border-gray-200 dark:border-gray-700 rounded-xl p-3 bg-white dark:bg-gray-800">
         {item.result_url && item.status === 'completed' ? (
           <LazyVideo
             resultUrl={item.result_url}
             thumbnailUrl={item.thumbnail_url}
           />
         ) : item.status === 'processing' || item.status === 'submitted' ? (
-          <div className={`w-full ${heightClass} min-h-[64px] bg-blue-50 rounded-lg flex items-center justify-center`}>
+          <div className={`w-full ${heightClass} min-h-[64px] bg-blue-50 dark:bg-blue-900/20 rounded-lg flex items-center justify-center`}>
             <div className="flex items-center gap-2">
-              <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full"></div>
-              <span className="text-blue-600 text-sm">
+              <div className="animate-spin h-4 w-4 border-2 border-blue-600 dark:border-blue-400 border-t-transparent rounded-full"></div>
+              <span className="text-blue-600 dark:text-blue-400 text-sm">
                 {showProgress && progressValue !== undefined
                   ? `${progressValue}%`
                   : 'Processing...'}
@@ -244,7 +244,7 @@ export default function FeedListItem({
                 <button
                   onClick={() => onFix(item.id)}
                   disabled={fixingJobs.has(item.id)}
-                  className="px-2 py-1 text-xs bg-orange-100 hover:bg-orange-200 text-orange-700 rounded border border-orange-300 disabled:opacity-50"
+                  className="px-2 py-1 text-xs bg-orange-100 dark:bg-orange-900/30 hover:bg-orange-200 dark:hover:bg-orange-900/50 text-orange-700 dark:text-orange-300 rounded border border-orange-300 dark:border-orange-700 disabled:opacity-50"
                 >
                   {fixingJobs.has(item.id) ? '...' : 'Fix'}
                 </button>
@@ -252,22 +252,22 @@ export default function FeedListItem({
             </div>
           </div>
         ) : (
-          <div className={`w-full ${heightClass} min-h-[64px] bg-gray-100 rounded-lg flex items-center justify-center`}>
+          <div className={`w-full ${heightClass} min-h-[64px] bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center`}>
             <span className="text-2xl">🎬</span>
           </div>
         )}
 
         <div className="mt-2 space-y-1">
           <div className="flex items-center justify-between">
-            <h3 className="font-medium text-gray-900 text-sm truncate flex-1">{item.title}</h3>
+            <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm truncate flex-1">{item.title}</h3>
             <span className={`text-xs px-2 py-0.5 rounded-full ml-2 ${getStatusColor(item.status)}`}>
               {getStatusText(item.status)}
             </span>
           </div>
-          <div className="flex items-center justify-between text-xs text-gray-500">
+          <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
             <span>{new Date(item.created_at).toLocaleDateString()}</span>
             {item.workflow_name && (
-              <span className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">
+              <span className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-gray-600 dark:text-gray-400">
                 {item.workflow_name}
               </span>
             )}
@@ -291,7 +291,7 @@ export default function FeedListItem({
   const hasMultipleImages = item.all_result_urls && item.all_result_urls.length > 1
 
   return (
-    <div className="border border-gray-200 rounded-xl p-3 bg-white">
+    <div className="border border-gray-200 dark:border-gray-700 rounded-xl p-3 bg-white dark:bg-gray-800">
       {/* Multi-image grid */}
       {hasMultipleImages && item.status === 'completed' ? (
         <div className="mb-2">
@@ -334,7 +334,7 @@ export default function FeedListItem({
               placeholderIcon="🖼️"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center bg-gray-100">
+            <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-700">
               <span className="text-3xl">🖼️</span>
             </div>
           )}
@@ -347,11 +347,11 @@ export default function FeedListItem({
       )}
 
       <div className="space-y-1">
-        <h3 className="font-medium text-gray-900 text-sm truncate">{item.title}</h3>
-        <div className="flex items-center justify-between text-xs text-gray-500">
+        <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm truncate">{item.title}</h3>
+        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
           <span>{new Date(item.created_at).toLocaleDateString()}</span>
           {item.workflow_name && (
-            <span className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">
+            <span className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-gray-600 dark:text-gray-400">
               {item.workflow_name}
             </span>
           )}

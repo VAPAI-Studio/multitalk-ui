@@ -1,7 +1,11 @@
 from fastapi import APIRouter, Header, UploadFile
 from typing import Optional
 import asyncio
+import base64
 import uuid
+from datetime import datetime
+
+import httpx
 
 from models.virtual_set import (
     VirtualSetGenerateRequest,
@@ -12,11 +16,17 @@ from models.virtual_set import (
     VirtualSetReconstructRequest,
     VirtualSetReconstructResponse,
 )
+from config.settings import settings
 from services.worldlabs_service import WorldLabsService
-from services.openrouter_service import OpenRouterService
+from services.comfyui_service import ComfyUIService
+from services.workflow_service import WorkflowService
 from services.storage_service import StorageService
 from services.image_job_service import ImageJobService
+from services.world_job_service import WorldJobService
 from models.image_job import CreateImageJobPayload, CompleteImageJobPayload
+from models.world_job import CreateWorldJobPayload, CompleteWorldJobPayload
+from core.supabase import get_supabase_for_token
+from core.auth import resolve_user_id
 
 router = APIRouter(prefix="/virtual-set", tags=["virtual-set"])
 
@@ -227,12 +237,11 @@ async def save_world(
     authorization: Optional[str] = Header(None),
     x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
 ):
-    """Save a generated 3D world as an image job for the feed."""
+    """Save a generated 3D world as a world job for the feed."""
     try:
         storage_service = StorageService()
-        image_job_service = ImageJobService(
-            auth_token=_resolve_token(authorization, x_api_key)
-        )
+        supabase = get_supabase_for_token(_resolve_token(authorization, x_api_key))
+        world_job_service = WorldJobService(supabase)
 
         # Upload original image to get a URL for the feed thumbnail
         upload_success, image_url, upload_error = (
@@ -246,23 +255,27 @@ async def save_world(
                 error=f"Failed to store image: {upload_error}",
             )
 
-        # Create image job with splat_url in parameters
-        job_id = str(uuid.uuid4())
-        job_payload = CreateImageJobPayload(
-            user_id=None,
-            comfy_job_id=job_id,
-            workflow_name="virtual-set-world",
-            comfy_url="worldlabs",
+        # Resolve user_id from auth
+        user_id = resolve_user_id(authorization, x_api_key)
+        if not user_id:
+            return VirtualSetSaveWorldResponse(
+                success=False,
+                error="Authentication required to save worlds",
+            )
+
+        # Create world job
+        job_payload = CreateWorldJobPayload(
+            user_id=user_id,
+            splat_url=request.splat_url,
+            world_id=request.world_id,
+            model=request.model,
+            prompt_type=request.prompt_type,
             input_image_urls=[image_url],
-            prompt=f"3D World ({request.model})",
-            parameters={
-                "splat_url": request.splat_url,
-                "world_id": request.world_id,
-                "model": request.model,
-            },
+            thumbnail_url=image_url,
+            display_name=f"3D World ({request.model})",
         )
 
-        success, created_job_id, error = await image_job_service.create_job(job_payload)
+        success, created_job_id, error = await world_job_service.create_job(job_payload)
         if not success:
             return VirtualSetSaveWorldResponse(
                 success=False,
@@ -271,11 +284,13 @@ async def save_world(
 
         # Mark as completed immediately
         if created_job_id:
-            await image_job_service.complete_job(
-                CompleteImageJobPayload(
+            await world_job_service.complete_job(
+                CompleteWorldJobPayload(
                     job_id=created_job_id,
                     status="completed",
-                    output_image_urls=[image_url],
+                    splat_url=request.splat_url,
+                    world_id=request.world_id,
+                    thumbnail_url=image_url,
                 )
             )
 
@@ -291,23 +306,55 @@ async def save_world(
         )
 
 
+def _extract_image_bytes(data_or_url: str) -> bytes:
+    """Extract raw image bytes from a data URL string."""
+    if data_or_url.startswith("data:"):
+        _, encoded = data_or_url.split(",", 1)
+        return base64.b64decode(encoded)
+    raise ValueError("Not a data URL — use _fetch_image_bytes for remote URLs")
+
+
+async def _fetch_image_bytes(url: str) -> bytes:
+    """Download image bytes from a remote URL."""
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.get(url)
+        resp.raise_for_status()
+        return resp.content
+
+
+def _image_ext_from_data_url(data_url: str) -> str:
+    """Infer file extension from a data URL's MIME type."""
+    if "image/png" in data_url:
+        return "png"
+    if "image/webp" in data_url:
+        return "webp"
+    return "jpg"
+
+
 @router.post("/reconstruct", response_model=VirtualSetReconstructResponse)
 async def reconstruct_image(
     request: VirtualSetReconstructRequest,
     authorization: Optional[str] = Header(None),
     x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
 ):
-    """Reconstruct a high-quality image from screenshot + original using OpenRouter."""
+    """Reconstruct a high-quality image from screenshot + reference via ComfyUI workflow."""
     image_job_id = None
 
     try:
-        openrouter_service = OpenRouterService()
+        comfyui_service = ComfyUIService()
+        workflow_service = WorkflowService()
         storage_service = StorageService()
-        image_job_service = ImageJobService(
-            auth_token=_resolve_token(authorization, x_api_key)
-        )
+        supabase = get_supabase_for_token(_resolve_token(authorization, x_api_key))
+        image_job_service = ImageJobService(supabase)
 
-        # Upload screenshot to storage
+        comfy_url = request.comfy_url
+        if not comfy_url:
+            return VirtualSetReconstructResponse(
+                success=False,
+                error="ComfyUI URL is required for reconstruction",
+            )
+
+        # --- 1. Upload screenshot to Supabase for record-keeping ---
         screenshot_upload_success, screenshot_url, screenshot_error = (
             await storage_service.upload_image_from_data_url(
                 request.screenshot_data, "virtual-set-screenshots"
@@ -319,7 +366,7 @@ async def reconstruct_image(
                 error=f"Failed to store screenshot: {screenshot_error}",
             )
 
-        # Upload original image to storage (handle both data URLs and regular URLs)
+        # --- 2. Upload/resolve original image to Supabase for record-keeping ---
         if request.original_image_data.startswith("data:image/"):
             original_upload_success, original_url, original_error = (
                 await storage_service.upload_image_from_data_url(
@@ -327,7 +374,6 @@ async def reconstruct_image(
                 )
             )
         else:
-            # Already a URL (e.g., loaded from feed), use it directly
             original_upload_success = True
             original_url = request.original_image_data
             original_error = None
@@ -338,100 +384,114 @@ async def reconstruct_image(
                 error=f"Failed to store original image: {original_error}",
             )
 
-        # Create image job record
-        job_id = str(uuid.uuid4())
+        # --- 3. Extract image bytes and upload both to ComfyUI ---
+        uid = str(uuid.uuid4())[:8]
+
+        # Screenshot bytes (always a data URL from canvas)
+        screenshot_bytes = _extract_image_bytes(request.screenshot_data)
+        screenshot_ext = _image_ext_from_data_url(request.screenshot_data)
+        screenshot_comfy_name = f"vs_screenshot_{uid}.{screenshot_ext}"
+
+        upload_ok, screenshot_filename, upload_err = await comfyui_service.upload_audio(
+            comfy_url, screenshot_bytes, screenshot_comfy_name
+        )
+        if not upload_ok:
+            return VirtualSetReconstructResponse(
+                success=False,
+                error=f"Failed to upload screenshot to ComfyUI: {upload_err}",
+            )
+
+        # Reference image bytes (can be data URL or remote URL)
+        if request.original_image_data.startswith("data:"):
+            ref_bytes = _extract_image_bytes(request.original_image_data)
+            ref_ext = _image_ext_from_data_url(request.original_image_data)
+        else:
+            ref_bytes = await _fetch_image_bytes(request.original_image_data)
+            ref_ext = "jpg"
+        ref_comfy_name = f"vs_reference_{uid}.{ref_ext}"
+
+        upload_ok, reference_filename, upload_err = await comfyui_service.upload_audio(
+            comfy_url, ref_bytes, ref_comfy_name
+        )
+        if not upload_ok:
+            return VirtualSetReconstructResponse(
+                success=False,
+                error=f"Failed to upload reference to ComfyUI: {upload_err}",
+            )
+
+        # --- 4. Build workflow from template ---
         base_prompt = (
-            "Using the original reference image, reconstruct and enhance this 3D viewport screenshot "
-            "into a high-quality photorealistic image. Maintain the exact camera angle and perspective "
-            "from the screenshot while applying the detail, texture quality, and lighting from the original."
+            "Reconstruct this scene from a new camera angle. The first image is a gaussian splatting 3D capture showing the "
+            "desired camera position and composition - ignore its rendering artifacts and quality issues. The second image is the "
+            "style and quality reference - match its visual style, textures, colors, and level of detail exactly. Combine the "
+            "viewpoint of the first image with the aesthetic of the second image."
         )
         full_prompt = f"{base_prompt} {request.prompt}".strip() if request.prompt else base_prompt
 
+        timestamp = datetime.now().strftime("%m-%d-%H-%M-%S")
+        output_prefix = f"image-{timestamp}"
+
+        build_ok, workflow, build_err = await workflow_service.build_workflow(
+            "Reconstruccion-virtualset-nb2",
+            {
+                "SCREENSHOT_FILENAME": screenshot_filename,
+                "REFERENCE_FILENAME": reference_filename,
+                "PROMPT": full_prompt,
+                "OUTPUT_PREFIX": output_prefix,
+            },
+        )
+        if not build_ok or not workflow:
+            return VirtualSetReconstructResponse(
+                success=False,
+                error=f"Failed to build workflow: {build_err}",
+            )
+
+        # --- 5. Submit to ComfyUI ---
+        client_id = request.client_id or f"virtualset-{uid}"
+        payload = {"prompt": workflow, "client_id": client_id}
+
+        # Add ComfyUI API key for paid API nodes (Gemini/Nano Banana)
+        api_key = settings.COMFY_API_KEY
+        if api_key:
+            payload["extra_data"] = {"api_key_comfy_org": api_key}
+
+        submit_ok, prompt_id, submit_err = await comfyui_service.submit_prompt(
+            comfy_url, payload
+        )
+        if not submit_ok or not prompt_id:
+            return VirtualSetReconstructResponse(
+                success=False,
+                error=f"Failed to submit to ComfyUI: {submit_err}",
+            )
+
+        # --- 6. Create image job record ---
+        user_id = resolve_user_id(authorization, x_api_key)
         job_payload = CreateImageJobPayload(
-            user_id=None,
-            comfy_job_id=job_id,
+            user_id=user_id or "anonymous",
+            comfy_job_id=prompt_id,
             workflow_name="virtual-set",
-            comfy_url="openrouter",
+            comfy_url=comfy_url,
             input_image_urls=[screenshot_url, original_url],
             prompt=full_prompt,
-            parameters={"model": "google/gemini-2.5-flash-image-preview:free"},
+            parameters={"model": "Nano Banana 2 (Gemini 3.1 Flash Image)"},
         )
 
         success, created_job_id, error = await image_job_service.create_job(job_payload)
         if success and created_job_id:
             image_job_id = created_job_id
-
-        if image_job_id:
             await image_job_service.update_to_processing(image_job_id)
 
-        # Call OpenRouter with the screenshot image + prompt referencing original
-        edit_success, result_image_url, edit_error = await openrouter_service.edit_image(
-            request.screenshot_data,
-            full_prompt,
-        )
-
-        if not edit_success or not result_image_url:
-            if image_job_id:
-                await image_job_service.complete_job(
-                    CompleteImageJobPayload(
-                        job_id=image_job_id,
-                        status="failed",
-                        error_message=edit_error or "Image reconstruction failed",
-                    )
-                )
-            return VirtualSetReconstructResponse(
-                success=False,
-                error=edit_error or "Image reconstruction failed",
-            )
-
-        # Upload result to storage
-        if result_image_url.startswith("data:image/"):
-            result_upload_success, result_storage_url, result_error = (
-                await storage_service.upload_image_from_data_url(
-                    result_image_url, "virtual-set-results"
-                )
-            )
-        else:
-            result_upload_success, result_storage_url, result_error = (
-                await storage_service.upload_image_from_url(
-                    result_image_url, "virtual-set-results"
-                )
-            )
-
-        if not result_upload_success:
-            if image_job_id:
-                await image_job_service.complete_job(
-                    CompleteImageJobPayload(
-                        job_id=image_job_id,
-                        status="failed",
-                        error_message=f"Failed to store result: {result_error}",
-                    )
-                )
-            return VirtualSetReconstructResponse(
-                success=False,
-                error=f"Failed to store result image: {result_error}",
-            )
-
-        # Complete job
-        if image_job_id:
-            await image_job_service.complete_job(
-                CompleteImageJobPayload(
-                    job_id=image_job_id,
-                    status="completed",
-                    output_image_urls=[result_storage_url],
-                )
-            )
-
+        # --- 7. Return prompt_id for frontend polling ---
         return VirtualSetReconstructResponse(
             success=True,
-            image_url=result_storage_url,
+            prompt_id=prompt_id,
             job_id=image_job_id,
         )
 
     except Exception as e:
         if image_job_id:
             try:
-                ijs = ImageJobService(auth_token=_resolve_token(authorization, x_api_key))
+                ijs = ImageJobService(get_supabase_for_token(_resolve_token(authorization, x_api_key)))
                 await ijs.complete_job(
                     CompleteImageJobPayload(
                         job_id=image_job_id,
@@ -450,20 +510,17 @@ async def reconstruct_image(
 
 @router.get("/health")
 async def check_config():
-    """Check if World Labs and OpenRouter APIs are configured."""
+    """Check if World Labs API is configured (reconstruction uses ComfyUI)."""
     worldlabs_service = WorldLabsService()
-    openrouter_service = OpenRouterService()
 
     has_worldlabs = bool(worldlabs_service.api_key)
-    has_openrouter = bool(openrouter_service.api_key)
 
     return {
-        "configured": has_worldlabs and has_openrouter,
+        "configured": has_worldlabs,
         "worldlabs_configured": has_worldlabs,
-        "openrouter_configured": has_openrouter,
         "message": (
-            "All APIs configured"
-            if has_worldlabs and has_openrouter
-            else f"Missing: {', '.join(k for k, v in [('WORLDLABS_API_KEY', has_worldlabs), ('OPENROUTER_API_KEY', has_openrouter)] if not v)}"
+            "World Labs API configured. Reconstruction uses ComfyUI."
+            if has_worldlabs
+            else "Missing: WORLDLABS_API_KEY"
         ),
     }

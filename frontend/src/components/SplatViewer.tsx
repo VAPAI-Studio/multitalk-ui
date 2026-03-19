@@ -20,7 +20,7 @@ export default function SplatViewer({
   const sceneRef = useRef<THREE.Scene | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
   const keysRef = useRef<Set<string>>(new Set());
-  const clockRef = useRef<THREE.Clock>(new THREE.Clock());
+  const timerRef = useRef<THREE.Timer>(new THREE.Timer());
   const [isLoaded, setIsLoaded] = useState(false);
   const [fov, setFov] = useState(60);
   const [loadError, setLoadError] = useState<string>("");
@@ -94,11 +94,11 @@ export default function SplatViewer({
       }, 60000);
 
       // Animation loop
-      const clock = clockRef.current;
-      clock.start();
+      const timer = timerRef.current;
 
       renderer.setAnimationLoop(() => {
-        const delta = clock.getDelta();
+        timer.update();
+        const delta = timer.getDelta();
         const speed = 3.0 * delta;
         const keys = keysRef.current;
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Label, Field, Section } from "../components/UI";
 import { apiClient } from "../lib/apiClient";
+import { findImageFromHistory, checkComfyUIHealth } from "../components/utils";
 import ResizableFeedSidebar from "../components/ResizableFeedSidebar";
 import SplatViewer from "../components/SplatViewer";
 
@@ -44,6 +45,7 @@ export default function VirtualSet({ comfyUrl = "" }: Props) {
   // Upload state — video
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoPreviewUrl, setVideoPreviewUrl] = useState("");
+  const [videoThumbnailDataUrl, setVideoThumbnailDataUrl] = useState("");
 
   // Common
   const [textPrompt, setTextPrompt] = useState("");
@@ -65,6 +67,13 @@ export default function VirtualSet({ comfyUrl = "" }: Props) {
   const [reconstructionPrompt, setReconstructionPrompt] = useState("");
   const [resultImageUrl, setResultImageUrl] = useState("");
   const [isReconstructing, setIsReconstructing] = useState(false);
+  const [reconstructionStatus, setReconstructionStatus] = useState("");
+  const reconstructPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Reference image selection
+  const [selectedReferenceIndex, setSelectedReferenceIndex] = useState(0);
+  const [customReferenceDataUrl, setCustomReferenceDataUrl] = useState("");
+  const [useCustomReference, setUseCustomReference] = useState(false);
 
   // General
   const [error, setError] = useState("");
@@ -86,10 +95,14 @@ export default function VirtualSet({ comfyUrl = "" }: Props) {
     return () => clearInterval(interval);
   }, [phase, generationStartTime]);
 
-  // Get the first available image data URL for reconstruction reference
+  // Get the reference image for reconstruction
   const getReferenceImageUrl = () => {
+    if (useCustomReference && customReferenceDataUrl) return customReferenceDataUrl;
     if (promptType === "image") return inputImageDataUrl;
-    if (promptType === "multi-image" && multiImages.length > 0) return multiImages[0].dataUrl;
+    if (promptType === "multi-image" && multiImages.length > 0) {
+      return multiImages[selectedReferenceIndex]?.dataUrl || multiImages[0].dataUrl;
+    }
+    if (promptType === "video") return videoThumbnailDataUrl;
     return "";
   };
 
@@ -165,8 +178,28 @@ export default function VirtualSet({ comfyUrl = "" }: Props) {
       return;
     }
     setVideoFile(file);
-    setVideoPreviewUrl(URL.createObjectURL(file));
+    const blobUrl = URL.createObjectURL(file);
+    setVideoPreviewUrl(blobUrl);
     setError("");
+
+    // Extract first frame as thumbnail for feed reference image
+    const video = document.createElement("video");
+    video.src = blobUrl;
+    video.crossOrigin = "anonymous";
+    video.muted = true;
+    video.addEventListener("loadeddata", () => {
+      video.currentTime = 0;
+    });
+    video.addEventListener("seeked", () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.drawImage(video, 0, 0);
+        setVideoThumbnailDataUrl(canvas.toDataURL("image/jpeg", 0.8));
+      }
+    });
   };
 
   // Check if we can generate
@@ -254,15 +287,18 @@ export default function VirtualSet({ comfyUrl = "" }: Props) {
         setGenerationStatus("");
         pollingRef.current = false;
 
-        // Save world to feed for later access (use first available image)
+        // Save world to feed for later access
         const refImage = getReferenceImageUrl();
         if (refImage) {
           apiClient.saveVirtualSetWorld(
             refImage,
             status.splat_url,
             status.world_id,
-            worldModel
-          ).catch(() => {});
+            worldModel,
+            promptType
+          ).catch((err) => console.error('[VirtualSet] Failed to save world:', err));
+        } else {
+          console.warn('[VirtualSet] No reference image available for world save (prompt_type:', promptType, ')');
         }
 
         return;
@@ -294,33 +330,147 @@ export default function VirtualSet({ comfyUrl = "" }: Props) {
     setScreenshotDataUrl(dataUrl);
   };
 
-  // Reconstruct image
+  // Cleanup reconstruction polling on unmount
+  useEffect(() => {
+    return () => {
+      if (reconstructPollingRef.current) {
+        clearInterval(reconstructPollingRef.current);
+      }
+    };
+  }, []);
+
+  // Reconstruct image via ComfyUI workflow
   const handleReconstruct = async () => {
     const refImage = getReferenceImageUrl();
     if (!screenshotDataUrl || !refImage) return;
+    if (!comfyUrl) {
+      setError("ComfyUI URL is required for reconstruction. Set it in the header.");
+      return;
+    }
+
     setIsReconstructing(true);
     setError("");
     setResultImageUrl("");
+    setReconstructionStatus("Checking ComfyUI...");
     setPhase("reconstructing");
 
     try {
+      // Health check
+      const health = await checkComfyUIHealth(comfyUrl);
+      if (!health.available) {
+        throw new Error(`ComfyUI unavailable: ${health.error}${health.details ? `. ${health.details}` : ""}`);
+      }
+
+      setReconstructionStatus("Submitting reconstruction...");
+      const clientId = `virtualset-reconstruct-${Math.random().toString(36).slice(2)}`;
+
       const response = (await apiClient.reconstructVirtualSet(
         screenshotDataUrl,
         refImage,
-        reconstructionPrompt
+        reconstructionPrompt,
+        comfyUrl,
+        clientId
       )) as any;
 
       if (!response.success) {
-        throw new Error(response.error || "Image reconstruction failed");
+        throw new Error(response.error || "Failed to submit reconstruction");
       }
 
-      setResultImageUrl(response.image_url);
-      setPhase("complete");
+      const promptId = response.prompt_id;
+      const jobId = response.job_id;
+      if (!promptId) {
+        throw new Error("No prompt ID returned from backend");
+      }
+
+      setReconstructionStatus("Processing in ComfyUI...");
+
+      // Poll ComfyUI history for completion
+      const startTime = Date.now();
+      const maxTime = 10 * 60 * 1000; // 10 minutes
+
+      reconstructPollingRef.current = setInterval(async () => {
+        try {
+          if (Date.now() - startTime > maxTime) {
+            if (reconstructPollingRef.current) clearInterval(reconstructPollingRef.current);
+            reconstructPollingRef.current = null;
+            setError("Reconstruction timed out after 10 minutes");
+            setPhase("navigate-3d");
+            setIsReconstructing(false);
+            setReconstructionStatus("");
+            return;
+          }
+
+          const historyResponse = (await apiClient.getComfyUIHistory(comfyUrl, promptId)) as any;
+          if (!historyResponse.success) return;
+
+          const entry = historyResponse.history?.[promptId];
+          if (!entry) return;
+
+          // Check for error
+          if (entry.status?.status_str === "error" || entry.status?.completed === true && !entry.outputs) {
+            if (reconstructPollingRef.current) clearInterval(reconstructPollingRef.current);
+            reconstructPollingRef.current = null;
+            // Extract error details from ComfyUI response
+            const nodeErrors = entry.status?.messages?.filter((m: any) => m[0] === "execution_error")?.[0]?.[1];
+            const errorDetail = nodeErrors?.exception_message
+              || nodeErrors?.traceback?.slice(-1)?.[0]
+              || entry.status?.messages?.map((m: any) => JSON.stringify(m)).join("; ")
+              || "Unknown ComfyUI error";
+            console.error("[VirtualSet] ComfyUI error details:", JSON.stringify(entry.status, null, 2));
+            setError(`Reconstruction failed: ${errorDetail}`);
+            setPhase("navigate-3d");
+            setIsReconstructing(false);
+            setReconstructionStatus("");
+            if (jobId) {
+              apiClient.completeImageJob(jobId, { status: "failed", error_message: errorDetail }).catch(() => {});
+            }
+            return;
+          }
+
+          // Check for completion
+          if (entry.status?.status_str === "success" || entry.outputs) {
+            if (reconstructPollingRef.current) clearInterval(reconstructPollingRef.current);
+            reconstructPollingRef.current = null;
+
+            const imageInfo = findImageFromHistory(entry);
+            if (imageInfo) {
+              const cleanUrl = comfyUrl.replace(/\/$/, "");
+              const viewUrl = `${cleanUrl}/view?filename=${encodeURIComponent(imageInfo.filename)}&subfolder=${encodeURIComponent(imageInfo.subfolder || "")}&type=${imageInfo.type || "output"}`;
+
+              setResultImageUrl(viewUrl);
+              setPhase("complete");
+              setReconstructionStatus("");
+
+              // Upload to Supabase for persistence and complete the job
+              try {
+                const uploadResult = (await apiClient.uploadImageFromUrl(viewUrl, "virtual-set-results")) as any;
+                if (uploadResult.success && uploadResult.url && jobId) {
+                  await apiClient.completeImageJob(jobId, {
+                    status: "completed",
+                    output_image_urls: [uploadResult.url],
+                  });
+                  // Update to persistent URL
+                  setResultImageUrl(uploadResult.url);
+                }
+              } catch (uploadErr) {
+                console.warn("[VirtualSet] Failed to persist result to Supabase:", uploadErr);
+              }
+            } else {
+              setError("Reconstruction completed but no image found in output");
+              setPhase("navigate-3d");
+              setReconstructionStatus("");
+            }
+            setIsReconstructing(false);
+          }
+        } catch (pollErr) {
+          console.warn("[VirtualSet] Polling error:", pollErr);
+        }
+      }, 3000);
     } catch (err: any) {
       setError(err.message);
       setPhase("navigate-3d");
-    } finally {
       setIsReconstructing(false);
+      setReconstructionStatus("");
     }
   };
 
@@ -334,15 +484,24 @@ export default function VirtualSet({ comfyUrl = "" }: Props) {
 
   // Go back to 3D viewer for another screenshot
   const handleTakeAnother = () => {
+    if (reconstructPollingRef.current) {
+      clearInterval(reconstructPollingRef.current);
+      reconstructPollingRef.current = null;
+    }
     setScreenshotDataUrl("");
     setResultImageUrl("");
     setReconstructionPrompt("");
+    setReconstructionStatus("");
     setError("");
     setPhase("navigate-3d");
   };
 
   // Start over
   const handleStartOver = () => {
+    if (reconstructPollingRef.current) {
+      clearInterval(reconstructPollingRef.current);
+      reconstructPollingRef.current = null;
+    }
     setPhase("upload");
     setInputImageDataUrl("");
     setMultiImages([]);
@@ -350,6 +509,7 @@ export default function VirtualSet({ comfyUrl = "" }: Props) {
     setVideoFile(null);
     if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl);
     setVideoPreviewUrl("");
+    setVideoThumbnailDataUrl("");
     setTextPrompt("");
     setSplatUrl("");
     setOperationId("");
@@ -357,16 +517,21 @@ export default function VirtualSet({ comfyUrl = "" }: Props) {
     setScreenshotHistory([]);
     setResultImageUrl("");
     setReconstructionPrompt("");
+    setReconstructionStatus("");
     setGenerationStatus("");
     setError("");
+    setSelectedReferenceIndex(0);
+    setCustomReferenceDataUrl("");
+    setUseCustomReference(false);
   };
 
   // Handle feed item click - load a saved world
   const handleFeedItemClick = useCallback((item: any): boolean => {
-    const params = item.metadata?.parameters;
-    if (params?.splat_url && item.workflow_name === "virtual-set-world") {
-      setSplatUrl(params.splat_url);
-      setInputImageDataUrl(item.source_image_url || item.preview_url || "");
+    // World items from world_jobs have splat_url as top-level field
+    const splatUrl = item.splat_url || item.metadata?.splat_url || item.metadata?.parameters?.splat_url;
+    if (splatUrl && (item.type === 'world' || item.workflow_name === 'virtual-set-world')) {
+      setSplatUrl(splatUrl);
+      setInputImageDataUrl(item.source_image_url || item.preview_url || item.thumbnail_url || "");
       setScreenshotDataUrl("");
       setScreenshotHistory([]);
       setResultImageUrl("");
@@ -408,7 +573,7 @@ export default function VirtualSet({ comfyUrl = "" }: Props) {
               API keys not fully configured
             </p>
             <p className="text-amber-600 dark:text-amber-300 text-xs mt-1">
-              {configMessage || "Set WORLDLABS_API_KEY and OPENROUTER_API_KEY in your backend .env"}
+              {configMessage || "Set WORLDLABS_API_KEY in your backend .env"}
             </p>
           </div>
         )}
@@ -668,14 +833,92 @@ export default function VirtualSet({ comfyUrl = "" }: Props) {
                 {getReferenceImageUrl() && (
                   <div>
                     <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
-                      Original (reference)
+                      Reference image
                     </p>
                     <img
                       src={getReferenceImageUrl()}
-                      alt="Original"
+                      alt="Reference"
                       className="w-full rounded-xl border border-gray-200 dark:border-gray-700"
                     />
                   </div>
+                )}
+              </div>
+
+              {/* Reference image selection — multi-image mode */}
+              {promptType === "multi-image" && multiImages.length > 0 && !useCustomReference && (
+                <div className="mb-4">
+                  <Label>Select Reference Image</Label>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                    Choose which uploaded image to use as style reference
+                  </p>
+                  <div className="flex gap-2 flex-wrap">
+                    {multiImages.map((img, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setSelectedReferenceIndex(idx)}
+                        className={`rounded-lg overflow-hidden border-2 w-16 h-16 transition-all ${
+                          selectedReferenceIndex === idx
+                            ? "border-teal-500 ring-2 ring-teal-200 dark:ring-teal-800 shadow-md"
+                            : "border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-500"
+                        }`}
+                      >
+                        <img src={img.dataUrl} alt={`Ref ${idx + 1}`} className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Reference image info — video mode */}
+              {promptType === "video" && videoThumbnailDataUrl && !useCustomReference && (
+                <div className="mb-4">
+                  <Label>Reference Frame</Label>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                    Using first frame as reference
+                  </p>
+                  <img
+                    src={videoThumbnailDataUrl}
+                    alt="Video frame"
+                    className="w-24 rounded-lg border border-gray-200 dark:border-gray-700"
+                  />
+                </div>
+              )}
+
+              {/* Custom reference upload — Plan B for all modes */}
+              <div className="mb-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={useCustomReference}
+                    onChange={(e) => setUseCustomReference(e.target.checked)}
+                    className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-teal-500 focus:ring-teal-500"
+                  />
+                  <span className="text-sm text-gray-700 dark:text-gray-300">
+                    Use custom reference image instead
+                  </span>
+                </label>
+                {useCustomReference && (
+                  <>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const reader = new FileReader();
+                        reader.onload = (ev) => setCustomReferenceDataUrl(ev.target?.result as string);
+                        reader.readAsDataURL(file);
+                      }}
+                      className="mt-2 w-full rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600 px-4 py-3 text-gray-600 dark:text-gray-400 file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-gradient-to-r file:from-teal-500 file:to-emerald-600 file:text-white file:font-semibold file:text-xs transition-all duration-200 bg-gray-50/50 dark:bg-gray-800/50 text-sm"
+                    />
+                    {customReferenceDataUrl && (
+                      <img
+                        src={customReferenceDataUrl}
+                        alt="Custom reference"
+                        className="mt-2 w-24 rounded-lg border border-gray-200 dark:border-gray-700"
+                      />
+                    )}
+                  </>
                 )}
               </div>
 
@@ -691,20 +934,27 @@ export default function VirtualSet({ comfyUrl = "" }: Props) {
               </Field>
 
               {phase !== "complete" && (
-                <button
-                  onClick={handleReconstruct}
-                  disabled={isReconstructing}
-                  className="w-full mt-3 px-6 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold shadow-lg hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
-                >
-                  {isReconstructing ? (
-                    <>
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Reconstructing...
-                    </>
-                  ) : (
-                    "Reconstruct Image"
+                <>
+                  <button
+                    onClick={handleReconstruct}
+                    disabled={isReconstructing || !comfyUrl}
+                    className="w-full mt-3 px-6 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold shadow-lg hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+                  >
+                    {isReconstructing ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        {reconstructionStatus || "Reconstructing..."}
+                      </>
+                    ) : (
+                      "Reconstruct Image"
+                    )}
+                  </button>
+                  {!comfyUrl && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
+                      Set a ComfyUI URL in the header to enable reconstruction
+                    </p>
                   )}
-                </button>
+                </>
               )}
             </Section>
           )}

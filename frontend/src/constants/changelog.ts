@@ -8,6 +8,11 @@ export interface Announcement {
 // When committing user-facing changes, add a new entry at the top.
 export const announcements: Announcement[] = [
   {
+    id: "2026-03-18-world-jobs",
+    message: "Virtual Set now saves 3D worlds to your generation feed so you can revisit and reconstruct them anytime",
+    type: "feature",
+    },
+  {
     id: "2026-03-14-dynamic-workflows-nav",
     message: "Custom workflows built in the Workflow Builder now appear automatically in their studio's navigation and on the homepage.",
     type: "feature" as const,

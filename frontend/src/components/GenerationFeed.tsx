@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { apiClient } from '../lib/apiClient'
 import { useComfyUIProgress } from '../hooks/useComfyUIProgress'
@@ -14,10 +14,10 @@ import type { FeedDisplaySettings } from '../types/feedDisplay'
 import { GRID_MIN_ITEM_WIDTH } from '../types/feedDisplay'
 import { getWorkflowDisplayName } from '../constants/workflowNames'
 
-// Unified item type that can be video or image
+// Unified item type that can be video, image, or world
 interface GenerationItem {
   id: string
-  type: 'video' | 'image'
+  type: 'video' | 'image' | 'world'
   created_at: string
   title: string
   status: string
@@ -37,6 +37,9 @@ interface GenerationItem {
   prompt?: string
   workflow_name?: string
   model_used?: string
+  // World-specific fields
+  splat_url?: string
+  world_id?: string
   // Metadata
   metadata: any
 }
@@ -44,7 +47,7 @@ interface GenerationItem {
 // Feed configuration
 export interface GenerationFeedConfig {
   // Media type filtering
-  mediaType: 'video' | 'image' | 'all'
+  mediaType: 'video' | 'image' | 'world' | 'all'
 
   // Workflow filtering
   workflowNames?: string[]  // Filter to specific workflows (multi-select)
@@ -123,15 +126,17 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
     return saved === null ? true : saved === 'true' // Default: true (filter to current workflow)
   })
 
-  const [mediaTypeFilter, setMediaTypeFilter] = useState<'video' | 'image' | 'all'>(config.mediaType)
+  const [mediaTypeFilter, setMediaTypeFilter] = useState<'video' | 'image' | 'world' | 'all'>(config.mediaType)
   const [error, setError] = useState<string | null>(null)
 
   // Progressive loading state
   const [loadingPhase, setLoadingPhase] = useState<'initial' | 'progressive' | 'complete'>('initial')
   const [videoOffset, setVideoOffset] = useState(0)
   const [imageOffset, setImageOffset] = useState(0)
+  const [worldOffset, setWorldOffset] = useState(0)
   const [hasMoreVideos, setHasMoreVideos] = useState(true)
   const [hasMoreImages, setHasMoreImages] = useState(true)
+  const [hasMoreWorlds, setHasMoreWorlds] = useState(true)
   const [isBackfilling, setIsBackfilling] = useState(false)
 
   // For image modal
@@ -246,6 +251,20 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
     }
   }
 
+  const worldJobToItem = (job: any): GenerationItem => ({
+    id: job.id,
+    type: 'world',
+    created_at: job.created_at,
+    title: job.text_prompt || job.display_name || `3D World (${job.model || 'World'})`,
+    status: job.status,
+    preview_url: job.thumbnail_url || job.input_image_urls?.[0] || '',
+    thumbnail_url: job.thumbnail_url,
+    splat_url: job.splat_url,
+    world_id: job.world_id,
+    workflow_name: 'virtual-set-world',
+    metadata: job,
+  })
+
   // Get effective workflow filter (now independent of user filtering)
   const getEffectiveWorkflows = useCallback(() => {
     // When "This Workflow" is selected and we have page context, filter to those workflows
@@ -258,16 +277,19 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
 
   // Load a batch of items (progressive loading)
   const loadBatch = useCallback(async (
-    type: 'video' | 'image' | 'both',
+    type: 'video' | 'image' | 'world' | 'both',
     batchSize: number,
     vOffset: number,
-    iOffset: number
-  ): Promise<{ videos: GenerationItem[], images: GenerationItem[], hasMoreV: boolean, hasMoreI: boolean }> => {
+    iOffset: number,
+    wOffset: number = 0
+  ): Promise<{ videos: GenerationItem[], images: GenerationItem[], worlds: GenerationItem[], hasMoreV: boolean, hasMoreI: boolean, hasMoreW: boolean }> => {
     const effectiveWorkflows = getEffectiveWorkflows()
     const videos: GenerationItem[] = []
     const images: GenerationItem[] = []
+    const worlds: GenerationItem[] = []
     let hasMoreV = true
     let hasMoreI = true
+    let hasMoreW = true
 
     // Load videos
     if (type === 'video' || type === 'both') {
@@ -278,31 +300,20 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
           workflow_name: effectiveWorkflows?.length === 1 ? effectiveWorkflows[0] : undefined,
           user_id: showMineOnly ? user?.id : undefined
         }
-        console.log('[GenerationFeed] Fetching videos with params:', videoParams)
         const videoResponse = config.showCompletedOnly
           ? await apiClient.getCompletedVideoJobs(videoParams) as any
           : await apiClient.getVideoJobs(videoParams) as any
-
-        console.log('[GenerationFeed] Video response:', {
-          success: videoResponse?.success,
-          jobCount: videoResponse?.video_jobs?.length ?? 0,
-          totalCount: videoResponse?.total_count,
-          error: videoResponse?.error
-        })
 
         if (videoResponse?.success && videoResponse.video_jobs) {
           for (const job of videoResponse.video_jobs) {
             if (effectiveWorkflows && effectiveWorkflows.length > 1 &&
                 !effectiveWorkflows.includes(job.workflow_name)) {
-              console.log('[GenerationFeed] Filtering out job:', job.id, 'workflow:', job.workflow_name)
               continue
             }
             videos.push(videoJobToItem(job))
           }
           hasMoreV = videoResponse.video_jobs.length === batchSize
-          console.log('[GenerationFeed] Processed videos:', videos.length)
         } else {
-          console.log('[GenerationFeed] No videos in response or success=false')
           hasMoreV = false
         }
       } catch (err: any) {
@@ -342,7 +353,39 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
       }
     }
 
-    return { videos, images, hasMoreV, hasMoreI }
+    // Load worlds
+    if (type === 'world' || type === 'both') {
+      try {
+        const worldParams = {
+          limit: batchSize,
+          offset: wOffset,
+          user_id: showMineOnly ? user?.id : undefined
+        }
+        const worldResponse = config.showCompletedOnly
+          ? await apiClient.getCompletedWorldJobs(worldParams) as any
+          : await apiClient.getWorldJobs(worldParams) as any
+
+        if (worldResponse?.success && worldResponse.world_jobs) {
+          for (const job of worldResponse.world_jobs) {
+            // Filter by page context if needed
+            if (effectiveWorkflows && effectiveWorkflows.length > 0 &&
+                !effectiveWorkflows.includes('virtual-set-world') &&
+                !effectiveWorkflows.includes('virtual-set')) {
+              continue
+            }
+            worlds.push(worldJobToItem(job))
+          }
+          hasMoreW = worldResponse.world_jobs.length === batchSize
+        } else {
+          hasMoreW = false
+        }
+      } catch (err: any) {
+        if (err?.name !== 'AbortError') console.error('Error loading worlds:', err)
+        hasMoreW = false
+      }
+    }
+
+    return { videos, images, worlds, hasMoreV, hasMoreI, hasMoreW }
   }, [config.showCompletedOnly, getEffectiveWorkflows, showMineOnly, user])
 
   // Initial load - load first batch quickly
@@ -352,22 +395,25 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
     setLoadingPhase('initial')
     setVideoOffset(0)
     setImageOffset(0)
+    setWorldOffset(0)
 
     try {
-      const { videos, images, hasMoreV, hasMoreI } = await loadBatch('both', initialBatch, 0, 0)
+      const { videos, images, worlds, hasMoreV, hasMoreI, hasMoreW } = await loadBatch('both', initialBatch, 0, 0, 0)
 
       // Merge and sort
-      const items = [...videos, ...images]
+      const items = [...videos, ...images, ...worlds]
       items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
       setAllItems(items)
       setVideoOffset(videos.length)
       setImageOffset(images.length)
+      setWorldOffset(worlds.length)
       setHasMoreVideos(hasMoreV)
       setHasMoreImages(hasMoreI)
+      setHasMoreWorlds(hasMoreW)
 
       // Start progressive loading if we have more
-      if ((hasMoreV || hasMoreI) && items.length < maxItems) {
+      if ((hasMoreV || hasMoreI || hasMoreW) && items.length < maxItems) {
         setLoadingPhase('progressive')
       } else {
         setLoadingPhase('complete')
@@ -387,7 +433,7 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
       setLoadingPhase('complete')
       return
     }
-    if (!hasMoreVideos && !hasMoreImages) {
+    if (!hasMoreVideos && !hasMoreImages && !hasMoreWorlds) {
       setLoadingPhase('complete')
       return
     }
@@ -395,13 +441,13 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
     setLoadingMore(true)
 
     try {
-      const { videos, images, hasMoreV, hasMoreI } = await loadBatch(
-        'both', BATCH_SIZE, videoOffset, imageOffset
+      const { videos, images, worlds, hasMoreV, hasMoreI, hasMoreW } = await loadBatch(
+        'both', BATCH_SIZE, videoOffset, imageOffset, worldOffset
       )
 
-      if (videos.length > 0 || images.length > 0) {
+      if (videos.length > 0 || images.length > 0 || worlds.length > 0) {
         setAllItems(prev => {
-          const newItems = [...prev, ...videos, ...images]
+          const newItems = [...prev, ...videos, ...images, ...worlds]
           // Remove duplicates by id
           const seen = new Set<string>()
           const unique = newItems.filter(item => {
@@ -415,18 +461,20 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
         })
         setVideoOffset(prev => prev + videos.length)
         setImageOffset(prev => prev + images.length)
+        setWorldOffset(prev => prev + worlds.length)
       }
 
       setHasMoreVideos(hasMoreV)
       setHasMoreImages(hasMoreI)
+      setHasMoreWorlds(hasMoreW)
 
-      if (!hasMoreV && !hasMoreI) {
+      if (!hasMoreV && !hasMoreI && !hasMoreW) {
         setLoadingPhase('complete')
       }
     } finally {
       setLoadingMore(false)
     }
-  }, [loadingPhase, loadingMore, allItems.length, hasMoreVideos, hasMoreImages, videoOffset, imageOffset, loadBatch, maxItems])
+  }, [loadingPhase, loadingMore, allItems.length, hasMoreVideos, hasMoreImages, hasMoreWorlds, videoOffset, imageOffset, worldOffset, loadBatch, maxItems])
 
   // Backfill - fetch more of a specific type when filter reduces visible items
   const backfillType = useCallback(async (type: 'video' | 'image') => {
@@ -468,11 +516,11 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
   const refreshFeed = useCallback(async () => {
     // Don't show loading spinner for refresh (keeps existing items visible)
     try {
-      const { videos, images } = await loadBatch('both', initialBatch, 0, 0)
+      const { videos, images, worlds } = await loadBatch('both', initialBatch, 0, 0, 0)
 
       // Merge new items with existing, keeping newest
       setAllItems(prev => {
-        const newItems = [...videos, ...images]
+        const newItems = [...videos, ...images, ...worlds]
         const merged = [...newItems, ...prev]
         const seen = new Set<string>()
         const unique = merged.filter(item => {
@@ -491,11 +539,11 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
 
   // Manual load more (user-triggered)
   const loadMore = useCallback(() => {
-    if (loadingPhase === 'complete' && (hasMoreVideos || hasMoreImages)) {
+    if (loadingPhase === 'complete' && (hasMoreVideos || hasMoreImages || hasMoreWorlds)) {
       setLoadingPhase('progressive')
     }
     loadNextBatch()
-  }, [loadingPhase, hasMoreVideos, hasMoreImages, loadNextBatch])
+  }, [loadingPhase, hasMoreVideos, hasMoreImages, hasMoreWorlds, loadNextBatch])
 
   // Fix stuck video job manually
   const handleFixStuckJob = async (jobId: string, comfyUrl: string) => {
@@ -538,22 +586,39 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
     metadata: item.metadata
   })
 
-  // Initial load on mount + polling
+  // --- Stable polling: use refs so the interval never re-creates ---
+  const refreshFeedRef = useRef(refreshFeed)
+  useEffect(() => { refreshFeedRef.current = refreshFeed }, [refreshFeed])
+
+  const loadInitialRef = useRef(loadInitial)
+  useEffect(() => { loadInitialRef.current = loadInitial }, [loadInitial])
+
+  // Check if any items are actively processing
+  const hasActiveJobs = useMemo(
+    () => allItems.some(item => item.status === 'processing' || item.status === 'submitted' || item.status === 'pending'),
+    [allItems]
+  )
+
+  // Initial load on mount (runs once)
   useEffect(() => {
-    // Clear API cache on mount to ensure fresh data
     apiClient.clearCache()
-    console.log('[GenerationFeed] Component mounted, cache cleared')
-    loadInitial()
-
-    // Refresh every 30 seconds (cache-friendly)
-    const interval = setInterval(() => refreshFeed(), POLL_INTERVAL)
-    return () => clearInterval(interval)
-  }, [loadInitial, refreshFeed])
-
-  // Re-run initial load when config/filters change
-  useEffect(() => {
-    loadInitial()
+    loadInitialRef.current()
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Conditional polling: fast when active jobs, stopped when idle
+  useEffect(() => {
+    if (!hasActiveJobs) return // No active jobs → no polling
+
+    const interval = setInterval(() => {
+      refreshFeedRef.current()
+    }, POLL_INTERVAL)
+    return () => clearInterval(interval)
+  }, [hasActiveJobs])
+
+  // Re-run initial load when filters change
+  useEffect(() => {
+    loadInitialRef.current()
   }, [showMineOnly, showThisWorkflowOnly, config.showCompletedOnly, config.workflowNames, pageContexts])
 
   // Progressive loading - continue loading in background after initial batch
@@ -571,7 +636,7 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
     if (loadingPhase !== 'complete' || isBackfilling) return
 
     // Only backfill if we're filtering by type and have few results
-    if (effectiveMediaType !== 'all' && displayedItems.length < MIN_VISIBLE) {
+    if (effectiveMediaType !== 'all' && effectiveMediaType !== 'world' && displayedItems.length < MIN_VISIBLE) {
       const hasMore = effectiveMediaType === 'video' ? hasMoreVideos : hasMoreImages
       if (hasMore) {
         backfillType(effectiveMediaType)
@@ -580,14 +645,14 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
     // Note: backfillType is intentionally excluded to prevent infinite loops
     // The function is stable and doesn't need to trigger re-runs
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectiveMediaType, displayedItems.length, loadingPhase, isBackfilling, hasMoreVideos, hasMoreImages])
+  }, [effectiveMediaType, displayedItems.length, loadingPhase, isBackfilling, hasMoreVideos, hasMoreImages, hasMoreWorlds])
 
   return (
-    <div className="h-full flex flex-col bg-white rounded-2xl shadow-lg border border-gray-200">
+    <div className="h-full flex flex-col bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700">
       {/* Header */}
-      <div className="flex-shrink-0 p-4 border-b border-gray-200">
+      <div className="flex-shrink-0 p-4 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+          <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
             <div className="w-2 h-6 bg-gradient-to-b from-purple-500 to-pink-600 rounded-full"></div>
             Generation Feed
           </h2>
@@ -595,7 +660,7 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
           <button
             onClick={() => loadInitial()}
             disabled={loading}
-            className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded-full border border-blue-300 hover:bg-blue-200 disabled:opacity-50"
+            className="px-3 py-1 text-sm bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded-full border border-blue-300 dark:border-blue-700 hover:bg-blue-200 dark:hover:bg-blue-900/60 disabled:opacity-50"
           >
             {loading ? '...' : 'Refresh'}
           </button>
@@ -605,33 +670,33 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
         <div className="flex flex-wrap items-center gap-2">
           {/* Media type toggle - only show if showMediaTypeToggle is true (default) */}
           {(config.showMediaTypeToggle !== false) && (
-            <div className="flex rounded-lg border border-gray-300 overflow-hidden text-xs">
+            <div className="flex rounded-lg border border-gray-300 dark:border-gray-600 overflow-hidden text-xs">
               <button
                 onClick={() => setMediaTypeFilter('all')}
                 className={`px-2 py-1 transition-colors ${
                   mediaTypeFilter === 'all'
                     ? 'bg-purple-600 text-white'
-                    : 'bg-white text-gray-600 hover:bg-gray-50'
+                    : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
                 }`}
               >
                 All
               </button>
               <button
                 onClick={() => setMediaTypeFilter('video')}
-                className={`px-2 py-1 border-l border-gray-300 transition-colors ${
+                className={`px-2 py-1 border-l border-gray-300 dark:border-gray-600 transition-colors ${
                   mediaTypeFilter === 'video'
                     ? 'bg-blue-600 text-white'
-                    : 'bg-white text-gray-600 hover:bg-gray-50'
+                    : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
                 }`}
               >
                 Videos
               </button>
               <button
                 onClick={() => setMediaTypeFilter('image')}
-                className={`px-2 py-1 border-l border-gray-300 transition-colors ${
+                className={`px-2 py-1 border-l border-gray-300 dark:border-gray-600 transition-colors ${
                   mediaTypeFilter === 'image'
                     ? 'bg-pink-600 text-white'
-                    : 'bg-white text-gray-600 hover:bg-gray-50'
+                    : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
                 }`}
               >
                 Images
@@ -641,13 +706,13 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
 
           {/* Show Mine toggle - only show if pageContext is set */}
           {pageContexts && (
-            <div className="flex items-center bg-gray-100 rounded-full p-0.5">
+            <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-full p-0.5">
               <button
                 onClick={() => setShowMineOnly(true)}
                 className={`px-2 py-1 text-xs rounded-full transition-all ${
                   showMineOnly
-                    ? 'bg-white text-purple-700 shadow-sm font-medium'
-                    : 'text-gray-500 hover:text-gray-700'
+                    ? 'bg-white dark:bg-gray-700 text-purple-700 dark:text-purple-300 shadow-sm font-medium'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                 }`}
               >
                 My Content
@@ -656,8 +721,8 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
                 onClick={() => setShowMineOnly(false)}
                 className={`px-2 py-1 text-xs rounded-full transition-all ${
                   !showMineOnly
-                    ? 'bg-white text-purple-700 shadow-sm font-medium'
-                    : 'text-gray-500 hover:text-gray-700'
+                    ? 'bg-white dark:bg-gray-700 text-purple-700 dark:text-purple-300 shadow-sm font-medium'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                 }`}
               >
                 All
@@ -667,13 +732,13 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
 
           {/* Workflow filter toggle - only show if pageContext is set */}
           {pageContexts && (
-            <div className="flex items-center bg-gray-100 rounded-full p-0.5">
+            <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-full p-0.5">
               <button
                 onClick={() => setShowThisWorkflowOnly(true)}
                 className={`px-2 py-1 text-xs rounded-full transition-all ${
                   showThisWorkflowOnly
-                    ? 'bg-white text-blue-700 shadow-sm font-medium'
-                    : 'text-gray-500 hover:text-gray-700'
+                    ? 'bg-white dark:bg-gray-700 text-blue-700 dark:text-blue-300 shadow-sm font-medium'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                 }`}
               >
                 {getWorkflowDisplayLabel(pageContexts)}
@@ -682,8 +747,8 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
                 onClick={() => setShowThisWorkflowOnly(false)}
                 className={`px-2 py-1 text-xs rounded-full transition-all ${
                   !showThisWorkflowOnly
-                    ? 'bg-white text-blue-700 shadow-sm font-medium'
-                    : 'text-gray-500 hover:text-gray-700'
+                    ? 'bg-white dark:bg-gray-700 text-blue-700 dark:text-blue-300 shadow-sm font-medium'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                 }`}
               >
                 All Workflows
@@ -694,7 +759,7 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
 
         {/* Display settings controls */}
         {(config.showDisplayControls !== false) && (
-          <div className="mt-2 pt-2 border-t border-gray-100">
+          <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700">
             <DisplaySettingsControls
               viewMode={displaySettings.viewMode}
               thumbnailSize={displaySettings.thumbnailSize}
@@ -712,8 +777,8 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
       <div className="flex-1 overflow-y-auto p-3">
         {error ? (
           <div className="text-center py-6">
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-              <p className="text-red-700 text-sm mb-2">{error}</p>
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+              <p className="text-red-700 dark:text-red-300 text-sm mb-2">{error}</p>
               <button
                 onClick={() => loadInitial()}
                 className="px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm"
@@ -725,14 +790,14 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
         ) : loading && displayedItems.length === 0 ? (
           <div className="text-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div>
-            <p className="text-gray-500 mt-2 text-sm">Loading...</p>
+            <p className="text-gray-500 dark:text-gray-400 mt-2 text-sm">Loading...</p>
           </div>
         ) : displayedItems.length === 0 ? (
           <div className="text-center py-8">
             <div className="text-4xl mb-2">
               {mediaTypeFilter === 'video' ? '🎬' : mediaTypeFilter === 'image' ? '🖼️' : '📁'}
             </div>
-            <p className="text-gray-500 text-sm">No generations found</p>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">No generations found</p>
           </div>
         ) : (
           <>
@@ -787,7 +852,7 @@ export default function GenerationFeed({ config, onUpscaleComplete }: Generation
             )}
 
             {/* Load More */}
-            {(hasMoreVideos || hasMoreImages) && displayedItems.length > 0 && (
+            {(hasMoreVideos || hasMoreImages || hasMoreWorlds) && displayedItems.length > 0 && (
               <div className="flex justify-center pt-2">
                 <button
                   onClick={loadMore}

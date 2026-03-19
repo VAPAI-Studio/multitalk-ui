@@ -6,10 +6,11 @@
         "-y",
         "@supabase/mcp-server-supabase@latest",
         "--read-only",
-        "--project-ref=rwbhfxltyxaegtalgxdx"
+        "--project-ref=rwbhfxltyxaegtalgxdx",
+        "--access-token=sbp_29e5c96727ab6589d061f41ca1021973d8338a17"
       ],
       "env": {
-        "SUPABASE_ACCESS_TOKEN": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3YmhmeGx0eXhhZWd0YWxneGR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU0Njc3OTMsImV4cCI6MjA3MTA0Mzc5M30.2euUdw7ubhbyQ_orFYJxJByPuRxl21QFO3cmZtnVRos"
+        "SUPABASE_ACCESS_TOKEN": "sbp_29e5c96727ab6589d061f41ca1021973d8338a17"
       }
     },
     "context7": {
