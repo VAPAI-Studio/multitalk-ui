@@ -271,7 +271,7 @@ export default function WorkflowList() {
                         >
                           <option value="">No studio</option>
                           {studios.filter((s) => !s.adminOnly).map((s) => (
-                            <option key={s.id} value={s.id}>{s.name}</option>
+                            <option key={s.id} value={s.id}>{s.title}</option>
                           ))}
                         </select>
                       </div>
