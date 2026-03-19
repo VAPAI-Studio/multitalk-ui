@@ -1199,13 +1199,15 @@ class ApiClient {
     return this.request(`/virtual-set/status/${operationId}`)
   }
 
-  async reconstructVirtualSet(screenshotData: string, originalImageData: string, prompt?: string) {
+  async reconstructVirtualSet(screenshotData: string, originalImageData: string, prompt?: string, comfyUrl?: string, clientId?: string) {
     return this.request('/virtual-set/reconstruct', {
       method: 'POST',
       body: JSON.stringify({
         screenshot_data: screenshotData,
         original_image_data: originalImageData,
         prompt: prompt || '',
+        comfy_url: comfyUrl || '',
+        client_id: clientId || '',
       }),
     })
   }

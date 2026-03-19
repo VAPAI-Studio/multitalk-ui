@@ -39,13 +39,13 @@ export default function DisplaySettingsControls({
   return (
     <div className="flex flex-wrap items-center gap-2">
       {/* View Mode Toggle */}
-      <div className="flex rounded-lg border border-gray-300 overflow-hidden">
+      <div className="flex rounded-lg border border-gray-300 dark:border-gray-600 overflow-hidden">
         <button
           onClick={() => onViewModeChange('list')}
           className={`${buttonBase} transition-colors flex items-center justify-center ${
             viewMode === 'list'
-              ? 'bg-gray-700 text-white'
-              : 'bg-white text-gray-600 hover:bg-gray-50'
+              ? 'bg-gray-700 dark:bg-gray-500 text-white'
+              : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
           }`}
           title="List view"
         >
@@ -53,10 +53,10 @@ export default function DisplaySettingsControls({
         </button>
         <button
           onClick={() => onViewModeChange('grid')}
-          className={`${buttonBase} border-l border-gray-300 transition-colors flex items-center justify-center ${
+          className={`${buttonBase} border-l border-gray-300 dark:border-gray-600 transition-colors flex items-center justify-center ${
             viewMode === 'grid'
-              ? 'bg-gray-700 text-white'
-              : 'bg-white text-gray-600 hover:bg-gray-50'
+              ? 'bg-gray-700 dark:bg-gray-500 text-white'
+              : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
           }`}
           title="Grid view"
         >
@@ -65,15 +65,15 @@ export default function DisplaySettingsControls({
       </div>
 
       {/* Thumbnail Size */}
-      <div className="flex rounded-lg border border-gray-300 overflow-hidden">
+      <div className="flex rounded-lg border border-gray-300 dark:border-gray-600 overflow-hidden">
         {(['small', 'medium', 'large'] as ThumbnailSize[]).map((size, index) => (
           <button
             key={size}
             onClick={() => onThumbnailSizeChange(size)}
-            className={`${buttonBase} ${index > 0 ? 'border-l border-gray-300' : ''} transition-colors ${
+            className={`${buttonBase} ${index > 0 ? 'border-l border-gray-300 dark:border-gray-600' : ''} transition-colors ${
               thumbnailSize === size
-                ? 'bg-gray-700 text-white'
-                : 'bg-white text-gray-600 hover:bg-gray-50'
+                ? 'bg-gray-700 dark:bg-gray-500 text-white'
+                : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
             }`}
             title={`${size.charAt(0).toUpperCase() + size.slice(1)} thumbnails`}
           >
@@ -84,15 +84,15 @@ export default function DisplaySettingsControls({
 
       {/* Column Count - only visible in grid mode */}
       {viewMode === 'grid' && (
-        <div className="flex rounded-lg border border-gray-300 overflow-hidden">
+        <div className="flex rounded-lg border border-gray-300 dark:border-gray-600 overflow-hidden">
           {([1, 2, 3, 4, 'auto'] as ColumnCount[]).map((count, index) => (
             <button
               key={count}
               onClick={() => onColumnCountChange(count)}
-              className={`${buttonBase} ${index > 0 ? 'border-l border-gray-300' : ''} transition-colors ${
+              className={`${buttonBase} ${index > 0 ? 'border-l border-gray-300 dark:border-gray-600' : ''} transition-colors ${
                 columnCount === count
-                  ? 'bg-gray-700 text-white'
-                  : 'bg-white text-gray-600 hover:bg-gray-50'
+                  ? 'bg-gray-700 dark:bg-gray-500 text-white'
+                  : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
               }`}
               title={count === 'auto' ? 'Auto-fit columns' : `${count} column${count > 1 ? 's' : ''}`}
             >

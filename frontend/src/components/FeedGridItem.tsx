@@ -20,7 +20,7 @@ function LazyImage({
 
   return (
     <div className="relative w-full h-full">
-      <div className={`absolute inset-0 flex items-center justify-center bg-gray-100 ${loaded ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}>
+      <div className={`absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-800 ${loaded ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}>
         <span className="text-lg">{error ? '⚠️' : placeholderIcon}</span>
       </div>
       {!error && (
@@ -90,7 +90,7 @@ function FeedGridItemComponent({ item, thumbnailSize, onClick }: FeedGridItemPro
 
   return (
     <div
-      className="relative rounded-lg overflow-hidden cursor-pointer group bg-gray-100 border border-gray-200"
+      className="relative rounded-lg overflow-hidden cursor-pointer group bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
       style={{ height: `${height}px` }}
       onClick={onClick}
       onMouseEnter={() => setIsHovered(true)}
@@ -98,9 +98,9 @@ function FeedGridItemComponent({ item, thumbnailSize, onClick }: FeedGridItemPro
     >
       {/* Multi-image 3x3 Grid Display */}
       {hasMultipleImages && isCompleted && gridImages.length > 0 ? (
-        <div className="w-full h-full grid grid-cols-3 gap-0.5 p-0.5 bg-gray-200">
+        <div className="w-full h-full grid grid-cols-3 gap-0.5 p-0.5 bg-gray-200 dark:bg-gray-700">
           {gridImages.map((url, index) => (
-            <div key={index} className="relative overflow-hidden bg-gray-100">
+            <div key={index} className="relative overflow-hidden bg-gray-100 dark:bg-gray-800">
               <LazyImage
                 src={getFeedThumbnailUrl(url)}
                 alt={`${item.title} ${index + 1}`}
@@ -111,7 +111,7 @@ function FeedGridItemComponent({ item, thumbnailSize, onClick }: FeedGridItemPro
           ))}
           {/* Fill empty slots if less than 9 images */}
           {gridImages.length < 9 && Array.from({ length: 9 - gridImages.length }).map((_, index) => (
-            <div key={`empty-${index}`} className="bg-gray-100" />
+            <div key={`empty-${index}`} className="bg-gray-100 dark:bg-gray-800" />
           ))}
         </div>
       ) : thumbnailUrl && isCompleted ? (
@@ -123,7 +123,7 @@ function FeedGridItemComponent({ item, thumbnailSize, onClick }: FeedGridItemPro
           placeholderIcon={item.type === 'video' ? '🎬' : '🖼️'}
         />
       ) : isProcessing ? (
-        <div className="w-full h-full flex items-center justify-center bg-blue-50">
+        <div className="w-full h-full flex items-center justify-center bg-blue-50 dark:bg-blue-900/20">
           <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full"></div>
         </div>
       ) : (

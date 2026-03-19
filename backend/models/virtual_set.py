@@ -51,11 +51,14 @@ class VirtualSetSaveWorldResponse(BaseModel):
 
 class VirtualSetReconstructRequest(BaseModel):
     screenshot_data: str  # data:image/png;base64,... from canvas
-    original_image_data: str  # original uploaded image data URL
+    original_image_data: str  # reference image (data URL or storage URL)
     prompt: str = ""
+    comfy_url: str  # ComfyUI server URL
+    client_id: str = ""  # optional client ID for WebSocket tracking
 
 class VirtualSetReconstructResponse(BaseModel):
     success: bool
-    image_url: Optional[str] = None
+    prompt_id: Optional[str] = None  # ComfyUI prompt ID for polling
     job_id: Optional[str] = None
+    image_url: Optional[str] = None  # kept for potential future use
     error: Optional[str] = None
