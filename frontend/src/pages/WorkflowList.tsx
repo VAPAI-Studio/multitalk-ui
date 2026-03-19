@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { apiClient, type CustomWorkflow, type UpdateWorkflowPayload } from '../lib/apiClient';
 import { studios } from '../lib/studioConfig';
 
@@ -181,7 +181,7 @@ export default function WorkflowList() {
               <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-500 flex-wrap">
                 <span className="capitalize">{wf.output_type}</span>
                 {wf.studio && (
-                  <span>{studios.find((s) => s.id === wf.studio)?.name ?? wf.studio}</span>
+                  <span>{studios.find((s) => s.id === wf.studio)?.title ?? wf.studio}</span>
                 )}
                 <span>{wf.variable_config.length} variable{wf.variable_config.length !== 1 ? 's' : ''}</span>
                 <span>{new Date(wf.created_at).toLocaleDateString()}</span>
