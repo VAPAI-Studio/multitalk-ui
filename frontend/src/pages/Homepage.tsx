@@ -1,9 +1,12 @@
 import { type User } from '../contexts/AuthContext';
 import { studios, standaloneApps, type StudioConfig, type StudioPageType } from '../lib/studioConfig';
 import { useMemo } from 'react';
+import { type CustomWorkflow } from '../lib/apiClient';
 
 interface Props {
   onNavigate: (page: StudioPageType) => void;
+  onDynamicNavigate: (wf: CustomWorkflow) => void;
+  dynamicWorkflows: CustomWorkflow[];
   user: User | null;
 }
 
@@ -105,7 +108,7 @@ function StudioCard({ studio, onClick }: { studio: StudioConfig; onClick: () => 
   );
 }
 
-export default function Homepage({ onNavigate, user }: Props) {
+export default function Homepage({ onNavigate, onDynamicNavigate: _onDynamicNavigate, dynamicWorkflows, user }: Props) {
   // Compute isAdmin from user role
   const isAdmin = useMemo(() => user?.role === 'admin', [user]);
 
@@ -119,6 +122,23 @@ export default function Homepage({ onNavigate, user }: Props) {
       return true;
     });
   }, [isAdmin]);
+
+  // Enrich studios with dynamic apps merged in for card preview
+  const enrichedStudios = useMemo(() => {
+    return visibleStudios.map((studio) => {
+      const dynApps = dynamicWorkflows
+        .filter((wf) => wf.studio === studio.id)
+        .map((wf) => ({
+          id: wf.slug,
+          title: wf.name,
+          icon: wf.icon,
+          gradient: wf.gradient,
+          description: wf.description || '',
+          features: [wf.output_type],
+        }));
+      return { ...studio, apps: [...studio.apps, ...dynApps] };
+    });
+  }, [visibleStudios, dynamicWorkflows]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
@@ -165,7 +185,7 @@ export default function Homepage({ onNavigate, user }: Props) {
 
         {/* Studios Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-8 mb-8">
-          {visibleStudios.map((studio) => (
+          {enrichedStudios.map((studio) => (
             <StudioCard
               key={studio.id}
               studio={studio}

@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import os
 
-from api import storage, datasets, image_edit, comfyui, multitalk, auth, image_jobs, video_jobs, flux_trainer, lora_trainer, feed, google_drive, virtual_set, runpod, infrastructure, api_keys, upscale
+from api import storage, datasets, image_edit, comfyui, multitalk, auth, image_jobs, video_jobs, world_jobs, flux_trainer, lora_trainer, feed, google_drive, virtual_set, runpod, infrastructure, api_keys, upscale, custom_workflows
 from services.upscale_job_service import UpscaleJobService
 
 # Only load .env file if not running on Heroku
@@ -54,6 +54,7 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/api")
 app.include_router(image_jobs.router, prefix="/api")
 app.include_router(video_jobs.router, prefix="/api")
+app.include_router(world_jobs.router, prefix="/api")
 app.include_router(storage.router, prefix="/api")
 app.include_router(datasets.router, prefix="/api")
 app.include_router(image_edit.router, prefix="/api")
@@ -68,6 +69,7 @@ app.include_router(runpod.router, prefix="/api")
 app.include_router(api_keys.router, prefix="/api")
 app.include_router(infrastructure.router)
 app.include_router(upscale.router, prefix="/api")
+app.include_router(custom_workflows.router)
 
 @app.get("/")
 async def root():
@@ -95,4 +97,4 @@ async def get_environment_info():
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)

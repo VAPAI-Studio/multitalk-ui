@@ -33,13 +33,16 @@
       "Bash(git commit:*)",
       "Bash(git push)",
       "Bash(python3:*)",
-      "Bash(git fetch:*)"
+      "Bash(git fetch:*)",
+      "mcp__context7__query-docs"
     ],
     "deny": [],
     "ask": []
   },
   "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
-    "supabase"
+    "supabase",
+    "context7",
+    "playwright"
   ]
 }

@@ -22,9 +22,13 @@ X-API-Key: $SOUT_API_KEY
 
 ## Base URL
 
-The API base URL depends on the deployment:
-- Local development: `http://localhost:8000/api`
-- Production: check with user (typically a Heroku URL at `/api`)
+```bash
+# Local development
+export SOUT_BASE_URL="http://localhost:8000/api"
+
+# Production
+export SOUT_BASE_URL="https://vapai-plataforma-backend-4daa799bd90b.herokuapp.com/api"
+```
 
 ## Available Workflows
 

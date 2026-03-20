@@ -96,6 +96,64 @@ class RunPodService:
         except Exception as e:
             return False, None, f"Unexpected RunPod error: {str(e)}"
 
+    async def submit_built_workflow(
+        self,
+        workflow_json: dict,
+        api_key: Optional[str] = None,
+    ) -> Tuple[bool, Optional[str], Optional[str]]:
+        """
+        Submit a pre-built workflow dict directly to the RunPod universal endpoint.
+
+        Used by execute_dynamic_workflow_runpod to avoid double template loading.
+        The workflow_json has already been built and validated by the caller.
+
+        Args:
+            workflow_json: Fully built ComfyUI workflow dict (all placeholders substituted).
+            api_key: RunPod API key (uses settings.RUNPOD_API_KEY if not provided).
+
+        Returns:
+            Tuple of (success, job_id, error_message)
+        """
+        api_key = api_key or settings.RUNPOD_API_KEY
+        if not api_key:
+            return False, None, "RunPod API key not configured."
+
+        endpoint_id = settings.RUNPOD_ENDPOINT_ID
+        if not endpoint_id:
+            return False, None, "RUNPOD_ENDPOINT_ID not configured."
+
+        url = f"{self.BASE_URL}/{endpoint_id}/run"
+        payload = {"input": {"workflow": workflow_json}}
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(url, json=payload, headers=headers)
+                response.raise_for_status()
+                data = response.json()
+                job_id = data.get("id")
+                if not job_id:
+                    return False, None, "RunPod did not return a valid job ID"
+                return True, job_id, None
+        except httpx.TimeoutException:
+            return False, None, "RunPod request timed out after 30 seconds"
+        except httpx.HTTPStatusError as e:
+            error_detail = f"RunPod HTTP error {e.response.status_code}"
+            try:
+                error_json = e.response.json()
+                if "error" in error_json:
+                    error_detail += f": {error_json['error']}"
+            except Exception:
+                pass
+            return False, None, error_detail
+        except httpx.RequestError as e:
+            return False, None, f"RunPod request failed: {str(e)}"
+        except Exception as e:
+            return False, None, f"Unexpected RunPod error: {str(e)}"
+
     async def get_job_status(
         self,
         job_id: str,

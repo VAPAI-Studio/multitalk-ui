@@ -4,15 +4,16 @@ from pydantic import BaseModel
 
 from services.video_job_service import VideoJobService
 from services.image_job_service import ImageJobService
+from services.world_job_service import WorldJobService
 from core.supabase import get_supabase_for_token
 
 router = APIRouter(prefix="/feed", tags=["feed"])
 
 
 class UnifiedFeedItem(BaseModel):
-    """A unified feed item that can represent videos or images."""
+    """A unified feed item that can represent videos, images, or worlds."""
     id: str
-    type: str  # 'video', 'image'
+    type: str  # 'video', 'image', 'world'
     status: str
     created_at: str
     workflow_name: Optional[str] = None
@@ -22,6 +23,10 @@ class UnifiedFeedItem(BaseModel):
     thumbnail_url: Optional[str] = None
     # For images
     output_image_urls: Optional[List[str]] = None
+    # For worlds
+    splat_url: Optional[str] = None
+    world_id: Optional[str] = None
+    model: Optional[str] = None
     # Common fields
     width: Optional[int] = None
     height: Optional[int] = None
@@ -64,6 +69,11 @@ def get_image_job_service(access_token: Optional[str] = None):
     return ImageJobService(supabase)
 
 
+def get_world_job_service(access_token: Optional[str] = None):
+    supabase = get_supabase_for_token(access_token)
+    return WorldJobService(supabase)
+
+
 @router.get("/unified", response_model=UnifiedFeedResponse)
 async def get_unified_feed(
     limit: int = Query(default=50, ge=1, le=100),
@@ -86,7 +96,7 @@ async def get_unified_feed(
         token = _resolve_token(authorization, x_api_key)
 
         # Parse types filter
-        allowed_types = {'video', 'image'}
+        allowed_types = {'video', 'image', 'world'}
         if types:
             requested_types = set(t.strip() for t in types.split(','))
             feed_types = requested_types & allowed_types
@@ -160,6 +170,37 @@ async def get_unified_feed(
                     'comfy_job_id': job.comfy_job_id,
                     'error_message': job.error_message,
                     'prompt': job.prompt,
+                })
+
+        if 'world' in feed_types:
+            world_service = get_world_job_service(token)
+            if completed_only:
+                world_jobs, _, error = await world_service.get_completed_jobs(
+                    limit=fetch_limit,
+                    user_id=user_id
+                )
+            else:
+                world_jobs, _, error = await world_service.get_recent_jobs(
+                    limit=fetch_limit,
+                    user_id=user_id
+                )
+
+            if error:
+                return UnifiedFeedResponse(success=False, items=[], error=f"World fetch error: {error}")
+
+            for job in world_jobs:
+                all_items.append({
+                    'id': job.id,
+                    'type': 'world',
+                    'status': job.status,
+                    'created_at': job.created_at,
+                    'user_id': job.user_id,
+                    'splat_url': job.splat_url,
+                    'world_id': job.world_id,
+                    'model': job.model,
+                    'thumbnail_url': job.thumbnail_url,
+                    'prompt': job.text_prompt,
+                    'error_message': job.error_message,
                 })
 
         # Sort all items by created_at descending
@@ -284,6 +325,58 @@ async def get_images_feed(
                 comfy_job_id=job.comfy_job_id,
                 error_message=job.error_message,
                 prompt=job.prompt,
+            )
+            for job in jobs
+        ]
+        return UnifiedFeedResponse(success=True, items=feed_items, total_count=total)
+
+    except Exception as e:
+        return UnifiedFeedResponse(success=False, items=[], error=str(e))
+
+
+@router.get("/worlds", response_model=UnifiedFeedResponse)
+async def get_worlds_feed(
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    completed_only: bool = Query(default=False),
+    user_id: Optional[str] = Query(default=None),
+    authorization: Optional[str] = Header(None),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
+):
+    """Get world jobs feed."""
+    try:
+        token = _resolve_token(authorization, x_api_key)
+        world_service = get_world_job_service(token)
+
+        if completed_only:
+            jobs, total, error = await world_service.get_completed_jobs(
+                limit=limit,
+                offset=offset,
+                user_id=user_id
+            )
+        else:
+            jobs, total, error = await world_service.get_recent_jobs(
+                limit=limit,
+                offset=offset,
+                user_id=user_id
+            )
+
+        if error:
+            return UnifiedFeedResponse(success=False, items=[], error=error)
+
+        feed_items = [
+            UnifiedFeedItem(
+                id=job.id,
+                type='world',
+                status=job.status,
+                created_at=job.created_at,
+                user_id=job.user_id,
+                splat_url=job.splat_url,
+                world_id=job.world_id,
+                model=job.model,
+                thumbnail_url=job.thumbnail_url,
+                prompt=job.text_prompt,
+                error_message=job.error_message,
             )
             for job in jobs
         ]

@@ -8,17 +8,18 @@ sideOUTsticks (multitalk-ui) is a full-stack web application for AI-powered vide
 
 Provide a unified platform for AI-powered media processing where users can generate, edit, upscale, and manage their content end-to-end — from creation through post-processing to organized storage.
 
-## Current Milestone: v1.1 Batch Video Upscale
+## Current Milestone: v1.2 Workflow Builder
 
-**Goal:** Enable users to batch-upscale videos using the Freepik Video Upscaler API with smart queue management, credit-aware pausing, and automatic output delivery to Supabase Storage + Google Drive.
+**Goal:** Enable admins to create new platform features from ComfyUI workflows without writing code — upload a workflow JSON, configure inputs visually, test it, and publish it as a live feature page.
 
 **Target features:**
-- Batch video upload with queue management (process one-by-one)
-- Freepik Video Upscaler API integration (resolution, creativity, sharpen, grain, FPS boost, flavor)
-- Credit exhaustion detection with pause-and-notify + resume capability
-- Output saved to Supabase Storage and Google Drive (using existing project folder picker)
-- Per-video status tracking (pending/processing/completed/failed/paused)
-- New feature page linked from homepage, accessible to all authenticated users
+- Admin-only workflow builder page in Infrastructure studio
+- Upload ComfyUI workflow JSON and parse all nodes/inputs
+- Configure which inputs become user-facing variables (text, slider, file upload, dropdown, toggle, resolution)
+- Test-run workflows directly from the builder
+- Publish features to any studio — instant appearance in navigation, no rebuild needed
+- Dynamic renderer that turns database configurations into feature pages
+- Full integration with existing job tracking, dual backends (ComfyUI + RunPod), and generation feed
 
 ## Requirements
 
@@ -41,18 +42,18 @@ Provide a unified platform for AI-powered media processing where users can gener
 - ✓ **HuggingFace Direct Download** — Streaming direct-to-S3 download with background job tracking — v1.0
 - ✓ **Dockerfile Editor** — Monaco in-browser editor with syntax highlighting and dirty-state tracking — v1.0
 - ✓ **GitHub Integration** — Commit to GitHub with optional deploy trigger via GitHub Releases — v1.0
+- ✓ **Batch Video Upscale** — Freepik API integration with queue management, pause/resume, ZIP download — v1.1 (90% — history/re-run deferred)
 
 ### Active
 
-<!-- Requirements for v1.1 Batch Video Upscale -->
+<!-- Requirements for v1.2 Workflow Builder -->
 
-- [ ] Batch video upscale page with multi-file upload
-- [ ] Freepik Video Upscaler API backend service
-- [ ] Queue management with sequential processing
-- [ ] Credit exhaustion pause-and-notify with resume
-- [ ] Output delivery to Supabase Storage + Google Drive
-- [ ] Database schema for batch/video job tracking
-- [ ] Per-video status tracking in UI
+- [ ] Custom workflow database schema and CRUD API
+- [ ] Workflow JSON parser with node/input extraction
+- [ ] Admin builder UI with node inspector and variable configuration
+- [ ] Test runner for workflows within the builder
+- [ ] Dynamic renderer component for published workflows
+- [ ] Navigation integration (studios, homepage, routing)
 
 ### Out of Scope
 
@@ -116,10 +117,13 @@ Provide a unified platform for AI-powered media processing where users can gener
 | 5MB multipart chunk size | S3 minimum; consistent across upload and HF download pipelines | ✓ Good |
 | PROTECTED_PATHS frozenset | Guards ComfyUI/ and venv/ from all mutations; prevents accidental model deletion | ✓ Good |
 
-| Freepik API for video upscaling | External API with credit-based pricing; not ComfyUI — separate service layer needed | — Pending |
-| Sequential batch processing | One video at a time to Freepik; avoids rate limit bursts and simplifies credit tracking | — Pending |
-| Pause-and-notify on credit exhaustion | Better UX than silent failure; user can add credits and resume | — Pending |
-| Output to Supabase + Google Drive | Dual storage: Supabase for in-app viewing, Drive for organized project delivery | — Pending |
+| Freepik API for video upscaling | External API with credit-based pricing; not ComfyUI — separate service layer needed | ✓ Good |
+| Sequential batch processing | One video at a time to Freepik; avoids rate limit bursts and simplifies credit tracking | ✓ Good |
+| Pause-and-notify on credit exhaustion | Better UX than silent failure; user can add credits and resume | ✓ Good |
+| Output to Supabase + Google Drive | Dual storage: Supabase for in-app viewing, Drive for organized project delivery | ✓ Good |
+| Dynamic renderer for custom workflows | Database-stored config, not code generation; instant publish without rebuild | — Pending |
+| JSONB for variable/section configs | Flexible schema evolution; no join tables for admin-managed config | — Pending |
+| Test runner shares code path with renderer | Guarantees consistency; if test works, production works | — Pending |
 
 ---
-*Last updated: 2026-03-11 after v1.1 milestone start*
+*Last updated: 2026-03-13 after v1.2 milestone start*

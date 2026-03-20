@@ -147,12 +147,12 @@ export const studios: StudioConfig[] = [
         features: ['Custom motion paths', 'Static anchors', 'Animation preview', 'Model: WAN Move']
       },
       {
-        id: 'ltx2-i2v',
-        title: 'LTX2 I2V',
+        id: 'ltx23-video',
+        title: 'LTX 2.3',
         icon: '🎥',
         gradient: 'from-cyan-500 to-blue-600',
-        description: 'Transform your images into high-quality videos with the LTX2 model. Adjustable strength and duration for precise control.',
-        features: ['Image to video generation', 'Adjustable strength', 'Duration presets (3s, 5s, 10s)', 'Model: LTX2']
+        description: 'Generate videos from text, images, and frame keypoints with LTX 2.3. Control first, middle, and last frames with optional audio.',
+        features: ['Text-to-video & Image-to-video', 'First/Last/Middle frame control', 'Custom audio support', 'Model: LTX 2.3']
       },
       {
         id: 'upscale-vid',

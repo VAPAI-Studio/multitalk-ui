@@ -1,0 +1,16 @@
+FROM runpod/comfyui:latest
+
+# System dependencies
+RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /comfyui
+
+# --- AUTO-GENERATED CUSTOM NODES START ---
+# DO NOT EDIT between these markers. Run: python scripts/generate_dockerfile.py
+# --- AUTO-GENERATED CUSTOM NODES END ---
+
+# Copy universal handler
+COPY universal_handler.py /handler.py
+
+# Entrypoint
+CMD ["python", "/handler.py"]

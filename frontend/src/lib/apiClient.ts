@@ -7,6 +7,118 @@ interface CacheEntry<T> {
   timestamp: number
 }
 
+// Custom Workflow Builder types
+export interface ParsedNodeInput {
+  name: string;
+  value: unknown;
+  is_link: boolean;
+}
+
+export interface ParsedNode {
+  node_id: string;
+  class_type: string;
+  title?: string;
+  inputs: ParsedNodeInput[];
+  configurable_inputs: ParsedNodeInput[];
+}
+
+export interface ParseWorkflowResponse {
+  success: boolean;
+  format?: string;
+  nodes: ParsedNode[];
+  error?: string;
+}
+
+export interface CustomWorkflow {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  output_type: 'image' | 'video' | 'audio';
+  studio?: string;
+  icon: string;
+  gradient: string;
+  is_published: boolean;
+  variable_config: Record<string, unknown>[];
+  section_config: Record<string, unknown>[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CustomWorkflowResponse {
+  success: boolean;
+  workflow?: CustomWorkflow;
+  error?: string;
+}
+
+export interface ExecuteCustomWorkflowPayload {
+  parameters: Record<string, string | number | boolean | null>
+  base_url?: string
+  client_id?: string
+  execution_backend?: 'comfyui' | 'runpod'
+}
+
+export interface ExecuteCustomWorkflowResponse {
+  success: boolean
+  prompt_id?: string
+  execution_backend?: string
+  error?: string
+}
+
+export interface CustomWorkflowListResponse {
+  success: boolean;
+  workflows: CustomWorkflow[];
+  error?: string;
+}
+
+export interface CreateWorkflowPayload {
+  name: string;
+  slug?: string;
+  description?: string;
+  workflow_json: Record<string, unknown>;
+  output_type?: 'image' | 'video' | 'audio';
+  studio?: string;
+  icon?: string;
+  gradient?: string;
+}
+
+export interface UpdateWorkflowPayload {
+  name?: string;
+  description?: string;
+  variable_config?: Record<string, unknown>[];
+  section_config?: Record<string, unknown>[];
+  output_type?: 'image' | 'video' | 'audio';
+  studio?: string;
+  icon?: string;
+  gradient?: string;
+}
+
+export interface NodeRegistryPackage {
+  repo: string;
+  branch: string | null;
+  has_requirements: boolean;
+  class_types: string[];
+}
+
+export interface NodeRegistry {
+  _schema_version: string;
+  packages: Record<string, NodeRegistryPackage>;
+}
+
+export interface ModelManifestEntry {
+  filename: string;
+  path: string;
+  source: string | null;
+  size_gb: number;
+  type: string;
+  used_by: string[];
+}
+
+export interface ModelManifest {
+  _schema_version: string;
+  models: ModelManifestEntry[];
+}
+
 class ApiClient {
   private baseURL: string
   private cache: Map<string, CacheEntry<any>> = new Map()
@@ -957,6 +1069,50 @@ class ApiClient {
     })
   }
 
+  // World Jobs endpoints (World Labs API)
+
+  async getWorldJobs(params?: {
+    limit?: number;
+    offset?: number;
+    user_id?: string;
+    status?: string;
+  }) {
+    const queryParams = new URLSearchParams()
+    if (params?.limit) queryParams.append('limit', params.limit.toString())
+    if (params?.offset) queryParams.append('offset', params.offset.toString())
+    if (params?.user_id) queryParams.append('user_id', params.user_id)
+    if (params?.status) queryParams.append('status', params.status)
+
+    const query = queryParams.toString()
+    const cacheKey = `world-jobs-feed-${query}`
+    const cached = this.getCached(cacheKey)
+    if (cached) return cached
+
+    const result = await this.request(`/world-jobs/feed${query ? `?${query}` : ''}`)
+    this.setCache(cacheKey, result)
+    return result
+  }
+
+  async getCompletedWorldJobs(params?: {
+    limit?: number;
+    offset?: number;
+    user_id?: string;
+  }) {
+    const queryParams = new URLSearchParams()
+    if (params?.limit) queryParams.append('limit', params.limit.toString())
+    if (params?.offset) queryParams.append('offset', params.offset.toString())
+    if (params?.user_id) queryParams.append('user_id', params.user_id)
+
+    const query = queryParams.toString()
+    const cacheKey = `world-jobs-completed-${query}`
+    const cached = this.getCached(cacheKey)
+    if (cached) return cached
+
+    const result = await this.request(`/world-jobs/completed/recent${query ? `?${query}` : ''}`)
+    this.setCache(cacheKey, result)
+    return result
+  }
+
   // LoRA Trainer endpoints (Musubi Tuner for QWEN Image LoRA)
   async startMusubiTraining(payload: {
     images: Array<{ filename: string; data: string; caption: string }>;
@@ -1100,33 +1256,75 @@ class ApiClient {
   }
 
   // Virtual Set (World Labs / Marble API)
-  async generateVirtualSetWorld(imageData: string, displayName?: string, model?: string) {
+  async generateVirtualSetWorld(params: {
+    promptType: 'image' | 'multi-image' | 'video'
+    imageData?: string
+    images?: { imageData: string; azimuth: number }[]
+    reconstructImages?: boolean
+    videoUrl?: string
+    textPrompt?: string
+    displayName?: string
+    model?: string
+  }) {
     return this.request('/virtual-set/generate', {
       method: 'POST',
       body: JSON.stringify({
-        image_data: imageData,
-        display_name: displayName || 'Virtual Set Scene',
-        model: model || 'Marble 0.1-plus',
+        prompt_type: params.promptType,
+        image_data: params.imageData,
+        images: params.images?.map(i => ({ image_data: i.imageData, azimuth: i.azimuth })),
+        reconstruct_images: params.reconstructImages || false,
+        video_url: params.videoUrl,
+        text_prompt: params.textPrompt || null,
+        display_name: params.displayName || 'Virtual Set Scene',
+        model: params.model || 'Marble 0.1-plus',
       }),
     })
+  }
+
+  async uploadVideoForVirtualSet(file: File): Promise<{ success: boolean; video_url?: string; filename?: string; error?: string }> {
+    const token = this.getAuthToken()
+    const url = `${this.baseURL}/virtual-set/upload-video`
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 300000) // 5 min timeout for large videos
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        body: formData,
+        signal: controller.signal,
+      })
+      clearTimeout(timeoutId)
+      return response.json()
+    } catch (e: any) {
+      clearTimeout(timeoutId)
+      return { success: false, error: e.message || 'Upload failed' }
+    }
   }
 
   async getVirtualSetStatus(operationId: string) {
     return this.request(`/virtual-set/status/${operationId}`)
   }
 
-  async reconstructVirtualSet(screenshotData: string, originalImageData: string, prompt?: string) {
+  async reconstructVirtualSet(screenshotData: string, originalImageData: string, prompt?: string, comfyUrl?: string, clientId?: string) {
     return this.request('/virtual-set/reconstruct', {
       method: 'POST',
       body: JSON.stringify({
         screenshot_data: screenshotData,
         original_image_data: originalImageData,
         prompt: prompt || '',
+        comfy_url: comfyUrl || '',
+        client_id: clientId || '',
       }),
     })
   }
 
-  async saveVirtualSetWorld(imageData: string, splatUrl: string, worldId?: string, model?: string) {
+  async saveVirtualSetWorld(imageData: string, splatUrl: string, worldId?: string, model?: string, promptType?: string) {
     return this.request('/virtual-set/save-world', {
       method: 'POST',
       body: JSON.stringify({
@@ -1134,6 +1332,7 @@ class ApiClient {
         splat_url: splatUrl,
         world_id: worldId || null,
         model: model || 'Marble 0.1-plus',
+        prompt_type: promptType || 'image',
       }),
     })
   }
@@ -1553,6 +1752,98 @@ class ApiClient {
     })
     if (!response.ok) throw new Error('ZIP download failed')
     return response.blob()
+  }
+
+  // ============================================================================
+  // Custom Workflow Builder Methods (Phase 15)
+  // ============================================================================
+
+  async parseWorkflow(workflowJson: Record<string, unknown>): Promise<ParseWorkflowResponse> {
+    return this.request<ParseWorkflowResponse>('/custom-workflows/parse', {
+      method: 'POST',
+      body: JSON.stringify({ workflow_json: workflowJson }),
+    });
+  }
+
+  async createCustomWorkflow(payload: CreateWorkflowPayload): Promise<CustomWorkflowResponse> {
+    return this.request<CustomWorkflowResponse>('/custom-workflows/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async listCustomWorkflows(): Promise<CustomWorkflowListResponse> {
+    return this.request<CustomWorkflowListResponse>('/custom-workflows/');
+  }
+
+  async listPublishedWorkflows(): Promise<CustomWorkflowListResponse> {
+    const cacheKey = 'published-workflows';
+    const cached = this.getCached<CustomWorkflowListResponse>(cacheKey);
+    if (cached) return cached;
+    const result = await this.request<CustomWorkflowListResponse>('/custom-workflows/published');
+    if (result.success) this.setCache(cacheKey, result);
+    return result;
+  }
+
+  async getCustomWorkflow(id: string): Promise<CustomWorkflowResponse> {
+    return this.request<CustomWorkflowResponse>(`/custom-workflows/${id}`);
+  }
+
+  async updateCustomWorkflow(id: string, payload: UpdateWorkflowPayload): Promise<CustomWorkflowResponse> {
+    return this.request<CustomWorkflowResponse>(`/custom-workflows/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async deleteCustomWorkflow(id: string): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(`/custom-workflows/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async publishCustomWorkflow(id: string): Promise<CustomWorkflowResponse> {
+    return this.request<CustomWorkflowResponse>(`/custom-workflows/${id}/publish`, {
+      method: 'POST',
+    });
+  }
+
+  async unpublishCustomWorkflow(id: string): Promise<CustomWorkflowResponse> {
+    return this.request<CustomWorkflowResponse>(`/custom-workflows/${id}/unpublish`, {
+      method: 'POST',
+    });
+  }
+
+  async executeCustomWorkflow(
+    id: string,
+    payload: ExecuteCustomWorkflowPayload
+  ): Promise<ExecuteCustomWorkflowResponse> {
+    return this.request<ExecuteCustomWorkflowResponse>(
+      `/custom-workflows/${id}/execute`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }
+    )
+  }
+
+  async getNodeRegistry(): Promise<NodeRegistry> {
+    return this.request<NodeRegistry>('/infrastructure/node-registry');
+  }
+
+  async getModelManifest(): Promise<ModelManifest> {
+    return this.request<ModelManifest>('/infrastructure/model-manifest');
+  }
+
+  async getDockerfileContent(): Promise<{ success: boolean; content: string; sha: string; path: string }> {
+    return this.request<{ success: boolean; content: string; sha: string; path: string }>('/infrastructure/dockerfiles/content');
+  }
+
+  async saveDockerfileContent(payload: { content: string; sha: string; commit_message: string; trigger_deploy?: boolean }): Promise<{ success: boolean; commit_sha: string; deploy_triggered: boolean }> {
+    return this.request<{ success: boolean; commit_sha: string; deploy_triggered: boolean }>('/infrastructure/dockerfiles/content', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
   }
 
   // Helper method for authenticated requests (backward compatibility)

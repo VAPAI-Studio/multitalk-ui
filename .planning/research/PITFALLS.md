@@ -1,449 +1,499 @@
-# Domain Pitfalls: Batch Video Upscale with Freepik API
+# Pitfalls Research: Workflow Builder
 
-**Domain:** Batch video upscaling via external credit-based API on Heroku-hosted FastAPI app
-**Researched:** 2026-03-11
-**Milestone:** v1.1 Batch Video Upscale
-**Overall confidence:** HIGH (based on codebase analysis, existing patterns, official Heroku/Supabase docs, and Freepik API documentation)
+**Domain:** Adding a dynamic workflow builder and feature generator to an existing AI platform with hardcoded navigation, TypeScript union routing, and static app configuration
+**Researched:** 2026-03-13
+**Milestone:** v1.2 Workflow Builder
+**Confidence:** HIGH (based on deep codebase analysis of actual files + verified against official documentation)
 
 ---
 
 ## Critical Pitfalls
 
-Mistakes that cause rewrites, data loss, or broken user experience at the architectural level.
+Mistakes that cause rewrites, broken routing, security holes, or complete loss of published features.
 
 ---
 
-### Pitfall 1: Batch State Lost on Heroku Dyno Restart
+### Pitfall 1: The `StudioPageType` Union Type Doesn't Cover Dynamic Workflow IDs
 
-**What goes wrong:** The app currently uses in-memory job stores for background processing (see `hf_download_service.py` lines 22-23: `_HF_JOBS: dict[str, dict] = {}`). If the same pattern is used for the batch upscale queue, all batch state -- which videos are pending, which is currently processing, what the overall batch progress is -- vanishes whenever Heroku restarts the dyno. Heroku performs at least one daily restart ("dyno cycling"), plus restarts on deploy, config var changes, or scaling events. A user who queues 10 videos goes to bed, and wakes up to find 3 completed, 7 vanished, and no record of the batch ever existing.
+**What goes wrong:**
+`StudioPageType` in `frontend/src/lib/studioConfig.ts` (line 335) is a hardcoded TypeScript string literal union:
 
-**Why it happens:** The in-memory pattern was acceptable for HuggingFace downloads because that was a single-admin, opportunistic use case. Batch video upscale is a multi-user, mission-critical workflow where users expect reliability. The architectural shortcut that worked for v1.0 infrastructure management becomes a critical flaw for v1.1.
+```typescript
+export type StudioPageType =
+  | 'home'
+  | 'lipsync-studio'
+  | 'image-studio'
+  | ...
+  | 'profile-settings';
+```
+
+`App.tsx` (line 112) defines `validPages: StudioPageType[]` from this same literal list and uses `validPages.includes(savedPage)` to gate localStorage restoration. Dynamic workflow pages have IDs like `'workflow-abc123'` at runtime — these will never appear in the compile-time union, so TypeScript will reject them, the `includes()` check will fail, and navigating to a dynamic page will always redirect to home after refresh.
+
+**Why it happens:**
+The type was built to enable TypeScript exhaustive checking at compile time. That benefit disappears the moment IDs come from a database at runtime. Developers add `| string` as a quick fix, which then kills type narrowing on ALL the static pages and breaks the switch-like rendering logic in `App.tsx`.
 
 **Consequences:**
-- Users lose queued videos mid-batch with no recovery path
-- Credit spent on completed-but-untracked videos is wasted (no record of output URLs)
-- Resuming after restart is impossible because the batch context is gone
-- Pause-and-notify feature is meaningless if the "paused" state does not survive restart
+- Deep-linking to a published workflow page fails silently on hard reload
+- Users lose their navigation position after every page refresh
+- TypeScript `as StudioPageType` casts everywhere become required, hiding future bugs
+- Adding `| string` makes the `validPages.includes()` guard useless (everything passes)
+
+**How to avoid:**
+Model dynamic pages as a separate routing concept from static studios. Keep `StudioPageType` exactly as-is for static pages. Add a parallel `dynamicPage` state: `{ type: 'workflow'; workflowId: string }`. Persist it separately in localStorage under a different key (`vapai-dynamic-page`). In `App.tsx`, check both: if `savedPage` is a known static page, restore normally; otherwise check localStorage for a dynamic page override. Never merge dynamic IDs into the static union.
 
 **Warning signs:**
-- Using `dict` or module-level variables to track batch/queue state
-- No database table for batch metadata (only individual video jobs)
-- Background tasks launched via `asyncio.create_task()` without persistence
-- Tests pass locally but production users report "disappeared" jobs
+- Any PR that adds `| string` to `StudioPageType`
+- Any `as StudioPageType` cast for a database-sourced ID
+- Navigation to published workflow breaks after F5
 
-**Prevention:**
-- Store ALL batch and queue state in Supabase from the start: a `batches` table (batch_id, user_id, status, total_videos, completed_count, paused_at, resumed_at) and a `batch_videos` table (batch_video_id, batch_id, video_index, status, freepik_task_id, input_url, output_url, error_message, credits_used)
-- The batch processing loop must be re-entrant: on startup, query for batches with status "processing" or "paused" and resume them
-- Use `@app.on_event("startup")` to scan for orphaned batches and either resume or mark them as "interrupted"
-- Each state transition (pending -> uploading -> submitted -> processing -> completed/failed) must be a database write BEFORE the next action
-
-**Detection:** Check if batch state survives `heroku ps:restart`. If not, this pitfall is active.
-
-**Phase:** Phase 1 (Database Schema + Batch Service) -- foundational, must be the first thing built
+**Phase to address:** Phase 1 (Navigation Integration) — the routing model must be decided before any other phase
 
 ---
 
-### Pitfall 2: Heroku 30-Second Timeout Killing Batch Submission Requests
+### Pitfall 2: ComfyUI UI-Format JSON Uploaded Instead of API-Format JSON
 
-**What goes wrong:** The user uploads 10 videos, the frontend sends them to the backend, and the backend tries to validate all files, upload each to Freepik, and start the batch -- all within a single HTTP request. This request easily exceeds Heroku's hard 30-second router timeout (H12 error). The request is terminated mid-processing, and the user sees a generic error. Some videos may have been submitted to Freepik but the response never reaches the client, creating orphaned tasks consuming credits.
+**What goes wrong:**
+ComfyUI has two entirely different JSON formats. The **UI format** (what you get when you drag the workflow canvas to a file or click "Save") contains node positions, link objects, visual metadata, and a `nodes` array. The **API format** (enabled via Dev Mode → "Save API Format") contains only the execution graph: a flat object keyed by node ID with `class_type` and `inputs`. Only the API format can be submitted to `POST /prompt`.
 
-**Why it happens:** The existing workflow submission pattern (see `runpod_service.py`, `comfyui_service.py`) handles single-item submissions that complete in <5 seconds. Developers apply the same single-request pattern to batch operations without accounting for the multiplicative time cost.
+The existing `WorkflowService.build_workflow()` in `backend/services/workflow_service.py` expects API format. The new workflow builder lets admins upload workflow JSON. If the admin uploads a UI-format workflow, `WorkflowService.validate_workflow()` may partially pass (it checks for `class_type` and `inputs` which exist in UI format nodes too, but nested under a different path), but when submitted to ComfyUI the result is a cryptic `{"error": "prompt is not a dict"}` or silent failure.
+
+**Why it happens:**
+Users working in ComfyUI naturally save the UI format — it's the default Ctrl+S behavior. API format requires enabling Dev Mode, a step that is not obvious. The difference is not called out in the ComfyUI UI and has confused experienced users (GitHub issue #1335 describes this as a "lot of confusion"). Admin users building workflows will almost certainly make this mistake without explicit instruction.
 
 **Consequences:**
-- H12 timeout errors for batches larger than 2-3 videos
-- Orphaned Freepik tasks consuming credits without tracking
-- Inconsistent state: some videos submitted, others not, user does not know which
-- Users retry the submission, creating duplicate Freepik tasks and burning more credits
+- Uploaded workflows fail validation in misleading ways (partial JSON structure match)
+- Admin sees no clear error explaining the format mismatch
+- Admin re-uploads the same wrong file multiple times, confused about why it fails
+- If validation somehow passes, ComfyUI rejects the workflow at submission time
+
+**How to avoid:**
+Detect the format on upload, not at execution time. Write a `detect_workflow_format(json_dict)` utility that checks for the signature fields: UI format has a top-level `nodes` array and `links` array; API format has node IDs as top-level keys with `class_type` values. If UI format is detected, either (a) auto-convert to API format using the ComfyUI conversion logic, or (b) immediately reject with a clear error: "This is a ComfyUI UI workflow file. Please export using Dev Mode → Save (API Format) instead." Include a screenshot in the builder UI showing exactly where to find the Save API Format button.
 
 **Warning signs:**
-- Batch submission endpoint does more than accept-and-acknowledge
-- No immediate HTTP response with batch ID before processing begins
-- Freepik API calls happening inside the request handler (not in a background task)
-- Any single endpoint exceeding 5-second response time
+- `"nodes"` key found at the root of uploaded JSON
+- `"links"` key found at the root of uploaded JSON
+- `validate_workflow()` fails with structure errors on freshly uploaded files
 
-**Prevention:**
-- The batch submission endpoint must follow a fire-and-forget pattern:
-  1. Accept the video list and parameters (validate input format only)
-  2. Create the batch record and individual video records in Supabase with status "pending"
-  3. Return immediately with the batch ID (response time <1 second)
-  4. Launch the batch processing loop as a background task
-- Frontend receives the batch ID instantly and starts polling for status
-- Each video upload to Freepik happens sequentially in the background task, not in the request handler
-- The background task updates the database after each individual video submission
-
-**Detection:** Time the batch submission endpoint. If it takes more than 2 seconds for 5+ videos, this pitfall is active.
-
-**Phase:** Phase 1 (API Design) -- the endpoint contract must be fire-and-forget from day one
+**Phase to address:** Phase 1 (Workflow JSON Upload + Parser) — format detection must be the first validation step
 
 ---
 
-### Pitfall 3: Credit Exhaustion Detection as an Afterthought
+### Pitfall 3: Node Introspection Assumes Static `object_info` Available at Parse Time
 
-**What goes wrong:** The batch processor submits videos to Freepik one by one. Video #6 out of 10 fails with a credit exhaustion error (likely HTTP 402 or 429 with a specific error body). But the error handling treats this like any other failure -- marks video #6 as "failed" and moves to video #7, which also fails, and #8, and so on. The user sees 6 individual failures instead of one clear "credits exhausted -- batch paused" message. Worse, each failed submission may still consume an API request against rate limits.
+**What goes wrong:**
+The workflow builder needs to inspect each node's possible inputs (to let admins configure which inputs become user-facing variables). The correct source for this is ComfyUI's `GET /object_info` endpoint, which returns all node types with their input definitions, types, default values, and constraints. But `object_info` is only available when a ComfyUI instance is live and reachable. Implementing node introspection as a backend call to the ComfyUI URL stored in the upload request creates several failure modes:
+1. Admin uploads a workflow but no ComfyUI is running — introspection fails, no feedback on what inputs are configurable
+2. The ComfyUI running during upload has different custom nodes than the ComfyUI that will run during execution (different node catalogs)
+3. `object_info` is 2-10 MB of JSON covering hundreds of node types — caching is critical but the existing `WorkflowService` has no caching layer
 
-**Why it happens:** Credit exhaustion is a fundamentally different error category from other API failures (network timeout, invalid parameters, server error). It affects ALL remaining videos in the batch, not just the current one. Treating it as a per-video error loses the ability to pause-and-resume intelligently.
+**Why it happens:**
+It seems natural to introspect at upload time using the live ComfyUI. But the workflow builder is admin infrastructure that needs to work even when ComfyUI is temporarily down, and the `comfyUrl` field is user-configurable in the header at any time.
 
 **Consequences:**
-- Remaining credits wasted on guaranteed-to-fail API calls
-- User sees N individual error messages instead of one actionable "credits exhausted" notification
-- No resume capability because the system does not distinguish "paused due to credits" from "failed due to error"
-- Rate limit quota consumed by submissions that will be rejected
+- Workflow upload UI is broken whenever ComfyUI is unreachable (even briefly)
+- Different ComfyUI environments produce different introspection results for the same workflow
+- Repeated `object_info` fetches on every upload add 500ms-2s latency and create unnecessary load on ComfyUI
+
+**How to avoid:**
+Do a two-pass parsing approach: (1) **Static parse** — extract all node IDs, class_types, and widget values directly from the workflow JSON without needing `object_info`. This always works offline and gives 80% of what admins need. (2) **Optional live introspection** — when ComfyUI is reachable, enrich the parsed results with `object_info` for input type labels, range constraints, and default values. If introspection fails, still let the admin proceed with manually specified variable types. Cache `object_info` responses in Redis or in-memory with a 5-minute TTL so repeated requests don't hit ComfyUI repeatedly. Never make `object_info` a blocking requirement for workflow upload.
 
 **Warning signs:**
-- Error handling uses a generic `except Exception` for all Freepik API errors
-- No distinct batch status for "paused_credit_exhaustion"
-- The batch processor does not check remaining credits before each submission
-- No notification mechanism when the batch pauses
+- Workflow upload failing with "ComfyUI unreachable" errors
+- Workflow builder showing a loading spinner that never resolves when ComfyUI is down
+- Admin reports that two identical uploads produce different variable lists
 
-**Prevention:**
-- Classify Freepik API errors into three categories:
-  1. **Retryable** (429 rate limit, 500/502/503 server errors) -- retry with exponential backoff
-  2. **Credit exhaustion** (402 or specific error code/message) -- pause the entire batch, notify user
-  3. **Permanent failure** (400 bad request, 422 validation error) -- mark this video as failed, continue to next
-- Add a `paused_credit_exhaustion` status to the batch, distinct from `paused` (user-initiated) and `failed`
-- Before each submission, optionally check a credits-remaining endpoint if Freepik provides one
-- When credit exhaustion is detected:
-  1. Update batch status to `paused_credit_exhaustion`
-  2. Store the index of the next video to process (resume point)
-  3. Send a notification to the user (store in database, show in UI on next poll)
-  4. Provide a "Resume" button that re-checks credits and continues from where it paused
-
-**Detection:** Simulate credit exhaustion in tests by mocking a 402 response on video #3 of a 5-video batch. Verify the batch pauses and videos #4-5 remain "pending" (not "failed").
-
-**Phase:** Phase 2 (Credit Management) -- but the error classification must be designed in Phase 1's Freepik service
+**Phase to address:** Phase 1 (Workflow JSON Parser) — parser must work offline; live enrichment is optional
 
 ---
 
-### Pitfall 4: Downloading Upscaled Videos Into Backend Memory Before Uploading
+### Pitfall 4: Dynamic Published Features Not Isolated From Static App State in Context/Rendering
 
-**What goes wrong:** When Freepik completes a video upscale, the result is available as a download URL. The backend downloads the full upscaled video into memory (using `httpx.get()` returning `.content`), then uploads it to Supabase Storage, then uploads it again to Google Drive. The existing `storage_service.py` does exactly this pattern (line 98: `video_content = video_response.content`) and the `google_drive_service.py` uses `MediaInMemoryUpload` (line 235). A 4K upscaled video can be 50-200 MB. Processing 3-4 such videos concurrently on Heroku's 512 MB memory limit causes OOM crashes (R14/R15 errors), killing the dyno and all running batch operations.
+**What goes wrong:**
+`StudioPage.tsx` uses a compile-time `appComponents` record (line 29):
 
-**Why it happens:** The existing upload pattern was designed for ComfyUI outputs that are typically small (5-20 MB). Video upscaling outputs are an order of magnitude larger. The same code patterns that work for small files cause memory exhaustion for large files.
+```typescript
+const appComponents: Record<string, React.ComponentType<...>> = {
+  'lipsync-one-person': LipsyncOnePerson,
+  'lipsync-multi-person': LipsyncMultiPerson,
+  ...
+};
+```
+
+The dynamic renderer for published workflows will need to be inserted into this same rendering pipeline. The naive approach adds a fallback: "if the app ID is not in `appComponents`, try to load it as a dynamic workflow." This works, but every re-render of `StudioPage` now triggers a database fetch for the dynamic workflow config, because the fallback has no caching. On navigation between apps in the same studio, `StudioPage` re-renders, the lookup misses `appComponents`, the fetch fires, and there's a flash of loading state even for pages the user already visited.
+
+**Why it happens:**
+Static components are imported at bundle time and always available synchronously. Dynamic components need async fetching. Mixing the two without explicit caching and loading state management creates an inconsistent UX between static features (instant) and dynamic features (always has a loading delay).
 
 **Consequences:**
-- R14 (Memory Quota Exceeded) warnings, then R15 (Memory Quota Vastly Exceeded) dyno kills
-- All in-progress requests fail when the dyno crashes
-- Other users' operations are affected (not just the upscale user)
-- If batch state is in-memory, all progress is lost (compounds Pitfall 1)
+- Dynamic feature pages flash a loading spinner every time the user navigates to them
+- Published workflow configs are fetched on every visit, not cached
+- If the database is slow or unavailable, published features become inaccessible while static features work fine
+- React StrictMode causes double-fetching, amplifying the database load
+
+**How to avoid:**
+Separate the data layer from the rendering layer. Fetch all published workflow configs at app startup (in `AuthContext` or a new `WorkflowConfigContext`) and store them in memory. `StudioPage.tsx` reads from this in-memory map synchronously — same pattern as `appComponents`. The `DynamicFeaturePage` component gets its config as a prop, not via an inline fetch. Implement a background refresh (every 5 minutes or on focus) to pick up newly published workflows. The loading state only happens once at app startup, not on every navigation.
 
 **Warning signs:**
-- `video_response.content` used to download large files (loads entire response into memory)
-- `MediaInMemoryUpload` used for Google Drive uploads of large files
-- Memory usage spikes during video download/upload operations
-- R14 errors in Heroku logs during batch processing
+- Dynamic feature pages have visible loading delay compared to static pages
+- Network tab shows `GET /api/workflows/{id}` firing on every navigation to a dynamic page
+- State reset occurs when switching between apps in a studio containing a dynamic workflow
 
-**Prevention:**
-- Stream the upscaled video download using `httpx` streaming: `async with client.stream("GET", url) as response: async for chunk in response.aiter_bytes(chunk_size=1_048_576):`
-- For Supabase Storage: use streaming upload or write to a temporary file and upload from disk (Heroku dynos have ~4 GB ephemeral disk space, far more than memory)
-- For Google Drive: replace `MediaInMemoryUpload` with `MediaFileUpload` using a temporary file, or use `MediaIoBaseUpload` with a streaming wrapper
-- Process batch videos strictly one at a time (never concurrent downloads/uploads)
-- Add memory monitoring: log process memory before and after each video processing cycle
-- Set a maximum file size guard: if the upscaled video exceeds a configurable limit (e.g., 300 MB), warn the user or refuse the operation
-
-**Detection:** Monitor Heroku memory usage during upscale processing. If memory exceeds 400 MB during a single video download, this pitfall is active.
-
-**Phase:** Phase 3 (Output Delivery) -- but the streaming architecture decision must be made in Phase 1
+**Phase to address:** Phase 2 (Navigation Integration) — loading strategy must be decided before building the renderer
 
 ---
 
-### Pitfall 5: Dual-Destination Upload Without Atomicity
+### Pitfall 5: Dynamic Form Renderer With Uncontrolled Input Types Crashes on Unexpected Values
 
-**What goes wrong:** Each completed video must be uploaded to both Supabase Storage (for in-app viewing) and Google Drive (for project delivery). The implementation uploads to Supabase first, succeeds, then uploads to Google Drive, which fails (network timeout, Google API rate limit, Drive quota exceeded). Now the video exists in Supabase but not in Drive. The system marks the video as "completed" because the Supabase upload worked, but the user's Google Drive project folder is missing the video. Or worse: Supabase upload fails, Google Drive upload succeeds, and the video is in Drive but not viewable in the app.
+**What goes wrong:**
+The dynamic form renderer constructs input fields from JSONB configuration stored in Supabase: `{ type: 'slider', key: 'steps', min: 1, max: 100, default: 20 }`. The renderer maps `type` to a React component. If an admin saves a config with `type: 'range'` instead of `type: 'slider'` (a typo or schema drift), the renderer hits the default branch and either renders nothing, crashes with "Cannot read properties of undefined", or renders a raw input with no constraints. Similarly, if `min`/`max`/`default` are missing for a slider, the component renders with `undefined` props that propagate as `NaN` to ComfyUI.
 
-**Why it happens:** Distributed systems cannot guarantee atomicity across two independent storage services without a coordination mechanism. Developers treat the dual upload as a simple sequential operation, but partial failures create inconsistent state.
+**Why it happens:**
+JSONB has no enforced schema by default — Supabase stores any valid JSON without validation. Configuration saved by the builder at v1 of the schema may not match the renderer expectations at v2. Admins editing configurations manually in Supabase's table editor can introduce drift.
 
 **Consequences:**
-- Videos missing from one storage destination with no indication to the user
-- Manual intervention required to fix inconsistent state
-- If the video is marked "completed" after the first upload, retrying only uploads to the second destination is complex
-- Google Drive failures may be transient but are not retried
+- Published feature pages crash or render broken forms for malformed configs
+- NaN or `undefined` values sent to ComfyUI cause cryptic node errors that are hard to trace back to the form config
+- Non-admin users see broken feature pages with no explanation
+
+**How to avoid:**
+(1) Use Supabase's `pg_jsonschema` extension with a CHECK constraint on the `variable_configs` JSONB column to enforce structure at the database level. (2) Add a Zod schema in the frontend that validates the entire config object before the renderer uses it. If validation fails, show an admin-only "Configuration Error" banner instead of crashing. (3) Normalize all variable types to a strict enum in the builder UI — admins pick from a dropdown, not a free-text field. (4) Add default fallbacks for missing numeric constraints: if `min` is missing for a slider, default to 0; if `max` is missing, default to 100. Log a warning but render rather than crash.
 
 **Warning signs:**
-- Sequential upload to Supabase then Drive with a single "completed" status at the end
-- No per-destination upload status tracking
-- No retry mechanism for the second upload if the first succeeds
-- Google Drive errors logged but not surfaced to the user
+- Feature page crashes with React error boundary catching "Cannot read properties of undefined"
+- ComfyUI receives workflow with `NaN` in numeric fields
+- Admin reports "my workflow stopped working after I edited the config"
 
-**Prevention:**
-- Track upload status per destination: `supabase_upload_status` and `drive_upload_status` columns on the batch_videos table
-- Mark the video as "completed" only when BOTH uploads succeed (or when Drive is not configured)
-- Implement independent retry for each destination: if Supabase succeeds but Drive fails, retry Drive without re-downloading the video
-- Use a temporary file on disk as an intermediary: download once, upload to both destinations from the temp file, then clean up
-- Add a "repair" mechanism: an endpoint or background job that finds videos with partial upload status and retries the missing destination
-- Make Google Drive upload optional (graceful degradation): if Drive is not configured or the user has no project context, skip Drive upload without failing the entire operation
+**Phase to address:** Phase 2 (Dynamic Form Renderer) — validation contract must be established before building any form types
 
-**Detection:** Simulate a Google Drive API failure during upload. Verify that the video appears in Supabase and that Drive upload is retried on the next processing cycle.
+---
 
-**Phase:** Phase 3 (Output Delivery) -- the per-destination status tracking must be in the database schema from Phase 1
+### Pitfall 6: Test Runner in the Builder Uses a Different Code Path Than the Renderer
+
+**What goes wrong:**
+The PROJECT.md explicitly flags this as a key architectural decision: "Test runner shares code path with renderer — guarantees consistency; if test works, production works." But the natural implementation drift creates divergence: the test runner calls the backend workflow submission endpoint directly (since it only needs to check if the workflow runs), while the renderer goes through a different flow (job tracking, storage, feed integration). The test runner may substitute placeholder values differently, may not upload files to ComfyUI before submission, or may skip the parameter normalization that the renderer applies. Tests pass in the builder but the published feature fails in production with parameter mismatches.
+
+**Why it happens:**
+The builder test is an admin-only operation and it seems faster to wire it directly to `POST /comfyui/submit-workflow` without all the job tracking overhead. But "just testing the workflow" still requires the same parameter preparation, file upload, and substitution logic. Taking a shortcut builds in divergence that only manifests when real users hit edge cases the test didn't cover.
+
+**Consequences:**
+- Admin publishes a "tested" workflow that fails for real users on the first submission
+- Edge cases in parameter types (boolean values, `null` for optional fields) work in the test but fail in production because the code paths handle them differently
+- Debugging is difficult because the admin can reproduce in the builder but cannot in the live feature
+
+**How to avoid:**
+Build a single `execute_dynamic_workflow(config, params, comfy_url, job_context)` function where `job_context` is optional (`None` for test runs, a real job record for production runs). Both the test runner and the renderer call this same function. The function handles: parameter validation, file upload to ComfyUI, template substitution, submission, and polling. The only difference between test and production is whether a job record is created and whether outputs are stored in Supabase. Never have two separate parameter substitution implementations.
+
+**Warning signs:**
+- Test runner imports `workflow_service.py` directly but renderer goes through an API endpoint
+- `submit_test_workflow` and `submit_production_workflow` are two separate functions
+- A workflow test passes but the published feature fails with a parameter error
+
+**Phase to address:** Phase 1 (Backend Workflow Execution) — single code path must be established before building either the test runner or the renderer
+
+---
+
+### Pitfall 7: Admin Publishes a Workflow to a Studio That Doesn't Exist in the Static Config
+
+**What goes wrong:**
+The builder lets admins publish a workflow to any studio by selecting from a dropdown. The admin types or selects `'custom-studio'` — a studio that doesn't exist in the hardcoded `studios` array in `studioConfig.ts`. The database stores `studio_id: 'custom-studio'`. At runtime, `App.tsx` calls `getStudioById('custom-studio')` which returns `undefined`. The `StudioPage` component receives `studio={undefined}` and crashes with a null reference, taking down the entire page for all users navigating to that studio route.
+
+**Why it happens:**
+The gap between what the database can store (any string) and what the frontend knows about (hardcoded `studios` array) is invisible to the admin. The builder doesn't validate against the static config at publish time.
+
+**Consequences:**
+- The studio containing the published workflow becomes inaccessible to all users
+- Error is not contained — it propagates up because `StudioPage` has no null guard on the `studio` prop
+- Admin cannot easily diagnose why the published feature doesn't appear
+
+**How to avoid:**
+The builder's "publish to studio" dropdown must be populated from the exact same `studios` array in `studioConfig.ts` (or an API that returns the same data). Never allow free-text studio IDs in the builder. Add a validation step at publish time that cross-references the target studio ID against known studio IDs. In `StudioPage.tsx`, add a null guard and render a "Studio not found" fallback if `studio` is undefined — this prevents a crash from taking down the page for other users.
+
+**Warning signs:**
+- Builder has a free-text studio ID field rather than a dropdown
+- `getStudioById()` returns `undefined` in production logs
+- `StudioPage` crashes with "Cannot read properties of undefined (reading 'apps')"
+
+**Phase to address:** Phase 2 (Builder UI) + Phase 3 (Navigation Integration) — constrain the publish target before the builder goes live
+
+---
+
+### Pitfall 8: `workflow_type` for Dynamic Features Conflicts With Existing Job Tracking Filter
+
+**What goes wrong:**
+Every job in `video_jobs` and `image_jobs` has a `workflow_name` field used by the generation feed for filtering (`pageContext` in `UnifiedFeed.tsx`). Existing static features use hardcoded type strings (`'lipsync-one'`, `'wan-i2v'`, etc.). Dynamic workflows will need a `workflow_name` too. If dynamic workflows use a pattern like `'workflow-' + db_id` (e.g., `'workflow-abc123'`), the generation feed's existing filter logic fails to match them — the feed was built assuming fixed known strings. Users who run a published dynamic workflow see their jobs disappear from the feed immediately after submission because the filter excludes unknown `workflow_name` values.
+
+**Why it happens:**
+The feed filtering assumes the set of `workflow_type` values is closed and known at build time. Dynamic workflows introduce open-ended IDs at runtime.
+
+**Consequences:**
+- Users cannot see their in-progress dynamic workflow jobs in the generation feed
+- Job history for dynamic features is invisible unless the user switches to "Show All"
+- "Fix stuck jobs" functionality in the feed doesn't apply to dynamic workflow jobs
+
+**How to avoid:**
+Add a discriminator to the job schema: a boolean `is_dynamic_workflow` column or a `workflow_category` enum with values `'static'` and `'dynamic'`. The generation feed can filter on `workflow_category = 'dynamic'` for the dynamic features page, showing all dynamic workflows regardless of their specific `workflow_name`. Alternatively, prefix all dynamic `workflow_name` values with a consistent sentinel like `'dyn:'` and update the feed filter to match on prefix. Choose one approach before writing any job creation code for dynamic workflows.
+
+**Warning signs:**
+- Dynamic workflow jobs submitted successfully but not appearing in the feed
+- Job feed shows empty for a dynamic feature page even after a successful run
+- `pageContext` in `UnifiedFeed` config for a dynamic renderer doesn't match the submitted `workflow_name`
+
+**Phase to address:** Phase 1 (Database Schema) — the discriminator field must exist before the first dynamic workflow job is created
+
+---
+
+### Pitfall 9: localStorage Stores a Published Workflow Page ID That Gets Deleted
+
+**What goes wrong:**
+A user navigates to a published workflow `'dyn:abc123'`. Their browser stores this as `vapai-current-page: 'dyn:abc123'` in localStorage. The admin deletes or unpublishes this workflow from the builder. The user refreshes. `App.tsx` loads the stored page ID, looks it up in the workflow config list (fetched on startup), finds no match, and falls through to... what? If there's no explicit fallback for "stored page not found," the app renders nothing, shows an error, or silently renders the wrong page.
+
+**Why it happens:**
+The existing localStorage restore logic (App.tsx, line 139) validates against a fixed `validPages` array. Dynamic pages can't be in this array. Without explicit "does this dynamic page still exist?" validation at restore time, orphaned localStorage entries cause silent failures.
+
+**Consequences:**
+- Users get a blank page or error screen on startup every time they visit after a workflow is unpublished
+- Users don't understand what happened and think the app is broken
+- The fix requires users to manually clear localStorage (they won't know to do this)
+
+**How to avoid:**
+When restoring a dynamic page from localStorage, validate that the workflow ID still exists in the loaded workflow configs. If not found, fall back to home and clear the stored dynamic page. This validation must happen after the workflow configs are fetched on startup — it cannot be synchronous. The sequence is: (1) fetch published workflows, (2) if stored page is a dynamic ID, look it up, (3) if not found, fall back to home.
+
+**Warning signs:**
+- Blank page or React error after app startup
+- Console shows "getStudioById returned undefined" or similar
+- Workflow was recently unpublished/deleted
+
+**Phase to address:** Phase 3 (Navigation Integration) — handle the full lifecycle of published → unpublished
 
 ---
 
 ## Moderate Pitfalls
 
-Mistakes that cause degraded experience, wasted resources, or technical debt.
-
 ---
 
-### Pitfall 6: Polling Freepik Status Too Aggressively or Too Lazily
+### Pitfall 10: Builder Allows Substitution of Hardcoded Node-to-Node Links as User Variables
 
-**What goes wrong:** Freepik's video upscaler is async: you submit a task and poll for completion. Two failure modes exist. **Too aggressive:** Polling every 1-2 seconds burns through rate limits (Freepik allows 50 hits/second burst, 10 hits/second sustained) and provides no benefit since video upscaling takes minutes. With a batch of 10 videos, aggressive polling generates 600+ requests per minute. **Too lazy:** Polling every 60 seconds means the user waits up to 60 seconds after completion before seeing their result, and the batch sits idle between videos unnecessarily.
+**What goes wrong:**
+In ComfyUI's API format, node connections are represented as arrays: `["source_node_id", output_slot_index]` (e.g., `["12", 0]`). Widget values (actual configurable values) are primitives: strings, numbers, booleans. The builder's variable detection logic needs to distinguish between these two. A naive parser that marks "all non-primitive inputs as configurable" will flag `["12", 0]` link references as configurable variables. The admin accidentally marks a node-to-node connection as a user-facing variable. The renderer tries to render a UI control for it. At execution time, the workflow is sent to ComfyUI with `"image": "user_string"` where ComfyUI expects `"image": ["12", 0]`, causing execution failure.
 
-**Why it happens:** The existing ComfyUI polling in `startJobMonitoring` (frontend) and RunPod polling (3-second intervals per PROJECT.md) were tuned for fast operations. Developers copy these intervals without considering that Freepik video upscaling takes 2-10 minutes per video.
-
-**Consequences:**
-- Aggressive: Rate limit exhaustion (429 errors), Freepik may throttle or block the API key
-- Aggressive: Unnecessary load on Heroku dyno spending CPU on HTTP requests
-- Lazy: Poor user experience, batch throughput reduced due to idle time between videos
-- Both: Credits potentially wasted if rate limits interfere with task submission
-
-**Prevention:**
-- Use exponential backoff polling: start at 5-second intervals, increase to 10, 20, 30 seconds, cap at 30 seconds
-- Alternatively, use adaptive polling: poll at 5-second intervals for the first 30 seconds, then 15-second intervals thereafter
-- If Freepik supports webhooks (the image upscaler has an optional `webhook_url` parameter), investigate whether the video upscaler supports them too -- this eliminates polling entirely
-- Track the average processing time per resolution/settings combination and use it to estimate when to start polling
-- Backend does the polling (not the frontend), updating the database. Frontend polls the backend at a reasonable interval (3-5 seconds) for UI updates
-
-**Detection:** Count Freepik API status-check calls per video. If >50 calls per video, polling is too aggressive. If average idle time after completion is >30 seconds, polling is too lazy.
-
-**Phase:** Phase 2 (Freepik Service Implementation)
-
----
-
-### Pitfall 7: Frontend Upload of Large Video Files Hitting Heroku Timeout
-
-**What goes wrong:** Users select 10 videos (each 50-100 MB) for batch upload. The frontend sends them to the backend in a single multipart POST request. Heroku's 30-second timeout kills the upload before all files transfer. Even if sent as individual uploads, each large video upload can exceed 30 seconds on slower connections.
-
-**Why it happens:** The existing file upload patterns handle small images (<10 MB) and audio files. Video files for upscaling are substantially larger, and batch upload multiplies the problem.
+**Why it happens:**
+The widget values vs. linked inputs distinction (documented in ComfyUI's workflow JSON spec) is not obvious. Link arrays look like valid JSON values and a simple `typeof value !== 'object'` check doesn't catch them because arrays are objects.
 
 **Consequences:**
-- Upload failures for batches with large or numerous videos
-- Users unsure which files were received and which were not
-- Retry uploads the entire batch, including already-uploaded files
+- Admins accidentally expose node wiring to users as configurable "inputs"
+- Published workflow fails at execution with cryptic ComfyUI node errors
+- The error happens at runtime, not at build time, so it's not caught until a user submits
 
-**Prevention:**
-- Upload videos individually, not as a batch: frontend sends each video as a separate upload request, tracking upload progress per video
-- Use chunked/resumable uploads for large videos (Supabase Storage supports TUS protocol for resumable uploads up to 50 GB)
-- Store uploaded videos in a staging area (Supabase Storage or temp bucket) before batch submission
-- The batch submission request sends only the storage references (URLs or paths), not the actual video data
-- Frontend shows per-video upload progress with the ability to retry individual failed uploads
-- Set file size limits: validate on the frontend before upload begins (e.g., max 500 MB per video, max 2 GB total batch)
-
-**Detection:** Test uploading a 100 MB video file through the backend on Heroku. If it returns H12, this pitfall is active.
-
-**Phase:** Phase 1 (Frontend Upload Component + Backend Upload Endpoint)
-
----
-
-### Pitfall 8: Freepik API Documentation Gap for Video Upscaler
-
-**What goes wrong:** Research shows that Freepik's API documentation (docs.freepik.com) extensively covers the image upscaler endpoints but has limited or no public documentation for a dedicated video upscaler API endpoint. The PROJECT.md references `api.freepik.com/v1/ai/video-upscaler` as the endpoint, but this may be based on internal knowledge, early API access, or an endpoint that is not yet publicly documented. Building against an undocumented or beta API means the endpoint behavior, error codes, rate limits, and pricing may change without notice.
-
-**Why it happens:** Freepik launched the video upscaler as a UI product (freepik.com/ai/video-upscaler) powered by Topaz technology. The API access may be newer or restricted to certain tiers. The llms-full.txt documentation dump does not mention a video upscaler endpoint.
-
-**Consequences:**
-- API endpoint URL, parameters, or response format may differ from assumptions
-- Credit consumption per video may be higher than expected (frame-based pricing for video can be 10-50x more than a single image upscale)
-- Rate limits specific to the video upscaler may be stricter than the general API rate limits
-- Breaking changes without deprecation notices (beta/undocumented APIs have no stability guarantees)
-
-**Prevention:**
-- Before writing any code, verify the exact API contract: make a manual test call to `api.freepik.com/v1/ai/video-upscaler` with a real API key and a test video
-- Document the actual request/response format, error codes, and credit consumption from the test
-- Build the Freepik service layer with an abstraction that isolates API-specific details (endpoint URL, parameter names, response parsing) so changes can be absorbed in one place
-- Implement a health check endpoint that verifies the Freepik video upscaler API is accessible and the API key is valid
-- Add defensive parsing for the API response: do not assume field names or structure, validate and log unexpected responses
-- Pin to a specific API version if Freepik supports versioning
-
-**Detection:** The very first integration task should be a standalone script that submits a test video and polls to completion. If this fails, escalate before building the full service.
-
-**Phase:** Phase 0 (Pre-implementation validation) -- must be verified before any development begins
-
----
-
-### Pitfall 9: Batch Processing Loop Not Surviving Background Task Failures
-
-**What goes wrong:** The batch processor runs as a Python `asyncio.create_task()` background task. If any unhandled exception occurs (network error, JSON parse error, unexpected API response structure), the entire task crashes. The batch is now stuck: some videos processed, the rest in "pending" forever. No error is logged because the task's exception is only raised if you `await` it, and fire-and-forget tasks do not do this.
-
-**Why it happens:** Python's `asyncio.create_task()` silently swallows exceptions from unawaited tasks (only emitting a warning on garbage collection). The existing HuggingFace download service wraps the blocking function in `asyncio.to_thread()` which provides better exception isolation, but a pure-async batch loop has this vulnerability.
-
-**Consequences:**
-- Batch silently stops processing with no error visible to the user
-- "Pending" videos remain pending indefinitely
-- Python emits "Task exception was never retrieved" warning to stderr, which may not be monitored
-- User has no way to restart or resume the batch because the system thinks it is still "processing"
+**How to avoid:**
+In the parser, explicitly exclude inputs where the value is an array with the pattern `[string_or_number, number]` — these are node link references, not widget values. Use this heuristic: `Array.isArray(value) && value.length === 2 && (typeof value[0] === 'string' || typeof value[0] === 'number') && typeof value[1] === 'number'` identifies a node link. Mark these as non-configurable in the builder UI. Optionally, enrich with `object_info` to know definitively which inputs are connectable vs. widget-only.
 
 **Warning signs:**
-- `asyncio.create_task()` called without storing the task reference
-- No `try/except` wrapping the entire batch processing loop
-- No "heartbeat" or "last_updated_at" timestamp on the batch record
-- No stale-batch detection on server startup
+- Builder shows array-valued inputs like `[12, 0]` as configurable variable candidates
+- Published workflow fails with "expected array, got string" type of ComfyUI error
 
-**Prevention:**
-- Wrap the entire batch processing loop in a top-level `try/except Exception` that catches ALL errors, logs them, and updates the batch status to "error" in the database
-- Store the task reference and add a `done_callback` that checks for exceptions: `task.add_done_callback(lambda t: handle_task_error(t, batch_id))`
-- Update a `last_heartbeat` timestamp on the batch record every processing cycle (every 30-60 seconds)
-- Add a startup check that finds batches with status "processing" but `last_heartbeat` older than 5 minutes, and either resumes or marks them as "interrupted"
-- Each individual video processing step should have its own try/except so one video failure does not crash the loop
-- Log every state transition with batch_id and video_id for debugging
-
-**Detection:** Kill the batch processing task mid-execution (e.g., raise an exception in a mock). Verify that the batch is marked as "error" or "interrupted" and can be resumed.
-
-**Phase:** Phase 2 (Batch Processing Loop) -- but the heartbeat column must be in the Phase 1 schema
+**Phase to address:** Phase 1 (Workflow JSON Parser) — link detection must be in the parser, not the renderer
 
 ---
 
-### Pitfall 10: Rate Limit Handling Conflated with Credit Exhaustion
+### Pitfall 11: File Upload Variables in Dynamic Forms Bypass Existing Upload Infrastructure
 
-**What goes wrong:** Freepik has two distinct limit systems: (1) rate limits (requests per second/day: 10 hits/s sustained, 50 hits/s burst; RPD varies by plan) and (2) credit-based pricing (per-frame costs). Developers treat both as the same error and either retry credit exhaustion (wasteful, will never succeed without adding credits) or pause-on-rate-limit (unnecessarily halts the batch when a simple backoff would resolve it).
+**What goes wrong:**
+Static feature pages upload files to ComfyUI using established patterns (see `LipsyncOnePerson.tsx`, `WANI2V.tsx`): the file is uploaded to ComfyUI's `/upload/image` endpoint and the returned filename is substituted into the workflow. The dynamic form renderer needs to handle `type: 'file-upload'` variables. The naive implementation has the renderer upload the file directly to ComfyUI using a new, simplified upload function — bypassing the existing upload utilities in `components/utils.ts`, skipping ComfyUI health checks, and not handling CORS properly (some ComfyUI instances require credentials: 'omit'). Files upload successfully in testing but fail for users with specific ComfyUI configurations.
 
-**Why it happens:** Both manifest as HTTP error responses (likely 429 for rate limits, 402 or a custom error for credits). Without parsing the response body or distinguishing the error codes, the handler cannot tell which limit was hit.
+**Why it happens:**
+Building new upload logic for the dynamic renderer is faster than wiring up the existing upload infrastructure. But the existing patterns encode months of edge case fixes.
 
 **Consequences:**
-- Rate limit hit: batch pauses and notifies user to "add credits" (wrong -- just needs to wait)
-- Credit exhaustion: batch retries every 30 seconds for hours (wrong -- needs user action)
-- RPD (requests per day) limit exhaustion at 125/day (Tier 1): batch fails entirely with no explanation
+- File uploads from dynamic feature pages fail on some ComfyUI configurations
+- CORS errors appear in production but not in testing
+- Upload progress indicators missing (existing upload code has progress tracking)
 
-**Prevention:**
-- Parse the Freepik error response to distinguish rate limit (temporary) from credit exhaustion (requires user action) from RPD exhaustion (wait until tomorrow)
-- Implement three distinct handlers:
-  1. **Rate limit (per-second):** Exponential backoff, retry automatically (max 3 retries)
-  2. **Credit exhaustion:** Pause batch, notify user, wait for explicit resume
-  3. **RPD exhaustion:** Pause batch, calculate time until reset (midnight?), auto-resume or notify user
-- Track the daily request count locally to preemptively avoid RPD exhaustion (if at 120/125, pause and warn rather than hitting the 126th request and getting blocked)
-- Store the last rate limit error timestamp to calculate safe retry windows
+**How to avoid:**
+The dynamic form renderer's file upload must call the same `apiClient` methods used by static pages. Create a reusable `useFileUploadToComfyUI(comfyUrl)` hook that wraps the existing upload logic. The dynamic renderer uses this hook for all file-type variables. Do not write new fetch calls for file upload in the renderer.
 
-**Detection:** Mock three different error responses (429 rate limit, 402 no credits, 429 daily limit exceeded) and verify each triggers the correct handler.
-
-**Phase:** Phase 2 (Freepik Service Error Handling)
+**Phase to address:** Phase 2 (Dynamic Form Renderer) — file upload must reuse existing infrastructure from the start
 
 ---
 
-### Pitfall 11: No Idempotency on Batch Resume
+### Pitfall 12: `comfy_job_id` vs `job_id` Mismatch in Dynamic Workflow Job Tracking
 
-**What goes wrong:** The user pauses a batch (or credits are exhausted), adds credits, and clicks "Resume." The resume logic reprocesses the batch from the beginning or from the wrong index, re-submitting videos that were already completed. This wastes credits on duplicate upscaling and creates duplicate outputs in Supabase Storage and Google Drive.
+**What goes wrong:**
+The existing `CreateJobPayload` interface in `supabase.ts` (line 71) uses `job_id` to mean the ComfyUI prompt ID. The newer `CreateVideoJobPayload` (line 44) uses `comfy_job_id` for the same concept. Dynamic workflow jobs will be created via whichever payload type seems appropriate, but the actual Supabase column is `comfy_job_id` in `video_jobs` and `image_jobs`. If the dynamic workflow job creation uses `job_id` (the legacy field), the job is stored without a `comfy_job_id`, the monitoring loop that polls by `comfy_job_id` never finds it, and the job stays permanently in "processing" state.
 
-**Why it happens:** The resume logic queries for videos with status "pending" but does not account for videos that were submitted to Freepik but not yet polled to completion (status "submitted" or "processing"). On resume, these in-flight videos are treated as pending and re-submitted.
+**Why it happens:**
+There are two payload interfaces for the same underlying operation (legacy `CreateJobPayload` with `job_id` and new `CreateVideoJobPayload` with `comfy_job_id`). The inconsistency is pre-existing tech debt documented in the codebase. New code written without checking which field maps to which column will use the wrong one.
 
 **Consequences:**
-- Double credit consumption for already-submitted videos
-- Duplicate files in Supabase Storage and Google Drive
-- Conflicting Freepik task IDs: old task completes after new task is submitted, causing state confusion
+- Dynamic workflow jobs submitted to ComfyUI successfully but never transition out of "processing"
+- Generation feed shows perpetual spinner for dynamic workflow jobs
+- "Fix stuck job" button required for every dynamic workflow job
 
-**Prevention:**
-- Use granular per-video statuses: `pending`, `uploading`, `submitted` (has Freepik task_id), `processing` (Freepik confirmed in progress), `completed`, `failed`, `skipped`
-- On resume: only process videos with status `pending`. Videos with status `submitted` or `processing` should be polled (not re-submitted)
-- Store the `freepik_task_id` on each video record immediately after submission. If a task_id exists, never re-submit -- only poll
-- Make video submission idempotent: before submitting, check if a Freepik task_id already exists for this video. If yes, poll instead of submitting
-- Add a "retry failed" action distinct from "resume paused" -- retry re-submits only videos with status `failed`
+**How to avoid:**
+Before writing any job creation code for dynamic workflows, map the `CreateJobPayload.job_id` → `comfy_job_id` relationship explicitly in a comment or migration note. Use only the new `CreateVideoJobPayload` or `CreateImageJobPayload` interfaces for new code — not the legacy `CreateJobPayload`. Add a linting rule or code review checklist item: "dynamic workflow job creation must use `comfy_job_id`, not `job_id`."
 
-**Detection:** Pause and resume a batch. Check Freepik API call count against expected count. If any video is submitted twice, this pitfall is active.
-
-**Phase:** Phase 2 (Batch Processing Logic + Resume Implementation)
+**Phase to address:** Phase 1 (Database Schema + Job Tracking) — identify and resolve the field naming before writing any dynamic job creation code
 
 ---
 
-## Minor Pitfalls
+### Pitfall 13: Published Workflow Configuration Cached Stale After Admin Updates
 
-Mistakes that cause friction, confusion, or minor bugs.
+**What goes wrong:**
+Following the recommendation in Pitfall 4, the frontend caches published workflow configs at startup. An admin updates a published workflow's variable configuration (adds a new input, changes a default value) and saves. The change is in the database immediately. But users who loaded the app before the update have the stale config in memory. They submit the workflow with the old variable set — missing required new variables or sending deprecated fields. The ComfyUI workflow receives an incorrect parameter set and fails.
 
----
+**Why it happens:**
+In-memory config caching has no invalidation signal from the server. The admin saves to the database but there's no push notification to connected clients. Standard polling or background refresh helps but doesn't guarantee immediate consistency.
 
-### Pitfall 12: Signed URLs Expiring Before User Downloads Upscaled Videos
+**Consequences:**
+- Users on stale config get workflow execution errors after the admin makes changes
+- The errors are intermittent (some users have fresh config, others have stale)
+- Impossible to reproduce in testing because the admin is always on the latest version
 
-**What goes wrong:** The existing `storage_service.py` creates Supabase signed URLs with 7-day expiry (line 145). If a batch completes on Monday and the user tries to download the videos on the following Monday, the signed URLs have expired. The video exists in storage but the URL in the database is dead.
+**How to avoid:**
+Add a `config_version` or `updated_at` timestamp to each published workflow record. The frontend polls for workflow config changes every 60 seconds (using an endpoint that returns only the IDs + updated_at of all published workflows). If any `updated_at` is newer than the cached version, re-fetch that workflow's full config. For critical changes, the admin can trigger a "force refresh" button in the builder that bumps a global `config_version` counter, which clients check on each polling cycle. This avoids a full re-fetch on every poll while ensuring changes propagate within 60 seconds.
 
-**Prevention:**
-- Use public URLs for completed upscaled videos (they are the user's content, not sensitive)
-- Or use longer-lived signed URLs (30 days)
-- Or implement on-demand URL regeneration: when a user requests a video, check if the URL is expired and generate a new signed URL
-
-**Phase:** Phase 3 (Output Delivery)
-
----
-
-### Pitfall 13: Batch UI Not Distinguishing Video States Clearly
-
-**What goes wrong:** The batch shows a progress bar (e.g., "5/10 complete") but does not distinguish between videos that are pending, submitted-but-waiting, actively processing, completed, failed, or skipped. Users cannot tell if the batch is stuck or just slow. They cannot identify which specific video failed or why.
-
-**Prevention:**
-- Show per-video status with individual progress indicators (icon or color per status)
-- Display the current action: "Uploading video 3..." vs "Waiting for Freepik to process video 3..." vs "Downloading result for video 3..."
-- Show estimated time remaining based on average processing time of completed videos
-- Allow clicking on a failed video to see the specific error message
-- Show credit consumption: "X credits used so far, estimated Y credits remaining for this batch"
-
-**Phase:** Phase 4 (Frontend UI)
+**Phase to address:** Phase 3 (Navigation Integration) — polling strategy must be planned before the renderer handles production traffic
 
 ---
 
-### Pitfall 14: Google Drive Folder Picker Context Lost Between Sessions
+## Technical Debt Patterns
 
-**What goes wrong:** The app has an existing ProjectContext with folder picker in the header (per PROJECT.md). Users select a Google Drive folder for one batch, navigate away, come back, and the folder selection is gone. They submit a new batch without realizing no Drive folder is selected, and videos are uploaded to Supabase only (or worse, the upload fails silently because the Drive folder ID is null).
+Shortcuts that seem reasonable but create long-term problems.
 
-**Prevention:**
-- Persist the Drive folder selection in the batch record at submission time (not just in localStorage or context)
-- Validate that the Drive folder exists and is accessible before starting the batch
-- Show the selected Drive folder prominently in the batch submission form
-- If no Drive folder is selected, clearly indicate that videos will be saved to Supabase only (not silently skip Drive)
-- Allow changing the Drive destination for future videos in a batch without re-processing completed ones
-
-**Phase:** Phase 3 (Output Delivery) + Phase 4 (Frontend UI)
-
----
-
-### Pitfall 15: Batch Cleanup Not Handling Partial State
-
-**What goes wrong:** A user deletes a batch from the UI. The deletion removes the batch record and video records from the database but does not clean up: (1) the original uploaded videos in the staging area, (2) the completed upscaled videos in Supabase Storage, (3) the upscaled videos in Google Drive, or (4) in-progress Freepik tasks that are still processing. Orphaned files accumulate, consuming storage quota. Orphaned Freepik tasks continue to run and consume credits.
-
-**Prevention:**
-- Implement cascade cleanup: deleting a batch should cancel any in-progress Freepik tasks (if the API supports cancellation), delete staging files, and optionally delete output files (with user confirmation)
-- Do not auto-delete output files -- ask the user: "Delete output files too, or keep them?"
-- Track Freepik task IDs in the database so they can be cancelled on batch deletion
-- Add a periodic cleanup job that finds orphaned staging files (uploads older than 24 hours with no associated batch) and deletes them
-
-**Phase:** Phase 4 (Polish and Cleanup)
+| Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
+|----------|-------------------|----------------|-----------------|
+| Add `\| string` to `StudioPageType` | Allows dynamic IDs to pass TypeScript checks | Kills compile-time safety on all static pages; breaks `includes()` validation | Never |
+| Inline `object_info` fetch in builder | Simpler — one request to get all node types | Builder broken whenever ComfyUI is down; repeated fetches on every upload | Never |
+| Separate test-runner and renderer code paths | Test runner is simpler without job tracking | Tests pass but production fails; two implementations diverge over time | Never |
+| Free-text studio ID in builder | More flexible for admins | Admin can publish to nonexistent studio, crashing navigation | Never |
+| Load dynamic workflow config inline in `StudioPage.tsx` | Easier to implement | Flash of loading state on every navigation; repeated DB fetches | Only in prototype, not production |
+| Use `CreateJobPayload` (legacy) for dynamic workflow jobs | Consistent with some existing code | `job_id` not stored in the right DB column; jobs never complete | Never |
+| Hardcode `workflow_type` string for dynamic workflows to a single value | Simpler feed filtering | Can't distinguish which workflow was run; breaks per-workflow feed filtering | Only if feed filtering is not needed |
 
 ---
 
-## Phase-Specific Warnings
+## Integration Gotchas
 
-| Phase Topic | Likely Pitfall | Mitigation |
-|-------------|---------------|------------|
-| **Phase 0: API Validation** | #8 (Freepik API docs gap) | Manual test call before writing any code |
-| **Phase 1: Database + Upload** | #1 (State persistence), #2 (30s timeout), #7 (Large file upload) | Database-first design, fire-and-forget endpoints, chunked upload |
-| **Phase 2: Freepik Integration** | #3 (Credit exhaustion), #6 (Polling strategy), #9 (Background task failure), #10 (Rate vs credit errors), #11 (Idempotent resume) | Error classification, exponential backoff, heartbeat, granular status |
-| **Phase 3: Output Delivery** | #4 (Memory exhaustion), #5 (Dual-destination atomicity), #12 (URL expiry), #14 (Drive folder context) | Streaming downloads, per-destination status, temp files |
-| **Phase 4: Frontend UI** | #13 (State visibility), #15 (Cleanup) | Per-video status display, cascade cleanup |
+Common mistakes when connecting this feature to the existing platform.
+
+| Integration | Common Mistake | Correct Approach |
+|-------------|----------------|------------------|
+| ComfyUI `/object_info` | Call on every workflow upload, no caching | Cache with 5-min TTL; treat as optional enrichment, not blocking requirement |
+| ComfyUI file upload in dynamic renderer | Write new fetch call, bypassing `utils.ts` | Reuse existing `uploadFileToComfyUI` logic via the `apiClient` |
+| Supabase JSONB for variable configs | No schema constraint, accept any JSON | Add pg_jsonschema CHECK constraint + Zod validation on frontend read |
+| `studioConfig.ts` studios array | Let builder accept any string as studio target | Builder dropdown sourced from same `studios` array; validate against it at publish time |
+| Generation feed `pageContext` for dynamic features | Set `pageContext` to a specific workflow ID | Use `workflow_category = 'dynamic'` discriminator so all dynamic jobs show together |
+| `WorkflowService.build_workflow()` | Call directly from test runner only | Share single `execute_dynamic_workflow()` wrapper between test and production paths |
+| Supabase RLS for workflow configs table | No RLS policy (relying on backend auth only) | Add RLS: published workflows readable by all authenticated users; write operations restricted to admin role |
 
 ---
 
-## Existing Codebase Risk Amplifiers
+## Performance Traps
 
-These are not new pitfalls but existing patterns that amplify the risks above.
+Patterns that work at small scale but fail as the number of published workflows grows.
 
-| Existing Pattern | Where | Risk for v1.1 |
-|------------------|-------|---------------|
-| In-memory job store | `hf_download_service.py:22` | Amplifies Pitfall 1 if copied |
-| Full-file-in-memory download | `storage_service.py:98` | Amplifies Pitfall 4 if reused for upscaled videos |
-| `MediaInMemoryUpload` for Drive | `google_drive_service.py:235` | Amplifies Pitfall 4 for Drive uploads |
-| 60-second httpx timeout | `storage_service.py:28` | May be too short for downloading 4K upscaled videos |
-| No streaming upload to Supabase | `storage_service.py:116` | Standard upload limited to 6 MB; upscaled videos will be 50-200 MB |
-| Single `comfy_job_id` keying | `video_job_service.py:163` | Need different keying for Freepik (freepik_task_id, not comfy_job_id) |
+| Trap | Symptoms | Prevention | When It Breaks |
+|------|----------|------------|----------------|
+| Fetching all published workflow configs on every app load | Slow startup as the workflow library grows | Paginate or fetch only the studio-relevant configs; cache aggressively | At ~20 published workflows with large JSONB configs |
+| Calling `object_info` without caching on each workflow parse | ComfyUI load spike during builder sessions | TTL cache for `object_info` response (5 min minimum) | Immediately if multiple admins use builder concurrently |
+| Storing full ComfyUI workflow JSON in JSONB without size limit | Large workflows bloat the config table | Validate workflow size on upload (reject if >500 KB) | At ~50 complex workflows with large embedded values |
+| Re-rendering `DynamicFeaturePage` on every `comfyUrl` change in header | Entire form resets when user edits ComfyUI URL | Memoize the rendered form; only re-instantiate on explicit workflow change | Immediately on any ComfyUI URL edit |
+
+---
+
+## Security Mistakes
+
+Domain-specific security issues beyond general web security.
+
+| Mistake | Risk | Prevention |
+|---------|------|------------|
+| Admin can publish any arbitrary workflow JSON to production | Malicious ComfyUI workflow nodes could exfiltrate data or execute arbitrary code on the ComfyUI server | Validate that all `class_type` values in the uploaded workflow exist in `object_info`; reject unknown node types |
+| Builder has no auth guard on the backend (relies on parent page) | Existing tech debt pattern (`DockerfileEditor` has no internal auth guard per PROJECT.md) — do not repeat this | Every builder endpoint must independently call `get_current_user()` and check `is_admin` on every request |
+| Dynamic workflow configs readable by all users including their ComfyUI node structure | Exposes internal workflow architecture (model names, node configurations) to non-admin users | Return only the form variable schema to regular users; restrict full workflow JSON access to admin role via Supabase RLS |
+| Test runner calls ComfyUI directly from admin browser | Admin's browser may have different CORS permissions than production backend | Route all ComfyUI calls through the backend, even for test runs; never expose ComfyUI URL endpoints directly to the browser |
+| Published workflow variable names used directly as ComfyUI parameter keys | Admin-supplied variable names become part of the workflow substitution template; a name containing `}}{{ADMIN_SECRET` could inject placeholder syntax | Sanitize all variable names: allow only `[A-Z_][A-Z0-9_]*` pattern; reject names with `{`, `}`, `\`, or template syntax characters |
+
+---
+
+## UX Pitfalls
+
+Common user experience mistakes in this domain.
+
+| Pitfall | User Impact | Better Approach |
+|---------|-------------|-----------------|
+| Builder validates the workflow only at save time, not during input | Admin spends 20 minutes configuring variables, then hits a parse error at save | Parse and validate workflow JSON immediately on upload; show errors inline before entering the config UI |
+| No preview of what the published feature will look like before publishing | Admin publishes, then sees the form looks wrong for users | Add a "Preview as user" mode in the builder that renders the `DynamicFeaturePage` with the current config |
+| Published feature shows generic "Generating..." status with no link to the generation feed | Users don't know where to find their results | `DynamicFeaturePage` must show the same `UnifiedFeed` sidebar with `pageContext` filter as static feature pages |
+| Deleting a published workflow with no confirmation | Users may be using the workflow; jobs referencing the workflow_name become orphaned in the feed | Require admin confirmation; check for jobs with that workflow_name created in the last 24 hours; show count before deletion |
+| Builder shows raw node IDs and class_type strings to admin | Non-technical admins cannot understand "KSampler → `steps` (INT, default 20)" as configuration | Map class_type to human-readable names; show node title from `_meta.title` if available in the workflow JSON |
+
+---
+
+## "Looks Done But Isn't" Checklist
+
+Things that appear complete but are missing critical pieces.
+
+- [ ] **Workflow published and visible in navigation:** verify it also appears after F5 (localStorage restore works for dynamic IDs)
+- [ ] **Builder test run passes:** verify the same workflow also completes when submitted via the published feature page (same code path confirmed)
+- [ ] **Dynamic feature page renders correctly:** verify jobs from this page appear in the generation feed sidebar (workflow_category discriminator working)
+- [ ] **Admin unpublishes a workflow:** verify users who had that page stored in localStorage are redirected to home, not shown a broken page
+- [ ] **Workflow config updated by admin:** verify users with stale cached config receive the updated version within 60 seconds (polling works)
+- [ ] **File upload variable in dynamic form:** verify files upload to ComfyUI and the returned filename is correctly substituted in the workflow JSON
+- [ ] **Builder upload of UI-format JSON:** verify the format detection fires and shows a clear error explaining API format is required
+- [ ] **Admin marks a node-link value as a variable:** verify the builder prevents this and shows an explanation of why it's not configurable
+
+---
+
+## Recovery Strategies
+
+When pitfalls occur despite prevention, how to recover.
+
+| Pitfall | Recovery Cost | Recovery Steps |
+|---------|---------------|----------------|
+| `StudioPageType` union broken by dynamic IDs | HIGH | Revert to separate routing state; requires refactor of `App.tsx` localStorage handling and type system |
+| UI-format workflow stored in DB | LOW | Add a migration to re-validate and re-parse all stored workflows; flag invalid ones for admin review |
+| Test/production code path divergence discovered | HIGH | Audit all parameter handling between test and renderer; write integration tests comparing outputs; likely requires refactoring the shared submission function |
+| Dynamic feature page crashes all users in a studio | LOW | Admin unpublishes the workflow from the builder (if builder is accessible); or backend endpoint to hard-delete the workflow config |
+| Stale configs causing user errors | LOW | Trigger a config version bump in the database; all clients re-fetch on next poll cycle (within 60 seconds) |
+| Node-link value was marked as a variable and published | MEDIUM | Admin edits the workflow config in the builder; re-publishes; users with cached config get the fix on next poll |
+
+---
+
+## Pitfall-to-Phase Mapping
+
+How roadmap phases should address these pitfalls.
+
+| Pitfall | Prevention Phase | Verification |
+|---------|------------------|--------------|
+| #1: `StudioPageType` union doesn't cover dynamic IDs | Phase 1: Navigation model design | F5 on a published workflow page restores correctly |
+| #2: UI-format vs API-format JSON | Phase 1: Workflow JSON upload parser | Upload a UI-format file; verify immediate clear error |
+| #3: Node introspection requires live ComfyUI | Phase 1: Workflow JSON parser | Parser works with ComfyUI URL set to unreachable; enrichment optional |
+| #4: Dynamic configs fetched inline causing flash | Phase 2: Navigation integration | Navigate to dynamic page 5 times; zero network requests after first load |
+| #5: JSONB form config has no schema enforcement | Phase 2: Dynamic form renderer | Store malformed config; renderer shows graceful error, not crash |
+| #6: Test runner diverges from renderer code path | Phase 1: Backend execution service | Unit test confirms test runner and renderer call same `execute_dynamic_workflow()` |
+| #7: Publish to nonexistent studio | Phase 2: Builder UI | Builder dropdown contains only known studio IDs |
+| #8: `workflow_type` conflicts with feed filtering | Phase 1: Database schema | Dynamic workflow jobs visible in generation feed sidebar |
+| #9: Stale localStorage after workflow deleted | Phase 3: Navigation integration | Delete workflow; existing user refreshes; lands on home |
+| #10: Node links marked as user variables | Phase 1: Workflow JSON parser | Link arrays excluded from configurable variable candidates |
+| #11: File upload bypasses existing infrastructure | Phase 2: Dynamic form renderer | File upload in dynamic page passes ComfyUI health check first |
+| #12: `comfy_job_id` vs `job_id` field mismatch | Phase 1: Database schema | Dynamic workflow job transitions to "completed" status without fix |
+| #13: Stale published workflow config | Phase 3: Navigation integration | Admin saves change; user sees it within 60 seconds without refresh |
 
 ---
 
 ## Sources
 
-- Heroku request timeout documentation: [Request Timeout | Heroku Dev Center](https://devcenter.heroku.com/articles/request-timeout)
-- Heroku H12 prevention: [Preventing H12 Errors | Heroku Dev Center](https://devcenter.heroku.com/articles/preventing-h12-errors-request-timeouts)
-- Freepik API rate limits: [Rate limiting - Freepik API](https://docs.freepik.com/ratelimits)
-- Freepik image upscaler API (closest documented analog): [Upscale image - Freepik API](https://docs.freepik.com/api-reference/image-upscaler-creative/post-image-upscaler)
-- Supabase storage upload limits: [File Limits | Supabase Docs](https://supabase.com/docs/guides/storage/uploads/file-limits)
-- Supabase resumable uploads: [Storage v3: Resumable Uploads](https://supabase.com/blog/storage-v3-resumable-uploads)
-- Google Drive resumable uploads: [Manage Uploads | Google for Developers](https://developers.google.com/drive/api/guides/manage-uploads)
-- FastAPI background tasks limitations: [Background Tasks - FastAPI](https://fastapi.tiangolo.com/tutorial/background-tasks/)
-- Codebase analysis: `hf_download_service.py`, `storage_service.py`, `google_drive_service.py`, `video_job_service.py`, `runpod_service.py`, `config/settings.py`
+- Codebase analysis: `frontend/src/lib/studioConfig.ts`, `frontend/src/App.tsx`, `frontend/src/components/StudioPage.tsx`, `frontend/src/lib/jobTracking.ts`, `frontend/src/lib/supabase.ts`, `backend/services/workflow_service.py`
+- ComfyUI workflow format specification: [Workflow JSON - ComfyUI Docs](https://docs.comfy.org/specs/workflow_json)
+- ComfyUI UI vs API format confusion (GitHub issue from community): [Issue #1335 - comfyanonymous/ComfyUI](https://github.com/comfyanonymous/ComfyUI/issues/1335)
+- ComfyUI production playbook patterns: [The ComfyUI Production Playbook - Cohorte Projects](https://www.cohorte.co/blog/the-comfyui-production-playbook)
+- Common ComfyUI workflow loading errors: [Fix ComfyUI Workflow Loading Errors 2025 - Apatero Blog](https://www.apatero.com/blog/comfyui-workflow-not-loading-8-common-errors-2025)
+- Supabase JSONB schema validation: [pg_jsonschema: JSON Schema Validation - Supabase Docs](https://supabase.com/docs/guides/database/extensions/pg_jsonschema)
+- Supabase Row Level Security: [Row Level Security - Supabase Docs](https://supabase.com/docs/guides/database/postgres/row-level-security)
+- Dynamic React configuration without rebuild: ["Dynamic Configurations in React Apps: Bypass the Rebuild with Express" - Medium](https://medium.com/@bjvalmaseda/dynamic-configurations-in-react-apps-bypass-the-rebuild-with-express-0269e86eb61d)
+- React Context common mistakes: [Common mistakes in using React Context API - greenonsoftware](https://greenonsoftware.com/articles/react/common-mistakes-in-using-react-context-api/)
+- Data Driven Forms React library patterns: [Data Driven Forms - data-driven-forms.org](https://www.data-driven-forms.org/introduction)
 
 ---
 
-*Research completed: 2026-03-11*
+*Pitfalls research for: v1.2 Workflow Builder — dynamic feature generation on an existing hardcoded-navigation platform*
+*Researched: 2026-03-13*

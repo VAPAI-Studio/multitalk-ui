@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { type StudioConfig, setLastUsedApp, sortAppsByLastUsed } from '../lib/studioConfig';
+import DynamicWorkflowPage from '../pages/DynamicWorkflowPage';
+import { type CustomWorkflow } from '../lib/apiClient';
 
 // Import all page components
 import LipsyncOnePerson from '../pages/LipsyncOnePerson';
@@ -12,7 +14,7 @@ import CreateImage from '../pages/CreateImage';
 import ImageGrid from '../pages/ImageGrid';
 import WANI2V from '../pages/WANI2V';
 import WANMove from '../pages/WANMove';
-import LTX2I2V from '../pages/LTX2I2V';
+import LTX23VideoGen from '../pages/LTX23VideoGen';
 import VideoUpscale from '../pages/VideoUpscale';
 import AudioStemSeparator from '../pages/AudioStemSeparator';
 import CharacterCaption from '../pages/CharacterCaption';
@@ -23,6 +25,8 @@ import BatchVideoUpscale from '../pages/BatchVideoUpscale';
 interface StudioPageProps {
   studio: StudioConfig;
   comfyUrl: string;
+  dynamicApps?: CustomWorkflow[];
+  onDynamicNavigate?: (wf: CustomWorkflow) => void;
 }
 
 // Map app IDs to their components
@@ -37,7 +41,7 @@ const appComponents: Record<string, React.ComponentType<{ comfyUrl: string }> | 
   'image-grid': ImageGrid,
   'wan-i2v': WANI2V,
   'wan-move': WANMove,
-  'ltx2-i2v': LTX2I2V,
+  'ltx23-video': LTX23VideoGen,
   'upscale-vid': VideoUpscale,
   'audio-stem-separator': AudioStemSeparator,
   'character-caption': CharacterCaption,
@@ -46,9 +50,20 @@ const appComponents: Record<string, React.ComponentType<{ comfyUrl: string }> | 
   'batch-upscale': BatchVideoUpscale,
 };
 
-export default function StudioPage({ studio, comfyUrl }: StudioPageProps) {
+export default function StudioPage({ studio, comfyUrl, dynamicApps = [], onDynamicNavigate: _onDynamicNavigate }: StudioPageProps) {
   // Get apps sorted by last used
   const sortedApps = sortAppsByLastUsed(studio);
+
+  // Convert dynamic workflows to AppConfig-compatible shape for the dropdown
+  const dynamicAppEntries = dynamicApps.map((wf) => ({
+    id: wf.slug,
+    title: wf.name,
+    icon: wf.icon,
+    gradient: wf.gradient,
+    description: wf.description || '',
+    features: [wf.output_type],
+  }));
+  const allApps = [...sortedApps, ...dynamicAppEntries];
 
   // State for selected app - default to first (last used) app
   const [selectedAppId, setSelectedAppId] = useState<string>(sortedApps[0]?.id || '');
@@ -93,16 +108,19 @@ export default function StudioPage({ studio, comfyUrl }: StudioPageProps) {
     );
   }
 
+  // Check if selected app is a dynamic workflow
+  const selectedDynamicWorkflow = dynamicApps.find((wf) => wf.slug === selectedAppId);
+
   // Get selected app config
   const selectedApp = studio.apps.find(app => app.id === selectedAppId) || sortedApps[0];
 
   // Get the component for the selected app
-  const AppComponent = selectedApp ? appComponents[selectedApp.id] : null;
+  const AppComponent = selectedApp && !selectedDynamicWorkflow ? appComponents[selectedApp.id] : null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
-      {/* App Switcher Header - Only show if studio has multiple apps */}
-      {studio.apps.length > 1 && (
+      {/* App Switcher Header - Only show if studio has multiple apps (static or dynamic) */}
+      {(studio.apps.length + dynamicApps.length) > 1 && (
         <div className="sticky top-16 z-10 bg-white/80 dark:bg-dark-surface/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-gray-700/50">
           <div className="max-w-7xl mx-auto px-6 py-4">
             <div className="flex items-center gap-4">
@@ -120,9 +138,9 @@ export default function StudioPage({ studio, comfyUrl }: StudioPageProps) {
                   }}
                   className="flex items-center gap-3 px-4 py-2.5 bg-white dark:bg-dark-surface-primary rounded-xl border-2 border-gray-200 dark:border-dark-border-primary hover:border-gray-300 dark:hover:border-gray-600 shadow-sm hover:shadow-md transition-all duration-200"
                 >
-                  <span className="text-xl">{selectedApp?.icon}</span>
+                  <span className="text-xl">{selectedDynamicWorkflow?.icon ?? selectedApp?.icon}</span>
                   <span className="text-lg font-bold text-gray-800 dark:text-white">
-                    {selectedApp?.title}
+                    {selectedDynamicWorkflow?.name ?? selectedApp?.title}
                   </span>
                   <svg
                     className={`w-5 h-5 text-gray-500 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`}
@@ -137,7 +155,7 @@ export default function StudioPage({ studio, comfyUrl }: StudioPageProps) {
                 {/* Dropdown Menu */}
                 {isDropdownOpen && (
                   <div className="absolute top-full left-0 mt-2 w-72 bg-white dark:bg-dark-surface-primary rounded-xl shadow-2xl border border-gray-200 dark:border-dark-border-primary py-2 z-50">
-                    {sortedApps.map((app) => (
+                    {allApps.map((app) => (
                       <button
                         key={app.id}
                         onClick={(e) => {
@@ -171,7 +189,7 @@ export default function StudioPage({ studio, comfyUrl }: StudioPageProps) {
 
               {/* App Description */}
               <p className="hidden md:block text-sm text-gray-500 dark:text-gray-400 flex-1 truncate">
-                {selectedApp?.description}
+                {selectedDynamicWorkflow?.description ?? selectedApp?.description}
               </p>
             </div>
           </div>
@@ -180,7 +198,12 @@ export default function StudioPage({ studio, comfyUrl }: StudioPageProps) {
 
       {/* Render the selected app component */}
       <div className={studio.apps.length > 1 ? '' : ''}>
-        {AppComponent && (
+        {selectedDynamicWorkflow ? (
+          <DynamicWorkflowPage
+            workflowConfig={selectedDynamicWorkflow}
+            comfyUrl={comfyUrl}
+          />
+        ) : AppComponent ? (
           selectedApp?.id === 'lora-trainer' ? (
             <div className="w-full max-w-7xl mx-auto p-6">
               <LoRATrainer />
@@ -190,6 +213,8 @@ export default function StudioPage({ studio, comfyUrl }: StudioPageProps) {
               <AppComponent comfyUrl={comfyUrl} />
             </div>
           )
+        ) : (
+          <div className="p-8 text-center text-gray-500">App not found</div>
         )}
       </div>
     </div>
