@@ -129,7 +129,7 @@
   },
   "114": {
     "inputs": {
-      "noise_seed": 42
+      "noise_seed": "{{SEED}}"
     },
     "class_type": "RandomNoise",
     "_meta": {
@@ -138,7 +138,7 @@
   },
   "115": {
     "inputs": {
-      "noise_seed": 43
+      "noise_seed": "{{SEED}}"
     },
     "class_type": "RandomNoise",
     "_meta": {

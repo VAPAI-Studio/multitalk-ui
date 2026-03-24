@@ -141,6 +141,22 @@ export default function LTX23VideoGen({ comfyUrl }: Props) {
   // Prompt & settings
   const [customPrompt, setCustomPrompt] = useState<string>('');
   const [duration, setDuration] = useState<number>(10);
+  const [seed, setSeed] = useState<number>(42);
+  const [seedInput, setSeedInput] = useState<string>('42');
+
+  const randomizeSeed = () => {
+    const newSeed = Math.floor(Math.random() * 2147483647);
+    setSeed(newSeed);
+    setSeedInput(String(newSeed));
+  };
+
+  const handleSeedChange = (value: string) => {
+    setSeedInput(value);
+    const parsed = parseInt(value);
+    if (!isNaN(parsed) && parsed >= 0) {
+      setSeed(parsed);
+    }
+  };
 
   // Smart resolution
   const {
@@ -332,6 +348,7 @@ export default function LTX23VideoGen({ comfyUrl }: Props) {
         HEIGHT: height,
         LENGTH: duration,
         FPS: 24,
+        SEED: seed,
       };
 
       // Upload first frame
@@ -426,6 +443,7 @@ export default function LTX23VideoGen({ comfyUrl }: Props) {
           has_audio: hasAudio,
           has_last_frame: hasLastFrame,
           has_middle_frame: hasMiddleFrame,
+          seed,
         }
       });
 
@@ -704,6 +722,29 @@ export default function LTX23VideoGen({ comfyUrl }: Props) {
                 min="1"
                 max="60"
               />
+            </Field>
+
+            <Field>
+              <Label>Seed</Label>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  value={seedInput}
+                  onChange={(e) => handleSeedChange(e.target.value)}
+                  className="flex-1 px-4 py-3 rounded-2xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-dark-surface-primary focus:border-cyan-500 focus:outline-none transition-colors text-gray-900 dark:text-white"
+                  min="0"
+                  max="2147483647"
+                />
+                <button
+                  type="button"
+                  onClick={randomizeSeed}
+                  className="px-4 py-3 rounded-2xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-dark-surface-primary hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 transition-colors"
+                  title="Randomize seed"
+                >
+                  🎲
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Use the same seed with identical settings to reproduce a generation</p>
             </Field>
 
             {/* Strict / Smooth toggle for FML2V without audio */}
