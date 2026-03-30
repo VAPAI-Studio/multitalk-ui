@@ -21,6 +21,7 @@ import CharacterCaption from '../pages/CharacterCaption';
 import LoRATrainer from '../pages/LoraTrainer';
 import VirtualSet from '../pages/VirtualSet';
 import BatchVideoUpscale from '../pages/BatchVideoUpscale';
+import BatchVideoLipsync from '../pages/BatchVideoLipsync';
 
 interface StudioPageProps {
   studio: StudioConfig;
@@ -48,6 +49,7 @@ const appComponents: Record<string, React.ComponentType<{ comfyUrl: string }> | 
   'lora-trainer': LoRATrainer,
   'virtual-set': VirtualSet,
   'batch-upscale': BatchVideoUpscale,
+  'batch-video-lipsync': BatchVideoLipsync,
 };
 
 export default function StudioPage({ studio, comfyUrl, dynamicApps = [], onDynamicNavigate: _onDynamicNavigate }: StudioPageProps) {
