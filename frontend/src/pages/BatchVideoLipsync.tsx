@@ -560,8 +560,7 @@ export default function BatchVideoLipsync({ comfyUrl }: Props) {
 
   if (view === 'monitoring') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
-        <div className="max-w-5xl mx-auto p-6 md:p-10 space-y-8">
+      <div className="space-y-8">
           {/* Header */}
           <div className="text-center space-y-4 py-4">
             <h1 className="text-3xl md:text-5xl font-black bg-gradient-to-r from-green-600 via-blue-600 to-purple-600 bg-clip-text text-transparent">
@@ -670,14 +669,12 @@ export default function BatchVideoLipsync({ comfyUrl }: Props) {
             </button>
           </div>
         </div>
-      </div>
     );
   }
 
   // --- SETUP VIEW ---
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
-      <div className="max-w-5xl mx-auto p-6 md:p-10 space-y-8">
+    <div className="space-y-8">
         {/* Header */}
         <div className="text-center space-y-4 py-8">
           <h1 className="text-4xl md:text-6xl font-black bg-gradient-to-r from-green-600 via-blue-600 to-purple-600 bg-clip-text text-transparent">
@@ -846,7 +843,6 @@ export default function BatchVideoLipsync({ comfyUrl }: Props) {
         <div className="text-center text-xs text-gray-400 dark:text-gray-500 space-y-1">
           <p>Resolution: {FIXED_WIDTH}x{FIXED_HEIGHT} &middot; Audio Scale: {FIXED_AUDIO_SCALE} &middot; Prompt: "{FIXED_PROMPT}"</p>
         </div>
-      </div>
     </div>
   );
 }

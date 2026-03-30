@@ -274,10 +274,10 @@ export default function App() {
       <div className="min-h-screen flex flex-col">
       {/* Header */}
       <header className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-lg border-b border-gray-200/50 dark:border-gray-700/50 sticky top-0 z-20 shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 py-4">
+        <div className="max-w-full mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             {/* Left: Menu + Title */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 flex-shrink-0">
               <button
                 onClick={() => setSidebarOpen(true)}
                 className="p-2 bg-white/90 dark:bg-gray-900/90 backdrop-blur-lg rounded-xl shadow border border-gray-200/50 dark:border-gray-700/50 hover:scale-105 transition-all duration-200"
@@ -297,8 +297,8 @@ export default function App() {
               </div>
             </div>
 
-            {/* Right: ComfyUI Settings + User Menu */}
-            <div className="flex items-center gap-4">
+            {/* Center: ComfyUI Settings + Project */}
+            <div className="flex items-center gap-4 justify-center flex-1">
               <div className="flex items-center gap-2">
                 <label className="text-xs font-medium text-gray-700 dark:text-gray-300">ComfyUI</label>
                 <input
@@ -313,8 +313,10 @@ export default function App() {
 
               {/* Project Selector */}
               <ProjectSelector />
+            </div>
 
-              {/* User Menu */}
+            {/* Right: User Menu */}
+            <div className="flex items-center gap-4 flex-shrink-0">
               <div className="relative flex items-center gap-3 pl-3 border-l border-gray-200 dark:border-gray-700">
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
