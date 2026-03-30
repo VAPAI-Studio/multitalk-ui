@@ -54,6 +54,14 @@ export const studios: StudioConfig[] = [
         gradient: 'from-green-500 to-blue-600',
         description: 'Add perfect lip-synchronization to existing videos with new audio tracks.',
         features: ['Video-to-video lipsync', 'Timeline sync controls', 'Model: Infinite Talk with WAN 2.1']
+      },
+      {
+        id: 'batch-video-lipsync',
+        title: 'Batch VideoLS',
+        icon: '📦',
+        gradient: 'from-green-500 to-teal-600',
+        description: 'Process multiple videos with lip-sync in batch. Upload a folder, configure runs per video, and process sequentially.',
+        features: ['Multi-video batch processing', 'Configurable runs per video', 'Sequential ComfyUI processing', 'Model: Infinite Talk with WAN 2.1']
       }
     ]
   },

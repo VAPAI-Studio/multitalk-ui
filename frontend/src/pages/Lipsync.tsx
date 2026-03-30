@@ -11,9 +11,10 @@ import { AVPlayerWithPadding } from "../components/AVPlayerWithPadding";
 import { apiClient } from "../lib/apiClient";
 import { useAuth } from "../contexts/AuthContext";
 import { useProject } from "../contexts/ProjectContext";
+import BatchVideoLipsync from "./BatchVideoLipsync";
 
 // Types for different lipsync modes
-type LipsyncMode = 'one-person' | 'multi-person' | 'video-lipsync';
+type LipsyncMode = 'one-person' | 'multi-person' | 'video-lipsync' | 'batch-video-lipsync';
 
 interface Props {
   comfyUrl: string;
@@ -1177,6 +1178,7 @@ export default function Lipsync({ comfyUrl, initialMode = 'one-person' }: Props)
       case 'one-person': return 'lipsync-one';
       case 'multi-person': return 'lipsync-multi';
       case 'video-lipsync': return 'video-lipsync';
+      case 'batch-video-lipsync': return 'batch-video-lipsync';
     }
   };
 
@@ -1231,10 +1233,24 @@ export default function Lipsync({ comfyUrl, initialMode = 'one-person' }: Props)
                 label="Video Lipsync"
                 gradient="from-green-500 to-blue-600"
               />
+              <TabButton
+                mode="batch-video-lipsync"
+                currentMode={activeMode}
+                onClick={() => setActiveMode('batch-video-lipsync')}
+                icon="📦"
+                label="Batch VideoLS"
+                gradient="from-green-500 to-teal-600"
+              />
             </div>
           </div>
 
-          {/* Shared Prompt Section */}
+          {/* Batch mode renders its own component */}
+          {activeMode === 'batch-video-lipsync' && (
+            <BatchVideoLipsync comfyUrl={comfyUrl} />
+          )}
+
+          {/* Regular modes content */}
+          {activeMode !== 'batch-video-lipsync' && (<>
           <Section title="Prompt">
             <Field>
               <Label>Custom Prompt</Label>
@@ -1810,9 +1826,11 @@ export default function Lipsync({ comfyUrl, initialMode = 'one-person' }: Props)
               </div>
             )}
           </Section>
+          </>)}
         </div>
 
         {/* Right Sidebar - Resizable Feed */}
+        {activeMode !== 'batch-video-lipsync' && (
         <ResizableFeedSidebar
           storageKey={getWorkflowName()}
           config={{
@@ -1825,6 +1843,7 @@ export default function Lipsync({ comfyUrl, initialMode = 'one-person' }: Props)
             comfyUrl: comfyUrl
           }}
         />
+        )}
       </div>
 
       {/* Multi-Person Mask Editing Modal */}
