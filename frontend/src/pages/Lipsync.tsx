@@ -1830,7 +1830,6 @@ export default function Lipsync({ comfyUrl, initialMode = 'one-person' }: Props)
         </div>
 
         {/* Right Sidebar - Resizable Feed */}
-        {activeMode !== 'batch-video-lipsync' && (
         <ResizableFeedSidebar
           storageKey={getWorkflowName()}
           config={{
@@ -1843,7 +1842,6 @@ export default function Lipsync({ comfyUrl, initialMode = 'one-person' }: Props)
             comfyUrl: comfyUrl
           }}
         />
-        )}
       </div>
 
       {/* Multi-Person Mask Editing Modal */}
