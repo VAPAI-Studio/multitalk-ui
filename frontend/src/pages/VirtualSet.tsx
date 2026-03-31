@@ -4,6 +4,7 @@ import { apiClient } from "../lib/apiClient";
 import { findImageFromHistory, checkComfyUIHealth } from "../components/utils";
 import ResizableFeedSidebar from "../components/ResizableFeedSidebar";
 import SplatViewer from "../components/SplatViewer";
+import AddAssetModal from "../components/AddAssetModal";
 
 type Phase = "upload" | "generating-3d" | "navigate-3d" | "reconstructing" | "complete";
 type PromptType = "image" | "multi-image" | "video";
@@ -77,6 +78,10 @@ export default function VirtualSet({ comfyUrl = "" }: Props) {
 
   // General
   const [error, setError] = useState("");
+
+  // 3D Assets
+  const [showAddAssetModal, setShowAddAssetModal] = useState(false);
+  const [generatedAssets, setGeneratedAssets] = useState<string[]>([]);
 
   // Check config on mount
   useEffect(() => {
@@ -809,7 +814,19 @@ export default function VirtualSet({ comfyUrl = "" }: Props) {
               splatUrl={splatUrl}
               onScreenshot={handleScreenshot}
               height={500}
+              assetsToLoad={generatedAssets}
             />
+
+            {/* Add 3D Object Button */}
+            <div className="mt-4">
+              <button
+                onClick={() => setShowAddAssetModal(true)}
+                className="px-6 py-3 rounded-2xl bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold shadow-lg hover:from-green-700 hover:to-emerald-700 transform hover:scale-[1.02] transition-all duration-200 flex items-center gap-2"
+              >
+                <span>➕</span>
+                Add 3D Object
+              </button>
+            </div>
           </Section>
         )}
 
@@ -1043,6 +1060,17 @@ export default function VirtualSet({ comfyUrl = "" }: Props) {
           comfyUrl: comfyUrl,
           onItemClick: handleFeedItemClick,
         }}
+      />
+
+      {/* Add Asset Modal */}
+      <AddAssetModal
+        isOpen={showAddAssetModal}
+        onClose={() => setShowAddAssetModal(false)}
+        onAssetGenerated={(glbUrl) => {
+          setGeneratedAssets([...generatedAssets, glbUrl]);
+          setShowAddAssetModal(false);
+        }}
+        comfyUrl={comfyUrl}
       />
     </div>
   );

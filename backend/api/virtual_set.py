@@ -15,6 +15,8 @@ from models.virtual_set import (
     VirtualSetSaveWorldResponse,
     VirtualSetReconstructRequest,
     VirtualSetReconstructResponse,
+    VirtualSetGenerateAssetRequest,
+    VirtualSetGenerateAssetResponse,
 )
 from config.settings import settings
 from services.worldlabs_service import WorldLabsService
@@ -96,6 +98,12 @@ async def generate_world(
     """Upload media to storage and submit to World Labs for 3D world generation.
     Supports image, multi-image, and video prompt types."""
     try:
+        print(f"\n🎬 Virtual Set Generate Request:")
+        print(f"   Prompt Type: {request.prompt_type}")
+        print(f"   Model: {request.model}")
+        print(f"   Display Name: {request.display_name}")
+        print(f"   Text Prompt: {request.text_prompt}")
+
         storage_service = StorageService()
         worldlabs_service = WorldLabsService()
 
@@ -105,7 +113,9 @@ async def generate_world(
 
         if request.prompt_type == "image":
             # Single image: upload to Supabase and get public URL
+            print("📤 Uploading single image to Supabase...")
             if not request.image_data:
+                print("❌ No image_data provided")
                 return VirtualSetGenerateResponse(
                     success=False, error="image_data is required for image prompt type"
                 )
@@ -115,10 +125,12 @@ async def generate_world(
                 )
             )
             if not upload_success or not public_url:
+                print(f"❌ Image upload failed: {upload_error}")
                 return VirtualSetGenerateResponse(
                     success=False, error=f"Failed to upload image: {upload_error}"
                 )
             image_url = public_url
+            print(f"✅ Image uploaded: {image_url[:100]}...")
 
         elif request.prompt_type == "multi-image":
             # Multiple images: upload each to Supabase
@@ -506,6 +518,205 @@ async def reconstruct_image(
             success=False,
             error=f"Server error: {str(e)}",
         )
+
+
+@router.post("/generate-asset", response_model=VirtualSetGenerateAssetResponse)
+async def generate_asset(
+    request: VirtualSetGenerateAssetRequest,
+    authorization: Optional[str] = Header(None),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+):
+    """Generate a 3D GLB asset from one or two images using Tripo AI via ComfyUI."""
+    image_job_id = None
+
+    try:
+        comfyui_service = ComfyUIService()
+        workflow_service = WorkflowService()
+        storage_service = StorageService()
+        supabase = get_supabase_for_token(_resolve_token(authorization, x_api_key))
+        image_job_service = ImageJobService(supabase)
+
+        comfy_url = request.comfy_url
+        if not comfy_url:
+            return VirtualSetGenerateAssetResponse(
+                success=False,
+                error="ComfyUI URL is required",
+            )
+
+        # --- 1. Upload images to Supabase for record-keeping ---
+        front_upload_success, front_url, front_error = (
+            await storage_service.upload_image_from_data_url(
+                request.image_front, "virtual-set-sources"
+            )
+        )
+        if not front_upload_success:
+            return VirtualSetGenerateAssetResponse(
+                success=False,
+                error=f"Failed to store front image: {front_error}",
+            )
+
+        # If no back image provided, use front image for both
+        if request.image_back:
+            back_upload_success, back_url, back_error = (
+                await storage_service.upload_image_from_data_url(
+                    request.image_back, "virtual-set-sources"
+                )
+            )
+            if not back_upload_success:
+                return VirtualSetGenerateAssetResponse(
+                    success=False,
+                    error=f"Failed to store back image: {back_error}",
+                )
+        else:
+            back_url = front_url
+            back_upload_success = True
+
+        # --- 2. Extract image bytes and upload to ComfyUI ---
+        uid = str(uuid.uuid4())[:8]
+
+        # Front image bytes
+        front_bytes = _extract_image_bytes(request.image_front)
+        front_ext = _image_ext_from_data_url(request.image_front)
+        front_comfy_name = f"3d_front_{uid}.{front_ext}"
+
+        upload_ok, front_filename, upload_err = await comfyui_service.upload_audio(
+            comfy_url, front_bytes, front_comfy_name
+        )
+        if not upload_ok:
+            return VirtualSetGenerateAssetResponse(
+                success=False,
+                error=f"Failed to upload front image to ComfyUI: {upload_err}",
+            )
+
+        # Back image bytes
+        if request.image_back:
+            back_bytes = _extract_image_bytes(request.image_back)
+            back_ext = _image_ext_from_data_url(request.image_back)
+        else:
+            # Duplicate front image
+            back_bytes = front_bytes
+            back_ext = front_ext
+
+        back_comfy_name = f"3d_back_{uid}.{back_ext}"
+        upload_ok, back_filename, upload_err = await comfyui_service.upload_audio(
+            comfy_url, back_bytes, back_comfy_name
+        )
+        if not upload_ok:
+            return VirtualSetGenerateAssetResponse(
+                success=False,
+                error=f"Failed to upload back image to ComfyUI: {upload_err}",
+            )
+
+        # --- 3. Build workflow from template ---
+        timestamp = datetime.now().strftime("%m-%d-%H-%M-%S")
+        output_prefix = f"3d/asset-{timestamp}"
+
+        build_ok, workflow, build_err = await workflow_service.build_workflow(
+            "image-to-3d",
+            {
+                "IMAGE_FRONT": front_filename,
+                "IMAGE_BACK": back_filename,
+                "OUTPUT_PREFIX": output_prefix,
+            },
+        )
+        if not build_ok or not workflow:
+            return VirtualSetGenerateAssetResponse(
+                success=False,
+                error=f"Failed to build workflow: {build_err}",
+            )
+
+        # --- 4. Submit to ComfyUI ---
+        client_id = request.client_id or f"3d-asset-{uid}"
+        payload = {"prompt": workflow, "client_id": client_id}
+
+        # Add ComfyUI API key if available
+        api_key = settings.COMFY_API_KEY
+        if api_key:
+            payload["extra_data"] = {"api_key_comfy_org": api_key}
+
+        submit_ok, prompt_id, submit_err = await comfyui_service.submit_prompt(
+            comfy_url, payload
+        )
+        if not submit_ok or not prompt_id:
+            return VirtualSetGenerateAssetResponse(
+                success=False,
+                error=f"Failed to submit to ComfyUI: {submit_err}",
+            )
+
+        # --- 5. Create image job record ---
+        user_id = resolve_user_id(authorization, x_api_key)
+        job_payload = CreateImageJobPayload(
+            user_id=user_id or "anonymous",
+            comfy_job_id=prompt_id,
+            workflow_name="image-to-3d",
+            comfy_url=comfy_url,
+            input_image_urls=[front_url, back_url],
+            prompt=request.asset_name,
+            parameters={"model": "Tripo AI (Multiview to Model)"},
+        )
+
+        success, created_job_id, error = await image_job_service.create_job(job_payload)
+        if success and created_job_id:
+            image_job_id = created_job_id
+            await image_job_service.update_to_processing(image_job_id)
+
+        # --- 6. Return prompt_id for frontend polling ---
+        return VirtualSetGenerateAssetResponse(
+            success=True,
+            prompt_id=prompt_id,
+            job_id=image_job_id,
+        )
+
+    except Exception as e:
+        if image_job_id:
+            try:
+                ijs = ImageJobService(get_supabase_for_token(_resolve_token(authorization, x_api_key)))
+                await ijs.complete_job(
+                    CompleteImageJobPayload(
+                        job_id=image_job_id,
+                        status="failed",
+                        error_message=f"Server error: {str(e)}",
+                    )
+                )
+            except Exception:
+                pass
+
+        return VirtualSetGenerateAssetResponse(
+            success=False,
+            error=f"Server error: {str(e)}",
+        )
+
+
+@router.post("/upload-glb")
+async def upload_glb(
+    payload: dict,
+    authorization: Optional[str] = Header(None),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+):
+    """Download GLB from ComfyUI and upload to Supabase Storage."""
+    try:
+        storage_service = StorageService()
+
+        comfy_url = payload.get("comfy_url")
+        filename = payload.get("filename")
+        subfolder = payload.get("subfolder", "")
+        job_id = payload.get("job_id", "unknown")
+
+        if not comfy_url or not filename:
+            return {"success": False, "error": "Missing required parameters"}
+
+        # Upload GLB to Supabase
+        success, glb_url, error = await storage_service.upload_glb_from_comfyui(
+            comfy_url, filename, subfolder, job_id
+        )
+
+        if not success:
+            return {"success": False, "error": error}
+
+        return {"success": True, "glb_url": glb_url}
+
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 
 @router.get("/health")

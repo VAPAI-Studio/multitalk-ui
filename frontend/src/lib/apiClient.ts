@@ -182,7 +182,7 @@ class ApiClient {
     return localStorage.getItem('vapai-auth-token')
   }
 
-  private async request<T>(endpoint: string, options: RequestInit = {}, retries: number = 3): Promise<T> {
+  async request<T>(endpoint: string, options: RequestInit = {}, retries: number = 3): Promise<T> {
     const url = `${this.baseURL}${endpoint}`
     const token = this.getAuthToken()
 

@@ -1,0 +1,78 @@
+{
+  "6": {
+    "inputs": {
+      "model_version": "v2.5-20250123",
+      "orientation": "default",
+      "texture": true,
+      "pbr": true,
+      "model_seed": 42,
+      "texture_seed": 42,
+      "texture_quality": "standard",
+      "texture_alignment": "original_image",
+      "face_limit": -1,
+      "quad": false,
+      "geometry_quality": "standard",
+      "image": [
+        "8",
+        0
+      ],
+      "image_back": [
+        "7",
+        0
+      ]
+    },
+    "class_type": "TripoMultiviewToModelNode",
+    "_meta": {
+      "title": "Tripo: Multiview to Model"
+    }
+  },
+  "7": {
+    "inputs": {
+      "image": "{{IMAGE_FRONT}}"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image: front"
+    }
+  },
+  "8": {
+    "inputs": {
+      "image": "{{IMAGE_BACK}}"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image: back"
+    }
+  },
+  "42": {
+    "inputs": {
+      "texture": true,
+      "pbr": true,
+      "texture_seed": 42,
+      "texture_quality": "standard",
+      "texture_alignment": "original_image",
+      "model_task_id": [
+        "6",
+        1
+      ]
+    },
+    "class_type": "TripoTextureNode",
+    "_meta": {
+      "title": "Tripo: Texture model"
+    }
+  },
+  "43": {
+    "inputs": {
+      "filename_prefix": "{{OUTPUT_PREFIX}}",
+      "image": "",
+      "mesh": [
+        "42",
+        2
+      ]
+    },
+    "class_type": "SaveGLB",
+    "_meta": {
+      "title": "Save 3D Model"
+    }
+  }
+}

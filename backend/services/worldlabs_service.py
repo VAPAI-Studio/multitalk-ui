@@ -72,6 +72,7 @@ class WorldLabsService:
         """
         try:
             if not self.api_key:
+                print("❌ World Labs API key not configured")
                 return False, None, "World Labs API key not configured"
 
             world_prompt = self._build_world_prompt(
@@ -89,6 +90,16 @@ class WorldLabsService:
                 "world_prompt": world_prompt,
             }
 
+            print(f"🌍 World Labs Request:")
+            print(f"   Prompt Type: {prompt_type}")
+            print(f"   Model: {model}")
+            print(f"   Display Name: {display_name}")
+            if image_url:
+                print(f"   Image URL: {image_url[:100]}...")
+            if text_prompt:
+                print(f"   Text Prompt: {text_prompt}")
+            print(f"   Full Payload: {payload}")
+
             headers = {
                 "WLT-Api-Key": self.api_key,
                 "Content-Type": "application/json",
@@ -101,23 +112,33 @@ class WorldLabsService:
                     headers=headers,
                 )
 
+                print(f"📡 World Labs Response: Status {response.status_code}")
+
                 if response.status_code != 200:
                     error_data = response.json() if response.content else {}
+                    print(f"❌ World Labs Error Response: {error_data}")
                     error_msg = error_data.get("error", {}).get(
                         "message", f"API request failed: {response.status_code}"
                     )
                     return False, None, error_msg
 
                 data = response.json()
+                print(f"✅ World Labs Success Response: {data}")
                 operation_id = data.get("operation_id")
                 if not operation_id:
+                    print("❌ No operation_id in response")
                     return False, None, "No operation_id returned from World Labs"
 
+                print(f"✅ Operation ID: {operation_id}")
                 return True, operation_id, None
 
         except httpx.TimeoutException:
+            print("⏱️ World Labs API timeout")
             return False, None, "Request timeout - World Labs API may be slow"
         except Exception as e:
+            print(f"❌ Exception calling World Labs: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return False, None, f"Error calling World Labs API: {str(e)}"
 
     async def poll_operation(

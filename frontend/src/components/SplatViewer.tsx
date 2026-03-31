@@ -1,18 +1,21 @@
 import { useRef, useEffect, useState, useCallback } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { SplatMesh } from "@sparkjsdev/spark";
 
 interface SplatViewerProps {
   splatUrl: string;
   onScreenshot: (dataUrl: string) => void;
   height?: number;
+  assetsToLoad?: string[];
 }
 
 export default function SplatViewer({
   splatUrl,
   onScreenshot,
   height = 500,
+  assetsToLoad = [],
 }: SplatViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -37,6 +40,18 @@ export default function SplatViewer({
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x1a1a2e);
     sceneRef.current = scene;
+
+    // Lighting for GLB models
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambientLight);
+
+    const directionalLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight1.position.set(5, 5, 5);
+    scene.add(directionalLight1);
+
+    const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.4);
+    directionalLight2.position.set(-5, 3, -5);
+    scene.add(directionalLight2);
 
     // Camera
     const camera = new THREE.PerspectiveCamera(
@@ -181,6 +196,47 @@ export default function SplatViewer({
       };
     }
   }, [splatUrl, height]);
+
+  // Load GLB assets into the scene
+  useEffect(() => {
+    if (!sceneRef.current || assetsToLoad.length === 0) return;
+
+    const scene = sceneRef.current;
+    const loader = new GLTFLoader();
+    const loadedObjects: THREE.Object3D[] = [];
+
+    assetsToLoad.forEach((glbUrl) => {
+      loader.load(
+        glbUrl,
+        (gltf) => {
+          // Scale and position the loaded model
+          const model = gltf.scene;
+          model.scale.set(0.5, 0.5, 0.5); // Adjust scale as needed
+          model.position.set(0, -0.5, 0); // Position on ground
+
+          // Add to scene
+          scene.add(model);
+          loadedObjects.push(model);
+
+          console.log(`✅ Loaded 3D asset from ${glbUrl}`);
+        },
+        (progress) => {
+          const percent = (progress.loaded / progress.total) * 100;
+          console.log(`Loading 3D asset: ${percent.toFixed(0)}%`);
+        },
+        (error) => {
+          console.error(`❌ Failed to load 3D asset from ${glbUrl}:`, error);
+        }
+      );
+    });
+
+    // Cleanup: remove loaded objects when assets change
+    return () => {
+      loadedObjects.forEach((obj) => {
+        scene.remove(obj);
+      });
+    };
+  }, [assetsToLoad]);
 
   // Keyboard listeners
   useEffect(() => {

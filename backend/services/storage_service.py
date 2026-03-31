@@ -11,6 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from core.supabase import get_supabase
 from models.storage import VideoFile
+from config.settings import settings
 
 # Reusable thread pool for Supabase operations (avoids thread creation overhead)
 _supabase_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="supabase")
@@ -20,6 +21,20 @@ class StorageService:
         self.supabase = get_supabase()
         # Reuse httpx client for connection pooling
         self._http_client: Optional[httpx.AsyncClient] = None
+
+    def _make_url_public(self, url: str) -> str:
+        """Replace localhost URLs with public ngrok URL if configured"""
+        if not url:
+            return url
+
+        public_url = settings.SUPABASE_PUBLIC_URL
+        if public_url and ('127.0.0.1' in url or 'localhost' in url):
+            # Replace http://127.0.0.1:54321 with ngrok URL
+            url = url.replace('http://127.0.0.1:54321', public_url.rstrip('/'))
+            url = url.replace('http://localhost:54321', public_url.rstrip('/'))
+            print(f"🌐 Replaced localhost URL with public URL: {url[:100]}...")
+
+        return url
 
     async def _get_http_client(self) -> httpx.AsyncClient:
         """Get or create a reusable HTTP client with connection pooling"""
@@ -168,7 +183,113 @@ class StorageService:
                 error_message = "CORS error - ComfyUI may need --enable-cors-header flag"
 
             return False, None, error_message
-    
+
+    async def upload_glb_from_comfyui(
+        self,
+        comfy_url: str,
+        filename: str,
+        subfolder: str,
+        job_id: str
+    ) -> Tuple[bool, Optional[str], Optional[str]]:
+        """Downloads a GLB file from ComfyUI and uploads it to Supabase Storage ('3d-assets' bucket)"""
+        start_time = time.time()
+        print(f"🔍 GLB upload service called with: comfy_url={comfy_url}, filename={filename}, subfolder={subfolder}, job_id={job_id}")
+
+        try:
+            # Download GLB from ComfyUI using connection pooling
+            clean_url = comfy_url.rstrip('/')
+            params = {
+                'filename': filename,
+                'subfolder': subfolder or '',
+                'type': 'output'
+            }
+
+            glb_url = f"{clean_url}/api/view?{urlencode(params)}"
+            print(f"🔍 Downloading GLB from ComfyUI: {glb_url}")
+
+            download_start = time.time()
+            client = await self._get_http_client()
+            glb_response = await client.get(
+                glb_url,
+                headers={'Cache-Control': 'no-store'}
+            )
+
+            if glb_response.status_code != 200:
+                print(f"❌ ComfyUI download failed: {glb_response.status_code}")
+                raise Exception(f"Failed to download GLB from ComfyUI: {glb_response.status_code}")
+
+            glb_content = glb_response.content
+            download_time = time.time() - download_start
+            print(f"✅ Downloaded {len(glb_content) / 1024 / 1024:.2f}MB in {download_time:.2f}s")
+
+            if len(glb_content) == 0:
+                raise Exception("Downloaded GLB file is empty")
+
+            # Generate storage path
+            timestamp = datetime.now().strftime('%Y-%m-%d')
+            storage_path = f"3d-models/{timestamp}/{job_id}_{filename}"
+
+            # Upload to Supabase Storage using thread pool
+            print(f"🔍 Uploading to Supabase Storage: {storage_path}")
+            upload_start = time.time()
+
+            loop = asyncio.get_event_loop()
+            upload_response = await loop.run_in_executor(
+                _supabase_executor,
+                lambda: self.supabase.storage
+                .from_('3d-assets')
+                .upload(
+                    storage_path,
+                    glb_content,
+                    file_options={
+                        'content-type': 'model/gltf-binary',
+                        'cache-control': '3600',
+                        'upsert': 'true'
+                    }
+                )
+            )
+
+            upload_time = time.time() - upload_start
+            print(f"✅ Upload completed in {upload_time:.2f}s")
+
+            # Check if upload was successful
+            if hasattr(upload_response, 'error') and upload_response.error:
+                raise Exception(f"Failed to upload to Supabase Storage: {upload_response.error}")
+            elif isinstance(upload_response, dict) and upload_response.get('error'):
+                raise Exception(f"Failed to upload to Supabase Storage: {upload_response['error']}")
+            elif not upload_response:
+                raise Exception("Upload failed: No response from Supabase Storage")
+
+            # Get public URL (3d-assets bucket should be public)
+            public_url = self.supabase.storage.from_('3d-assets').get_public_url(storage_path)
+
+            # Make sure we got a URL
+            if isinstance(public_url, dict):
+                public_url = public_url.get('publicUrl') or public_url.get('public_url') or str(public_url)
+
+            if not public_url:
+                raise Exception("No public URL generated for GLB file")
+
+            total_time = time.time() - start_time
+            print(f"✅ Total GLB upload time: {total_time:.2f}s (download: {download_time:.2f}s, upload: {upload_time:.2f}s)")
+            print(f"✅ GLB public URL: {public_url}")
+
+            return True, public_url, None
+
+        except Exception as error:
+            error_message = str(error)
+            print(f"❌ GLB storage service error: {error_message}")
+
+            # Provide more specific error messages
+            if "timeout" in error_message.lower():
+                error_message = "Timeout connecting to ComfyUI - server may be slow or unreachable"
+            elif "connection" in error_message.lower():
+                error_message = "Cannot connect to ComfyUI - check if server is running and URL is correct"
+            elif "bucket not found" in error_message.lower():
+                error_message = "3d-assets bucket not found - please create it in Supabase Storage"
+
+            return False, None, error_message
+
     async def delete_video_from_storage(self, public_url: str) -> Tuple[bool, Optional[str]]:
         """Delete a video from Supabase Storage"""
         try:
@@ -373,6 +494,9 @@ class StorageService:
 
             if not public_url:
                 raise Exception("Failed to get public URL from Supabase Storage")
+
+            # Make URL publicly accessible for external APIs
+            public_url = self._make_url_public(public_url)
 
             total_time = time.time() - start_time
             print(f"✅ Image uploaded in {total_time:.2f}s")

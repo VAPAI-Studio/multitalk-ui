@@ -62,3 +62,16 @@ class VirtualSetReconstructResponse(BaseModel):
     job_id: Optional[str] = None
     image_url: Optional[str] = None  # kept for potential future use
     error: Optional[str] = None
+
+class VirtualSetGenerateAssetRequest(BaseModel):
+    image_front: str  # data:image/...;base64,...
+    image_back: Optional[str] = None  # data:image/...;base64,... (if not provided, use image_front)
+    asset_name: str = "3D Asset"
+    comfy_url: str  # ComfyUI server URL
+    client_id: str = ""  # optional client ID for WebSocket tracking
+
+class VirtualSetGenerateAssetResponse(BaseModel):
+    success: bool
+    prompt_id: Optional[str] = None  # ComfyUI prompt ID for polling
+    job_id: Optional[str] = None  # Database job ID
+    error: Optional[str] = None

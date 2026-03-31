@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     SUPABASE_KEY: str = ""  # Legacy fallback
     SUPABASE_SERVICE_ROLE_KEY: str = ""  # For server operations (bypasses RLS)
     SUPABASE_ANON_KEY: str = ""  # For client operations
+    SUPABASE_PUBLIC_URL: str = ""  # Public URL for external APIs (ngrok URL)
 
     # External APIs
     OPENROUTER_API_KEY: str = ""
