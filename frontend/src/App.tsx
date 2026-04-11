@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, lazy, Suspense } from "react";
 // Page components
 import Homepage from "./pages/Homepage";
 import GenerationFeed from "./pages/GenerationFeed";
@@ -6,6 +6,8 @@ import ProfileSettings from "./ProfileSettings";
 import StudioPage from "./components/StudioPage";
 import Infrastructure from "./pages/Infrastructure";
 import DynamicWorkflowPage from "./pages/DynamicWorkflowPage";
+// Lazy-load the screenwriting studio to keep the main bundle lean
+const ScreenwritingStudio = lazy(() => import("./features/screenwriting/ScreenwritingStudio"));
 // UI Components
 import ComfyUIStatus from "./components/ComfyUIStatus";
 import ConsoleToggle from "./components/ConsoleToggle";
@@ -147,6 +149,7 @@ export default function App() {
     'text-studio',
     'lora-studio',
     'infrastructure-studio',
+    'screenwriting-studio',
     'history',
     'profile-settings'
   ];
@@ -266,6 +269,15 @@ export default function App() {
   // Show auth page if not authenticated
   if (!isAuthenticated) {
     return <AuthPage />;
+  }
+
+  // Screenwriting studio takes over the full viewport — no multitalk shell
+  if (currentPage === 'screenwriting-studio') {
+    return (
+      <Suspense fallback={<div className="flex items-center justify-center h-screen text-gray-400">Loading Film Automation Studio…</div>}>
+        <ScreenwritingStudio onBack={() => handlePageChange('home')} />
+      </Suspense>
+    );
   }
 
   return (

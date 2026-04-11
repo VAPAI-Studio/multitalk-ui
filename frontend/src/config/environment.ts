@@ -9,7 +9,8 @@ interface EnvironmentConfig {
 const isProduction = (): boolean => {
   // Check if deployed on common hosting platforms
   const hostname = window.location.hostname;
-  const isDeploy = hostname !== 'localhost' && hostname !== '127.0.0.1';
+  // applocal.vapai.studio is a Cloudflare tunnel to the local dev server — treat as dev
+  const isDeploy = hostname !== 'localhost' && hostname !== '127.0.0.1' && hostname !== 'applocal.vapai.studio';
   
   // Check Vite mode
   const viteMode = import.meta.env.MODE === 'production';
@@ -48,9 +49,9 @@ const getEnvironmentConfig = (): EnvironmentConfig => {
   const isProd = isProduction();
   
   return {
-    apiBaseUrl: isProd 
+    apiBaseUrl: isProd
       ? 'https://vapai-plataforma-backend-4daa799bd90b.herokuapp.com/api'
-      : 'http://localhost:8000/api',
+      : '/api',  // Relative — Vite proxy forwards to localhost:8001
     environment: isProd ? 'production' : 'development'
   };
 };

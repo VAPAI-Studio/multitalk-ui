@@ -248,6 +248,23 @@ export const studios: StudioConfig[] = [
         features: ['Volume browser', 'File operations', 'Dockerfile editor']
       }
     ]
+  },
+  {
+    id: 'screenwriting-studio',
+    title: 'Film Automation Studio',
+    icon: '🎬',
+    gradient: 'from-amber-500 to-orange-600',
+    description: 'AI-powered film production — write scripts, break them down, and generate shot lists.',
+    apps: [
+      {
+        id: 'screenwriting',
+        title: 'Film Automation',
+        icon: '✍️',
+        gradient: 'from-amber-500 to-orange-600',
+        description: 'AI-powered script writing with frameworks, agent review, breakdown, and storyboard.',
+        features: ['Template-based writing', 'Multi-agent AI review', 'Script breakdown', 'Storyboard']
+      }
+    ]
   }
 ];
 
@@ -350,5 +367,6 @@ export type StudioPageType =
   | 'text-studio'
   | 'lora-studio'
   | 'infrastructure-studio'
+  | 'screenwriting-studio'
   | 'history'
   | 'profile-settings';
