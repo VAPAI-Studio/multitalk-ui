@@ -1,0 +1,219 @@
+{
+  "id": "short_movie",
+  "name": "Short Movie",
+  "description": "Template for 5-10 minute short films ideal for YouTube / Vimeo etc.",
+  "icon": "film",
+  "phases": [
+    {
+      "id": "idea",
+      "name": "Idea",
+      "order": 0,
+      "subsections": [
+        {
+          "key": "idea_wizard",
+          "name": "Idea Wizard",
+          "description": "Unsure of your overall story idea? Use the Idea Wizard to have a back-and-forth discussion where it will suggest you various directions to where you could take your story.",
+          "ui_pattern": "wizard_with_chat",
+          "fields": [
+            {"key": "genre", "label": "Genre", "type": "text", "placeholder": "e.g., Drama, Thriller, Romance..."},
+            {"key": "initial_idea", "label": "Initial Idea", "type": "textarea", "placeholder": "Describe your short film concept..."},
+            {"key": "runtime_target", "label": "Target Runtime", "type": "text", "placeholder": "e.g., 5 minutes, 10 minutes"},
+            {"key": "tone", "label": "Tone", "type": "text", "placeholder": "e.g., Dark, Comedic, Suspenseful..."}
+          ],
+          "sidebar_chat": true,
+          "chat_system_prompt": "You are an expert short film story development partner. Help the user develop their short film idea through creative discussion. Focus on economy of storytelling \u2014 every moment must count in a 5-10 minute film. Suggest visual storytelling, clear character arcs, and impactful endings."
+        },
+        {
+          "key": "import_project",
+          "name": "Import Project",
+          "description": "Bring an existing screenplay to seed beats, scenes, and the screenplay editor. Paste or upload your screenplay, optionally include guidance, and we will align beats, scenes, and screenplay sequences for you.",
+          "ui_pattern": "import_wizard",
+          "fields": [
+            {"key": "screenplay_text", "label": "Paste Screenplay", "type": "textarea", "placeholder": "Paste your screenplay here..."},
+            {"key": "guidance", "label": "Guidance (Optional)", "type": "textarea", "placeholder": "Any specific guidance for how to align beats and scenes..."}
+          ],
+          "ai_actions": [
+            {"key": "align", "label": "Align Beats, Scenes & Screenplay", "prompt_template": "import_and_align"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "story",
+      "name": "Story",
+      "order": 1,
+      "subsections": [
+        {
+          "key": "core",
+          "name": "Core",
+          "description": "Establish the foundational elements that will drive your short film. Focus on clarity and visual storytelling potential. Each element should be concise and work together to create a story that plays effectively at the scope you choose.",
+          "ui_pattern": "card_grid",
+          "grid_columns": 3,
+          "sidebar_chat": true,
+          "cards": [
+            {"key": "logline", "label": "Logline", "type": "textarea", "placeholder": "Premise you can recite in one breath."},
+            {"key": "theme", "label": "Theme", "type": "textarea", "placeholder": "The moral argument you'll prove."},
+            {"key": "desire", "label": "Desire", "type": "textarea", "placeholder": "What does the protagonist want? The specific, visible goal driving the story."},
+            {"key": "plan", "label": "Plan", "type": "textarea", "placeholder": "What's the protagonist's plan to get what they want?"},
+            {"key": "antagonistic_force", "label": "Antagonistic Force", "type": "textarea", "placeholder": "Person, system, or internal flaw that actively blocks goal."},
+            {"key": "external_stakes", "label": "External Stakes", "type": "textarea", "placeholder": "Life-and-death can be emotional, social, or literal."},
+            {"key": "internal_stakes", "label": "Internal Stakes", "type": "textarea", "placeholder": "What emotional or psychological consequence faces the protagonist."},
+            {"key": "key_visual_motif", "label": "Key Visual Motif / Payoff", "type": "textarea", "placeholder": "An image or prop that appears in beat 1 and transforms by beat 8 (great shorthand for arc)."},
+            {"key": "unique_element", "label": "Unique Element", "type": "textarea", "placeholder": "World rule or similar; something that makes this story unique."}
+          ]
+        },
+        {
+          "key": "characters",
+          "name": "Characters",
+          "description": "Define your short film's characters. In a 5-10 minute film, every character must earn their screen time. Focus on distinct voices, clear motivations, and how characters reveal theme through action.",
+          "ui_pattern": "repeatable_cards",
+          "card_groups": [
+            {
+              "key": "protagonist",
+              "label": "Protagonist",
+              "item_type": "protagonist",
+              "min_items": 1,
+              "max_items": 2,
+              "fields": [
+                {"key": "name", "label": "Name", "type": "text"},
+                {"key": "core_trait", "label": "Core Trait", "type": "textarea", "placeholder": "The defining quality that drives their actions"},
+                {"key": "fatal_flaw", "label": "Fatal Flaw", "type": "textarea", "placeholder": "The weakness that creates internal conflict"},
+                {"key": "want_vs_need", "label": "Want vs Need", "type": "textarea", "placeholder": "What they pursue vs what they actually need"},
+                {"key": "dialogue_style", "label": "Dialogue Style", "type": "textarea", "placeholder": "How they speak \u2014 rhythm, vocabulary, verbal habits"},
+                {"key": "visual_description_prompt", "label": "Visual Description (for AI)", "type": "textarea", "placeholder": "Physical appearance for image generation \u2014 age, build, hair, clothing, distinguishing features"}
+              ]
+            },
+            {
+              "key": "antagonist",
+              "label": "Antagonist / Opposing Force",
+              "item_type": "antagonist",
+              "min_items": 0,
+              "max_items": 2,
+              "fields": [
+                {"key": "name", "label": "Name", "type": "text"},
+                {"key": "core_trait", "label": "Core Trait", "type": "textarea"},
+                {"key": "fatal_flaw", "label": "Fatal Flaw", "type": "textarea"},
+                {"key": "want_vs_need", "label": "Want vs Need", "type": "textarea"},
+                {"key": "dialogue_style", "label": "Dialogue Style", "type": "textarea"},
+                {"key": "visual_description_prompt", "label": "Visual Description (for AI)", "type": "textarea", "placeholder": "Physical appearance for image generation \u2014 age, build, hair, clothing, distinguishing features"}
+              ]
+            },
+            {
+              "key": "supporting",
+              "label": "Supporting Characters",
+              "item_type": "supporting",
+              "min_items": 0,
+              "max_items": 5,
+              "fields": [
+                {"key": "name", "label": "Name", "type": "text"},
+                {"key": "role", "label": "Role & Purpose", "type": "textarea", "placeholder": "What function they serve in the story"},
+                {"key": "dialogue_style", "label": "Dialogue Style", "type": "textarea"},
+                {"key": "visual_description_prompt", "label": "Visual Description (for AI)", "type": "textarea", "placeholder": "Physical appearance for image generation \u2014 age, build, hair, clothing, distinguishing features"}
+              ]
+            }
+          ]
+        },
+        {
+          "key": "story",
+          "name": "Story",
+          "description": "Build your story arc using these 8 beats. Each beat should be visual and contribute to the short-film runtime you choose. Focus on economy of storytelling \u2013 every moment should advance plot, reveal character, or enhance theme. Remember: in a short film, you can suggest more than you show.",
+          "ui_pattern": "card_grid",
+          "grid_columns": 3,
+          "sidebar_chat": true,
+          "linked_cards_source": "story.core",
+          "cards": [
+            {"key": "hook_opening_image", "label": "Hook / Opening Image", "type": "textarea", "placeholder": "Grab attention with visual contradiction or immediate stakes. \u2018What\u2019s the tone, genre, and central tension?\u2019"},
+            {"key": "status_quo", "label": "Status Quo", "type": "textarea", "placeholder": "One clear image or exchange that defines the protagonist\u2019s normal world & flaw/need. \u2018Who am I following and what\u2019s missing?\u2019"},
+            {"key": "inciting_incident", "label": "Inciting Incident", "type": "textarea", "placeholder": "Event that yanks the protagonist off balance; promise of conflict. \u2018Why must something change right now?\u2019"},
+            {"key": "point_of_no_return", "label": "Point of No Return", "type": "textarea", "placeholder": "Hero chooses (or is forced) to pursue a goal; tension escalates. \u2018What concrete objective drives the rest of the story?\u2019"},
+            {"key": "rising_complications", "label": "Rising Complications", "type": "textarea", "placeholder": "2-3 quick obstacles that tighten screws; reveal stakes & character. \u2018How does each obstacle sharpen the dilemma?\u2019"},
+            {"key": "twist_revelation", "label": "Twist / Revelation", "type": "textarea", "placeholder": "Single beat that flips understanding, raises price, or exposes true antagonist/self, pushing the story towards its climax. \u2018What new truth redefines the goal?\u2019"},
+            {"key": "climax", "label": "Climax", "type": "textarea", "placeholder": "Short, decisive confrontation where protagonist\u2019s need meets want; choice under pressure. \u2018What irreversible action resolves the central question?\u2019"},
+            {"key": "resolution_closing_image", "label": "Resolution / Closing Image", "type": "textarea", "placeholder": "Echo or invert the opening image; show consequence & thematic aftershock. \u2018How has the character/world changed?\u2019"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "scenes",
+      "name": "Scenes",
+      "order": 2,
+      "subsections": [
+        {
+          "key": "scene_wizard",
+          "name": "Scene Wizard",
+          "description": "Transform your beats into a tight scene structure. The Scene Wizard helps you jump-start your screenplay planning by creating your Scene List based on the inputted story beats.",
+          "ui_pattern": "wizard",
+          "wizard_config": {
+            "item_label": "Scene",
+            "item_label_plural": "Scenes",
+            "default_count": "auto",
+            "count_selector": false,
+            "readiness_checks": [
+              {"source": "story.core", "label": "Foundation Elements", "count_fields": ["logline", "theme", "protagonist", "desire", "plan", "antagonistic_force", "other_characters", "external_stakes", "internal_stakes", "key_visual_motif", "unique_element"]},
+              {"source": "story.characters", "label": "Characters", "count_items": true, "item_groups": ["protagonist", "antagonist", "supporting"]},
+              {"source": "story.story", "label": "Story Beats", "count_fields": ["hook_opening_image", "status_quo", "inciting_incident", "point_of_no_return", "rising_complications", "twist_revelation", "climax", "resolution_closing_image"]}
+            ],
+            "guidance_default": "Construct scenes for a short film. Each scene must do heavy lifting \u2014 consolidating multiple story beats into dramatic units. Favor visual storytelling over dialogue. Every scene should have a clear dramatic question that drives it. Each scene should feel complete yet propel into the next.",
+            "beat_mapping_strategy": "Map the 8 story beats across the scenes. Consolidate related beats into single scenes when appropriate. Ensure the complete arc is covered from opening hook through resolution. Beats should be woven together within scenes, not listed sequentially.",
+            "import_from_screenplay": true,
+            "custom_guidance": true,
+            "generate_button": "Generate Scene List"
+          }
+        },
+        {
+          "key": "scene_list",
+          "name": "Scene List",
+          "description": "Organize your short film scenes.",
+          "ui_pattern": "ordered_list",
+          "list_config": {
+            "item_type": "scene",
+            "section_label": "SHORT FILM SCENES",
+            "sortable": true,
+            "addable": true,
+            "deletable": true,
+            "expandable": false,
+            "analyze_button": true,
+            "sidebar_chat": true,
+            "display_field": "summary"
+          }
+        },
+        {
+          "key": "scene_detail",
+          "name": "Individual Scenes",
+          "description": "Craft each scene with precision. In a short film, every scene must multitask \u2013 advance plot, reveal character, and express theme simultaneously. Focus on visual storytelling and minimize dialogue. Each scene should have a clear beginning, middle, and end while contributing to the overall story arc. Populate the goal and climax fields explicitly when inferable.",
+          "ui_pattern": "individual_editor",
+          "editor_config": {
+            "item_type": "scene",
+            "navigator": true,
+            "layout": "two_column",
+            "fields": [
+              {"key": "summary", "label": "Summary", "type": "textarea", "full_width": true},
+              {"key": "arena", "label": "Arena", "type": "textarea", "column": "left"},
+              {"key": "inciting_incident", "label": "Inciting Incident", "type": "textarea", "column": "left"},
+              {"key": "goal", "label": "Goal", "type": "textarea", "column": "left"},
+              {"key": "subtext", "label": "Subtext", "type": "textarea", "column": "left", "placeholder": "What are the characters really feeling or wanting beneath their words and actions? The emotional truth they can't or won't say directly."},
+              {"key": "turning_point", "label": "Turning Point", "type": "textarea", "column": "left"},
+              {"key": "crisis", "label": "Crisis", "type": "textarea", "column": "right"},
+              {"key": "climax", "label": "Climax", "type": "textarea", "column": "right"},
+              {"key": "fallout", "label": "Fallout", "type": "textarea", "column": "right"},
+              {"key": "push_forward", "label": "Push Forward", "type": "textarea", "column": "right"}
+            ],
+            "sidebar_chat": true,
+            "bottom_bar": {
+              "show_item_number": true,
+              "show_act_sequence": true,
+              "show_linked_beats": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "write",
+      "name": "Write",
+      "order": 3,
+      "$ref": "shared/write_phase.json"
+    }
+  ]
+}

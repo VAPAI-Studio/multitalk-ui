@@ -8,19 +8,29 @@ import os
 from api import storage, datasets, image_edit, comfyui, multitalk, auth, image_jobs, video_jobs, world_jobs, flux_trainer, lora_trainer, feed, google_drive, virtual_set, runpod, infrastructure, api_keys, upscale, custom_workflows
 from services.upscale_job_service import UpscaleJobService
 
+# Screenwriter sub-application
+from screenwriter.router import router as screenwriter_router, init_screenwriter
+
 # Only load .env file if not running on Heroku
 if not os.getenv("DYNO"):  # DYNO is a Heroku-specific environment variable
     from dotenv import load_dotenv
     load_dotenv()
-    print("🔧 Local development: Loaded .env file")
+    print("[local] Loaded .env file")
 else:
-    print("☁️ Running on Heroku: Using environment variables")
+    print("[heroku] Using environment variables")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup: recover interrupted upscale batches. Shutdown: no-op (state is in DB)."""
+    """Startup: recover interrupted upscale batches + init screenwriter DB. Shutdown: no-op (state is in DB)."""
     from api.upscale import _process_batch
+
+    # Initialize screenwriter database (runs migrations)
+    try:
+        init_screenwriter()
+        print("[SCREENWRITER] Database initialized, migrations applied")
+    except Exception as e:
+        print(f"[SCREENWRITER] DB init error (non-fatal): {e}")
 
     try:
         service = UpscaleJobService()
@@ -70,6 +80,9 @@ app.include_router(api_keys.router, prefix="/api")
 app.include_router(infrastructure.router)
 app.include_router(upscale.router, prefix="/api")
 app.include_router(custom_workflows.router)
+
+# Screenwriter sub-application — all screenwriter endpoints under /api/screenwriter/*
+app.include_router(screenwriter_router, prefix="/api/screenwriter")
 
 @app.get("/")
 async def root():
