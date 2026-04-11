@@ -71,7 +71,10 @@ async def get_current_user(
             )
 
         # Production JWT authentication flow
-        user_id = auth_service.verify_token(credentials.credentials)
+        # SECRET_KEY must equal the Supabase JWT secret so Supabase-issued
+        # tokens are accepted directly (both use HS256).
+        token_str = credentials.credentials
+        user_id = auth_service.verify_token(token_str)
         if user_id is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -79,14 +82,27 @@ async def get_current_user(
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
-        # Query real user from database
+        # Extract email from the JWT payload for auto-provisioning
+        try:
+            from jose import jwt as jose_jwt
+            payload = jose_jwt.decode(token_str, settings.SECRET_KEY, algorithms=["HS256"])
+            email = payload.get("email", "")
+        except Exception:
+            email = ""
+
+        # Auto-provision: create sw_users row on first login
         user = db.query(database.User).filter(database.User.id == user_id).first()
         if user is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User not found",
-                headers={"WWW-Authenticate": "Bearer"},
+            from uuid import UUID
+            user = database.User(
+                id=UUID(user_id),
+                email=email,
+                display_name=email.split("@")[0] if email else "User",
+                hashed_password="",
             )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
 
         return schemas.User(
             id=user.id,
