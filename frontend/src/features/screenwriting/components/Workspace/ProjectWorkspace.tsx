@@ -68,7 +68,7 @@ export function ProjectWorkspace() {
         const subs = JSON.parse(localStorage.getItem(STORAGE_KEYS.LAST_SUBSECTION) || '{}');
         subs[projectId!] = firstKey;
         localStorage.setItem(STORAGE_KEYS.LAST_SUBSECTION, JSON.stringify(subs));
-      } catch {}
+      } catch { /* localStorage unavailable */ }
     }
   }, [currentPhase, selectedSubsection, projectId]);
 
@@ -85,7 +85,7 @@ export function ProjectWorkspace() {
       const phases = JSON.parse(localStorage.getItem(STORAGE_KEYS.LAST_PHASE) || '{}');
       phases[projectId!] = phaseId;
       localStorage.setItem(STORAGE_KEYS.LAST_PHASE, JSON.stringify(phases));
-    } catch {}
+    } catch { /* localStorage unavailable */ }
   };
 
   const handleSubsectionChange = (key: string) => {
@@ -95,7 +95,7 @@ export function ProjectWorkspace() {
       const subs = JSON.parse(localStorage.getItem(STORAGE_KEYS.LAST_SUBSECTION) || '{}');
       subs[projectId!] = key;
       localStorage.setItem(STORAGE_KEYS.LAST_SUBSECTION, JSON.stringify(subs));
-    } catch {}
+    } catch { /* localStorage unavailable */ }
   };
 
   const handleYoloFill = useCallback(async () => {

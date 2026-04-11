@@ -60,4 +60,5 @@ export function ShotRow({ shot, onUpdateField, actionCell }: ShotRowProps) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export { EDITABLE_COLUMNS };

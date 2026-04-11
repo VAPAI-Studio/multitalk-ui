@@ -13,7 +13,7 @@
  *    outer Layout/Header (multitalk provides the shell).
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import './screenwriting.css';
 import { MemoryRouter, Routes, Route, useParams } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -88,7 +88,6 @@ interface ScreenwritingStudioProps {
 
 export default function ScreenwritingStudio({ onBack }: ScreenwritingStudioProps) {
   const { token } = useAuth();
-  const prevTokenRef = useRef<string | null>(null);
 
   // Auth bridge: in dev the screenwriter backend accepts 'mock-token' directly.
   // Phase 4 will unify auth so it verifies Supabase JWTs.
