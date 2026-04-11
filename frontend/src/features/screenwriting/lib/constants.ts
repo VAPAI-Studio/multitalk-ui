@@ -3,8 +3,10 @@
 import { SectionType, Framework } from '../types';
 import type { BreakdownCategory } from '../types';
 
-// API Configuration — screenwriter routes live under /api/screenwriter when embedded in multitalk
-export const API_BASE_URL = import.meta.env.VITE_SW_API_URL || '/api/screenwriter';
+// API Configuration — reuses multitalk's environment detection so it works both
+// in dev (Vite proxy → localhost) and production (full Heroku URL).
+import { config } from '../../../config/environment';
+export const API_BASE_URL = import.meta.env.VITE_SW_API_URL || `${config.apiBaseUrl}/screenwriter`;
 export const API_TIMEOUT = 30000; // 30 seconds
 export const CHAT_TIMEOUT = 120000; // 2 minutes for agent chat/review
 
