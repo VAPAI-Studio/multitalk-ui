@@ -13,6 +13,7 @@ import StyleTransfer from '../pages/StyleTransfer';
 import CreateImage from '../pages/CreateImage';
 import ImageGrid from '../pages/ImageGrid';
 import WANI2V from '../pages/WANI2V';
+import ShotStream from '../pages/ShotStream';
 import WANMove from '../pages/WANMove';
 import LTX23VideoGen from '../pages/LTX23VideoGen';
 import VideoUpscale from '../pages/VideoUpscale';
@@ -41,6 +42,7 @@ const appComponents: Record<string, React.ComponentType<{ comfyUrl: string }> | 
   'create-image': CreateImage,
   'image-grid': ImageGrid,
   'wan-i2v': WANI2V,
+  'shotstream': ShotStream,
   'wan-move': WANMove,
   'ltx23-video': LTX23VideoGen,
   'upscale-vid': VideoUpscale,

@@ -35,6 +35,12 @@ class Settings(BaseSettings):
     RUNPOD_ENDPOINT_ID: str = ""  # RunPod endpoint ID (ComfyUI serverless deployment)
     RUNPOD_TIMEOUT: int = 600  # Timeout in seconds for RunPod requests (default: 10 minutes)
 
+    # ShotStream Configuration — local daemon (same host as ComfyUI, different port)
+    # Reference: https://github.com/KlingAIResearch/ShotStream
+    ENABLE_SHOTSTREAM: bool = False  # Feature flag
+    SHOTSTREAM_SERVICE_URL: str = ""  # e.g. http://127.0.0.1:9100
+    SHOTSTREAM_TIMEOUT: int = 900     # seconds; multi-shot gen can be long
+
     # RunPod S3 API Configuration (for Network Volume access)
     RUNPOD_S3_ACCESS_KEY: str = ""
     RUNPOD_S3_SECRET_KEY: str = ""

@@ -8,6 +8,11 @@ export interface Announcement {
 // When committing user-facing changes, add a new entry at the top.
 export const announcements: Announcement[] = [
   {
+    id: "2026-04-12-shotstream",
+    message: "New: ShotStream in Video Studio — describe each shot and generate a continuous multi-shot video with the local ShotStream daemon.",
+    type: "feature",
+  },
+  {
     id: "2026-03-18-world-jobs",
     message: "Virtual Set now saves 3D worlds to your generation feed so you can revisit and reconstruct them anytime",
     type: "feature",
@@ -25,17 +30,6 @@ export const announcements: Announcement[] = [
   {
     id: "2026-03-14-workflow-builder",
     message: "New: Workflow Builder in Infrastructure -- admins can now build and publish custom AI features without code",
-    type: "feature",
-  },
-  {
-    id: "2026-03-11-batch-upscale",
-    message: "New: Batch Video Upscale in Video Studio -- upscale multiple videos at once with Freepik AI",
-    type: "feature",
-  },
-  {
-    id: "2026-03-09-video-upscale",
-    message:
-      "New: Video Upscale in Video Studio, Runpod infrastructure integration, API key creation, 3D Virtual Set",
     type: "feature",
   },
 ];

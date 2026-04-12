@@ -155,6 +155,14 @@ export const studios: StudioConfig[] = [
         features: ['Custom motion paths', 'Static anchors', 'Animation preview', 'Model: WAN Move']
       },
       {
+        id: 'shotstream',
+        title: 'ShotStream',
+        icon: '🎞️',
+        gradient: 'from-indigo-500 to-pink-600',
+        description: 'Streaming multi-shot video generation for interactive storytelling. Describe each shot, get a continuous video.',
+        features: ['Multi-shot text-to-video', 'Local GPU daemon', 'Model: ShotStream (Wan2.1 base)']
+      },
+      {
         id: 'ltx23-video',
         title: 'LTX 2.3',
         icon: '🎥',

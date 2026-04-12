@@ -493,6 +493,52 @@ class ApiClient {
     }
   }
 
+  // ShotStream endpoints — proxies to local ShotStream daemon (see backend/api/shotstream.py)
+  async submitShotStream(payload: {
+    shots: Array<{ prompt: string; duration_sec: number }>
+    width: number
+    height: number
+    seed?: number | null
+    fps?: number
+  }) {
+    return this.request<{ success: boolean; job_id?: string; error?: string }>(
+      '/shotstream/submit',
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }
+    )
+  }
+
+  async getShotStreamStatus(jobId: string) {
+    return this.request<{
+      success: boolean
+      job_id: string
+      status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
+      progress?: number | null
+      output_url?: string | null
+      error?: string | null
+    }>(`/shotstream/status/${encodeURIComponent(jobId)}`)
+  }
+
+  async cancelShotStream(jobId: string) {
+    return this.request<{ success: boolean; error?: string }>(
+      `/shotstream/cancel/${encodeURIComponent(jobId)}`,
+      { method: 'POST' }
+    )
+  }
+
+  async getShotStreamHealth() {
+    return this.request<{
+      enabled: boolean
+      configured: boolean
+      reachable: boolean
+      service_url?: string | null
+      device?: string | null
+      error?: string | null
+    }>('/shotstream/health')
+  }
+
   async submitWorkflow(workflowName: string, parameters: any, baseUrl: string, clientId: string, comfyuiApiKey?: string) {
     const payload: any = {
       workflow_name: workflowName,
