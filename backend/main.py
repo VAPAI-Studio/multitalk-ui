@@ -52,9 +52,18 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="MultiTalk API", version="1.0.0", lifespan=lifespan)
 
 # Configure CORS
+# ALLOWED_ORIGINS env var: comma-separated list of allowed origins.
+# Falls back to permissive defaults for local dev.
+_raw_origins = os.getenv("ALLOWED_ORIGINS", "")
+_allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()] if _raw_origins else [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "https://app.vapai.studio",
+    "https://dev.vapai.studio",
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://your-frontend.vercel.app", "http://localhost:5173", "*"],  # In production, replace with your frontend domain
+    allow_origins=_allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
