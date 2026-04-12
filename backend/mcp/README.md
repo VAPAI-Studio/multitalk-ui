@@ -27,7 +27,29 @@ export SOUTSTICKS_COMFY_URL=https://comfy.vapai.studio    # user's ComfyUI endpo
 python -m backend.mcp.server
 ```
 
-## Register with Claude Desktop
+## Use with Claude Code
+
+Already wired up in `.mcp.json` at the repo root. Just export your API key
+before launching `claude`:
+
+```bash
+export SOUTSTICKS_API_KEY=sout_...
+# optional overrides:
+export SOUTSTICKS_BASE_URL=https://api.vapai.studio
+export SOUTSTICKS_COMFY_URL=https://comfy.vapai.studio
+
+claude  # MCP server will auto-start and its tools appear as mcp__sideoutsticks__*
+```
+
+If the key isn't set, the server starts but every tool call returns an auth
+error, which is what you want — fail loud, not silently.
+
+### Verify it loaded
+
+Inside Claude Code, run `/mcp` to see connected servers. `sideoutsticks`
+should appear with 8 tools.
+
+## Use with Claude Desktop
 
 Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 

@@ -31,6 +31,16 @@
         "@playwright/mcp@latest"
       ],
       "env": {}
+    },
+    "sideoutsticks": {
+      "type": "stdio",
+      "command": "python",
+      "args": ["-m", "backend.mcp.server"],
+      "env": {
+        "SOUTSTICKS_API_KEY": "${SOUTSTICKS_API_KEY}",
+        "SOUTSTICKS_BASE_URL": "${SOUTSTICKS_BASE_URL:-https://api.vapai.studio}",
+        "SOUTSTICKS_COMFY_URL": "${SOUTSTICKS_COMFY_URL:-https://comfy.vapai.studio}"
+      }
     }
   }
 }

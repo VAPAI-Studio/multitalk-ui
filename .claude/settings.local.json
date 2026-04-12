@@ -43,6 +43,7 @@
   "enabledMcpjsonServers": [
     "supabase",
     "context7",
-    "playwright"
+    "playwright",
+    "sideoutsticks"
   ]
 }
