@@ -1,0 +1,47 @@
+# docker compose up --build
+#
+# Adjust the host paths under `volumes` to wherever you downloaded the
+# weights (default assumes D:\shotstream\...  on Windows).
+#
+# Requires: Docker Desktop (Windows) with WSL2 + NVIDIA Container Toolkit,
+# or Docker Engine on Linux with nvidia-container-toolkit installed.
+
+services:
+  shotstream:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: shotstream-daemon:latest
+    container_name: shotstream-daemon
+    restart: unless-stopped
+    ports:
+      - "9100:9100"
+    environment:
+      SHOTSTREAM_PRELOAD: "false"      # set "true" to load weights at startup
+      SHOTSTREAM_PUBLIC_URL: "http://127.0.0.1:9100"
+      LOG_LEVEL: "INFO"
+    volumes:
+      # === Weights (download once — see scripts/download_models.*) ===
+      - type: bind
+        source: ${SHOTSTREAM_MODELS_DIR:-D:/shotstream}/ckpts
+        target: /workspace/ckpts
+      - type: bind
+        source: ${SHOTSTREAM_MODELS_DIR:-D:/shotstream}/wan_models
+        target: /workspace/wan_models
+      # === Finished videos served over /outputs ===
+      - type: bind
+        source: ${SHOTSTREAM_MODELS_DIR:-D:/shotstream}/outputs
+        target: /workspace/outputs
+      # === HF cache (speeds up any runtime-downloaded aux weights) ===
+      - type: bind
+        source: ${SHOTSTREAM_MODELS_DIR:-D:/shotstream}/hf_cache
+        target: /workspace/.cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    # Shared memory for dataloader workers.
+    shm_size: "8gb"

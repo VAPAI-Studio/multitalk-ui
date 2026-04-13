@@ -1,0 +1,5 @@
+# Daemon-only deps (the heavy ML deps — torch, flash-attn, ShotStream's own
+# requirements.txt — are installed inside the Dockerfile).
+fastapi>=0.115,<1
+uvicorn[standard]>=0.30,<1
+pydantic>=2.7,<3
