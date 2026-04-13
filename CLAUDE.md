@@ -111,23 +111,28 @@ The frontend is a single-page application with navigation state:
 frontend/src/
 ├── App.tsx                # Main app with auth guard, navigation, header
 ├── main.tsx              # Entry point with AuthProvider
+├── lib/
+│   └── studioConfig.ts   # Studio/app registry — single source of truth for navigation
 ├── contexts/
 │   └── AuthContext.tsx   # Global auth state (login, logout, user)
 ├── components/           # Reusable UI components
-│   ├── Login.tsx
-│   ├── Register.tsx
-│   ├── ComfyUIStatus.tsx
+│   ├── StudioPage.tsx    # Generic page renderer for studio apps
 │   └── ...
-├── config/
-│   └── environment.ts    # Auto-detects dev/prod, configures API URL
-└── [Feature].tsx         # Page-level components (MultiTalkOnePerson, etc.)
+├── pages/                # Page-level components per studio app
+├── features/
+│   └── screenwriting/    # Self-contained Film Automation Studio (105+ components)
+├── hooks/
+│   └── useDynamicWorkflows.ts  # Loads user-published custom workflows
+└── config/
+    └── environment.ts    # Auto-detects dev/prod, configures API URL
 ```
 
 **Key architectural patterns:**
-- App.tsx manages page navigation state (stored in localStorage)
+- `studioConfig.ts` is the single source of truth for all studios and their apps — add new features here, not directly in App.tsx types or Homepage.tsx
+- App.tsx reads `studioConfig.ts` to build the sidebar and validate `localStorage` page state; `StudioPageType` is derived from it
 - AuthContext provides authentication state globally via React Context
 - Environment config automatically detects dev (localhost:8000) vs prod (Heroku)
-- Page components are loaded conditionally based on navigation state
+- The Film Automation Studio (`screenwriting-studio`) is lazy-loaded and renders full-screen with its own internal React Router
 
 ### Authentication Flow
 
@@ -152,6 +157,34 @@ The app executes AI workflows via ComfyUI using a centralized workflow system:
 ComfyUI server URL is configurable in the UI header.
 
 **See [WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md) for detailed documentation on the workflow system, including how to create and use workflow templates.**
+
+### Film Automation Studio Backend
+
+The Film Automation Studio has its own **standalone FastAPI service** at `backend/screenwriter/`, separate from the main backend. It has its own Supabase tables, migrations, and configuration.
+
+```
+backend/screenwriter/
+├── main.py              # FastAPI app and router registration
+├── config.py            # Configuration (reads SW_* env vars)
+├── db.py                # Database initialization
+├── middleware.py        # Logging, security, rate limiting
+├── exceptions.py        # Custom exception classes
+├── api/
+│   └── endpoints/       # 20+ endpoint files (projects, sections, shots, breakdown,
+│                        #   storyboard, agents, snippets, snapshots, review, etc.)
+├── migrations/          # Supabase SQL migrations (001–008)
+├── models/              # Pydantic models
+├── services/            # Business logic
+└── utils/
+```
+
+**Running the screenwriter backend:**
+```bash
+cd backend/screenwriter
+python -m uvicorn main:app --reload --port 8001
+```
+
+The frontend connects to this service via a separate base URL (configured by `VITE_SW_API_BASE_URL` or auto-detected via `frontend/src/features/screenwriting/lib/constants.ts`).
 
 ### RunPod Serverless Integration
 
@@ -287,16 +320,46 @@ For specialized topics, see these additional guides:
 
 ### Current Features
 
-As of the latest update, the application includes these features:
+The app is organized into studios. The authoritative source is `frontend/src/lib/studioConfig.ts`.
 
-- **Lipsync 1 Person** - Generate realistic talking videos from a single person image with custom audio (Model: Multitalk and Infinite Talk with WAN 2.1)
-- **Lipsync Multi Person** - Create conversations between multiple people with synchronized audio and video (Model: Multitalk and Infinite Talk with WAN 2.1)
-- **Video Lipsync** - Add perfect lip-synchronization to existing videos with new audio tracks (Model: Infinite Talk with WAN 2.1)
-- **Image Edit** - Edit and enhance images using AI-powered editing with natural language instructions (Model: Nano Banana)
-- **Character Caption** - Generate detailed captions for character images to create training datasets for LoRA models (Model: JoyCaption Beta 2)
-- **WAN I2V** - Transform images into captivating videos with AI-powered image-to-video generation (Model: WAN I2V)
-- **Style Transfer** - Transfer artistic styles between images using AI (Model: Flux with USO Style Reference)
-- **Generation Feed** - View and manage all generations across all features in one unified interface
+**Lipsync Studio** (`lipsync-studio`)
+- **1 Person** - Single avatar lipsync from image + audio (Model: Multitalk / Infinite Talk with WAN 2.1)
+- **Multi Person** - Multi-avatar conversations with mask-based tracking (Model: Multitalk with WAN 2.1)
+- **Video Lipsync** - Lip-sync new audio onto an existing video (Model: Infinite Talk with WAN 2.1)
+- **Batch VideoLS** - Process multiple videos sequentially (Model: Infinite Talk with WAN 2.1)
+
+**Image Studio** (`image-studio`)
+- **Nano Banana** - AI image editing with natural language instructions (Model: OpenRouter AI)
+- **Camera Angle** - Generate new perspectives from a reference image (Model: Qwen Multiple Angles)
+- **Style Transfer** - Transfer artistic styles between images (Model: Flux with USO Style Reference)
+- **Create Image** - Generate images with Flux/Qwen + multiple LoRA support
+- **Image Grid** - Generate a 3×3 grid of variations from one reference (Model: Gemini Pro Image)
+
+**Virtual Set Studio** (`virtual-set-studio`)
+- **Virtual Set** - Transform an image into an explorable 3D world (Model: World Labs Marble + OpenRouter AI)
+
+**Video Studio** (`video-studio`)
+- **WAN I2V** - Image-to-video generation (Model: WAN I2V)
+- **WAN Move** - Animate objects with custom motion paths (Model: WAN Move)
+- **LTX 2.3** - Text/image-to-video with keyframe control and optional audio (Model: LTX 2.3)
+- **Video Upscale** - AI super-resolution for videos (Model: SeedVR2)
+- **Batch Upscale** - Upscale multiple videos via Freepik AI
+
+**Audio Studio** (`audio-studio`)
+- **Stem Separator** - Separate audio into vocals, drums, bass, other (Model: Open Unmix)
+
+**LoRA Studio** (`lora-studio`)
+- **Character Caption** - Generate training captions for LoRA datasets (Model: JoyCaption Beta 2)
+- **LoRA Trainer** - Train custom QWEN Image LoRA models (Model: QWEN Image via Musubi Tuner)
+
+**Film Automation Studio** (`screenwriting-studio`)
+- **Film Automation** - AI script writing, multi-agent review, breakdown, storyboard, and shot lists
+
+**Infrastructure** (`infrastructure-studio`, admin only)
+- **Infrastructure Manager** - Browse RunPod volumes, manage files, edit Dockerfiles
+
+**Standalone**
+- **History** - View and manage all generations across all features
 
 ---
 

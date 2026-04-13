@@ -381,80 +381,67 @@ async function buildPromptJSON(/* parameters */) {
 }
 ```
 
-### Step 3: Add to App.tsx Navigation
+### Step 3: Register in studioConfig.ts (REQUIRED)
 
-Update `frontend/src/App.tsx`:
+Navigation, the homepage grid, and the sidebar are all driven by `frontend/src/lib/studioConfig.ts`. **Do not edit App.tsx types or Homepage.tsx directly** — add your feature here instead.
 
-1. **Import your component**:
-```tsx
-import YourFeatureName from "./YourFeatureName";
+1. **Add your app to an existing studio, or create a new studio**:
+
+```ts
+// In the `studios` array in studioConfig.ts
+
+// Option A — add to an existing studio:
+{
+  id: 'your-studio-id',          // existing studio
+  // ...
+  apps: [
+    // ...existing apps...
+    {
+      id: 'your-feature',        // used as pageContext and workflow_type
+      title: 'Your Feature Name',
+      icon: '🎯',
+      gradient: 'from-orange-500 to-red-600',
+      description: 'Brief description of what your feature does.',
+      features: ['Key feature 1', 'Key feature 2', 'Model: Your AI Model']
+    }
+  ]
+},
+
+// Option B — create a new studio:
+{
+  id: 'your-studio',
+  title: 'Your Studio Name',
+  icon: '🎯',
+  gradient: 'from-orange-500 to-red-600',
+  description: 'Short studio description.',
+  apps: [
+    {
+      id: 'your-feature',
+      title: 'Your Feature Name',
+      icon: '🎯',
+      gradient: 'from-orange-500 to-red-600',
+      description: 'Brief description.',
+      features: ['Key feature 1', 'Model: Your AI Model']
+    }
+  ]
+},
 ```
 
-2. **Add to currentPage type**:
-```tsx
-const [currentPage, setCurrentPage] = useState<"home" | "multitalk-one" | /* existing */ | "your-feature">("home");
+2. **If you created a new studio, add its ID to `StudioPageType`** at the bottom of `studioConfig.ts`:
+
+```ts
+export type StudioPageType =
+  | 'home'
+  | 'lipsync-studio'
+  // ...existing studios...
+  | 'your-studio';   // add here
 ```
 
-3. **Add navigation button in sidebar**:
-```tsx
-<button
-  onClick={() => handlePageChange("your-feature")}
-  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
-    currentPage === "your-feature"
-      ? "bg-gradient-to-r from-orange-500 to-red-600 text-white shadow-lg"
-      : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
-  }`}
->
-  <span className="text-lg">🎯</span>
-  <span className="font-medium">Your Feature Name</span>
-</button>
-```
+3. **Wire the page component in App.tsx** — App.tsx renders studio pages via `StudioPage`. If your feature needs special full-screen rendering (like the screenwriting studio), add a case in the main render block. For standard ComfyUI features, `StudioPage` handles it automatically once `studioConfig.ts` is updated.
 
-4. **Add to main content switch**:
-```tsx
-{currentPage === "your-feature" && (
-  <YourFeatureName comfyUrl={comfyUrl} />
-)}
-```
+### Step 4: Homepage is automatic
 
-5. **Update localStorage validation**:
-```tsx
-if (savedPage && ['home', 'multitalk-one', /* existing pages */, 'your-feature'].includes(savedPage)) {
-  setCurrentPage(savedPage);
-}
-```
-
-### Step 4: Add to Homepage (REQUIRED)
-
-Update `frontend/src/Homepage.tsx` to include your new feature:
-
-1. **Update the Props interface**:
-```tsx
-interface Props {
-  onNavigate: (page: "multitalk-one" | "multitalk-multiple" | /* existing pages */ | "your-feature") => void;
-}
-```
-
-2. **Add your app to the apps array**:
-```tsx
-const apps = [
-  // ... existing apps
-  {
-    id: "your-feature" as const,
-    title: "Your Feature Name",
-    description: "Brief description of what your feature does and its benefits.",
-    icon: "🎯", // Choose an appropriate emoji
-    gradient: "from-orange-500 to-red-600", // Choose unique gradient colors
-    features: ["Key feature 1", "Key feature 2", "Model: Your AI Model"]
-  }
-];
-```
-
-This ensures your feature appears on the homepage grid with:
-- **Clickable card** that navigates to your feature
-- **Consistent styling** with gradient and hover effects
-- **Feature descriptions** to help users understand functionality
-- **Model information** showing which AI models are used
+The homepage grid is rendered dynamically from `studioConfig.ts` — no changes to `Homepage.tsx` are needed. Your app card will appear automatically once you've registered it in Step 3.
 
 ## Frontend Integration
 
@@ -1092,13 +1079,10 @@ Before considering your feature complete:
 - [ ] Uses correct node names and parameters
 
 ### ✅ Navigation Integration
-- [ ] Adds component to App.tsx imports
-- [ ] Updates currentPage type definition
-- [ ] Adds navigation button to sidebar
-- [ ] Adds route to main content area
-- [ ] Updates localStorage validation array
-- [ ] Adds app entry to Homepage.tsx apps array
-- [ ] Updates Homepage.tsx Props interface
+- [ ] Adds app entry (or new studio) to `frontend/src/lib/studioConfig.ts`
+- [ ] If new studio: adds its ID to `StudioPageType` in `studioConfig.ts`
+- [ ] If full-screen rendering needed: adds special case in App.tsx render block
+- [ ] Homepage card appears automatically (no Homepage.tsx changes needed)
 
 ### ✅ Job Tracking
 - [ ] Sets correct workflow_type for filtering
