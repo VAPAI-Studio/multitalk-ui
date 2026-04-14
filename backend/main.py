@@ -52,15 +52,22 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="MultiTalk API", version="1.0.0", lifespan=lifespan)
 
 # Configure CORS
-# ALLOWED_ORIGINS env var: comma-separated list of allowed origins.
+# ALLOWED_ORIGINS env var: JSON array or comma-separated list of allowed origins.
 # Falls back to permissive defaults for local dev.
+import json as _json
 _raw_origins = os.getenv("ALLOWED_ORIGINS", "")
-_allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()] if _raw_origins else [
-    "http://localhost:5173",
-    "http://localhost:3000",
-    "https://app.vapai.studio",
-    "https://dev.vapai.studio",
-]
+if _raw_origins:
+    try:
+        _allowed_origins = _json.loads(_raw_origins)
+    except (_json.JSONDecodeError, ValueError):
+        _allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+else:
+    _allowed_origins = [
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "https://app.vapai.studio",
+        "https://dev.vapai.studio",
+    ]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_allowed_origins,
