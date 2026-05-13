@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import os
 
-from api import storage, datasets, image_edit, comfyui, multitalk, auth, image_jobs, video_jobs, world_jobs, flux_trainer, lora_trainer, feed, google_drive, virtual_set, runpod, infrastructure, api_keys, upscale, custom_workflows
+from api import storage, datasets, image_edit, comfyui, multitalk, auth, image_jobs, video_jobs, world_jobs, flux_trainer, lora_trainer, feed, google_drive, virtual_set, runpod, infrastructure, api_keys, upscale, custom_workflows, drive_qa
 from services.upscale_job_service import UpscaleJobService
 
 # Screenwriter sub-application
@@ -96,6 +96,7 @@ app.include_router(api_keys.router, prefix="/api")
 app.include_router(infrastructure.router)
 app.include_router(upscale.router, prefix="/api")
 app.include_router(custom_workflows.router)
+app.include_router(drive_qa.router, prefix="/api")
 
 # Screenwriter sub-application — all screenwriter endpoints under /api/screenwriter/*
 app.include_router(screenwriter_router, prefix="/api/screenwriter")
