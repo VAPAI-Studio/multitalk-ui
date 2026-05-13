@@ -248,6 +248,23 @@ export const studios: StudioConfig[] = [
         features: ['Volume browser', 'File operations', 'Dockerfile editor']
       }
     ]
+  },
+  {
+    id: 'screenwriting-studio',
+    title: 'Film Automation Studio',
+    icon: '🎬',
+    gradient: 'from-amber-500 to-orange-600',
+    description: 'AI-powered film production — write scripts, break them down, and generate shot lists.',
+    apps: [
+      {
+        id: 'screenwriting',
+        title: 'Film Automation',
+        icon: '✍️',
+        gradient: 'from-amber-500 to-orange-600',
+        description: 'AI-powered script writing with frameworks, agent review, breakdown, and storyboard.',
+        features: ['Template-based writing', 'Multi-agent AI review', 'Script breakdown', 'Storyboard']
+      }
+    ]
   }
 ];
 
@@ -260,6 +277,15 @@ export const standaloneApps: AppConfig[] = [
     gradient: 'from-gray-600 to-slate-700',
     description: 'View and manage all your AI generations in one place. Browse videos, images, and style transfers with real-time updates.',
     features: ['All generations in one view', 'Filter by type', 'Real-time progress tracking'],
+    fullWidth: true
+  },
+  {
+    id: 'drive-qa',
+    title: 'Max Wild ep 3 QA',
+    icon: '🎬',
+    gradient: 'from-amber-500 to-orange-600',
+    description: 'Side-by-side QA viewer for Drive scenes. Compare assets vs results per shot with synced zoom and OK/NOK tracking.',
+    features: ['Assets vs Results side-by-side', 'Synced zoom & pan', 'Per-scene OK/NOK review notes'],
     fullWidth: true
   }
 ];
@@ -350,5 +376,7 @@ export type StudioPageType =
   | 'text-studio'
   | 'lora-studio'
   | 'infrastructure-studio'
+  | 'screenwriting-studio'
   | 'history'
+  | 'drive-qa'
   | 'profile-settings';

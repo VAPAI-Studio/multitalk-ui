@@ -11,6 +11,13 @@ jobs:
     name: Backend Tests
     runs-on: ubuntu-latest
 
+    # Dummy creds required at import time by the screenwriter sub-app
+    # (EmbeddingService instantiates AsyncOpenAI at module load, and newer
+    # openai SDK versions validate the api_key eagerly). Tests don't make
+    # real calls.
+    env:
+      OPENAI_API_KEY: sk-dummy-for-ci
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

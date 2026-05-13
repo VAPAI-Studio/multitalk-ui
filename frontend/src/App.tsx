@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, lazy, Suspense } from "react";
 // Page components
 import Homepage from "./pages/Homepage";
 import GenerationFeed from "./pages/GenerationFeed";
@@ -6,6 +6,9 @@ import ProfileSettings from "./ProfileSettings";
 import StudioPage from "./components/StudioPage";
 import Infrastructure from "./pages/Infrastructure";
 import DynamicWorkflowPage from "./pages/DynamicWorkflowPage";
+import DriveQA from "./pages/DriveQA";
+// Lazy-load the screenwriting studio to keep the main bundle lean
+const ScreenwritingStudio = lazy(() => import("./features/screenwriting/ScreenwritingStudio"));
 // UI Components
 import ComfyUIStatus from "./components/ComfyUIStatus";
 import ConsoleToggle from "./components/ConsoleToggle";
@@ -147,7 +150,9 @@ export default function App() {
     'text-studio',
     'lora-studio',
     'infrastructure-studio',
+    'screenwriting-studio',
     'history',
+    'drive-qa',
     'profile-settings'
   ];
 
@@ -266,6 +271,15 @@ export default function App() {
   // Show auth page if not authenticated
   if (!isAuthenticated) {
     return <AuthPage />;
+  }
+
+  // Screenwriting studio takes over the full viewport — no multitalk shell
+  if (currentPage === 'screenwriting-studio') {
+    return (
+      <Suspense fallback={<div className="flex items-center justify-center h-screen text-gray-400">Loading Film Automation Studio…</div>}>
+        <ScreenwritingStudio onBack={() => handlePageChange('home')} />
+      </Suspense>
+    );
   }
 
   return (
@@ -493,6 +507,17 @@ export default function App() {
                   <span className="text-lg">📋</span>
                   <span className="font-medium">History</span>
                 </button>
+                <button
+                  onClick={() => handlePageChange("drive-qa")}
+                  className={`w-full mt-1 flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
+                    currentPage === "drive-qa"
+                      ? "bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-lg"
+                      : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                  }`}
+                >
+                  <span className="text-lg">🎬</span>
+                  <span className="font-medium">Max Wild ep 3 QA</span>
+                </button>
               </div>
 
               {/* External Tools Section */}
@@ -611,6 +636,8 @@ export default function App() {
             <Infrastructure comfyUrl={comfyUrl} />
           ) : currentPage === "history" ? (
             <GenerationFeed />
+          ) : currentPage === "drive-qa" ? (
+            <DriveQA />
           ) : currentPage === "profile-settings" ? (
             <ProfileSettings onNavigateBack={() => setCurrentPage("home")} />
           ) : null}

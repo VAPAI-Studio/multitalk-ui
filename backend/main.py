@@ -5,22 +5,32 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import os
 
-from api import storage, datasets, image_edit, comfyui, multitalk, auth, image_jobs, video_jobs, world_jobs, flux_trainer, lora_trainer, feed, google_drive, virtual_set, runpod, infrastructure, api_keys, upscale, custom_workflows
+from api import storage, datasets, image_edit, comfyui, multitalk, auth, image_jobs, video_jobs, world_jobs, flux_trainer, lora_trainer, feed, google_drive, virtual_set, runpod, infrastructure, api_keys, upscale, custom_workflows, drive_qa
 from services.upscale_job_service import UpscaleJobService
+
+# Screenwriter sub-application
+from screenwriter.router import router as screenwriter_router, init_screenwriter
 
 # Only load .env file if not running on Heroku
 if not os.getenv("DYNO"):  # DYNO is a Heroku-specific environment variable
     from dotenv import load_dotenv
     load_dotenv()
-    print("🔧 Local development: Loaded .env file")
+    print("[local] Loaded .env file")
 else:
-    print("☁️ Running on Heroku: Using environment variables")
+    print("[heroku] Using environment variables")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup: recover interrupted upscale batches. Shutdown: no-op (state is in DB)."""
+    """Startup: recover interrupted upscale batches + init screenwriter DB. Shutdown: no-op (state is in DB)."""
     from api.upscale import _process_batch
+
+    # Initialize screenwriter database (runs migrations)
+    try:
+        init_screenwriter()
+        print("[SCREENWRITER] Database initialized, migrations applied")
+    except Exception as e:
+        print(f"[SCREENWRITER] DB init error (non-fatal): {e}")
 
     try:
         service = UpscaleJobService()
@@ -42,9 +52,25 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="MultiTalk API", version="1.0.0", lifespan=lifespan)
 
 # Configure CORS
+# ALLOWED_ORIGINS env var: JSON array or comma-separated list of allowed origins.
+# Falls back to permissive defaults for local dev.
+import json as _json
+_raw_origins = os.getenv("ALLOWED_ORIGINS", "")
+if _raw_origins:
+    try:
+        _allowed_origins = _json.loads(_raw_origins)
+    except (_json.JSONDecodeError, ValueError):
+        _allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+else:
+    _allowed_origins = [
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "https://app.vapai.studio",
+        "https://dev.vapai.studio",
+    ]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://your-frontend.vercel.app", "http://localhost:5173", "*"],  # In production, replace with your frontend domain
+    allow_origins=_allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -70,6 +96,10 @@ app.include_router(api_keys.router, prefix="/api")
 app.include_router(infrastructure.router)
 app.include_router(upscale.router, prefix="/api")
 app.include_router(custom_workflows.router)
+app.include_router(drive_qa.router, prefix="/api")
+
+# Screenwriter sub-application — all screenwriter endpoints under /api/screenwriter/*
+app.include_router(screenwriter_router, prefix="/api/screenwriter")
 
 @app.get("/")
 async def root():

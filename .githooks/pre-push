@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# pre-push hook — runs smoke tests against the dev backend before every GitHub push.
+# Install once with: git config core.hooksPath .githooks
+
+set -euo pipefail
+
+BASE="https://vapai-plataforma-backend-dev-6057571fda81.herokuapp.com"
+PASS=0
+FAIL=0
+
+green() { printf '\033[0;32m%s\033[0m\n' "$1"; }
+red()   { printf '\033[0;31m%s\033[0m\n' "$1"; }
+bold()  { printf '\033[1m%s\033[0m\n'   "$1"; }
+
+check() {
+  local name="$1"
+  local expected="$2"
+  local actual="$3"
+
+  if echo "$actual" | grep -q "$expected"; then
+    green "  ✓ $name"
+    PASS=$((PASS + 1))
+  else
+    red   "  ✗ $name (expected to find: '$expected')"
+    red   "    Got: $actual"
+    FAIL=$((FAIL + 1))
+  fi
+}
+
+bold ""
+bold "Running smoke tests against dev backend…"
+bold "  $BASE"
+bold ""
+
+# 1. Health
+r=$(curl -sf --max-time 15 "$BASE/health" 2>/dev/null || echo "CURL_FAILED")
+check "Health endpoint" "healthy" "$r"
+
+# 2. Main auth rejects bad creds (not 500)
+r=$(curl -s --max-time 15 -X POST "$BASE/api/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"smoke@test.com","password":"wrongpass"}' 2>/dev/null || echo "CURL_FAILED")
+check "Auth rejects bad creds" "Invalid credentials" "$r"
+
+# 3. Screenwriter projects requires auth
+r=$(curl -s --max-time 15 -o /dev/null -w "%{http_code}" "$BASE/api/screenwriter/projects/v2")
+check "Screenwriter auth guard" "401" "$r"
+
+# 4. ComfyUI workflows list loads
+r=$(curl -sf --max-time 15 "$BASE/api/comfyui/workflows" 2>/dev/null || echo "CURL_FAILED")
+check "ComfyUI workflows list" '"success":true' "$r"
+
+# 5. CORS allows dev.vapai.studio
+r=$(curl -sI --max-time 15 -X OPTIONS "$BASE/api/auth/login" \
+  -H "Origin: https://dev.vapai.studio" \
+  -H "Access-Control-Request-Method: POST" 2>/dev/null || echo "CURL_FAILED")
+check "CORS allows dev.vapai.studio" "dev.vapai.studio" "$r"
+
+# 6. Environment is Heroku
+r=$(curl -sf --max-time 15 "$BASE/api/environment" 2>/dev/null || echo "CURL_FAILED")
+check "Environment is Heroku" "heroku" "$r"
+
+bold ""
+bold "Results: $PASS passed, $FAIL failed"
+bold ""
+
+if [ "$FAIL" -gt 0 ]; then
+  red "Smoke tests FAILED — push blocked."
+  red "Fix the issues above or run with --no-verify to skip."
+  bold ""
+  exit 1
+fi
+
+green "All smoke tests passed!"
+bold ""
+exit 0

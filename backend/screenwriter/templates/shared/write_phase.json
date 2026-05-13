@@ -1,0 +1,52 @@
+{
+  "id": "write",
+  "name": "Write",
+  "order": 3,
+  "subsections": [
+    {
+      "key": "script_writer_wizard",
+      "name": "Script Writer Wizard",
+      "description": "Generate screenplays from your scenes, then view and edit them in the Screenplay Editor.",
+      "ui_pattern": "wizard",
+      "wizard_config": {
+        "item_label": "Screenplay",
+        "item_label_plural": "Screenplays",
+        "default_count": null,
+        "count_selector": false,
+        "episode_selector": true,
+        "episode_selector_max": 10,
+        "readiness_checks": [
+          {"source": "scenes", "label": "Scenes", "count_items": true},
+          {"source": "story.core", "label": "Core Story Elements", "count_fields": ["logline", "theme", "protagonist"]},
+          {"source": "story.characters", "label": "Characters", "count_items": true}
+        ],
+        "custom_guidance": true,
+        "generate_button": "Generate Screenplays"
+      }
+    },
+    {
+      "key": "screenplay_editor",
+      "name": "Screenplay Editor",
+      "description": "View and edit your screenplay.",
+      "ui_pattern": "screenplay_editor",
+      "editor_config": {
+        "split_pane": true,
+        "left_panel": "screenplay_text",
+        "right_panel": "episode_context",
+        "toolbar": {
+          "actions_dropdown": true,
+          "ai_query": true,
+          "commands": true
+        }
+      }
+    },
+    {
+      "key": "screenplay_analyzer",
+      "name": "Screenplay Analyzer",
+      "description": "Analyze and polish your screenplay \u2013 view and edit dialogue by character.",
+      "ui_pattern": "analyzer",
+      "requires_content": true,
+      "empty_message": "No screenplay content found. Create scenes in the Screenplay Editor first."
+    }
+  ]
+}

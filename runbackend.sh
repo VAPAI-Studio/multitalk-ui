@@ -12,8 +12,15 @@ cd "$(dirname "$0")/backend"
 
 # Create venv if it doesn't exist
 if [ ! -d "venv" ]; then
-    python3 -m venv venv
+    python -m venv venv
 fi
-source venv/bin/activate
-pip3 install -r requirements.txt
-python3 -m uvicorn main:app --reload --host 0.0.0.0 --port $PORT
+
+# Activate venv — Scripts/ on Windows, bin/ on macOS/Linux
+if [ -f "venv/Scripts/activate" ]; then
+    source venv/Scripts/activate
+else
+    source venv/bin/activate
+fi
+
+pip install -r requirements.txt
+python -m uvicorn main:app --reload --host 0.0.0.0 --port $PORT
