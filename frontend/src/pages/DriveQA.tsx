@@ -57,8 +57,59 @@ function authHeaders(): HeadersInit {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+// The backend Supabase auth occasionally returns 401 with "Resource temporarily
+// unavailable" when several requests hit in parallel. Retry once after a short
+// delay to ride out the transient error.
+// The backend's Supabase auth check is a sync, blocking call shared by every
+// request. Hitting it from N parallel image loads at once produces EAGAIN
+// 401s. Cap concurrency at 4 in-flight requests at a time.
+const MAX_INFLIGHT = 4;
+let inflight = 0;
+const queue: Array<() => void> = [];
+
+function acquireSlot(): Promise<void> {
+  if (inflight < MAX_INFLIGHT) {
+    inflight++;
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    queue.push(() => {
+      inflight++;
+      resolve();
+    });
+  });
+}
+
+function releaseSlot(): void {
+  inflight--;
+  const next = queue.shift();
+  if (next) next();
+}
+
+async function fetchWithRetry(
+  url: string,
+  init: RequestInit,
+  retries = 3,
+): Promise<Response> {
+  await acquireSlot();
+  try {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      const r = await fetch(url, init);
+      if (r.ok) return r;
+      if (attempt === retries) return r;
+      if (r.status !== 401 && r.status < 500) return r;
+      const base = 200 * Math.pow(2, attempt);
+      const jitter = Math.random() * 200;
+      await new Promise((resolve) => setTimeout(resolve, base + jitter));
+    }
+    return fetch(url, init);
+  } finally {
+    releaseSlot();
+  }
+}
+
 async function apiGet<T>(path: string): Promise<T> {
-  const r = await fetch(`${config.apiBaseUrl}${path}`, {
+  const r = await fetchWithRetry(`${config.apiBaseUrl}${path}`, {
     headers: { ...authHeaders() },
   });
   if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
@@ -66,7 +117,7 @@ async function apiGet<T>(path: string): Promise<T> {
 }
 
 async function apiPost<T>(path: string, body: unknown): Promise<T> {
-  const r = await fetch(`${config.apiBaseUrl}${path}`, {
+  const r = await fetchWithRetry(`${config.apiBaseUrl}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(body),
@@ -99,7 +150,7 @@ function useBlobUrl(url: string | null): { src: string | null; loading: boolean;
     let blobUrl: string | null = null;
     setLoading(true);
     setError(null);
-    fetch(url, { headers: authHeaders() })
+    fetchWithRetry(url, { headers: authHeaders() })
       .then(async (r) => {
         if (!r.ok) throw new Error(`${r.status}`);
         const blob = await r.blob();
@@ -151,27 +202,27 @@ function ViewerPane({
   onTransformChange,
 }: ViewerPaneProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const draggingRef = useRef<{ startX: number; startY: number; tx: number; ty: number } | null>(
-    null
-  );
+  const draggingRef = useRef<{
+    startX: number;
+    startY: number;
+    tx: number;
+    ty: number;
+    moved: boolean;
+  } | null>(null);
 
   const currentImage = images[selectedIndex] ?? null;
   const imageUrl = currentImage ? buildFileUrl(currentImage.id) : null;
   const { src, loading, error } = useBlobUrl(imageUrl);
 
-  // Zoom on wheel — anchor zoom around the cursor position.
-  const handleWheel = useCallback(
-    (e: React.WheelEvent<HTMLDivElement>) => {
-      e.preventDefault();
+  // Cursor-anchored zoom step. `factor > 1` zooms in, `< 1` zooms out.
+  const zoomAroundCursor = useCallback(
+    (clientX: number, clientY: number, factor: number) => {
       const rect = containerRef.current?.getBoundingClientRect();
       if (!rect) return;
-      const mouseX = e.clientX - rect.left - rect.width / 2;
-      const mouseY = e.clientY - rect.top - rect.height / 2;
-
-      const zoomFactor = Math.exp(-e.deltaY * 0.0015);
-      const newScale = Math.min(8, Math.max(0.2, transform.scale * zoomFactor));
+      const mouseX = clientX - rect.left - rect.width / 2;
+      const mouseY = clientY - rect.top - rect.height / 2;
+      const newScale = Math.min(8, Math.max(0.2, transform.scale * factor));
       const ratio = newScale / transform.scale;
-
       onTransformChange({
         scale: newScale,
         x: mouseX - (mouseX - transform.x) * ratio,
@@ -181,28 +232,37 @@ function ViewerPane({
     [onTransformChange, transform]
   );
 
+  // Mouse down: either trigger a modifier-zoom or start a drag-pan.
   const handleMouseDown = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
+      // Shift+Click → zoom in towards cursor.
+      // Cmd/Ctrl+Click → zoom out from cursor.
+      if (e.shiftKey || e.metaKey || e.ctrlKey) {
+        e.preventDefault();
+        const factor = e.shiftKey ? 1.5 : 1 / 1.5;
+        zoomAroundCursor(e.clientX, e.clientY, factor);
+        return;
+      }
       e.preventDefault();
       draggingRef.current = {
         startX: e.clientX,
         startY: e.clientY,
         tx: transform.x,
         ty: transform.y,
+        moved: false,
       };
     },
-    [transform]
+    [transform, zoomAroundCursor]
   );
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       if (!draggingRef.current) return;
       const { startX, startY, tx, ty } = draggingRef.current;
-      onTransformChange({
-        ...transform,
-        x: tx + (e.clientX - startX),
-        y: ty + (e.clientY - startY),
-      });
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      if (Math.abs(dx) > 2 || Math.abs(dy) > 2) draggingRef.current.moved = true;
+      onTransformChange({ ...transform, x: tx + dx, y: ty + dy });
     },
     [onTransformChange, transform]
   );
@@ -226,7 +286,6 @@ function ViewerPane({
       <div
         ref={containerRef}
         className="flex-1 relative overflow-hidden bg-[#1a1a1a] flex items-center justify-center select-none cursor-grab active:cursor-grabbing"
-        onWheel={handleWheel}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -246,7 +305,7 @@ function ViewerPane({
             src={src}
             alt={currentImage?.name}
             draggable={false}
-            className="max-w-none max-h-none pointer-events-none"
+            className="max-w-full max-h-full object-contain pointer-events-none"
             style={{
               transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`,
               transformOrigin: "center center",
@@ -331,7 +390,7 @@ export default function DriveQA() {
   const [resultIndex, setResultIndex] = useState(0);
 
   const [transform, setTransform] = useState<ViewerTransform>(INITIAL_TRANSFORM);
-  const [syncedZoom, setSyncedZoom] = useState(true);
+  const [syncedZoom, setSyncedZoom] = useState(false);
   const [assetTransform, setAssetTransform] = useState<ViewerTransform>(INITIAL_TRANSFORM);
   const [resultTransform, setResultTransform] = useState<ViewerTransform>(INITIAL_TRANSFORM);
 
@@ -339,38 +398,58 @@ export default function DriveQA() {
   const [notes, setNotes] = useState("");
   const [savingReview, setSavingReview] = useState(false);
 
-  // Load episode + scenes + reviews on mount
+  // Load episode + scenes + reviews on mount. Serialized rather than
+  // Promise.all because parallel auth checks against Supabase occasionally
+  // return EAGAIN 401s from the backend.
   useEffect(() => {
+    let cancelled = false;
     setScenesLoading(true);
-    Promise.all([
-      apiGet<{ id: string; name: string }>("/drive-qa/episode"),
-      apiGet<{ success: boolean; scenes: QAScene[]; error?: string }>(
-        "/drive-qa/scenes"
-      ),
-      apiGet<{ success: boolean; reviews: QAReview[]; error?: string }>(
-        "/drive-qa/reviews"
-      ),
-    ])
-      .then(([ep, scenesResp, reviewsResp]) => {
+
+    (async () => {
+      try {
+        const ep = await apiGet<{ id: string; name: string }>("/drive-qa/episode");
+        if (cancelled) return;
         setEpisodeId(ep.id);
         setEpisodeName(ep.name);
+
+        const scenesResp = await apiGet<{
+          success: boolean;
+          scenes: QAScene[];
+          error?: string;
+        }>("/drive-qa/scenes");
+        if (cancelled) return;
         if (scenesResp.success) {
           setScenes(scenesResp.scenes);
-          if (scenesResp.scenes.length > 0 && !selectedSceneId) {
-            setSelectedSceneId(scenesResp.scenes[0].id);
+          if (scenesResp.scenes.length > 0) {
+            setSelectedSceneId((curr) => curr ?? scenesResp.scenes[0].id);
           }
         } else {
           setScenesError(scenesResp.error || "Failed to load scenes");
         }
+
+        const reviewsResp = await apiGet<{
+          success: boolean;
+          reviews: QAReview[];
+          error?: string;
+        }>("/drive-qa/reviews");
+        if (cancelled) return;
         if (reviewsResp.success) {
           const map: Record<string, QAReview> = {};
           for (const r of reviewsResp.reviews) map[r.scene_id] = r;
           setReviews(map);
         }
-      })
-      .catch((e) => setScenesError(e instanceof Error ? e.message : "Error"))
-      .finally(() => setScenesLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      } catch (e) {
+        if (!cancelled) {
+          setScenesError(e instanceof Error ? e.message : "Error");
+        }
+      } finally {
+        if (!cancelled) setScenesLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Load scene detail when selection changes
@@ -442,12 +521,75 @@ export default function DriveQA() {
     }
   };
 
+  // Keyboard shortcuts:
+  //   A / D       → previous / next asset (left pane)
+  //   ← / →       → previous / next result (right pane)
+  //   ↑ / ↓       → previous / next scene (sidebar)
+  //   R           → reset zoom/pan on both panes
+  // Disabled while typing in the notes field.
+  useEffect(() => {
+    function isTypingTarget(target: EventTarget | null): boolean {
+      if (!(target instanceof HTMLElement)) return false;
+      const tag = target.tagName;
+      return (
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        target.isContentEditable
+      );
+    }
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (isTypingTarget(e.target)) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const assets = sceneDetail?.assets ?? [];
+      const results = sceneDetail?.results ?? [];
+
+      if (e.key === "a" || e.key === "A") {
+        if (assets.length === 0) return;
+        e.preventDefault();
+        setAssetIndex((i) => (i - 1 + assets.length) % assets.length);
+      } else if (e.key === "d" || e.key === "D") {
+        if (assets.length === 0) return;
+        e.preventDefault();
+        setAssetIndex((i) => (i + 1) % assets.length);
+      } else if (e.key === "ArrowLeft") {
+        if (results.length === 0) return;
+        e.preventDefault();
+        setResultIndex((i) => (i - 1 + results.length) % results.length);
+      } else if (e.key === "ArrowRight") {
+        if (results.length === 0) return;
+        e.preventDefault();
+        setResultIndex((i) => (i + 1) % results.length);
+      } else if (e.key === "ArrowUp") {
+        if (scenes.length === 0) return;
+        e.preventDefault();
+        const idx = scenes.findIndex((s) => s.id === selectedSceneId);
+        const next = idx <= 0 ? scenes.length - 1 : idx - 1;
+        setSelectedSceneId(scenes[next].id);
+      } else if (e.key === "ArrowDown") {
+        if (scenes.length === 0) return;
+        e.preventDefault();
+        const idx = scenes.findIndex((s) => s.id === selectedSceneId);
+        const next = idx < 0 || idx === scenes.length - 1 ? 0 : idx + 1;
+        setSelectedSceneId(scenes[next].id);
+      } else if (e.key === "r" || e.key === "R") {
+        e.preventDefault();
+        setTransform(INITIAL_TRANSFORM);
+        setAssetTransform(INITIAL_TRANSFORM);
+        setResultTransform(INITIAL_TRANSFORM);
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [sceneDetail, scenes, selectedSceneId]);
+
   return (
     <div className="h-[calc(100vh-4rem)] flex bg-gray-50">
       {/* Sidebar with scenes */}
       <aside className="w-64 shrink-0 border-r border-gray-200 bg-white flex flex-col">
         <div className="p-4 border-b border-gray-200">
-          <h2 className="font-bold text-gray-900 text-sm">QA Viewer</h2>
+          <h2 className="font-bold text-gray-900 text-sm">Max Wild ep 3 QA</h2>
           <p className="text-xs text-gray-500 mt-1">{episodeName}</p>
           <div className="mt-2 flex gap-2 text-[11px]">
             <span className="text-green-600">✓ {statusCounts.ok}</span>
@@ -494,7 +636,15 @@ export default function DriveQA() {
               <span className="text-xs text-gray-500">Loading…</span>
             )}
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
+            <div className="hidden md:flex items-center gap-3 text-[11px] text-gray-500">
+              <span><kbd className="font-mono bg-gray-100 border border-gray-300 rounded px-1">A</kbd>/<kbd className="font-mono bg-gray-100 border border-gray-300 rounded px-1">D</kbd> assets</span>
+              <span><kbd className="font-mono bg-gray-100 border border-gray-300 rounded px-1">←</kbd>/<kbd className="font-mono bg-gray-100 border border-gray-300 rounded px-1">→</kbd> results</span>
+              <span><kbd className="font-mono bg-gray-100 border border-gray-300 rounded px-1">↑</kbd>/<kbd className="font-mono bg-gray-100 border border-gray-300 rounded px-1">↓</kbd> scene</span>
+              <span><kbd className="font-mono bg-gray-100 border border-gray-300 rounded px-1">⇧</kbd>+click zoom in</span>
+              <span><kbd className="font-mono bg-gray-100 border border-gray-300 rounded px-1">⌘</kbd>+click zoom out</span>
+              <span><kbd className="font-mono bg-gray-100 border border-gray-300 rounded px-1">R</kbd> reset</span>
+            </div>
             <label className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
               <input
                 type="checkbox"

@@ -281,7 +281,7 @@ export const standaloneApps: AppConfig[] = [
   },
   {
     id: 'drive-qa',
-    title: 'Drive QA',
+    title: 'Max Wild ep 3 QA',
     icon: '🎬',
     gradient: 'from-amber-500 to-orange-600',
     description: 'Side-by-side QA viewer for Drive scenes. Compare assets vs results per shot with synced zoom and OK/NOK tracking.',

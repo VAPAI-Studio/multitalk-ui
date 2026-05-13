@@ -516,7 +516,7 @@ export default function App() {
                   }`}
                 >
                   <span className="text-lg">🎬</span>
-                  <span className="font-medium">Drive QA</span>
+                  <span className="font-medium">Max Wild ep 3 QA</span>
                 </button>
               </div>
 
