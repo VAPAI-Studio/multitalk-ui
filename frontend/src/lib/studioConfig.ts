@@ -278,6 +278,15 @@ export const standaloneApps: AppConfig[] = [
     description: 'View and manage all your AI generations in one place. Browse videos, images, and style transfers with real-time updates.',
     features: ['All generations in one view', 'Filter by type', 'Real-time progress tracking'],
     fullWidth: true
+  },
+  {
+    id: 'drive-qa',
+    title: 'Drive QA',
+    icon: '🎬',
+    gradient: 'from-amber-500 to-orange-600',
+    description: 'Side-by-side QA viewer for Drive scenes. Compare assets vs results per shot with synced zoom and OK/NOK tracking.',
+    features: ['Assets vs Results side-by-side', 'Synced zoom & pan', 'Per-scene OK/NOK review notes'],
+    fullWidth: true
   }
 ];
 
@@ -369,4 +378,5 @@ export type StudioPageType =
   | 'infrastructure-studio'
   | 'screenwriting-studio'
   | 'history'
+  | 'drive-qa'
   | 'profile-settings';
