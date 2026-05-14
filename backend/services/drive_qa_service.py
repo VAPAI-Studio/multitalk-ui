@@ -16,11 +16,35 @@ import io
 import re
 from typing import List, Optional, Tuple
 
+import httpx
+from cachetools import TTLCache
 from googleapiclient.http import MediaIoBaseDownload
 
 from core.google_drive import get_drive_client, is_drive_configured
 from core.supabase import get_supabase
 from models.drive_qa import QAImage, QAReview, QAScene, QASceneDetail, ReviewStatus
+
+
+# ---------------------------------------------------------------------------
+# Caches (process-local, in-memory)
+# ---------------------------------------------------------------------------
+#
+# Drive QA traffic is read-heavy (the same images get pulled many times as
+# reviewers navigate scenes). Caching avoids both the per-request 401 storms
+# from the backend's Supabase auth pool and the Drive bandwidth cost.
+#
+# Three caches, sized so the total stays ~500 MB worst case:
+#   - thumbnail cache (small JPEGs): keys "id:size" → bytes + mime
+#   - preview cache (medium JPEGs): same key shape
+#   - full cache (original bytes): keyed by file_id; smaller maxsize because
+#     entries can be 20+ MB each.
+#
+# `cachetools.TTLCache` evicts both on size and on TTL so memory can't grow
+# without bound.
+
+_THUMB_CACHE: TTLCache[str, Tuple[bytes, str]] = TTLCache(maxsize=512, ttl=60 * 30)
+_PREVIEW_CACHE: TTLCache[str, Tuple[bytes, str]] = TTLCache(maxsize=128, ttl=60 * 30)
+_FULL_CACHE: TTLCache[str, Tuple[bytes, str]] = TTLCache(maxsize=24, ttl=60 * 30)
 
 
 # ---------------------------------------------------------------------------
@@ -135,7 +159,12 @@ class DriveQAService:
                 for c in children
                 if c["mimeType"].startswith(IMAGE_MIME_PREFIX)
             ]
-            results.sort(key=lambda i: i.name.lower())
+            # Newest first: the reviewer almost always wants to see the most
+            # recent render. Fall back to name when modifiedTime is missing.
+            results.sort(
+                key=lambda i: (i.modified_time or "", i.name.lower()),
+                reverse=True,
+            )
 
             # Assets = images inside the scene's `Assets/` subfolder (if any).
             assets_folder = next(
@@ -179,12 +208,17 @@ class DriveQAService:
     async def download_file(
         self, file_id: str
     ) -> Tuple[bool, Optional[bytes], Optional[str], Optional[str]]:
-        """Download the full bytes of a Drive file.
+        """Download the full bytes of a Drive file (cached).
 
         Returns (success, content, mime_type, error).
         """
         if not self.drive:
             return False, None, None, "Google Drive not configured"
+
+        cached = _FULL_CACHE.get(file_id)
+        if cached is not None:
+            content, mime_type = cached
+            return True, content, mime_type, None
 
         try:
             meta = self.drive.files().get(
@@ -204,21 +238,41 @@ class DriveQAService:
             while not done:
                 _status, done = downloader.next_chunk()
 
-            return True, buf.getvalue(), mime_type, None
+            content = buf.getvalue()
+            _FULL_CACHE[file_id] = (content, mime_type)
+            return True, content, mime_type, None
 
         except Exception as e:
             return False, None, None, str(e)
 
-    async def get_thumbnail_url(
-        self, file_id: str, size_px: int = 800
-    ) -> Tuple[bool, Optional[str], Optional[str]]:
-        """Get a Drive-generated thumbnail link, resized to `size_px` on the long side.
+    async def get_preview_bytes(
+        self,
+        file_id: str,
+        size_px: int = 2000,
+    ) -> Tuple[bool, Optional[bytes], Optional[str], Optional[str]]:
+        """Fetch a resized JPEG preview of the file, served through Drive's
+        thumbnail endpoint.
 
-        Drive's thumbnailLink looks like `...=s220`; we swap the size param.
-        Returns (success, url, error).
+        This is much faster than `download_file` for two reasons:
+          1. Drive returns an already-compressed JPEG (not the source PNG).
+          2. The smaller payload (typically 200KB–2MB instead of 5–20MB)
+             traverses our backend → browser pipe much faster.
+
+        Falls back to a 1600px size if Drive caps the request. If even that
+        fails (some file types have no thumbnail), the caller can fall back
+        to `download_file`.
+
+        Cached by (file_id, size).
         """
         if not self.drive:
-            return False, None, "Google Drive not configured"
+            return False, None, None, "Google Drive not configured"
+
+        cache_key = f"{file_id}:{size_px}"
+        target_cache = _THUMB_CACHE if size_px <= 600 else _PREVIEW_CACHE
+        cached = target_cache.get(cache_key)
+        if cached is not None:
+            content, mime_type = cached
+            return True, content, mime_type, None
 
         try:
             meta = self.drive.files().get(
@@ -228,14 +282,27 @@ class DriveQAService:
             ).execute()
             link = meta.get("thumbnailLink")
             if not link:
-                return False, None, "No thumbnail available"
+                return False, None, None, "No thumbnail available"
 
-            # Drive returns links ending in `=sNNN`; resize by replacing it.
+            # Drive thumbnailLinks end in `=sNNN` (sometimes with `-c` crop suffix).
+            # Replace with the size we want.
             resized = re.sub(r"=s\d+(-c)?$", f"=s{size_px}", link)
-            return True, resized, None
+
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                r = await client.get(resized)
+                if r.status_code != 200 and size_px > 1600:
+                    # Drive sometimes caps at 1600 — retry once.
+                    resized = re.sub(r"=s\d+(-c)?$", "=s1600", link)
+                    r = await client.get(resized)
+                r.raise_for_status()
+
+            content = r.content
+            mime_type = r.headers.get("content-type", "image/jpeg")
+            target_cache[cache_key] = (content, mime_type)
+            return True, content, mime_type, None
 
         except Exception as e:
-            return False, None, str(e)
+            return False, None, None, str(e)
 
     # ------------------------------------------------------------------
     # Internal
