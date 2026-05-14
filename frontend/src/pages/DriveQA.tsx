@@ -127,9 +127,24 @@ async function apiPost<T>(path: string, body: unknown): Promise<T> {
 }
 
 // Build a URL the <img> can hit — needs auth, so we use blob URLs via fetch.
-function buildFileUrl(fileId: string, thumbnail = false, size = 1200): string {
-  const suffix = thumbnail ? `/thumbnail?size=${size}` : "";
-  return `${config.apiBaseUrl}/drive-qa/file/${fileId}${suffix}`;
+//
+// Three modes:
+//   - "thumb"   → small JPEG for the thumbnails strip (<=600px).
+//   - "preview" → medium JPEG for the main viewer pane (default).
+//   - "full"    → original bytes, only when the user asks for source quality.
+type ImageVariant = "thumb" | "preview" | "full";
+
+function buildFileUrl(
+  fileId: string,
+  variant: ImageVariant = "preview",
+  size?: number,
+): string {
+  const base = `${config.apiBaseUrl}/drive-qa/file/${fileId}`;
+  if (variant === "full") return base;
+  if (variant === "thumb") {
+    return `${base}/thumbnail?size=${size ?? 400}`;
+  }
+  return `${base}/preview?size=${size ?? 2000}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -211,8 +226,16 @@ function ViewerPane({
   } | null>(null);
 
   const currentImage = images[selectedIndex] ?? null;
-  const imageUrl = currentImage ? buildFileUrl(currentImage.id) : null;
-  const { src, loading, error } = useBlobUrl(imageUrl);
+  // Progressive load: show the small thumbnail (which is usually already
+  // cached by the strip) as a placeholder while the medium preview arrives.
+  const thumbUrl = currentImage ? buildFileUrl(currentImage.id, "thumb", 400) : null;
+  const previewUrl = currentImage ? buildFileUrl(currentImage.id, "preview") : null;
+  const thumb = useBlobUrl(thumbUrl);
+  const preview = useBlobUrl(previewUrl);
+  const src = preview.src ?? thumb.src;
+  const loading = !preview.src && !thumb.src && (preview.loading || thumb.loading);
+  const error = preview.error && !thumb.src ? preview.error : null;
+  const showingHighRes = preview.src !== null;
 
   // Cursor-anchored zoom step. `factor > 1` zooms in, `< 1` zooms out.
   const zoomAroundCursor = useCallback(
@@ -310,11 +333,17 @@ function ViewerPane({
               transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`,
               transformOrigin: "center center",
               willChange: "transform",
+              filter: showingHighRes ? undefined : "blur(2px)",
               transition: draggingRef.current
                 ? "none"
-                : "transform 50ms ease-out",
+                : "transform 50ms ease-out, filter 200ms ease-out",
             }}
           />
+        )}
+        {currentImage && !showingHighRes && thumb.src && preview.loading && (
+          <div className="absolute top-2 right-2 text-[10px] text-white/70 bg-black/40 px-2 py-1 rounded animate-pulse">
+            Loading high-res…
+          </div>
         )}
       </div>
 
@@ -345,7 +374,7 @@ function Thumbnail({
   active: boolean;
   onClick: () => void;
 }) {
-  const { src, loading } = useBlobUrl(buildFileUrl(image.id, true, 200));
+  const { src, loading } = useBlobUrl(buildFileUrl(image.id, "thumb", 200));
   return (
     <button
       onClick={onClick}
@@ -485,6 +514,50 @@ export default function DriveQA() {
   useEffect(() => {
     setResultTransform(INITIAL_TRANSFORM);
   }, [resultIndex, selectedSceneId]);
+
+  // Prefetch neighbours so D / → feel instant: when the user lands on an
+  // image, fire-and-forget requests for ±1 in the same list. The backend
+  // caches the response so the actual navigation just reads from cache.
+  useEffect(() => {
+    const assets = sceneDetail?.assets ?? [];
+    const results = sceneDetail?.results ?? [];
+
+    function prefetch(url: string | null) {
+      if (!url) return;
+      fetch(url, { headers: authHeaders() }).catch(() => {});
+    }
+
+    function neighbour(list: QAImage[], i: number, delta: number) {
+      if (list.length < 2) return null;
+      const idx = (i + delta + list.length) % list.length;
+      return list[idx]?.id ?? null;
+    }
+
+    const nextAsset = neighbour(assets, assetIndex, 1);
+    const prevAsset = neighbour(assets, assetIndex, -1);
+    const nextResult = neighbour(results, resultIndex, 1);
+    const prevResult = neighbour(results, resultIndex, -1);
+
+    if (nextAsset) prefetch(buildFileUrl(nextAsset, "preview"));
+    if (prevAsset) prefetch(buildFileUrl(prevAsset, "preview"));
+    if (nextResult) prefetch(buildFileUrl(nextResult, "preview"));
+    if (prevResult) prefetch(buildFileUrl(prevResult, "preview"));
+  }, [sceneDetail, assetIndex, resultIndex]);
+
+  // Prefetch the next scene's first image too, so ↓ feels snappy.
+  useEffect(() => {
+    if (!selectedSceneId || scenes.length < 2) return;
+    const idx = scenes.findIndex((s) => s.id === selectedSceneId);
+    if (idx < 0) return;
+    const nextScene = scenes[(idx + 1) % scenes.length];
+    if (!nextScene) return;
+    // The scene detail isn't cached client-side yet, so we just warm the
+    // backend's per-scene response. The image proxy cache takes over once
+    // the user actually visits the scene.
+    fetch(`${config.apiBaseUrl}/drive-qa/scenes/${nextScene.id}`, {
+      headers: authHeaders(),
+    }).catch(() => {});
+  }, [selectedSceneId, scenes]);
 
   const currentReview = selectedSceneId ? reviews[selectedSceneId] : undefined;
   const currentStatus: ReviewStatus = currentReview?.status ?? "pending";
