@@ -12,8 +12,10 @@ Exposes:
 
 from __future__ import annotations
 
-import httpx
-from fastapi import APIRouter, Depends, HTTPException, Query
+import hashlib
+from typing import Optional
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from fastapi.responses import Response
 
 from core.auth import get_current_user
@@ -81,7 +83,12 @@ async def get_file_bytes(
     file_id: str,
     _: dict = Depends(get_current_user),
 ) -> Response:
-    """Stream the full image bytes for a Drive file."""
+    """Stream the full (original) image bytes for a Drive file.
+
+    Cached server-side; large files (multi-MB) so still slower than `preview`.
+    Use this only when the viewer needs the source quality (e.g. "Original"
+    button).
+    """
     service = DriveQAService()
     success, content, mime_type, error = await service.download_file(file_id)
     if not success or content is None:
@@ -93,41 +100,70 @@ async def get_file_bytes(
     )
 
 
+def _image_response(
+    content: bytes,
+    mime: Optional[str],
+    file_id: str,
+    variant: str,
+    size: int,
+    if_none_match: Optional[str],
+) -> Response:
+    """Return image bytes with ETag + Cache-Control headers, or 304 if the
+    client already has the same version."""
+    # ETag built from path + size + a hash of the bytes so it changes when
+    # the underlying file does.
+    digest = hashlib.sha1(content).hexdigest()[:16]
+    etag = f'W/"{file_id}-{variant}-{size}-{digest}"'
+    if if_none_match and if_none_match.strip() == etag:
+        return Response(status_code=304)
+    return Response(
+        content=content,
+        media_type=mime or "image/jpeg",
+        headers={
+            "Cache-Control": "private, max-age=86400",
+            "ETag": etag,
+        },
+    )
+
+
+@router.get("/file/{file_id}/preview")
+async def get_file_preview(
+    file_id: str,
+    size: int = Query(2000, ge=200, le=4000),
+    if_none_match: Optional[str] = Header(None, alias="If-None-Match"),
+    _: dict = Depends(get_current_user),
+) -> Response:
+    """Medium-resolution JPEG preview (default for the main viewer pane).
+
+    Served from the backend's in-memory TTLCache after the first hit. Returns
+    304 Not Modified when the browser already has the same ETag.
+    """
+    service = DriveQAService()
+    success, content, mime, error = await service.get_preview_bytes(
+        file_id, size_px=size
+    )
+    if not success or content is None:
+        raise HTTPException(status_code=502, detail=error or "Drive preview unavailable")
+    return _image_response(content, mime, file_id, "preview", size, if_none_match)
+
+
 @router.get("/file/{file_id}/thumbnail")
 async def get_file_thumbnail(
     file_id: str,
-    size: int = Query(400, ge=64, le=2000),
+    size: int = Query(400, ge=64, le=600),
+    if_none_match: Optional[str] = Header(None, alias="If-None-Match"),
     _: dict = Depends(get_current_user),
 ) -> Response:
-    """Proxy a Drive-generated thumbnail (smaller than the full image)."""
+    """Small thumbnail (≤600px) for the thumbnails strip."""
     service = DriveQAService()
-    success, url, error = await service.get_thumbnail_url(file_id, size_px=size)
-    if not success or not url:
-        # Fall back to the full image if the thumbnail is unavailable.
-        full_success, content, mime, full_error = await service.download_file(file_id)
-        if not full_success or content is None:
-            raise HTTPException(
-                status_code=502,
-                detail=error or full_error or "Drive thumbnail unavailable",
-            )
-        return Response(
-            content=content,
-            media_type=mime or "image/jpeg",
-            headers={"Cache-Control": "private, max-age=3600"},
-        )
-
-    try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            r = await client.get(url)
-            r.raise_for_status()
-    except httpx.HTTPError as e:
-        raise HTTPException(status_code=502, detail=f"Thumbnail fetch failed: {e}")
-
-    return Response(
-        content=r.content,
-        media_type=r.headers.get("content-type", "image/jpeg"),
-        headers={"Cache-Control": "private, max-age=3600"},
+    success, content, mime, error = await service.get_preview_bytes(
+        file_id, size_px=size
     )
+    if not success or content is None:
+        raise HTTPException(
+            status_code=502, detail=error or "Drive thumbnail unavailable"
+        )
+    return _image_response(content, mime, file_id, "thumb", size, if_none_match)
 
 
 # ---------------------------------------------------------------------------
