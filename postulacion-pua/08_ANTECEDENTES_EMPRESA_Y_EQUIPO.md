@@ -21,18 +21,18 @@ comunidad en torno a la nueva animación con IA.
 
 **Antecedentes / trayectoria:**
 
-- **Tres cortometrajes** realizados con su pipeline AI-Native, **presentados en festivales de cine de la
-  región**. ‹Completar títulos, años y festivales›
+- **Tres cortometrajes** realizados con su pipeline AI-Native, **presentados en festivales y mercados de la
+  región** (entre ellos **Ventana Sur 2025** y el **Sticks n' Festival**).
 - **Servicio de producción** en curso para una **serie web en Estados Unidos**. ‹Completar título/cliente›
 - Organiza su propio festival, **Sticks n' Festival**, dedicado a la nueva creación audiovisual. ‹Completar
   edición/año›
 - Desarrolla *El hombre que pensó que estaba pensando* junto al director **Federico Veiroj**.
 
-| Año | Título / Proyecto | Formato | Rol | Hitos (festivales / premios) |
-|-----|-------------------|---------|-----|------------------------------|
-| ‹› | ‹Cortometraje 1› | Cortometraje (animación IA) | Productora | ‹Festival(es) de la región› |
-| ‹› | ‹Cortometraje 2› | Cortometraje (animación IA) | Productora | ‹Festival(es) de la región› |
-| ‹› | ‹Cortometraje 3› | Cortometraje (animación IA) | Productora | ‹Festival(es) de la región› |
+| Año | Título / Proyecto | Formato | Rol | Hitos (festivales / mercados) |
+|-----|-------------------|---------|-----|-------------------------------|
+| 2026 | *Something Is Shifting (And We All Know It)* | Cortometraje (animación IA) | Productora | Sticks n' Festival |
+| 2025 | *Lucy's Strange Encounter* | Cortometraje (animación IA) | Productora | ‹Festival(es) a completar› |
+| 2025 | *TINK* | Cortometraje (animación IA) | Productora | **Ventana Sur 2025** |
 | ‹› | ‹Serie web (EE.UU.)› | Serie web | Servicio de producción | En curso |
 | ‹› | Sticks n' Festival | Festival | Organizadora | ‹Edición / año› |
 
@@ -78,7 +78,7 @@ fija, una fe o una culpa, en un registro que combina lo cómico y lo melancólic
 ### Pendientes
 
 - [ ] Completar la filmografía real de Federico Veiroj con títulos, años, festivales y premios.
-- [ ] Completar títulos/años/festivales de los **tres cortometrajes** de VELIDER, la **serie web (EE.UU.)** y el **Sticks n' Festival**.
+- [ ] Completar festivales de *Lucy's Strange Encounter*, el título/cliente de la **serie web (EE.UU.)** y la edición/año del **Sticks n' Festival**.
 - [ ] Adjuntar CVs firmados del equipo y cartas de compromiso.
 - [ ] Completar antecedentes y rendiciones previas de la empresa ante ICAU/ACAU.
 - [ ] Confirmar elenco y adjuntar cartas de interés.
