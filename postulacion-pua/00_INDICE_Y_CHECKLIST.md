@@ -3,11 +3,15 @@
 **Proyecto:** *El hombre que pensó que estaba pensando* — Largometraje de **animación** (ficción)
 **Línea PUA:** Producción de Contenidos Audiovisuales (Nacional) — Ventanilla abierta
 
-> ⚠️ **PENDIENTE DE REVISIÓN — OBRA ANIMADA:** los documentos **04 (puesta en escena), 05 (producción y
-> cronograma) y 06 (presupuesto)** fueron redactados asumiendo **imagen real** y deben reescribirse para
-> **animación** (técnica, pipeline, estudio de animación, etapas layout/animática/animación/composición,
-> cronograma típico de 18–36 meses, estructura de costos por animación, voces en lugar de casting en set).
-> A definir la **técnica** antes de rehacerlos.
+> ⚠️ **PENDIENTE DE REVISIÓN — ANIMACIÓN CON IA GENERATIVA:** los documentos **04 (puesta en escena),
+> 05 (producción y cronograma) y 06 (presupuesto)** fueron redactados asumiendo **imagen real** y deben
+> reescribirse para un **pipeline de animación con IA generativa** (diseño de arte y consistencia de
+> personajes/mundos, generación de imagen e image-to-video, lipsync, voces, composición, montaje, sonido).
+> Esto reduce equipo, cronograma y costo respecto de imagen real o animación tradicional.
+>
+> ⚠️ **VERIFICAR ELEGIBILIDAD:** confirmar con ACAU/ICAU si la **obra generada con IA** es admisible en la
+> línea, y cómo se evalúan en ese marco la **autoría**, el **carácter nacional** (gasto/talento uruguayo) y
+> la **titularidad de derechos** de los materiales generados. Consultar a `pua.icau@mec.gub.uy` antes de postular.
 **Empresa postulante:** VELIDER SAS (nombre fantasía: Souts) — RUT 220073360012, Montevideo
 
 ---

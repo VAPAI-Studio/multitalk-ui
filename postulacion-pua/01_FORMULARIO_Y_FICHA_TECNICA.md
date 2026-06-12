@@ -11,7 +11,7 @@
 | Título internacional | The Man Who Thought He Was Thinking |
 | Título de trabajo alterno | — |
 | Formato | **Largometraje de animación** |
-| Técnica de animación | ‹A CONFIRMAR — 2D, 3D/CGI, stop-motion, recortes, técnica mixta› |
+| Técnica de animación | **Animación generada con Inteligencia Artificial (IA generativa)** — pipeline de generación de imagen, image-to-video, lipsync y voces |
 | Género | Ficción animada — comedia dramática / fábula existencial (autor, con elementos surreales) |
 | Duración estimada | 95–105 min ‹BORRADOR› |
 | Soporte / entrega | Digital — máster 4K ‹A CONFIRMAR› |
