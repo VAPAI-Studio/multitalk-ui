@@ -97,9 +97,9 @@
 
 | Campo | Valor |
 |-------|-------|
-| Base de costeo | USD 2.500 por minuto de película terminada |
-| Presupuesto total estimado | USD 250.000 ‹BORRADOR› (≈ 100 min) |
-| Monto solicitado al PUA | USD 90.000 ‹BORRADOR› |
+| Base de costeo | Por minuto de película terminada (piso USD 2.500/min; objetivo ≈ USD 4.000/min) |
+| Presupuesto total estimado | USD 400.000 ‹BORRADOR› (≈ 100 min) |
+| Monto solicitado al PUA | USD 144.000 ‹BORRADOR› |
 | % financiación confirmada al postular | ~32 % ‹A CONFIRMAR› |
 | Modalidad de producción | Animación con IA generativa (sin rodaje de imagen real) |
 | Plazo de ejecución | 12 meses desde la firma ‹BORRADOR› |
