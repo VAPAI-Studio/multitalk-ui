@@ -67,25 +67,27 @@ preproducción, actores, postproducción y generales (USD 150.000)**.
 
 | Fuente | USD | % | Estado |
 |--------|----:|--:|--------|
-| **PUA — Producción (apoyo solicitado)** | 144.000 | 36 % | 🟡 En gestión (esta postulación) |
-| FONA / Concurso de Fomento Cinematográfico | 64.000 | 16 % | 🟡 A gestionar |
-| Aporte de la empresa productora (efectivo + servicios + pipeline propio) | 80.000 | 20 % | 🟢 Confirmado |
-| Salarios y servicios **diferidos** del equipo | 36.000 | 9 % | 🟢 Comprometido |
-| Programa Ibermedia — Desarrollo (ya ejecutado) | 12.000 | 3 % | 🟢 Confirmado |
-| Preventa / coproducción TV pública (TNU / TV Ciudad) | 28.000 | 7 % | 🟡 Carta de interés |
-| Sponsors, fundaciones y becas privadas | 24.000 | 6 % | 🟡 En gestión |
-| Anticipo / MG de agente de ventas o distribuidor | 12.000 | 3 % | 🟡 En negociación |
+| **Aporte de la empresa productora (VELIDER SAS / Souts)** | 70.000 | 18 % | 🟢 Confirmado |
+| **PUA — Producción (apoyo solicitado)** | 144.000 | 36 % | 🟡 Solicitado (esta postulación) |
+| FONA / Concurso de Fomento Cinematográfico | 60.000 | 15 % | 🔴 A gestionar |
+| Preventa / coproducción TV pública (TNU / TV Ciudad) | 40.000 | 10 % | 🔴 A gestionar |
+| Sponsors, fundaciones y becas privadas | 46.000 | 12 % | 🔴 A gestionar |
+| Programa Ibermedia | 20.000 | 5 % | 🔴 A gestionar |
+| Anticipo / MG de agente de ventas o distribuidor | 20.000 | 5 % | 🔴 A gestionar |
 | **TOTAL** | **400.000** | **100 %** | |
 
 ### Resumen de confirmación
 
 | | USD | % del total |
 |---|----:|--:|
-| **Confirmado / comprometido** (🟢) | 128.000 | ~32 % |
-| En gestión / cartas de interés (🟡) | 272.000 | ~68 % |
+| **Confirmado** (🟢) — aporte VELIDER SAS | 70.000 | ~18 % |
+| Solicitado al PUA (🟡) | 144.000 | ~36 % |
+| A gestionar (🔴) | 186.000 | ~46 % |
 
-> ⚠️ Si las bases exigen un **mínimo de financiación confirmada**, elevar la porción confirmada con fondos ya
-> adjudicados y cartas de compromiso firmes antes de postular. ‹A CONFIRMAR contra bases›
+> ⚠️ **Punto crítico:** hoy la única financiación confirmada es el **aporte propio de VELIDER SAS (USD 70.000,
+> ~18 %)**. Si las bases del PUA exigen un **mínimo de financiación confirmada** al momento de postular,
+> habrá que **elevar esa porción** antes de enviar (p. ej. cerrando FONA, una preventa de TV o un sponsor, o
+> aumentando el aporte propio). **Verificar el umbral exacto contra las bases vigentes.** ‹A CONFIRMAR›
 
 ---
 

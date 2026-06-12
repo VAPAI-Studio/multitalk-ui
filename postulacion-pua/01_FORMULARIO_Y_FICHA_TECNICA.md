@@ -100,6 +100,6 @@
 | Base de costeo | Por minuto de película terminada (piso USD 2.500/min; objetivo ≈ USD 4.000/min) |
 | Presupuesto total estimado | USD 400.000 ‹BORRADOR› (≈ 100 min) |
 | Monto solicitado al PUA | USD 144.000 ‹BORRADOR› |
-| % financiación confirmada al postular | ~32 % ‹A CONFIRMAR› |
+| % financiación confirmada al postular | ~18 % (aporte VELIDER SAS USD 70.000) ‹A CONFIRMAR umbral exigido› |
 | Modalidad de producción | Animación con IA generativa (sin rodaje de imagen real) |
 | Plazo de ejecución | 12 meses desde la firma ‹BORRADOR› |
