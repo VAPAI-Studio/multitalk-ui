@@ -7,8 +7,8 @@
 
 | Campo | Valor |
 |-------|-------|
-| Título | **El hombre que pensó que estaba pensando** |
-| Título internacional | The Man Who Thought He Was Thinking |
+| Título | **The Man Who Thought He Was Thinking** |
+| Título en español / original | El hombre que pensó que estaba pensando |
 | Título de trabajo alterno | — |
 | Formato | **Largometraje de animación** |
 | Técnica de animación | **Animación generada con Inteligencia Artificial (IA generativa)** — pipeline de generación de imagen, image-to-video, lipsync y voces |

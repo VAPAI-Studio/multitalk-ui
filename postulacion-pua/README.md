@@ -2,8 +2,8 @@
 
 ### Línea: Producción de Contenidos Audiovisuales — Largometraje de Ficción (Nacional)
 
-**Proyecto:** *EL HOMBRE QUE PENSÓ QUE ESTABA PENSANDO*
-*(AKA The Man Who Thought He Was Thinking)*
+**Proyecto:** *THE MAN WHO THOUGHT HE WAS THINKING*
+*(título en español: El hombre que pensó que estaba pensando)*
 
 **Dirección y guion:** Federico Veiroj
 **Técnica:** Largometraje de **animación con IA generativa** (voces de actores reales + motion capture)
