@@ -37,7 +37,7 @@ preproducción, actores, postproducción y generales (USD 150.000)**.
 | Rubro | USD | % |
 |-------|----:|--:|
 | Producción visual con IA (artistas de generación + supervisión de pipeline) | 150.000 | 38 % |
-| Cómputo, servicios de generación y licencias (Flux, Nano Banana, Seedream, LTX, Kling, Seedance) | 70.000 | 18 % |
+| Cómputo, servicios de generación y licencias (infraestructura propia UY + nube y licencias del exterior) | 70.000 | 18 % |
 | Composición e integración (continuidad, limpieza) | 30.000 | 8 % |
 | **Subtotal A** | **250.000** | **63 %** |
 
@@ -109,8 +109,15 @@ La estrategia combina **fondos públicos nacionales + regional + recursos propio
 
 - El apoyo suele instrumentarse como **devolución de un porcentaje del gasto elegible realizado en Uruguay
   (cash rebate)** y/o aporte a producción según la línea y convocatoria. **Confirmar modalidad, rubros
-  elegibles y topes**, y en particular **cómo computa el gasto en cómputo, licencias y servicios de IA**
-  (parte puede ser de proveedores del exterior y no elegible como gasto nacional).
+  elegibles y topes.**
+- **Cómputo e infraestructura de IA (clave para el gasto elegible):** el proyecto combina —
+  - **Infraestructura propia en Uruguay** (GPUs/servidores): **potencialmente elegible** como gasto nacional
+    (amortización/uso, energía, mantenimiento, operación local). ✅
+  - **Servicios de nube del exterior** (APIs de generación) y **licencias/suscripciones extranjeras**:
+    **probablemente NO elegibles** como gasto nacional. ❌
+  - **Acción:** estimar el **split nacional vs. exterior** del rubro cómputo (USD 70.000) y, donde sea
+    posible, **maximizar el uso de infraestructura propia uruguaya** para ampliar la base del cash rebate.
+    Documentar facturación local. ‹A CONFIRMAR % nacional vs. exterior›
 - Mantener separada y documentada la **trazabilidad del gasto elegible** para la rendición.
 - Prever el **flujo de caja**: el cash rebate se reembolsa contra gasto ejecutado y rendido.
 
