@@ -97,8 +97,9 @@
 
 | Campo | Valor |
 |-------|-------|
-| Presupuesto total estimado | USD 980.000 ‹BORRADOR› |
-| Monto solicitado al PUA | USD 290.000 ‹BORRADOR› |
-| % financiación confirmada al postular | ‹A CONFIRMAR› % |
-| Semanas de rodaje | 6 semanas (≈ 30 jornadas) ‹BORRADOR› |
-| Plazo de ejecución | 14 meses desde la firma ‹BORRADOR› |
+| Base de costeo | USD 2.500 por minuto de película terminada |
+| Presupuesto total estimado | USD 250.000 ‹BORRADOR› (≈ 100 min) |
+| Monto solicitado al PUA | USD 90.000 ‹BORRADOR› |
+| % financiación confirmada al postular | ~32 % ‹A CONFIRMAR› |
+| Modalidad de producción | Animación con IA generativa (sin rodaje de imagen real) |
+| Plazo de ejecución | 12 meses desde la firma ‹BORRADOR› |
