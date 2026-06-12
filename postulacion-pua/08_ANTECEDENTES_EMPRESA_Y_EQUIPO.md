@@ -23,9 +23,10 @@ comunidad en torno a la nueva animación con IA.
 
 - **Tres cortometrajes** realizados con su pipeline AI-Native, **presentados en festivales y mercados de la
   región** (entre ellos **Ventana Sur 2025** y el **Sticks n' Festival**).
-- **Servicio de producción** en curso para una **serie web en Estados Unidos**. ‹Completar título/cliente›
-- Organiza su propio festival, **Sticks n' Festival**, dedicado a la nueva creación audiovisual. ‹Completar
-  edición/año›
+- **Servicio de producción** en curso para la **serie web *Max Wild*** (Estados Unidos, para **YouTube**),
+  realizando la **animación completa**.
+- Organiza su propio festival, **Sticks n' Festival** —**primera edición en 2026**—, dedicado a
+  **cortometrajes internacionales hechos con IA**.
 - Desarrolla *El hombre que pensó que estaba pensando* junto al director **Federico Veiroj**.
 
 | Año | Título / Proyecto | Formato | Rol | Hitos (festivales / mercados) |
@@ -33,8 +34,8 @@ comunidad en torno a la nueva animación con IA.
 | 2026 | *Something Is Shifting (And We All Know It)* | Cortometraje (animación IA) | Productora | Sticks n' Festival |
 | 2025 | *Lucy's Strange Encounter* | Cortometraje (animación IA) | Productora | ‹Festival(es) a completar› |
 | 2025 | *TINK* | Cortometraje (animación IA) | Productora | **Ventana Sur 2025** |
-| ‹› | ‹Serie web (EE.UU.)› | Serie web | Servicio de producción | En curso |
-| ‹› | Sticks n' Festival | Festival | Organizadora | ‹Edición / año› |
+| 2026 | *Max Wild* (EE.UU. · YouTube) | Serie web | Servicio — animación completa | En curso |
+| 2026 | Sticks n' Festival | Festival (cortos de IA internacionales) | Organizadora | 1.ª edición |
 
 ---
 
@@ -78,7 +79,7 @@ fija, una fe o una culpa, en un registro que combina lo cómico y lo melancólic
 ### Pendientes
 
 - [ ] Completar la filmografía real de Federico Veiroj con títulos, años, festivales y premios.
-- [ ] Completar festivales de *Lucy's Strange Encounter*, el título/cliente de la **serie web (EE.UU.)** y la edición/año del **Sticks n' Festival**.
+- [ ] Completar festivales de *Lucy's Strange Encounter*.
 - [ ] Adjuntar CVs firmados del equipo y cartas de compromiso.
 - [ ] Completar antecedentes y rendiciones previas de la empresa ante ICAU/ACAU.
 - [ ] Confirmar elenco y adjuntar cartas de interés.
