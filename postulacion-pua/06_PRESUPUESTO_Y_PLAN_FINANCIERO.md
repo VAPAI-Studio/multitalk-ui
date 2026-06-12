@@ -69,10 +69,10 @@ preproducción, actores, postproducción y generales (USD 150.000)**.
 |--------|----:|--:|--------|
 | **Aporte de la empresa productora (VELIDER SAS / Souts)** | 70.000 | 18 % | 🟢 Confirmado |
 | **PUA — Producción (apoyo solicitado)** | 144.000 | 36 % | 🟡 Solicitado (esta postulación) |
-| FONA / Concurso de Fomento Cinematográfico | 60.000 | 15 % | 🔴 A gestionar |
+| FONA / Concurso de Fomento Cinematográfico | 60.000 | 15 % | 🟡 A postular (convocatoria) |
+| Programa Ibermedia | 20.000 | 5 % | 🟡 A postular (convocatoria) |
 | Preventa / coproducción TV pública (TNU / TV Ciudad) | 40.000 | 10 % | 🔴 A gestionar |
 | Sponsors, fundaciones y becas privadas | 46.000 | 12 % | 🔴 A gestionar |
-| Programa Ibermedia | 20.000 | 5 % | 🔴 A gestionar |
 | Anticipo / MG de agente de ventas o distribuidor | 20.000 | 5 % | 🔴 A gestionar |
 | **TOTAL** | **400.000** | **100 %** | |
 
@@ -81,13 +81,27 @@ preproducción, actores, postproducción y generales (USD 150.000)**.
 | | USD | % del total |
 |---|----:|--:|
 | **Confirmado** (🟢) — aporte VELIDER SAS | 70.000 | ~18 % |
-| Solicitado al PUA (🟡) | 144.000 | ~36 % |
-| A gestionar (🔴) | 186.000 | ~46 % |
+| A postular en fondos públicos (🟡) — PUA + FONA + Ibermedia | 224.000 | ~56 % |
+| A gestionar (🔴) — TV, sponsors, ventas | 106.000 | ~26 % |
 
 > ⚠️ **Punto crítico:** hoy la única financiación confirmada es el **aporte propio de VELIDER SAS (USD 70.000,
 > ~18 %)**. Si las bases del PUA exigen un **mínimo de financiación confirmada** al momento de postular,
 > habrá que **elevar esa porción** antes de enviar (p. ej. cerrando FONA, una preventa de TV o un sponsor, o
 > aumentando el aporte propio). **Verificar el umbral exacto contra las bases vigentes.** ‹A CONFIRMAR›
+
+### Hoja de ruta de financiación
+
+La estrategia combina **fondos públicos nacionales + regional + recursos propios y privados**. El proyecto
+**se postulará a varias convocatorias**:
+
+1. **PUA — Producción** (esta postulación): USD 144.000 solicitados.
+2. **FONA / Concurso de Fomento Cinematográfico**: USD 60.000 — postular en la convocatoria correspondiente.
+3. **Ibermedia**: USD 20.000 — postular en la línea aplicable (ver nota de compatibilidad).
+4. **TV pública, sponsors y agente de ventas**: gestión en paralelo (USD 106.000).
+
+> Ordenar el **calendario de convocatorias** (PUA, FONA, Ibermedia) según sus fechas de apertura y verificar
+> **compatibilidad y acumulación** entre fondos públicos (algunos topes limitan el % de apoyo público total).
+> ‹A CONFIRMAR reglas de compatibilidad y plazos de cada convocatoria›
 
 ---
 
