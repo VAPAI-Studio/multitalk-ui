@@ -10,11 +10,12 @@
 | Título | **El hombre que pensó que estaba pensando** |
 | Título internacional | The Man Who Thought He Was Thinking |
 | Título de trabajo alterno | — |
-| Formato | Largometraje |
-| Género | Ficción — comedia dramática / fábula existencial (drama de autor con elementos surreales) |
+| Formato | **Largometraje de animación** |
+| Técnica de animación | ‹A CONFIRMAR — 2D, 3D/CGI, stop-motion, recortes, técnica mixta› |
+| Género | Ficción animada — comedia dramática / fábula existencial (autor, con elementos surreales) |
 | Duración estimada | 95–105 min ‹BORRADOR› |
-| Soporte de rodaje | Digital — captura 4K ‹A CONFIRMAR› |
-| Relación de aspecto | 1.66:1 ‹A CONFIRMAR según propuesta de foto› |
+| Soporte / entrega | Digital — máster 4K ‹A CONFIRMAR› |
+| Relación de aspecto | 1.66:1 ‹A CONFIRMAR según propuesta visual› |
 | Color | Color con tratamiento desaturado / pasajes en clave de grises (ver doc. 04) |
 | Idioma principal | Español |
 | Otros idiomas en pantalla | Inglés, alemán, yiddish (diálogos puntuales) |

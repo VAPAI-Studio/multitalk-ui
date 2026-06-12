@@ -1,7 +1,13 @@
 # 00 · Índice maestro y checklist de postulación
 
-**Proyecto:** *El hombre que pensó que estaba pensando* — Largometraje de ficción
+**Proyecto:** *El hombre que pensó que estaba pensando* — Largometraje de **animación** (ficción)
 **Línea PUA:** Producción de Contenidos Audiovisuales (Nacional) — Ventanilla abierta
+
+> ⚠️ **PENDIENTE DE REVISIÓN — OBRA ANIMADA:** los documentos **04 (puesta en escena), 05 (producción y
+> cronograma) y 06 (presupuesto)** fueron redactados asumiendo **imagen real** y deben reescribirse para
+> **animación** (técnica, pipeline, estudio de animación, etapas layout/animática/animación/composición,
+> cronograma típico de 18–36 meses, estructura de costos por animación, voces en lugar de casting en set).
+> A definir la **técnica** antes de rehacerlos.
 **Empresa postulante:** VELIDER SAS (nombre fantasía: Souts) — RUT 220073360012, Montevideo
 
 ---
