@@ -110,6 +110,10 @@ La estrategia combina **fondos públicos nacionales + regional + recursos propio
 - El apoyo suele instrumentarse como **devolución de un porcentaje del gasto elegible realizado en Uruguay
   (cash rebate)** y/o aporte a producción según la línea y convocatoria. **Confirmar modalidad, rubros
   elegibles y topes.**
+- **Gasto elegible nacional (fortaleza del proyecto):** la mayor parte del presupuesto es **talento y
+  servicios uruguayos** y, por tanto, gasto elegible: dirección creativa, artistas de IA, supervisión de
+  pipeline, composición/integración, montaje, sonido, música, **voces (actores y estudio uruguayos)** y
+  **motion capture (en Uruguay)** — todo se realiza en el país. ✅
 - **Cómputo e infraestructura de IA (clave para el gasto elegible):** el proyecto combina —
   - **Infraestructura propia en Uruguay** (GPUs/servidores): **potencialmente elegible** como gasto nacional
     (amortización/uso, energía, mantenimiento, operación local). ✅

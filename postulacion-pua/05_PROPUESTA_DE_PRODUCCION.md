@@ -19,8 +19,9 @@ Esta metodología:
 - **reduce drásticamente cronograma y costo** frente a la animación tradicional o la imagen real, y
 - posiciona a la productora en la **vanguardia técnica** del cine animado.
 
-> Las únicas instancias con presencia física son la **grabación de voces** (estudio) y las sesiones de
-> **motion capture**; todo lo demás es trabajo de pipeline digital.
+> Las únicas instancias con presencia física son la **grabación de voces** (actores y estudio **uruguayos**)
+> y las sesiones de **motion capture** (**en Uruguay**); todo lo demás es trabajo de pipeline digital. Todo
+> el proceso se realiza en el país, lo que refuerza el **gasto elegible nacional** y el carácter uruguayo.
 >
 > **Coproducción:** el aporte uruguayo es **mayoritario** y conserva el carácter nacional para el PUA; el
 > coproductor minoritario extranjero (‹país/empresa a definir›) habilita la postulación a **Ibermedia
