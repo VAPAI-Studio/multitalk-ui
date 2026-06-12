@@ -1,0 +1,67 @@
+# 00 · Índice maestro y checklist de postulación
+
+**Proyecto:** *El hombre que pensó que estaba pensando* — Largometraje de ficción
+**Línea PUA:** Producción de Contenidos Audiovisuales (Nacional) — Ventanilla abierta
+**Empresa postulante:** ‹BORRADOR› Keen Tales Producciones SRL (Uruguay)
+
+---
+
+## A. Checklist de requisitos de elegibilidad
+
+> Verificar cada punto contra las **bases vigentes** de la convocatoria antes de enviar.
+
+- [ ] Postulante es **persona jurídica uruguaya** formalmente constituida, con domicilio permanente en Uruguay.
+- [ ] La empresa tiene **al menos 12 meses** de iniciada su actividad al momento de postular. ‹A CONFIRMAR›
+- [ ] Objeto social vinculado a la **producción audiovisual**.
+- [ ] El proyecto es un **largometraje de ficción** (duración ≥ 60 min). ✔ (~95–105 min estimados)
+- [ ] El proyecto cuenta con **carácter nacional** según los criterios del ICAU (dirección, guion, empresa, equipo, etc.). ✔
+- [ ] Porcentaje de **financiación confirmada** según exige la convocatoria. ‹A CONFIRMAR› (ver doc. 06)
+- [ ] La empresa **no tiene rendiciones pendientes** ni incumplimientos con ICAU/ACAU. ‹A CONFIRMAR›
+- [ ] Plazo de ejecución dentro del máximo previsto por las bases. ‹A CONFIRMAR›
+- [ ] Cumple topes mínimos/máximos de gasto elegible y de apoyo de la convocatoria. ‹A CONFIRMAR›
+
+---
+
+## B. Checklist de documentos de la carpeta
+
+| # | Documento | Estado | Notas |
+|---|-----------|:------:|-------|
+| 01 | Formulario / ficha técnica | ✅ borrador | Confirmar datos legales y cifras |
+| 02 | Logline y sinopsis | ✅ | Texto definitivo a partir del guion |
+| 03 | Nota de intención de dirección | ✅ | Revisar/aprobar por F. Veiroj |
+| 04 | Propuesta de puesta en escena | ✅ | Sumar referencias visuales (moodboard) |
+| 05 | Propuesta de producción + cronograma | ✅ borrador | Ajustar fechas y semanas de rodaje |
+| 06 | Presupuesto + plan financiero | ⚠️ borrador | **Reemplazar por presupuesto real (planilla ICAU)** |
+| 07 | Estrategia de distribución y festivales | ✅ | Confirmar agente de ventas / distribuidor |
+| 08 | Antecedentes empresa + equipo | ✅ borrador | Completar filmografías y CVs reales |
+| 09 | Declaraciones y anexos | ⚠️ | Adjuntar documentación legal real |
+
+---
+
+## C. Anexos a adjuntar (archivos fuera de esta carpeta)
+
+- [ ] **Guion completo** (PDF) — *El hombre que pensó que estaba pensando* (90 pp.)
+- [ ] **Presupuesto detallado** en planilla oficial ICAU/ACAU (xls)
+- [ ] **Plan financiero** con cartas de compromiso / fuentes confirmadas
+- [ ] **Cronograma** (desarrollo → preproducción → rodaje → post → estreno)
+- [ ] **Certificado notarial** de existencia y vigencia de la persona jurídica
+- [ ] **Certificado de regularidad** (DGI / BPS) ‹A CONFIRMAR›
+- [ ] **Estatutos** y constancia de objeto social
+- [ ] **Cesión de derechos** del guion a la productora (contrato guionistas → productora)
+- [ ] **Cartas de compromiso** del equipo clave (dirección, dirección de fotografía, etc.)
+- [ ] **Cartas de interés** de coproductores asociados / agente de ventas / distribuidor (si las hubiera)
+- [ ] **Biofilmografías y CVs** del equipo y antecedentes de la empresa
+- [ ] **Material visual de referencia** (moodboard / lookbook) — opcional, recomendado
+
+---
+
+## D. Datos clave de la convocatoria (a completar al postular)
+
+| Campo | Valor |
+|-------|-------|
+| Convocatoria / año | ‹A CONFIRMAR — convocatoria vigente› |
+| Modalidad | Ventanilla abierta |
+| Fecha de postulación | ‹A CONFIRMAR› |
+| Monto solicitado al PUA | ‹BORRADOR› (ver doc. 06) |
+| Plazo de ejecución propuesto | ‹BORRADOR› (ver doc. 05) |
+| Correo de consultas | pua.icau@mec.gub.uy |
