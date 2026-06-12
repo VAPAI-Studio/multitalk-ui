@@ -11,7 +11,7 @@
 **Nombre comercial / fantasía:** Souts
 **País / domicilio:** Uruguay — Saldanha da Gama 3918, Montevideo
 **RUT:** 220073360012
-**Constitución / antigüedad:** ‹A CONFIRMAR — acreditar ≥ 12 meses de actividad›
+**Constitución / antigüedad:** Abril de 2025 — ≈ 14 meses de actividad (cumple el mínimo de 12 meses; confirmar fecha exacta con certificado notarial)
 **Objeto:** producción de contenidos audiovisuales (cine, series, publicidad).
 
 **Perfil:** productora uruguaya dedicada al cine de autor con proyección internacional. Desarrolla

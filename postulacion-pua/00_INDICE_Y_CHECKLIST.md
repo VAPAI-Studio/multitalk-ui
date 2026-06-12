@@ -11,7 +11,7 @@
 > Verificar cada punto contra las **bases vigentes** de la convocatoria antes de enviar.
 
 - [ ] Postulante es **persona jurídica uruguaya** formalmente constituida, con domicilio permanente en Uruguay.
-- [ ] La empresa tiene **al menos 12 meses** de iniciada su actividad al momento de postular. ‹A CONFIRMAR›
+- [x] La empresa tiene **al menos 12 meses** de iniciada su actividad al momento de postular. (Constituida abril 2025 ≈ 14 meses; confirmar fecha exacta)
 - [ ] Objeto social vinculado a la **producción audiovisual**.
 - [ ] El proyecto es un **largometraje de ficción** (duración ≥ 60 min). ✔ (~95–105 min estimados)
 - [ ] El proyecto cuenta con **carácter nacional** según los criterios del ICAU (dirección, guion, empresa, equipo, etc.). ✔

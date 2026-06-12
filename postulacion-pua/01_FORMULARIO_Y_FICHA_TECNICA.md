@@ -45,7 +45,7 @@
 | Nombre comercial / fantasía | **Souts** |
 | RUT | **220073360012** |
 | Domicilio | **Saldanha da Gama 3918**, Montevideo, Uruguay |
-| Fecha de constitución | ‹A CONFIRMAR› (debe acreditar ≥ 12 meses de actividad) |
+| Fecha de constitución | Abril de 2025 (≈ 14 meses de actividad → cumple el mínimo de 12 meses) |
 | Representante legal | ‹A CONFIRMAR› |
 | Productor/a responsable | ‹A CONFIRMAR› |
 | Email / teléfono | ‹A CONFIRMAR› |
