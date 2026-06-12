@@ -57,7 +57,7 @@
 - [ ] **Certificado de regularidad** (DGI / BPS) ‹A CONFIRMAR›
 - [ ] **Estatutos** y constancia de objeto social
 - [ ] **Cesión de derechos** del guion a la productora (guionistas / Keen Tales → VELIDER SAS) — ⏳ en proceso
-- [ ] **Cartas de compromiso** del equipo clave (dirección, dirección de fotografía, etc.)
+- [ ] **Carta de compromiso del director** (Veiroj — acuerdo existente, firmable a demanda) + resto del equipo clave
 - [ ] **Cartas de interés** de coproductores asociados / agente de ventas / distribuidor (si las hubiera)
 - [ ] **Biofilmografías y CVs** del equipo y antecedentes de la empresa
 - [ ] **Material visual de referencia** (moodboard / lookbook) — opcional, recomendado

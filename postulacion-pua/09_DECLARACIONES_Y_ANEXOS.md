@@ -15,12 +15,15 @@
 ## 2. Documentación del proyecto
 
 - [ ] **Guion completo** firmado (PDF) — *El hombre que pensó que estaba pensando*.
-- [ ] **Cesión de derechos** del guion (Federico Veiroj) / Keen Tales a la productora **VELIDER SAS** —
-      ⏳ **en proceso de cesión** (formalizar con escribano antes de postular; incluir a todo autor acreditado
-      en la portada del guion para cerrar la cadena de derechos).
+- [ ] **Cesión de derechos** del guion del autor **Federico Veiroj** (y Keen Tales) a la productora
+      **VELIDER SAS** — ⏳ **en proceso de cesión** sobre la base del **acuerdo existente con el director**;
+      formalizar con escribano antes de postular e incluir a todo autor acreditado en la portada del guion
+      para cerrar la cadena de derechos.
 - [ ] **Cadena de derechos** / titularidad de la obra y de cualquier material preexistente (incluir relación
       Keen Tales ↔ VELIDER SAS). ‹A CONFIRMAR›
-- [ ] **Cartas de compromiso** del equipo clave (dirección, fotografía, producción, etc.).
+- [ ] **Carta de compromiso del director** Federico Veiroj (dirige y es autor del guion) — existe acuerdo con
+      VELIDER SAS; **formalizar/firmar** el documento para adjuntar si la convocatoria lo requiere.
+- [ ] **Cartas de compromiso** del resto del equipo clave (producción, diseño visual, etc.).
 - [ ] **Cartas de interés / compromiso** de fuentes de financiación (ver doc. 06).
 - [ ] **Acuerdo / carta de intención de coproducción** con el coproductor minoritario extranjero (a definir),
       con reparto de aportes, territorialización del gasto y titularidad de derechos — requerido para
