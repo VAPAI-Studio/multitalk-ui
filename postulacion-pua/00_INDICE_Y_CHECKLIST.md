@@ -24,7 +24,7 @@
 - [ ] Objeto social vinculado a la **producción audiovisual**.
 - [ ] El proyecto es un **largometraje de ficción** (duración ≥ 60 min). ✔ (~95–105 min estimados)
 - [ ] El proyecto cuenta con **carácter nacional** según los criterios del ICAU (dirección, guion, empresa, equipo, etc.). ✔ (coproducción **mayoritaria uruguaya**; coproductor minoritario extranjero a definir para Ibermedia — verificar que la mayoría uruguaya preserve la elegibilidad PUA)
-- [ ] ⚠️ **Idioma principal inglés:** verificar cómo impacta en los criterios de **obra nacional** del ICAU (algunos sistemas de puntaje ponderan el idioma original). El **carácter nacional se sostiene** por dirección, empresa, equipo y gasto uruguayos. Consultar a ACAU antes de postular.
+- [ ] **Idioma principal español** (con inglés, alemán y yiddish secundarios) y **título internacional en inglés** (*The Man Who Thought He Was Thinking*). Combinación favorable al carácter nacional; verificar igualmente con ACAU el encuadre completo.
 - [ ] Porcentaje de **financiación confirmada** según exige la convocatoria. ‹A CONFIRMAR› (ver doc. 06)
 - [ ] La empresa **no tiene rendiciones pendientes** ni incumplimientos con ICAU/ACAU. ‹A CONFIRMAR›
 - [ ] Plazo de ejecución dentro del máximo previsto por las bases. ‹A CONFIRMAR›
