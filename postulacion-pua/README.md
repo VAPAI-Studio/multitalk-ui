@@ -7,6 +7,7 @@
 
 **Dirección y guion:** Federico Veiroj
 **Técnica:** Largometraje de **animación con IA generativa** (voces de actores reales + motion capture)
+**Hito:** primer **largometraje de ficción AI-Native de Uruguay** — eje de innovación/vanguardia de la postulación
 **Desarrollado por:** Keen Tales · **Productora postulante:** VELIDER SAS (Souts)
 **Estructura:** Coproducción **mayoritaria uruguaya** (coproductor minoritario extranjero a definir, para habilitar Ibermedia Producción)
 

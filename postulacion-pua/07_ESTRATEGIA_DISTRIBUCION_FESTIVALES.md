@@ -2,12 +2,34 @@
 
 ## 1. Posicionamiento
 
-*El hombre que pensó que estaba pensando* es una **película de autor con vocación internacional**: una
-tragicomedia existencial con la accesibilidad de un relato de viaje y la ambición formal de una fábula. Su
-estrategia combina **prestigio festivalero** como motor de visibilidad y **explotación multiventana** de
-largo recorrido, apalancada en el **nombre del director** y en su trayectoria en circuitos internacionales.
+*El hombre que pensó que estaba pensando* se posiciona como un **hito de innovación**: el **primer
+largometraje de ficción AI-Native producido en Uruguay**, dirigido por un autor de proyección internacional
+(**Federico Veiroj**) y realizado por **VELIDER SAS / Souts**, la primera productora AI-Native del país. El
+**ángulo de vanguardia es el eje de la estrategia**: une el prestigio del cine de autor con el atractivo
+noticioso de una obra que abre camino técnico para toda la región.
 
-## 2. Público objetivo
+Su estrategia combina **prestigio festivalero**, **relevancia tecnológica/mediática** y **explotación
+multiventana** de largo recorrido, apalancada en el nombre del director y en el carácter pionero del proyecto.
+
+## 2. Ángulo de innovación (eje de la postulación)
+
+- **Primera vez de Uruguay** en un largometraje de ficción íntegramente realizado con **IA generativa**:
+  un caso país de **vanguardia y soberanía tecnológica audiovisual**.
+- **Metodología propia** (pipeline de Souts: generación de imagen y video, lipsync/MultiTalk, integración),
+  capaz de **escalar la producción nacional** a costos antes inviables.
+- **Doble visibilidad**: circuito de cine de autor **+** prensa y foros de **tecnología, innovación y futuro
+  del audiovisual** (mercados, paneles, festivales con foco en IA/nuevas tecnologías).
+- **Posicionamiento de marca país**: Uruguay como **polo regional de cine con IA**, generando talento,
+  método exportable y atención internacional.
+- **Capacitación y derrame**: el proyecto consolida un equipo local especializado en un campo emergente.
+
+> Esta es la **carta principal** de la postulación: un proyecto que no solo cuenta una gran historia, sino
+> que **inaugura una capacidad productiva** para el sector audiovisual uruguayo.
+>
+> ⚠️ Por lo mismo, es **imprescindible** alinear con ACAU/ICAU el encuadre de la obra con IA (autoría,
+> carácter nacional, derechos): el ángulo innovador es la fortaleza y, a la vez, el punto a blindar.
+
+## 3. Público objetivo
 
 - **Núcleo:** público adulto cinéfilo (30–65), espectador de cine de autor, festivales, salas de arte y
   plataformas de catálogo curado.
@@ -16,7 +38,7 @@ largo recorrido, apalancada en el **nombre del director** y en su trayectoria en
 - **Ventaja de conexión:** pese a su forma arriesgada, el corazón **emocional y familiar** (paternidad,
   duelo, ternura) amplía el alcance más allá del nicho.
 
-## 3. Estrategia de festivales (ruta tentativa) ‹BORRADOR›
+## 4. Estrategia de festivales (ruta tentativa) ‹BORRADOR›
 
 | Etapa | Objetivo | Plazas tentativas |
 |-------|----------|-------------------|
@@ -28,13 +50,13 @@ largo recorrido, apalancada en el **nombre del director** y en su trayectoria en
 > La definición de la plaza de estreno se coordina con el **agente de ventas internacional** (clave para la
 > estrategia; ver financiación, doc. 06).
 
-## 4. Ventas internacionales y mercados
+## 5. Ventas internacionales y mercados
 
 - Incorporar **agente de ventas internacional** que acompañe desde la post.
 - Presencia en **mercados**: Marché du Film (Cannes), Ventana Sur (Buenos Aires), San Sebastián, EFM Berlín.
 - Materiales de mercado: **lookbook, teaser, EPK, press kit bilingüe** (español/inglés).
 
-## 5. Distribución y ventanas
+## 6. Distribución y ventanas
 
 | Ventana | Estrategia |
 |---------|------------|
@@ -44,14 +66,14 @@ largo recorrido, apalancada en el **nombre del director** y en su trayectoria en
 | **Plataformas (SVOD/TVOD)** | Plataformas de catálogo curado y regionales tras el recorrido en salas |
 | **Educativo / no teatral** | Universidades, muestras científicas, cineclubes (el tema lo habilita) |
 
-## 6. Marketing y comunicación
+## 7. Marketing y comunicación
 
 - Relato de prensa apoyado en la **dupla autoral** y en el ángulo temático "pensar vs. estar / la mente como
   un bosque".
 - Campaña gráfica derivada del **dibujo del cacique** (motivo visual y emocional de la película).
 - Estrategia digital sobria, coherente con el tono de autor.
 
-## 7. Impacto para el ecosistema uruguayo
+## 8. Impacto para el ecosistema uruguayo
 
 - Proyección internacional de **talento y técnica uruguayos**.
 - Caso de **producción de autor 100 % nacional** con resultado exportable.
