@@ -19,6 +19,9 @@
 - [ ] **Cadena de derechos** / titularidad de la obra y de cualquier material preexistente.
 - [ ] **Cartas de compromiso** del equipo clave (dirección, fotografía, producción, etc.).
 - [ ] **Cartas de interés / compromiso** de fuentes de financiación (ver doc. 06).
+- [ ] **Acuerdo / carta de intención de coproducción** con el coproductor minoritario extranjero (a definir),
+      con reparto de aportes, territorialización del gasto y titularidad de derechos — requerido para
+      **Ibermedia Producción** y para acreditar la estructura de coproducción mayoritaria uruguaya.
 - [ ] **Presupuesto** en planilla oficial + **plan financiero** documentado.
 - [ ] **Cronograma** de producción.
 

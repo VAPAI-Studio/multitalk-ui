@@ -70,7 +70,7 @@ preproducción, actores, postproducción y generales (USD 150.000)**.
 | **Aporte de la empresa productora (VELIDER SAS / Souts)** | 70.000 | 18 % | 🟢 Confirmado |
 | **PUA — Producción (apoyo solicitado)** | 144.000 | 36 % | 🟡 Solicitado (esta postulación) |
 | FONA / Concurso de Fomento Cinematográfico | 60.000 | 15 % | 🟡 A postular (convocatoria) |
-| Programa Ibermedia | 20.000 | 5 % | 🟡 A postular (convocatoria) |
+| Programa Ibermedia — Producción (vía coproductor minoritario extranjero) | 20.000 | 5 % | 🟡 A postular (convocatoria) |
 | Preventa / coproducción TV pública (TNU / TV Ciudad) | 40.000 | 10 % | 🔴 A gestionar |
 | Sponsors, fundaciones y becas privadas | 46.000 | 12 % | 🔴 A gestionar |
 | Anticipo / MG de agente de ventas o distribuidor | 20.000 | 5 % | 🔴 A gestionar |
@@ -96,7 +96,8 @@ La estrategia combina **fondos públicos nacionales + regional + recursos propio
 
 1. **PUA — Producción** (esta postulación): USD 144.000 solicitados.
 2. **FONA / Concurso de Fomento Cinematográfico**: USD 60.000 — postular en la convocatoria correspondiente.
-3. **Ibermedia**: USD 20.000 — postular en la línea aplicable (ver nota de compatibilidad).
+3. **Ibermedia — Producción**: USD 20.000 — requiere **coproductor minoritario extranjero** (a definir);
+   incorporar el acuerdo de coproducción y el reparto de aportes antes de postular.
 4. **TV pública, sponsors y agente de ventas**: gestión en paralelo (USD 106.000).
 
 > Ordenar el **calendario de convocatorias** (PUA, FONA, Ibermedia) según sus fechas de apertura y verificar

@@ -7,7 +7,8 @@
 
 **Dirección:** Federico Veiroj · **Guion:** Rodrigo Moreno y Federico Veiroj
 **Técnica:** Largometraje de **animación con IA generativa** (voces de actores reales + motion capture)
-**Desarrollado por:** Keen Tales · **Productora postulante:** VELIDER SAS (Souts) · **Estructura:** Producción 100 % uruguaya
+**Desarrollado por:** Keen Tales · **Productora postulante:** VELIDER SAS (Souts)
+**Estructura:** Coproducción **mayoritaria uruguaya** (coproductor minoritario extranjero a definir, para habilitar Ibermedia Producción)
 
 ---
 

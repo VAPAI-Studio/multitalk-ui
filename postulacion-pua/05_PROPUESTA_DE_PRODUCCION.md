@@ -1,11 +1,13 @@
 # 05 · Propuesta de producción y cronograma (animación con IA)
 
-> Estructura **100 % uruguaya**. Cifras de etapas y meses en `‹BORRADOR›`: ajustar al plan real.
+> Estructura **mayoritaria uruguaya** (con coproductor minoritario extranjero previsto para Ibermedia).
+> Cifras de etapas y meses en `‹BORRADOR›`: ajustar al plan real.
 
 ## 1. Estrategia de producción
 
 El proyecto es un **largometraje de animación realizado íntegramente con un pipeline de IA generativa**,
-desarrollado y producido en **Uruguay** con **talento y servicios uruguayos**. No hay rodaje de imagen real
+desarrollado y producido **mayoritariamente en Uruguay** con **talento y servicios uruguayos**, con un
+**coproductor minoritario extranjero a definir** (previsto para habilitar **Ibermedia Producción**). No hay rodaje de imagen real
 ni construcción de sets físicos: los tres mundos del guion —**Viena**, un **bosque** indeterminado y **San
 Francisco**— se construyen como **locaciones generadas**, lo que elimina viajes, scouting y logística de
 rodaje y concentra el esfuerzo en **diseño, generación, dirección de voces y postproducción**.
@@ -19,6 +21,10 @@ Esta metodología:
 
 > Las únicas instancias con presencia física son la **grabación de voces** (estudio) y las sesiones de
 > **motion capture**; todo lo demás es trabajo de pipeline digital.
+>
+> **Coproducción:** el aporte uruguayo es **mayoritario** y conserva el carácter nacional para el PUA; el
+> coproductor minoritario extranjero (‹país/empresa a definir›) habilita la postulación a **Ibermedia
+> Producción**. Definir reparto de aportes, gasto territorializado y titularidad antes de cerrar el acuerdo.
 
 ## 2. "Locaciones" (generadas)
 

@@ -19,7 +19,7 @@
 | Color | Color con tratamiento desaturado / pasajes en clave de grises (ver doc. 04) |
 | Idioma principal | Español |
 | Otros idiomas en pantalla | Inglés, alemán, yiddish (diálogos puntuales) |
-| País | Uruguay (producción 100 % nacional) |
+| País | Uruguay (mayoritario) — coproducción mayoritaria uruguaya con coproductor minoritario extranjero ‹A DEFINIR país/empresa› |
 | Etapa actual | Guion finalizado · financiación en armado · listo para producción |
 | Público objetivo | Adulto, cinéfilo, circuito de autor y festivales (ver doc. 07) |
 
