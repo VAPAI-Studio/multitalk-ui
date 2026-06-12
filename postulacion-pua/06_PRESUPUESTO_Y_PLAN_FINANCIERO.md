@@ -22,37 +22,36 @@ pipeline de **IA generativa** dirigido y supervisado por equipo uruguayo.
 | Equivalencia al piso | USD 2.500/min × 160 | 400.000 (≈ 160 min) |
 
 > El total final **escala con la duración definitiva** del corte. Se trabaja sobre **USD 400.000**, de los
-> cuales **USD 250.000** corresponden al núcleo de **pre + producción + post + actores** (ver Bloque A) y
-> **USD 150.000** a los demás rubros (Bloque B). ‹A CONFIRMAR duración objetivo y costo/min definitivo›
+> cuales **USD 250.000** corresponden a la **producción / generación visual** (Bloque A) y **USD 150.000** a
+> **desarrollo, preproducción, actores, postproducción y generales** (Bloque B).
+> ‹A CONFIRMAR duración objetivo y costo/min definitivo›
 
 ---
 
 ## 2. Presupuesto resumido por rubro ‹BORRADOR› (objetivo = USD 400.000)
 
-Estructurado en dos bloques: el **núcleo de pre + producción + post + actores (USD 250.000)** y los **demás
-rubros (USD 150.000)**.
+Estructurado en dos bloques: la **producción / generación visual (USD 250.000)** y el resto —**desarrollo,
+preproducción, actores, postproducción y generales (USD 150.000)**.
 
-### Bloque A — Pre + Producción + Post + Actores · USD 250.000
+### Bloque A — Producción (generación visual con IA) · USD 250.000
 
 | Rubro | USD | % |
 |-------|----:|--:|
-| Diseño y preproducción (personajes, mundos, storyboard, animática) | 45.000 | 11 % |
-| Producción visual con IA (artistas de generación + supervisión de pipeline) | 95.000 | 24 % |
-| Voces (actores reales) + dirección de voces + estudio | 28.000 | 7 % |
-| Motion capture (sesiones y procesamiento) | 16.000 | 4 % |
+| Producción visual con IA (artistas de generación + supervisión de pipeline) | 150.000 | 38 % |
+| Cómputo, servicios de generación y licencias (Flux, Nano Banana, Seedream, LTX, Kling, Seedance) | 70.000 | 18 % |
 | Composición e integración (continuidad, limpieza) | 30.000 | 8 % |
-| Postproducción (montaje, sonido, música, color, DCP) | 36.000 | 9 % |
 | **Subtotal A** | **250.000** | **63 %** |
 
-### Bloque B — Desarrollo, cómputo, generales y contingencia · USD 150.000
+### Bloque B — Desarrollo, preproducción, actores, post y generales · USD 150.000
 
 | Rubro | USD | % |
 |-------|----:|--:|
-| Desarrollo y derechos (guion, cesiones, biblia visual) | 30.000 | 8 % |
-| Cómputo, servicios de generación y licencias (Flux, Nano Banana, Seedream, LTX, Kling, Seedance) | 60.000 | 15 % |
-| Generales, legales y seguros | 24.000 | 6 % |
-| Materiales de promoción, festivales y entrega | 16.000 | 4 % |
-| Contingencia | 20.000 | 5 % |
+| Desarrollo y derechos (guion, cesiones) | 18.000 | 5 % |
+| Diseño y preproducción (biblia visual, personajes, mundos, storyboard, animática) | 30.000 | 8 % |
+| Voces (actores reales) + dirección de voces + estudio | 28.000 | 7 % |
+| Motion capture (sesiones y procesamiento) | 14.000 | 4 % |
+| Postproducción (montaje, sonido, música, color, DCP) | 36.000 | 9 % |
+| Generales, legales, seguros, promoción y contingencia | 24.000 | 6 % |
 | **Subtotal B** | **150.000** | **37 %** |
 
 | | USD | % |
