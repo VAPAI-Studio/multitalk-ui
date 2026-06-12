@@ -39,18 +39,28 @@ comunidad en torno a la nueva animación con IA.
 
 ---
 
-## 2. Federico Veiroj — Dirección y guion ‹VERIFICAR/COMPLETAR›
+## 2. Federico Veiroj — Dirección y guion
 
-Cineasta uruguayo de reconocida trayectoria internacional, con películas seleccionadas y premiadas en
-festivales de primer nivel. Su obra explora con humor y sensibilidad personajes atravesados por una idea
-fija, una fe o una culpa, en un registro que combina lo cómico y lo melancólico —el mismo territorio de
-*El hombre que pensó que estaba pensando*.
+Cineasta, guionista y productor uruguayo (Montevideo, 1976), de reconocida trayectoria internacional. Su obra
+explora con humor y sensibilidad a personajes atravesados por una idea fija, una fe o una culpa, en un
+registro que combina lo cómico y lo melancólico —el mismo territorio de *El hombre que pensó que estaba
+pensando*. **Dos de sus películas fueron seleccionadas por Uruguay como precandidatas al Óscar a Mejor
+Película Internacional** (*La vida útil* y *Así habló el cambista*).
 
-- **Filmografía seleccionada:** ‹COMPLETAR/VERIFICAR con títulos, años, festivales y premios›
-- **Reconocimientos y recorrido en festivales:** ‹COMPLETAR›
+**Filmografía como director (largometrajes):**
+
+| Año | Título | Hitos destacados |
+|-----|--------|------------------|
+| 2008 | *Acné* | Ópera prima; estreno en la **Quincena de Realizadores (Cannes)** |
+| 2010 | *La vida útil* (A Useful Life) | Estreno en **Toronto (TIFF)**; precandidata uruguaya al Óscar Internacional |
+| 2015 | *El apóstata* (The Apostate) | **Premio FIPRESCI**; primer rodaje en España |
+| 2018 | *Belmonte* | **Mejor Guion en el Festival de Mar del Plata** |
+| 2019 | *Así habló el cambista* (The Moneychanger) | Sección **Platform de Toronto**; estreno europeo en **San Sebastián**; precandidata uruguaya al Óscar Internacional |
+
 - Contacto: federico.veiroj@gmail.com
 
-> Adjuntar biofilmografía oficial y completa como anexo.
+> Datos compilados de fuentes públicas (IMDb / Wikipedia) — **revisar y completar** con la biofilmografía
+> oficial del director antes de enviar. Adjuntar biofilmografía completa como anexo.
 
 ## 3. Equipo técnico-artístico clave ‹A CONFIRMAR›
 
@@ -78,7 +88,7 @@ fija, una fe o una culpa, en un registro que combina lo cómico y lo melancólic
 
 ### Pendientes
 
-- [ ] Completar la filmografía real de Federico Veiroj con títulos, años, festivales y premios.
+- [ ] Revisar la filmografía de Federico Veiroj (compilada de fuentes públicas) contra su bio oficial.
 - [ ] Completar festivales de *Lucy's Strange Encounter*.
 - [ ] Adjuntar CVs firmados del equipo y cartas de compromiso.
 - [ ] Completar antecedentes y rendiciones previas de la empresa ante ICAU/ACAU.
