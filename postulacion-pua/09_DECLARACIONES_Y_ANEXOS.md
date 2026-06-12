@@ -15,8 +15,10 @@
 ## 2. Documentación del proyecto
 
 - [ ] **Guion completo** firmado (PDF) — *El hombre que pensó que estaba pensando*.
-- [ ] **Cesión de derechos** del guion de los guionistas (Rodrigo Moreno, Federico Veiroj) a la productora.
-- [ ] **Cadena de derechos** / titularidad de la obra y de cualquier material preexistente.
+- [ ] **Cesión de derechos** del guion de los guionistas (Rodrigo Moreno, Federico Veiroj) / Keen Tales a la
+      productora **VELIDER SAS** — ⏳ **en proceso de cesión** (formalizar con escribano antes de postular).
+- [ ] **Cadena de derechos** / titularidad de la obra y de cualquier material preexistente (incluir relación
+      Keen Tales ↔ VELIDER SAS). ‹A CONFIRMAR›
 - [ ] **Cartas de compromiso** del equipo clave (dirección, fotografía, producción, etc.).
 - [ ] **Cartas de interés / compromiso** de fuentes de financiación (ver doc. 06).
 - [ ] **Acuerdo / carta de intención de coproducción** con el coproductor minoritario extranjero (a definir),
@@ -35,9 +37,10 @@
 > la convocatoria del Programa Uruguay Audiovisual a la que se presenta.
 
 **Declaración de titularidad de derechos**
-> Se declara que ‹EMPRESA› cuenta con los derechos necesarios sobre el guion y la obra audiovisual
-> *El hombre que pensó que estaba pensando* para llevar adelante su producción y explotación, conforme a la
-> cadena de derechos adjunta.
+> Se declara que VELIDER SAS cuenta (o contará, conforme a la cesión **en proceso de formalización**) con los
+> derechos necesarios sobre el guion y la obra audiovisual *El hombre que pensó que estaba pensando* para
+> llevar adelante su producción y explotación, conforme a la cadena de derechos adjunta. ‹A CONFIRMAR estado
+> de la cesión al momento de postular›
 
 **Declaración de ausencia de incumplimientos**
 > Se declara que ‹EMPRESA› no mantiene rendiciones pendientes ni incumplimientos con el ICAU/ACAU ni con

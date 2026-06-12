@@ -56,7 +56,7 @@
 - [ ] **Certificado notarial** de existencia y vigencia de la persona jurídica
 - [ ] **Certificado de regularidad** (DGI / BPS) ‹A CONFIRMAR›
 - [ ] **Estatutos** y constancia de objeto social
-- [ ] **Cesión de derechos** del guion a la productora (contrato guionistas → productora)
+- [ ] **Cesión de derechos** del guion a la productora (guionistas / Keen Tales → VELIDER SAS) — ⏳ en proceso
 - [ ] **Cartas de compromiso** del equipo clave (dirección, dirección de fotografía, etc.)
 - [ ] **Cartas de interés** de coproductores asociados / agente de ventas / distribuidor (si las hubiera)
 - [ ] **Biofilmografías y CVs** del equipo y antecedentes de la empresa
