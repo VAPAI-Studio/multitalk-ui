@@ -51,7 +51,7 @@ proyecto.
 
 | Rol | Nombre | Notas / antecedentes |
 |-----|--------|----------------------|
-| Producción ejecutiva | ‹A CONFIRMAR› | ‹CV adjunto› |
+| Producción ejecutiva | Yves Fogel | Representante legal de VELIDER SAS · yvesfogel@sideoutsticks.com · 098 864 445 · ‹CV adjunto› |
 | Dirección de producción | ‹A CONFIRMAR› | |
 | Dirección de fotografía | ‹A CONFIRMAR› | |
 | Dirección de arte | ‹A CONFIRMAR› | |

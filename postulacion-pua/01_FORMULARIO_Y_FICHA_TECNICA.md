@@ -46,9 +46,9 @@
 | RUT | **220073360012** |
 | Domicilio | **Saldanha da Gama 3918**, Montevideo, Uruguay |
 | Fecha de constitución | Abril de 2025 (≈ 14 meses de actividad → cumple el mínimo de 12 meses) |
-| Representante legal | ‹A CONFIRMAR› |
-| Productor/a responsable | ‹A CONFIRMAR› |
-| Email / teléfono | ‹A CONFIRMAR› |
+| Representante legal | Yves Fogel |
+| Productor/a responsable | Yves Fogel |
+| Email / teléfono | yvesfogel@sideoutsticks.com · 098 864 445 |
 | Antecedentes | Ver documento 08 |
 
 ## 5. Ficha técnica del equipo (heads of department) ‹BORRADOR›
@@ -57,7 +57,7 @@
 |------|-------------|
 | Dirección | Federico Veiroj |
 | Guion | Rodrigo Moreno · Federico Veiroj |
-| Producción ejecutiva | ‹A CONFIRMAR› |
+| Producción ejecutiva | Yves Fogel |
 | Dirección de producción | ‹A CONFIRMAR› |
 | Dirección de fotografía | ‹A CONFIRMAR› |
 | Dirección de arte | ‹A CONFIRMAR› |
