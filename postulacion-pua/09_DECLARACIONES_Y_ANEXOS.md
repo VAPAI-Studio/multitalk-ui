@@ -15,8 +15,9 @@
 ## 2. Documentación del proyecto
 
 - [ ] **Guion completo** firmado (PDF) — *El hombre que pensó que estaba pensando*.
-- [ ] **Cesión de derechos** del guion de los guionistas (Rodrigo Moreno, Federico Veiroj) / Keen Tales a la
-      productora **VELIDER SAS** — ⏳ **en proceso de cesión** (formalizar con escribano antes de postular).
+- [ ] **Cesión de derechos** del guion (Federico Veiroj) / Keen Tales a la productora **VELIDER SAS** —
+      ⏳ **en proceso de cesión** (formalizar con escribano antes de postular; incluir a todo autor acreditado
+      en la portada del guion para cerrar la cadena de derechos).
 - [ ] **Cadena de derechos** / titularidad de la obra y de cualquier material preexistente (incluir relación
       Keen Tales ↔ VELIDER SAS). ‹A CONFIRMAR›
 - [ ] **Cartas de compromiso** del equipo clave (dirección, fotografía, producción, etc.).

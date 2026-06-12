@@ -33,7 +33,7 @@
 | Rol | Nombre |
 |-----|--------|
 | Dirección | Federico Veiroj |
-| Guion | Rodrigo Moreno y Federico Veiroj |
+| Guion | Federico Veiroj |
 | Argumento original | Federico Veiroj |
 | Desarrollado por | Keen Tales |
 | Contacto creativo | federico.veiroj@gmail.com |
@@ -57,7 +57,7 @@
 | Área | Responsable |
 |------|-------------|
 | Dirección | Federico Veiroj |
-| Guion | Rodrigo Moreno · Federico Veiroj |
+| Guion | Federico Veiroj |
 | Producción ejecutiva | Yves Fogel |
 | Dirección de producción | ‹A CONFIRMAR› |
 | Dirección de arte / diseño visual | ‹A CONFIRMAR› |

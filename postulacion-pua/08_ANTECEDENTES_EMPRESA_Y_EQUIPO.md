@@ -14,19 +14,31 @@
 **Constitución / antigüedad:** Abril de 2025 — ≈ 14 meses de actividad (cumple el mínimo de 12 meses; confirmar fecha exacta con certificado notarial)
 **Objeto:** producción de contenidos audiovisuales (cine, series, publicidad).
 
-**Perfil:** productora uruguaya dedicada al cine de autor con proyección internacional. Desarrolla
-*El hombre que pensó que estaba pensando* junto al director Federico Veiroj.
+**Perfil:** **VELIDER SAS (Souts) es la primera productora de ficción AI-Native del Uruguay**: concibe y
+produce obra de ficción con un pipeline íntegramente basado en **IA generativa**, dirigido y supervisado por
+talento uruguayo. La empresa combina creación propia, servicios de producción para terceros y desarrollo de
+comunidad en torno a la nueva animación con IA.
 
-**Antecedentes / filmografía de la empresa:** ‹COMPLETAR con producciones, premios, festivales,
-coproducciones y rendiciones anteriores ante ICAU/ACAU›
+**Antecedentes / trayectoria:**
 
-| Año | Título | Formato | Rol | Hitos (festivales / premios) |
-|-----|--------|---------|-----|------------------------------|
-| ‹› | ‹› | ‹› | ‹Productora / Coproductora› | ‹› |
+- **Tres cortometrajes** realizados con su pipeline AI-Native, **presentados en festivales de cine de la
+  región**. ‹Completar títulos, años y festivales›
+- **Servicio de producción** en curso para una **serie web en Estados Unidos**. ‹Completar título/cliente›
+- Organiza su propio festival, **Sticks n' Festival**, dedicado a la nueva creación audiovisual. ‹Completar
+  edición/año›
+- Desarrolla *El hombre que pensó que estaba pensando* junto al director **Federico Veiroj**.
+
+| Año | Título / Proyecto | Formato | Rol | Hitos (festivales / premios) |
+|-----|-------------------|---------|-----|------------------------------|
+| ‹› | ‹Cortometraje 1› | Cortometraje (animación IA) | Productora | ‹Festival(es) de la región› |
+| ‹› | ‹Cortometraje 2› | Cortometraje (animación IA) | Productora | ‹Festival(es) de la región› |
+| ‹› | ‹Cortometraje 3› | Cortometraje (animación IA) | Productora | ‹Festival(es) de la región› |
+| ‹› | ‹Serie web (EE.UU.)› | Serie web | Servicio de producción | En curso |
+| ‹› | Sticks n' Festival | Festival | Organizadora | ‹Edición / año› |
 
 ---
 
-## 2. Federico Veiroj — Dirección y co-guion ‹VERIFICAR/COMPLETAR›
+## 2. Federico Veiroj — Dirección y guion ‹VERIFICAR/COMPLETAR›
 
 Cineasta uruguayo de reconocida trayectoria internacional, con películas seleccionadas y premiadas en
 festivales de primer nivel. Su obra explora con humor y sensibilidad personajes atravesados por una idea
@@ -39,28 +51,23 @@ fija, una fe o una culpa, en un registro que combina lo cómico y lo melancólic
 
 > Adjuntar biofilmografía oficial y completa como anexo.
 
-## 3. Rodrigo Moreno — Co-guion ‹VERIFICAR/COMPLETAR›
-
-Guionista y director de extensa trayectoria en el cine de autor de la región, co-autor del guion del
-proyecto.
-
-- **Trayectoria seleccionada:** ‹COMPLETAR/VERIFICAR›
-- **Reconocimientos:** ‹COMPLETAR›
-
-## 4. Equipo técnico-artístico clave ‹A CONFIRMAR›
+## 3. Equipo técnico-artístico clave ‹A CONFIRMAR›
 
 | Rol | Nombre | Notas / antecedentes |
 |-----|--------|----------------------|
 | Producción ejecutiva | Yves Fogel | Representante legal de VELIDER SAS · yvesfogel@sideoutsticks.com · 098 864 445 · ‹CV adjunto› |
 | Dirección de producción | ‹A CONFIRMAR› | |
-| Dirección de fotografía | ‹A CONFIRMAR› | |
-| Dirección de arte | ‹A CONFIRMAR› | |
-| Diseño de sonido | ‹A CONFIRMAR› | |
+| Dirección de arte / diseño visual | ‹A CONFIRMAR› | |
+| Supervisión de pipeline IA | ‹A CONFIRMAR› | |
+| Artistas de IA (imagen y video) | ‹A CONFIRMAR› | |
+| Dirección de voces | ‹A CONFIRMAR› | |
+| Motion capture | ‹A CONFIRMAR› | |
+| Composición / integración | ‹A CONFIRMAR› | |
 | Montaje | ‹A CONFIRMAR› | |
+| Diseño de sonido | ‹A CONFIRMAR› | |
 | Música | ‹A CONFIRMAR› | |
-| Casting | ‹A CONFIRMAR› | |
 
-## 5. Reparto previsto ‹A CONFIRMAR›
+## 4. Reparto de voces previsto ‹A CONFIRMAR›
 
 - **Milton Bloch:** ‹A CONFIRMAR — adjuntar carta de interés/compromiso si la hubiera›
 - **La Niña:** ‹A CONFIRMAR›
@@ -70,7 +77,8 @@ proyecto.
 
 ### Pendientes
 
-- [ ] Completar filmografías reales de Veiroj y Moreno con títulos, años, festivales y premios.
+- [ ] Completar la filmografía real de Federico Veiroj con títulos, años, festivales y premios.
+- [ ] Completar títulos/años/festivales de los **tres cortometrajes** de VELIDER, la **serie web (EE.UU.)** y el **Sticks n' Festival**.
 - [ ] Adjuntar CVs firmados del equipo y cartas de compromiso.
 - [ ] Completar antecedentes y rendiciones previas de la empresa ante ICAU/ACAU.
 - [ ] Confirmar elenco y adjuntar cartas de interés.
