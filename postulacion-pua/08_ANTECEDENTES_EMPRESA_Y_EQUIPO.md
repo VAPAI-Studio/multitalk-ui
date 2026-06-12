@@ -5,12 +5,12 @@
 
 ---
 
-## 1. Empresa postulante ‹BORRADOR›
+## 1. Empresa postulante
 
-**Razón social:** ‹BORRADOR› Keen Tales Producciones SRL
-**Nombre comercial:** Keen Tales
-**País / domicilio:** Uruguay — Montevideo ‹A CONFIRMAR›
-**RUT:** ‹A CONFIRMAR›
+**Razón social:** VELIDER SAS (Sociedad por Acciones Simplificada)
+**Nombre comercial / fantasía:** Souts
+**País / domicilio:** Uruguay — Saldanha da Gama 3918, Montevideo
+**RUT:** 220073360012
 **Constitución / antigüedad:** ‹A CONFIRMAR — acreditar ≥ 12 meses de actividad›
 **Objeto:** producción de contenidos audiovisuales (cine, series, publicidad).
 

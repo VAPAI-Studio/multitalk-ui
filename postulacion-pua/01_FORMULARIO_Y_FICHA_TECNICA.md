@@ -37,14 +37,14 @@
 | Desarrollado por | Keen Tales |
 | Contacto creativo | federico.veiroj@gmail.com |
 
-## 4. Datos de la empresa postulante ‹BORRADOR›
+## 4. Datos de la empresa postulante
 
 | Campo | Valor |
 |-------|-------|
-| Razón social | ‹BORRADOR› Keen Tales Producciones SRL |
-| Nombre comercial | Keen Tales |
-| RUT | ‹A CONFIRMAR› |
-| Domicilio | ‹A CONFIRMAR›, Montevideo, Uruguay |
+| Razón social | **VELIDER SAS** (Sociedad por Acciones Simplificada) |
+| Nombre comercial / fantasía | **Souts** |
+| RUT | **220073360012** |
+| Domicilio | **Saldanha da Gama 3918**, Montevideo, Uruguay |
 | Fecha de constitución | ‹A CONFIRMAR› (debe acreditar ≥ 12 meses de actividad) |
 | Representante legal | ‹A CONFIRMAR› |
 | Productor/a responsable | ‹A CONFIRMAR› |

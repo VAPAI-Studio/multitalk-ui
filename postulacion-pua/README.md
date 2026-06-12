@@ -6,7 +6,7 @@
 *(AKA The Man Who Thought He Was Thinking)*
 
 **Dirección:** Federico Veiroj · **Guion:** Rodrigo Moreno y Federico Veiroj
-**Desarrollado por:** Keen Tales · **Estructura:** Producción 100 % uruguaya
+**Desarrollado por:** Keen Tales · **Productora postulante:** VELIDER SAS (Souts) · **Estructura:** Producción 100 % uruguaya
 
 ---
 

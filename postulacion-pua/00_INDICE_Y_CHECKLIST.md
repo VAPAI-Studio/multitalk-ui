@@ -2,7 +2,7 @@
 
 **Proyecto:** *El hombre que pensó que estaba pensando* — Largometraje de ficción
 **Línea PUA:** Producción de Contenidos Audiovisuales (Nacional) — Ventanilla abierta
-**Empresa postulante:** ‹BORRADOR› Keen Tales Producciones SRL (Uruguay)
+**Empresa postulante:** VELIDER SAS (nombre fantasía: Souts) — RUT 220073360012, Montevideo
 
 ---
 
