@@ -13,7 +13,7 @@
 | Formato | **Largometraje de animación** |
 | Técnica de animación | **Animación generada con Inteligencia Artificial (IA generativa)** — pipeline de generación de imagen, image-to-video, lipsync y voces |
 | Género | Ficción animada — comedia dramática / fábula existencial (autor, con elementos surreales) |
-| Duración estimada | 95–105 min ‹BORRADOR› |
+| Duración estimada | 90 min (objetivo) |
 | Soporte / entrega | Digital — máster 4K ‹A CONFIRMAR› |
 | Relación de aspecto | 1.66:1 ‹A CONFIRMAR según propuesta visual› |
 | Color | Color con tratamiento desaturado / pasajes en clave de grises (ver doc. 04) |
@@ -97,8 +97,8 @@
 
 | Campo | Valor |
 |-------|-------|
-| Base de costeo | Por minuto de película terminada (piso USD 2.500/min; objetivo ≈ USD 4.000/min) |
-| Presupuesto total estimado | USD 400.000 ‹BORRADOR› (≈ 100 min) |
+| Base de costeo | Por minuto de película terminada (90 min; piso USD 2.500/min; objetivo ≈ USD 4.444/min) |
+| Presupuesto total estimado | USD 400.000 ‹BORRADOR› (≈ 90 min) |
 | Monto solicitado al PUA | USD 144.000 ‹BORRADOR› |
 | % financiación confirmada al postular | ~18 % (aporte VELIDER SAS USD 70.000) ‹A CONFIRMAR umbral exigido› |
 | Modalidad de producción | Animación con IA generativa (sin rodaje de imagen real) |

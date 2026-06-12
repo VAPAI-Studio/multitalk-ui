@@ -11,15 +11,14 @@
 ## 1. Base de cálculo: costo por minuto
 
 El presupuesto se estima por **costo por minuto de película terminada**, métrica de costeo habitual en
-animación. Se toma **USD 2.500/min como piso** de referencia y un **objetivo de trabajo de USD 400.000** para
-un largometraje de ~100 min, lo que equivale a **≈ USD 4.000/min**, dando margen de calidad e iteración al
-pipeline de **IA generativa** dirigido y supervisado por equipo uruguayo.
+animación. La **duración objetivo es de 90 min**. Se toma **USD 2.500/min como piso** de referencia y un
+**objetivo de trabajo de USD 400.000**, lo que equivale a **≈ USD 4.444/min**, dando margen de calidad e
+iteración al pipeline de **IA generativa** dirigido y supervisado por equipo uruguayo.
 
 | Escenario | Cálculo | Total |
 |-----------|---------|------:|
-| Piso (≈ 100 min) | USD 2.500/min × 100 | 250.000 |
-| **Objetivo de trabajo (≈ 100 min)** | **USD 4.000/min × 100** | **400.000** |
-| Equivalencia al piso | USD 2.500/min × 160 | 400.000 (≈ 160 min) |
+| Piso (90 min) | USD 2.500/min × 90 | 225.000 |
+| **Objetivo de trabajo (90 min)** | **≈ USD 4.444/min × 90** | **400.000** |
 
 > El total final **escala con la duración definitiva** del corte. Se trabaja sobre **USD 400.000**, de los
 > cuales **USD 250.000** corresponden a la **producción / generación visual** (Bloque A) y **USD 150.000** a
