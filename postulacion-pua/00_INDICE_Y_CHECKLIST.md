@@ -3,11 +3,10 @@
 **Proyecto:** *El hombre que pensó que estaba pensando* — Largometraje de **animación** (ficción)
 **Línea PUA:** Producción de Contenidos Audiovisuales (Nacional) — Ventanilla abierta
 
-> ⚠️ **PENDIENTE DE REVISIÓN — ANIMACIÓN CON IA GENERATIVA:** los documentos **04 (puesta en escena),
-> 05 (producción y cronograma) y 06 (presupuesto)** fueron redactados asumiendo **imagen real** y deben
-> reescribirse para un **pipeline de animación con IA generativa** (diseño de arte y consistencia de
-> personajes/mundos, generación de imagen e image-to-video, lipsync, voces, composición, montaje, sonido).
-> Esto reduce equipo, cronograma y costo respecto de imagen real o animación tradicional.
+> ✅ **ANIMACIÓN CON IA GENERATIVA:** los documentos **04 (puesta en escena), 05 (producción y cronograma) y
+> 06 (presupuesto)** ya fueron reescritos para el **pipeline de IA generativa** (Flux/Nano Banana/Seedream +
+> LTX/Kling/Seedance + lipsync + voces de actores reales + motion capture + edición tradicional). Las cifras
+> del doc. 06 son **borrador** y deben reemplazarse por el presupuesto real.
 >
 > ⚠️ **VERIFICAR ELEGIBILIDAD:** confirmar con ACAU/ICAU si la **obra generada con IA** es admisible en la
 > línea, y cómo se evalúan en ese marco la **autoría**, el **carácter nacional** (gasto/talento uruguayo) y

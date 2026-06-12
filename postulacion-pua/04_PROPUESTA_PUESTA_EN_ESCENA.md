@@ -1,74 +1,90 @@
-# 04 · Propuesta de puesta en escena
+# 04 · Propuesta de puesta en escena y pipeline visual (animación con IA)
 
-> Propuesta estética integral. Acompañar al postular con un **moodboard / lookbook** visual (recomendado).
+> Acompañar al postular con un **lookbook / style bible** (diseños de personajes, paletas, frames de
+> referencia y pruebas de pipeline). Recomendado adjuntar un **teaser / prueba de concepto** ya generado.
 
 ## 1. Principio rector
 
-La película está construida en **tres movimientos** con texturas distintas pero un mismo pulso. El desafío
-de dirección y de los departamentos artísticos es que el pasaje de lo **real** (Viena) a lo **onírico**
-(bosque) y al **regreso** (San Francisco) ocurra **sin costuras visibles**: el espectador debe deslizarse,
-como Milton, sin darse cuenta exacta de cuándo dejó el mundo de los hechos.
+*El hombre que pensó que estaba pensando* es un **largometraje de animación realizado con IA generativa**.
+La técnica no es un efecto: es la forma misma de la película. Un relato sobre una mente que confunde
+**pensar** con **estar** encuentra en la imagen generada —maleable, onírica, capaz de transformarse sin
+corte— el lenguaje ideal para deslizarse de lo real a lo soñado.
 
-| Movimiento | Mundo | Clave tonal |
-|------------|-------|-------------|
-| I — Viena | Realismo con grietas absurdas | Comedia seca, formal, control |
-| II — El bosque | Fábula / sueño | Sensorial, elemental, despojado |
-| III — San Francisco | Regreso transfigurado | Intimidad, calidez, suspensión |
+La película está construida en **tres movimientos** con texturas distintas pero un mismo pulso. El reto es
+que el pasaje de lo **real** (Viena) a lo **onírico** (bosque) y al **regreso** (San Francisco) ocurra **sin
+costuras visibles**.
 
-## 2. Dirección de fotografía
+| Movimiento | Mundo | Clave visual con IA |
+|------------|-------|---------------------|
+| I — Viena | Realismo con grietas absurdas | Render controlado, casi fotográfico, paleta gris; composición pictórica y frontal |
+| II — El bosque | Fábula / sueño | Libertad generativa: morphing, transiciones imposibles, materia elemental (agua, fuego, barro) |
+| III — San Francisco | Regreso transfigurado | Calidez matinal, intimidad doméstica, suspensión |
 
-- **Cámara:** predominio de **plano fijo y composición pictórica** en Viena (simetrías, frontalidad,
-  encuadres "de cuadro"), coherente con un protagonista que observa el mundo como un experimento. En el
-  bosque, la cámara se vuelve más **háptica y móvil**, a la altura del cuerpo, del barro y de la niña.
-- **Paleta:** Viena en **escala de grises y desaturados** —el guion insiste en el cielo nublado y el "todo
-  en gris"—, con estallidos puntuales de color (la estela naranja de la patinadora). El bosque introduce el
-  **verde húmedo, el ocre y el fuego** de los fósforos. San Francisco recupera una **luz cálida y matinal**.
-- **Óptica y formato:** relación **1.66:1** ‹A CONFIRMAR› para reforzar el aire de fábula clásica; lentes
-  que respeten la piel y los rostros sin estilización excesiva.
-- **Luz:** naturalista y motivada; el contraste entre interiores controlados (hotel, teatro, radio) y la
-  intemperie del bosque organiza la dramaturgia lumínica.
+## 2. El desafío central: consistencia
 
-## 3. Dirección de arte
+El mayor reto de una película de IA es la **consistencia** de personajes, vestuario, espacios y luz a lo
+largo de ~100 minutos. La estrategia:
 
-- **Viena:** lujo institucional y frío —hotel, teatro, estudio de radio, cementerio monumental—. Detalles
-  precisos: la pizarra del remisero, la guía de "números de emergencia" del teléfono, la bandeja del
-  desayuno, los patines. El absurdo vive en lo concreto.
-- **El bosque:** materia elemental —piedra, agua, fuego, fango, paracaídas, mochila de salvataje—. La
-  **caverna con pinturas rupestres** (mujer con lanza, animal, cacique de plumas) es el corazón simbólico:
-  el dibujo de la niña debe rimar exactamente con el **dibujo final del hijo en la heladera**.
-- **San Francisco:** austeridad cuidada de la casa familiar; la tienda de ropa "de viejo estilo"; el
-  imán-dibujo en la heladera como objeto-clave del desenlace.
-- **Motivos recurrentes a sostener por arte:** patines, marcadores de colores, el dibujo del cacique, el
-  agua (lluvia, lago, regador), las lápidas, las credenciales con el nombre "M. Bloch".
+- **Biblia visual / style bible**: diseño cerrado de cada personaje (Milton, la Niña, Rose, los niños,
+  secundarios), con hojas de referencia (turnarounds, expresiones, vestuario) antes de generar planos.
+- **Anclas de identidad**: referencias de personaje reutilizables y, donde aporte, **LoRAs/embeddings
+  propios** por personaje y por "mundo" para mantener rasgos y paleta estables entre tomas.
+- **Edición dirigida de imagen** con **Nano Banana** para correcciones de continuidad (mismo rostro,
+  vestuario, props) sobre frames generados con **Flux** y **Seedream**.
+- **Continuidad de color y luz** por secuencia, fijada en la etapa de arte y sostenida en composición.
 
-## 4. Sonido y música
+## 3. Pipeline de producción visual
 
-- **Sonido directo** cuidado por el plurilingüismo (español, inglés, alemán, yiddish) y por la comedia de
-  diálogos solapados.
-- **Diseño de sonido** como puente entre movimientos: el rumor de la pista de patinaje, el tractor del
-  cementerio, la lluvia torrencial de la caverna, los pájaros del bosque, el regador final. El sonido
-  anticipa los deslizamientos hacia lo onírico antes que la imagen.
-- **Música:** uso **diegético y austero** (la flauta de Ute, el piano de la madre uruguaya). Una partitura
-  original mínima, de cámara, que sostenga la melancolía sin subrayar la comedia. ‹Compositor/a A CONFIRMAR›
+```
+Guion ─► Storyboard / Animática ─► Diseño (style bible, personajes, mundos)
+      ─► Keyframes / stills        [Flux · Nano Banana · Seedream]
+      ─► Image-to-video / planos    [LTX · Kling · Seedance]
+      ─► Lipsync de diálogo         [MultiTalk / InfiniteTalk]
+      ─► Voces (actores reales) + Motion capture (gesto/expresión)
+      ─► Composición e integración (continuidad, color, limpieza)
+      ─► Montaje tradicional ─► Color ─► Sonido y música ─► Máster/DCP
+```
 
-## 5. Montaje
+- **Generación de imagen (keyframes y diseño):** Flux, Nano Banana, Seedream — definición de cada plano
+  clave y de la identidad visual.
+- **Image-to-video (movimiento):** LTX, Kling y Seedance para animar los planos; selección de herramienta
+  según el tipo de toma (cámara, acción, atmósfera).
+- **Lipsync:** MultiTalk / InfiniteTalk sincroniza el diálogo de los personajes con las voces grabadas.
+- **Voces:** **actores reales** (dirección de voces), aprovechando el plurilingüismo del guion
+  (español, inglés, alemán, yiddish).
+- **Motion capture:** soporte puntual para dar **naturalidad de gesto y expresión** a personajes clave en
+  momentos dramáticos (la escena de la lápida, la caverna, el reencuentro final).
+- **Composición y edición:** flujo **tradicional** —montaje, corrección de color y diseño de sonido— sobre
+  los planos generados, para imprimir autoría, ritmo y unidad.
 
-- Ritmo de **comedia de tempos** en Viena (la gracia está en la duración del equívoco) y de **respiración
-  contemplativa** en el bosque.
-- El **match cut** y el corte "seco" como herramientas del pasaje real/sueño (ya inscriptos en el guion:
-  `MATCH CUT`, `CUT TO`).
-- El último bloque debe construir la **revelación silenciosa** del dibujo: que el espectador entienda, sin
-  diálogo, el lazo entre la niña y el hijo.
+## 4. Dirección de arte y paleta
 
-## 6. Casting (criterios)
+- **Viena:** lujo institucional y frío; escala de **grises y desaturados** (el guion insiste en el cielo
+  nublado), con estallidos puntuales de color (la **estela naranja** de la patinadora) que la IA resuelve
+  con naturalidad.
+- **El bosque:** verde húmedo, ocre, fuego de los fósforos; la **caverna con pinturas rupestres** (mujer con
+  lanza, animal, cacique de plumas) como corazón simbólico. El dibujo de la niña debe rimar exactamente con
+  el **dibujo final del hijo en la heladera**.
+- **San Francisco:** luz cálida y matinal; austeridad doméstica; el imán-dibujo como objeto-clave del cierre.
+- **Motivos a sostener con consistencia:** patines, marcadores de colores, el dibujo del cacique, el agua
+  (lluvia, lago, regador), las lápidas, la credencial "M. Bloch".
 
-- **Milton:** un intérprete capaz de sostener la comedia y el quiebre emocional en un mismo plano; presencia
-  física para la odisea del bosque.
-- **La Niña:** naturalidad y misterio; trabajo de dirección de actores con menores (jornadas y normativa
-  específicas previstas en producción).
-- Elenco con **solvencia plurilingüe** para los roles vieneses.
+## 5. Sonido y música
 
-## 7. Referencias (orientativas)
+- **Voces** de actores reales como columna de la actuación; casting de voz cuidando matices y acentos.
+- **Diseño de sonido** tradicional como puente entre movimientos: pista de patinaje, tractor del cementerio,
+  lluvia de la caverna, pájaros del bosque, regador final.
+- **Música:** uso diegético y austero (flauta de Ute, piano de la madre uruguaya) + partitura original
+  mínima, de cámara. ‹Compositor/a A CONFIRMAR›
 
-Cine de tragicomedia existencial y fábula contemplativa —del absurdo cortés europeo al realismo onírico
-latinoamericano—. Adjuntar **lookbook** con referencias visuales concretas de fotografía, color y locaciones.
+## 6. Por qué IA, y por qué uruguaya
+
+- La IA generativa permite a Uruguay producir un **largometraje de animación de horizonte internacional** a
+  una **escala financiable**, con **talento local** dirigiendo y operando todo el pipeline.
+- Posiciona al país y a la productora en la **frontera técnica** del cine animado, con metodología propia
+  (la plataforma de Souts) y capacidad exportable.
+- El **gasto elegible** se concentra en **talento y servicios uruguayos**: dirección, diseño, artistas de IA,
+  composición, montaje, sonido, música, dirección y grabación de voces, motion capture e infraestructura.
+
+> ⚠️ Confirmar con ACAU/ICAU el encuadre de la **obra generada con IA** (autoría, carácter nacional,
+> titularidad de derechos de los materiales y de las herramientas utilizadas).

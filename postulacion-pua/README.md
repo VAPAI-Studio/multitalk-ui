@@ -6,6 +6,7 @@
 *(AKA The Man Who Thought He Was Thinking)*
 
 **Dirección:** Federico Veiroj · **Guion:** Rodrigo Moreno y Federico Veiroj
+**Técnica:** Largometraje de **animación con IA generativa** (voces de actores reales + motion capture)
 **Desarrollado por:** Keen Tales · **Productora postulante:** VELIDER SAS (Souts) · **Estructura:** Producción 100 % uruguaya
 
 ---
@@ -37,9 +38,9 @@ sus números reales antes de enviar.
 | 01 | [`01_FORMULARIO_Y_FICHA_TECNICA.md`](01_FORMULARIO_Y_FICHA_TECNICA.md) | Ficha técnica, datos de la empresa, formato, género, datos del formulario |
 | 02 | [`02_LOGLINE_Y_SINOPSIS.md`](02_LOGLINE_Y_SINOPSIS.md) | Logline, sinopsis corta / media / larga (argumento) |
 | 03 | [`03_NOTA_DE_INTENCION_DIRECCION.md`](03_NOTA_DE_INTENCION_DIRECCION.md) | Nota de intención de dirección (Federico Veiroj) |
-| 04 | [`04_PROPUESTA_PUESTA_EN_ESCENA.md`](04_PROPUESTA_PUESTA_EN_ESCENA.md) | Propuesta estética: fotografía, arte, sonido, música, montaje |
-| 05 | [`05_PROPUESTA_DE_PRODUCCION.md`](05_PROPUESTA_DE_PRODUCCION.md) | Plan de producción, locaciones, cronograma, plan de rodaje |
-| 06 | [`06_PRESUPUESTO_Y_PLAN_FINANCIERO.md`](06_PRESUPUESTO_Y_PLAN_FINANCIERO.md) | Presupuesto resumido + plan de financiación |
+| 04 | [`04_PROPUESTA_PUESTA_EN_ESCENA.md`](04_PROPUESTA_PUESTA_EN_ESCENA.md) | Propuesta visual + pipeline de animación con IA (consistencia, herramientas, sonido) |
+| 05 | [`05_PROPUESTA_DE_PRODUCCION.md`](05_PROPUESTA_DE_PRODUCCION.md) | Plan de producción del pipeline de IA, etapas y cronograma |
+| 06 | [`06_PRESUPUESTO_Y_PLAN_FINANCIERO.md`](06_PRESUPUESTO_Y_PLAN_FINANCIERO.md) | Presupuesto (estructura de animación con IA) + plan de financiación |
 | 07 | [`07_ESTRATEGIA_DISTRIBUCION_FESTIVALES.md`](07_ESTRATEGIA_DISTRIBUCION_FESTIVALES.md) | Distribución, festivales, públicos, marketing |
 | 08 | [`08_ANTECEDENTES_EMPRESA_Y_EQUIPO.md`](08_ANTECEDENTES_EMPRESA_Y_EQUIPO.md) | Antecedentes de la productora + biofilmografías del equipo |
 | 09 | [`09_DECLARACIONES_Y_ANEXOS.md`](09_DECLARACIONES_Y_ANEXOS.md) | Declaraciones juradas, documentos legales y lista de anexos |

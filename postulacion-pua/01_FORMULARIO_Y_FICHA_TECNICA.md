@@ -60,19 +60,30 @@
 | Guion | Rodrigo Moreno · Federico Veiroj |
 | Producción ejecutiva | Yves Fogel |
 | Dirección de producción | ‹A CONFIRMAR› |
-| Dirección de fotografía | ‹A CONFIRMAR› |
-| Dirección de arte | ‹A CONFIRMAR› |
-| Sonido directo | ‹A CONFIRMAR› |
-| Diseño de sonido | ‹A CONFIRMAR› |
+| Dirección de arte / diseño visual | ‹A CONFIRMAR› |
+| Supervisión de pipeline IA | ‹A CONFIRMAR› |
+| Artistas de IA / generación de imagen y video | ‹A CONFIRMAR› |
+| Dirección de voces (actores reales) | ‹A CONFIRMAR› |
+| Motion capture | ‹A CONFIRMAR› |
+| Composición / integración | ‹A CONFIRMAR› |
 | Montaje | ‹A CONFIRMAR› |
+| Diseño de sonido | ‹A CONFIRMAR› |
 | Música | ‹A CONFIRMAR› |
-| Vestuario | ‹A CONFIRMAR› |
-| Casting | ‹A CONFIRMAR› |
 
-## 6. Reparto principal (personajes) 
+**Pipeline de IA generativa:**
+- Generación de imagen / diseño: **Flux · Nano Banana · Seedream**
+- Image-to-video / movimiento: **LTX · Kling · Seedance**
+- Lipsync de diálogo: **MultiTalk / InfiniteTalk** (plataforma propia)
+- Voces: **actores reales** · soporte de **motion capture** para movimiento/expresión
+- Edición, color y sonido: flujo **tradicional** sobre los planos generados
 
-| Personaje | Descripción | Intérprete |
-|-----------|-------------|------------|
+## 6. Personajes y voces
+
+> Personajes **animados con IA**; las **voces** las interpretan **actores reales** (con soporte de motion
+> capture para gesto/expresión en personajes clave).
+
+| Personaje | Descripción | Voz (actor/actriz) |
+|-----------|-------------|--------------------|
 | **Milton Bloch** | Científico de San Francisco, 45–55, protagonista. Premio Leopold Auenbrugger. | ‹A CONFIRMAR› |
 | **La Niña** | Figura enigmática que guía a Milton en la odisea; eco de su hija/sus hijos. | ‹A CONFIRMAR› |
 | **Rose** | Esposa de Milton. | ‹A CONFIRMAR› |

@@ -1,78 +1,87 @@
-# 05 · Propuesta de producción y cronograma
+# 05 · Propuesta de producción y cronograma (animación con IA)
 
-> Estructura **100 % uruguaya**. Cifras de jornadas, semanas y fechas en `‹BORRADOR›`: ajustar al plan real.
+> Estructura **100 % uruguaya**. Cifras de etapas y meses en `‹BORRADOR›`: ajustar al plan real.
 
 ## 1. Estrategia de producción
 
-El proyecto se concibe como una **producción nacional integral**, rodada y posproducida en **Uruguay** con
-**equipo técnico y artístico uruguayo**. La apuesta central es resolver con recursos locales tres mundos
-geográficos —**Viena**, un **bosque** indeterminado y **San Francisco**— apostando a la dirección de arte,
-la selección de locaciones y un uso preciso de la luz por sobre el viaje internacional. Esta decisión:
+El proyecto es un **largometraje de animación realizado íntegramente con un pipeline de IA generativa**,
+desarrollado y producido en **Uruguay** con **talento y servicios uruguayos**. No hay rodaje de imagen real
+ni construcción de sets físicos: los tres mundos del guion —**Viena**, un **bosque** indeterminado y **San
+Francisco**— se construyen como **locaciones generadas**, lo que elimina viajes, scouting y logística de
+rodaje y concentra el esfuerzo en **diseño, generación, dirección de voces y postproducción**.
 
-- **maximiza el gasto elegible en territorio uruguayo** (alineado al objetivo del PUA),
-- **capacita y da continuidad de trabajo** al equipo local, y
-- mantiene la película dentro de una **escala de autor financiable**.
+Esta metodología:
 
-> Nota: si más adelante el proyecto sumara socios extranjeros, podría migrar a una estructura de
-> coproducción; la presente carpeta asume producción 100 % nacional según lo definido.
+- **maximiza el gasto elegible en territorio uruguayo** (talento creativo y técnico local, infraestructura,
+  estudios de voz y motion capture, post),
+- **reduce drásticamente cronograma y costo** frente a la animación tradicional o la imagen real, y
+- posiciona a la productora en la **vanguardia técnica** del cine animado.
 
-## 2. Locaciones (Uruguay como set)
+> Las únicas instancias con presencia física son la **grabación de voces** (estudio) y las sesiones de
+> **motion capture**; todo lo demás es trabajo de pipeline digital.
 
-| Mundo del guion | Resolución de producción en Uruguay |
-|-----------------|--------------------------------------|
-| **Aeropuerto de Viena** | Terminal / hangar o set; señalética y vestuario para la atmósfera europea |
-| **Cementerio de Viena** | Cementerios monumentales de Montevideo (p. ej. Cementerio Central / del Buceo) ‹A CONFIRMAR› |
-| **Hotel de lujo (hab. 2623)** | Hotel histórico montevideano + set para la habitación y la pista de patinaje (vista por VFX/maqueta) |
-| **Teatro / gala** | Teatro a la europea (Teatro Solís u otro) ‹A CONFIRMAR› |
-| **Estudio de radio** | Estudio real o set |
-| **Calles / confitería / escuela de Viena** | Barrios de arquitectura europea de Montevideo (Ciudad Vieja, Cordón, Prado) |
-| **Avión (interior + caída)** | Set de fuselaje + efectos; exterior aéreo por VFX/segunda unidad |
-| **Bosque, caverna, lago, riacho, pradera** | **Interior del país**: montes nativos, quebradas, lagunas y sierras (Quebrada de los Cuervos, Valle del Lunarejo, sierras de Rocha/Lavalleja) ‹A CONFIRMAR› |
-| **Rancho / corral / campamento** | Establecimiento rural / estancia |
-| **San Francisco (calles empinadas, tienda, casa)** | Barrios con desniveles de Montevideo + dirección de arte; casa familiar en locación |
+## 2. "Locaciones" (generadas)
 
-La diversidad geográfica uruguaya (ciudad europea + campo + costa) permite construir los tres mundos sin
-salir del país, una fortaleza clásica de la producción nacional.
+| Mundo del guion | Resolución en el pipeline de IA |
+|-----------------|----------------------------------|
+| Aeropuerto, cementerio, hotel, teatro, radio, calles de **Viena** | Diseño de mundo "Viena" (style bible) + generación de planos con continuidad de paleta gris |
+| Interior de avión, caída, **bosque, caverna, lago, riacho, pradera** | Mundo "odisea": libertad generativa, atmósferas, agua/fuego/barro |
+| Calles, tienda y **casa de San Francisco** | Mundo "regreso": luz cálida, interiores domésticos |
 
 ## 3. Plan de trabajo (fases)
 
 | Fase | Duración estimada | Hitos |
 |------|-------------------|-------|
-| Desarrollo (en curso) | — | Guion finalizado; armado de financiación; scouting preliminar |
-| Preproducción | 10–12 semanas ‹BORRADOR› | Casting, locaciones, plan de rodaje, contrataciones, arte |
-| **Rodaje** | **6 semanas (≈ 30 jornadas)** ‹BORRADOR› | Bloque Viena (ciudad) · Bloque bosque/campo · Bloque San Francisco/casa |
-| Postproducción | 20–24 semanas ‹BORRADOR› | Montaje, sonido, música, VFX, corrección de color, DCP |
-| Entrega y estreno | — | Máster, materiales, estrategia de festivales (ver doc. 07) |
+| Desarrollo (en curso) | — | Guion finalizado; biblia visual; pruebas de pipeline; teaser/prueba de concepto |
+| Preproducción | 8–10 semanas ‹BORRADOR› | Diseño de personajes y mundos, storyboard, animática, casting de voces |
+| **Producción visual** | **20–28 semanas** ‹BORRADOR› | Generación de keyframes (Flux/Nano Banana/Seedream) e image-to-video (LTX/Kling/Seedance) por secuencia; supervisión e iteración |
+| Voces + motion capture | en paralelo, 4–6 semanas ‹BORRADOR› | Grabación de voces (actores reales); sesiones de mocap; lipsync (MultiTalk/InfiniteTalk) |
+| Composición e integración | en paralelo / 8–10 semanas ‹BORRADOR› | Continuidad, limpieza, integración de planos |
+| Postproducción | 12–16 semanas ‹BORRADOR› | Montaje tradicional, diseño de sonido, música, color, máster/DCP |
+| Entrega y estreno | — | Materiales, estrategia de festivales (ver doc. 07) |
 
-**Plazo total de ejecución estimado:** ~14 meses desde la firma del apoyo ‹BORRADOR› (verificar tope de las bases).
+**Plazo total de ejecución estimado:** ~12 meses desde la firma del apoyo ‹BORRADOR› (verificar tope de las bases).
 
 ## 4. Cronograma indicativo (Gantt simplificado) ‹BORRADOR›
 
 ```
-Mes        1  2  3  4  5  6  7  8  9 10 11 12 13 14
-Preprod.   ███████████
-Rodaje              ██████
-Montaje                ████████
-Sonido/Mús.               ███████
-VFX/Color                    ██████
-Entrega/DCP                        ███
+Mes              1  2  3  4  5  6  7  8  9 10 11 12
+Preprod./Diseño  ████
+Producción visual    ██████████
+Voces + Mocap        ████
+Lipsync                ████
+Composición             ███████
+Montaje                      █████
+Sonido/Música/Color            █████
+Entrega/Máster/DCP                 ██
 ```
 
-## 5. Equipo de producción ‹BORRADOR›
+## 5. Equipo (estructura ligera) ‹BORRADOR›
 
-- **Productor/a responsable:** ‹A CONFIRMAR›
-- **Producción ejecutiva:** ‹A CONFIRMAR›
+- **Dirección:** Federico Veiroj
+- **Producción ejecutiva:** Yves Fogel (VELIDER SAS / Souts)
 - **Dirección de producción:** ‹A CONFIRMAR›
-- **Jefatura de locaciones:** ‹A CONFIRMAR›
-- Estructura de equipo dimensionada para una producción de autor de escala media (ver presupuesto, doc. 06).
+- **Dirección de arte / diseño visual:** ‹A CONFIRMAR›
+- **Supervisión de pipeline IA + artistas de generación (imagen y video):** ‹A CONFIRMAR› (equipo reducido)
+- **Dirección de voces + casting de voz:** ‹A CONFIRMAR›
+- **Motion capture:** ‹A CONFIRMAR›
+- **Composición / integración:** ‹A CONFIRMAR›
+- **Montaje, sonido y música:** ‹A CONFIRMAR›
+
+> Estructura mucho más reducida que una producción de imagen real o de animación tradicional: el valor está
+> en la **dirección creativa, la curaduría y la supervisión** del material generado.
 
 ## 6. Consideraciones especiales
 
-- **Menor en rol protagónico (La Niña):** previsión de jornadas reducidas, tutoría, permisos y normativa
-  laboral de actuación infantil.
-- **Animales (caballo Bravo):** wrangler y protocolos de bienestar animal.
-- **Secuencias de intemperie (lluvia, barro, lago, caverna):** plan de contingencia climática, seguridad,
-  efectos especiales de lluvia, jornadas en exterior natural.
-- **Plurilingüismo:** coaching de idiomas (inglés/alemán/yiddish) y subtitulado.
-- **VFX puntuales:** caída del avión, vistas aéreas, pista de patinaje (estela naranja), integración de
-  cielos — alcance acotado, resuelto con casa de post local.
+- **Consistencia visual** a lo largo de ~100 min: principal riesgo de producción; se mitiga con biblia
+  visual, anclas de identidad/LoRAs y control de continuidad en composición (ver doc. 04).
+- **Voces y motion capture:** coordinación de actores reales; si participa un **menor** en la voz/mocap de la
+  Niña, prever normativa laboral de actuación infantil.
+- **Infraestructura de cómputo:** disponibilidad de GPU/servicios de generación; previsión de costos y
+  tiempos de render/iteración.
+- **Derechos y trazabilidad:** registrar herramientas, modelos y materiales usados; asegurar la
+  **titularidad** de los resultados y la cadena de derechos (ver doc. 09).
+- **Pipeline propio (Souts):** uso de la plataforma de la productora para lipsync/MultiTalk y orquestación,
+  como diferencial metodológico.
+
+> ⚠️ Verificar con ACAU/ICAU la admisibilidad y el encuadre de la obra generada con IA antes de postular.
