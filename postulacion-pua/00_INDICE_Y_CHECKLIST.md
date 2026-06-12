@@ -69,9 +69,10 @@
 
 | Campo | Valor |
 |-------|-------|
-| Convocatoria / año | ‹A CONFIRMAR — convocatoria vigente› |
-| Modalidad | Ventanilla abierta |
-| Fecha de postulación | ‹A CONFIRMAR› |
-| Monto solicitado al PUA | ‹BORRADOR› (ver doc. 06) |
-| Plazo de ejecución propuesto | ‹BORRADOR› (ver doc. 05) |
+| Convocatoria / año | PUA — Producción de Contenidos Audiovisuales · **Ventanilla abierta 2026** |
+| Modalidad | Ventanilla abierta (postular en la convocatoria vigente) |
+| Fecha de postulación | A presentar en la ventanilla abierta actual (2026) ‹confirmar disponibilidad de cupo› |
+| FONA e Ibermedia | **Postular al abrir** sus respectivas convocatorias (no son ventanilla permanente) |
+| Monto solicitado al PUA | USD 144.000 ‹BORRADOR› (ver doc. 06; sujeto a % y topes del cash rebate) |
+| Plazo de ejecución propuesto | 12 meses (ver doc. 05) |
 | Correo de consultas | pua.icau@mec.gub.uy |
