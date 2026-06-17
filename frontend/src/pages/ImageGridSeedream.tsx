@@ -29,6 +29,7 @@ export default function ImageGridSeedream({ comfyUrl }: Props) {
   const [inputImagePreview, setInputImagePreview] = useState<string>("");
   const [subjectCategory, setSubjectCategory] = useState<string>("person");
   const [appendedPrompt, setAppendedPrompt] = useState<string>("");
+  const [seed, setSeed] = useState<string>(""); // empty = random per generation
   const [status, setStatus] = useState<string>("");
   const [resultUrls, setResultUrls] = useState<string[]>([]);
   const [jobId, setJobId] = useState<string>("");
@@ -112,11 +113,14 @@ export default function ImageGridSeedream({ comfyUrl }: Props) {
       logger.startTiming("Step 3: Submit workflow to ComfyUI");
       const clientId = `image-grid-seedream-${Math.random().toString(36).slice(2)}`;
 
-      // Generate random seeds for each generation.
-      // ByteDanceSeedreamNode (node 97) caps seed at INT32 max (2147483647),
-      // so SEED_1 must stay within that range.
-      const seed1 = Math.floor(Math.random() * 2147483647);
-      const seed2 = Math.floor(Math.random() * 2147483647);
+      // Seeds. ByteDanceSeedreamNode (node 97) caps seed at INT32 max
+      // (2147483647), so SEED_1 must stay within that range. If the user
+      // provided a seed, use it (clamped); otherwise generate random seeds.
+      const SEED_MAX = 2147483647;
+      const manualSeed = seed.trim() !== "" ? Math.abs(parseInt(seed, 10)) : NaN;
+      const hasManualSeed = !Number.isNaN(manualSeed);
+      const seed1 = hasManualSeed ? Math.min(manualSeed, SEED_MAX) : Math.floor(Math.random() * SEED_MAX);
+      const seed2 = hasManualSeed ? Math.min(manualSeed, SEED_MAX) : Math.floor(Math.random() * SEED_MAX);
 
       const workflowResponse = await apiClient.submitWorkflow(
         'ImageGridSeedream',
@@ -153,7 +157,8 @@ export default function ImageGridSeedream({ comfyUrl }: Props) {
         project_id: selectedProject?.id || null,
         parameters: {
           subject_category: subjectCategory || 'other',
-          appended_prompt: appendedPrompt.trim() || ''
+          appended_prompt: appendedPrompt.trim() || '',
+          seed: seed1
         }
       }) as any;
 
@@ -396,6 +401,36 @@ export default function ImageGridSeedream({ comfyUrl }: Props) {
               />
               <p className="text-xs text-gray-500 mt-2">
                 Your text is added to the AI's prompt — it does not replace it. Leave blank to let the AI decide.
+              </p>
+            </Field>
+          </Section>
+
+          {/* Seed */}
+          <Section title="Seed">
+            <Field>
+              <Label>Seed (optional)</Label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="number"
+                  min={0}
+                  max={2147483647}
+                  value={seed}
+                  onChange={(e) => setSeed(e.target.value)}
+                  placeholder="Leave blank for a random seed"
+                  className="flex-1 rounded-2xl border-2 border-gray-200 dark:border-dark-border-primary px-4 py-3 text-gray-800 dark:text-dark-text-primary focus:border-rose-500 focus:ring-4 focus:ring-rose-100 dark:focus:ring-rose-900/30 transition-all duration-200 bg-white/80 dark:bg-dark-surface-secondary"
+                />
+                <button
+                  type="button"
+                  onClick={() => setSeed(String(Math.floor(Math.random() * 2147483647)))}
+                  className="px-4 py-3 rounded-2xl border-2 border-gray-300 dark:border-dark-border-primary bg-white dark:bg-dark-surface-secondary hover:bg-gray-50 text-gray-700 dark:text-dark-text-primary font-semibold shadow-sm hover:shadow-md transition-all duration-200 flex items-center gap-2 whitespace-nowrap"
+                  title="Generate a random seed"
+                >
+                  <span>🎲</span>
+                  Random
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Use the same seed to reproduce a result. Leave blank to get a new random seed each time (max 2,147,483,647).
               </p>
             </Field>
           </Section>

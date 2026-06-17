@@ -28,6 +28,7 @@ export default function ImageGrid({ comfyUrl }: Props) {
   const [inputImage, setInputImage] = useState<File | null>(null);
   const [inputImagePreview, setInputImagePreview] = useState<string>("");
   const [subjectCategory, setSubjectCategory] = useState<string>("person");
+  const [seed, setSeed] = useState<string>(""); // empty = random per generation
   const [status, setStatus] = useState<string>("");
   const [resultUrls, setResultUrls] = useState<string[]>([]);
   const [jobId, setJobId] = useState<string>("");
@@ -108,9 +109,11 @@ export default function ImageGrid({ comfyUrl }: Props) {
       logger.startTiming("Step 3: Submit workflow to ComfyUI");
       const clientId = `image-grid-${Math.random().toString(36).slice(2)}`;
 
-      // Generate random seeds for each generation
-      const seed1 = Math.floor(Math.random() * 1000000000000);
-      const seed2 = Math.floor(Math.random() * 1000000000000);
+      // Seeds. If the user provided a seed, use it; otherwise generate random.
+      const manualSeed = seed.trim() !== "" ? Math.abs(parseInt(seed, 10)) : NaN;
+      const hasManualSeed = !Number.isNaN(manualSeed);
+      const seed1 = hasManualSeed ? manualSeed : Math.floor(Math.random() * 1000000000000);
+      const seed2 = hasManualSeed ? manualSeed : Math.floor(Math.random() * 1000000000000);
 
       const workflowResponse = await apiClient.submitWorkflow(
         'ImageGrid',
@@ -145,7 +148,8 @@ export default function ImageGrid({ comfyUrl }: Props) {
         input_image_urls: [inputImagePreview],
         project_id: selectedProject?.id || null,
         parameters: {
-          subject_category: subjectCategory || 'other'
+          subject_category: subjectCategory || 'other',
+          seed: seed1
         }
       }) as any;
 
@@ -371,6 +375,35 @@ export default function ImageGrid({ comfyUrl }: Props) {
               <p className="text-xs text-gray-500 mt-2">
                 This helps the AI understand the context for generating appropriate variations.
                 Select "Other" to let the AI decide based on the image.
+              </p>
+            </Field>
+          </Section>
+
+          {/* Seed */}
+          <Section title="Seed">
+            <Field>
+              <Label>Seed (optional)</Label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="number"
+                  min={0}
+                  value={seed}
+                  onChange={(e) => setSeed(e.target.value)}
+                  placeholder="Leave blank for a random seed"
+                  className="flex-1 rounded-2xl border-2 border-gray-200 dark:border-dark-border-primary px-4 py-3 text-gray-800 dark:text-dark-text-primary focus:border-teal-500 focus:ring-4 focus:ring-teal-100 dark:focus:ring-teal-900/30 transition-all duration-200 bg-white/80 dark:bg-dark-surface-secondary"
+                />
+                <button
+                  type="button"
+                  onClick={() => setSeed(String(Math.floor(Math.random() * 1000000000000)))}
+                  className="px-4 py-3 rounded-2xl border-2 border-gray-300 dark:border-dark-border-primary bg-white dark:bg-dark-surface-secondary hover:bg-gray-50 text-gray-700 dark:text-dark-text-primary font-semibold shadow-sm hover:shadow-md transition-all duration-200 flex items-center gap-2 whitespace-nowrap"
+                  title="Generate a random seed"
+                >
+                  <span>🎲</span>
+                  Random
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Use the same seed to reproduce a result. Leave blank to get a new random seed each time.
               </p>
             </Field>
           </Section>
