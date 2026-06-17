@@ -112,9 +112,11 @@ export default function ImageGridSeedream({ comfyUrl }: Props) {
       logger.startTiming("Step 3: Submit workflow to ComfyUI");
       const clientId = `image-grid-seedream-${Math.random().toString(36).slice(2)}`;
 
-      // Generate random seeds for each generation
-      const seed1 = Math.floor(Math.random() * 1000000000000);
-      const seed2 = Math.floor(Math.random() * 1000000000000);
+      // Generate random seeds for each generation.
+      // ByteDanceSeedreamNode (node 97) caps seed at INT32 max (2147483647),
+      // so SEED_1 must stay within that range.
+      const seed1 = Math.floor(Math.random() * 2147483647);
+      const seed2 = Math.floor(Math.random() * 2147483647);
 
       const workflowResponse = await apiClient.submitWorkflow(
         'ImageGridSeedream',
