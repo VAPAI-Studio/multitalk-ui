@@ -1,4 +1,7 @@
 fastapi>=0.104.1
+# Pin below 1.0: starlette 1.0 requires httpx2 for TestClient, which breaks
+# fastapi.testclient import (and thus the test suite / deploys).
+starlette<1.0
 uvicorn[standard]>=0.24.0
 gunicorn>=21.2.0
 pydantic>=2.5.1
