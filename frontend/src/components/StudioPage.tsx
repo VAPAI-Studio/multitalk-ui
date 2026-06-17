@@ -12,6 +12,7 @@ import CameraAngle from '../pages/CameraAngle';
 import StyleTransfer from '../pages/StyleTransfer';
 import CreateImage from '../pages/CreateImage';
 import ImageGrid from '../pages/ImageGrid';
+import ImageGridSeedream from '../pages/ImageGridSeedream';
 import WANI2V from '../pages/WANI2V';
 import WANMove from '../pages/WANMove';
 import LTX23VideoGen from '../pages/LTX23VideoGen';
@@ -40,6 +41,7 @@ const appComponents: Record<string, React.ComponentType<{ comfyUrl: string }> | 
   'style-transfer': StyleTransfer,
   'create-image': CreateImage,
   'image-grid': ImageGrid,
+  'image-grid-seedream': ImageGridSeedream,
   'wan-i2v': WANI2V,
   'wan-move': WANMove,
   'ltx23-video': LTX23VideoGen,

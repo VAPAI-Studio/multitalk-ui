@@ -112,6 +112,14 @@ export const studios: StudioConfig[] = [
         description: 'Generate a 3×3 grid of unique image variations from a single reference. Perfect for product photography and creative exploration.',
         features: ['9 unique angles', 'Subject-aware prompts', 'Model: Gemini Pro Image']
       },
+      {
+        id: 'image-grid-seedream',
+        title: 'Image Grid Seedream',
+        icon: '🌅',
+        gradient: 'from-rose-500 to-orange-600',
+        description: 'Generate a 3×3 grid of unique image variations from a single reference using ByteDance Seedream. Add your own prompt to steer the variations.',
+        features: ['9 unique angles', 'Custom prompt steering', 'Model: ByteDance Seedream 4.5']
+      },
     ]
   },
   {
